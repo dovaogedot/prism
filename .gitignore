@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+.env
+.env.local
+
+media/
+!media/.gitkeep
+
+.DS_Store
+*.log

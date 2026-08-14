@@ -1,0 +1,114 @@
+name: hue-and-cry
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: hue
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hue}
+      POSTGRES_DB: hue
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # -d matters: the socket accepts connections before initdb has finished
+      # creating the database, so checking the socket alone reports ready early.
+      test: ["CMD-SHELL", "pg_isready -U hue -d hue"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  mailpit:
+    image: axllent/mailpit:v1.28
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    ports:
+      # Password-reset emails land here — this is the inbox a reviewer opens.
+      - "8025:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # One-shot: applies migrations, then seeds the catalogue. The api waits for
+  # this to exit 0, so it never serves a request against a half-built schema.
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: ["sh", "-c", "node src/db/migrate.ts && node src/db/seed.ts"]
+    environment:
+      DATABASE_URL: postgres://hue:${POSTGRES_PASSWORD:-hue}@postgres:5432/hue
+      MEDIA_DIR: /srv/media
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+    volumes:
+      - media:/srv/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PORT: 8080
+      DATABASE_URL: postgres://hue:${POSTGRES_PASSWORD:-hue}@postgres:5432/hue
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      MEDIA_DIR: /srv/media
+      CAPTCHA_MODE: ${CAPTCHA_MODE:-test}
+      RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}
+      OAUTH_MODE: ${OAUTH_MODE:-mock}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+    volumes:
+      - media:/srv/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8080/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_CAPTCHA_MODE: ${CAPTCHA_MODE:-test}
+        VITE_RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres-data:
+  media:
