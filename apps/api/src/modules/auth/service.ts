@@ -111,6 +111,11 @@ export type AuthService = Readonly<{
 
   requestPasswordReset: (email: string) => ResultAsync<void, DomainError>;
 
+  setPassword: (input: {
+    userId: string;
+    password: string;
+  }) => ResultAsync<SessionUser, DomainError>;
+
   resetPassword: (input: {
     token: string;
     password: string;
@@ -378,6 +383,37 @@ export const createAuthService = (deps: AuthDependencies): AuthService => {
           );
         }),
       ),
+
+    /**
+     * Adds a password to an account that has none — one created through a
+     * provider, which until now could only sign in that way.
+     *
+     * The authenticated session is the authorization: there is no current
+     * password to confirm. An account that already has one is refused rather
+     * than overwritten, because that request needs the old password or a
+     * mailed token to prove it is the owner and not a stolen session.
+     */
+    setPassword: ({ userId, password }) =>
+      ResultAsync.fromSafePromise(repository.findUserById(userId)).andThen((found) => {
+        if (Option.isNone(found)) {
+          return errAsync<SessionUser, DomainError>({ _tag: "Unauthenticated" });
+        }
+
+        if (Option.isSome(found.value.passwordHash)) {
+          return errAsync<SessionUser, DomainError>({ _tag: "PasswordAlreadySet" });
+        }
+
+        return ResultAsync.fromSafePromise(
+          hasher.hash(password).then(async (passwordHash) => {
+            await repository.setPasswordHash(userId, passwordHash);
+            // Sessions stay: nothing was compromised, an option was added.
+            return toSessionUser({
+              ...found.value,
+              passwordHash: Option.some(passwordHash),
+            });
+          }),
+        );
+      }),
 
     resetPassword: ({ token, password }) =>
       ResultAsync.fromSafePromise(

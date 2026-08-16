@@ -70,6 +70,15 @@ export const resetPasswordSchema = z.object({
   password: passwordSchema,
 });
 
+/**
+ * Adding a password to an account that signed up through a provider. There is
+ * no current password to confirm, because there is no current password — the
+ * authenticated session is the proof.
+ */
+export const setPasswordSchema = z.object({
+  password: passwordSchema,
+});
+
 export const enableTwoFactorSchema = z.object({
   code: totpCodeSchema,
 });
@@ -83,6 +92,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type TwoFactorLoginInput = z.infer<typeof twoFactorLoginSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type SetPasswordInput = z.infer<typeof setPasswordSchema>;
 export type EnableTwoFactorInput = z.infer<typeof enableTwoFactorSchema>;
 export type DisableTwoFactorInput = z.infer<typeof disableTwoFactorSchema>;
 

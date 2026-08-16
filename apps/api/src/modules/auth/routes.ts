@@ -13,6 +13,7 @@ import {
   oauthProviderSchema,
   registerSchema,
   resetPasswordSchema,
+  setPasswordSchema,
   twoFactorLoginSchema,
   Option,
 } from "@prism/shared";
@@ -307,6 +308,34 @@ export const registerAuthRoutes = (
       }
 
       const result = await service.beginTwoFactorSetup(user.value.id);
+
+      return result.isErr()
+        ? sendDomainError(reply, result.error)
+        : reply.status(200).send(result.value);
+    },
+  );
+
+  routes.post(
+    "/password",
+    {
+      preHandler: guards.requireUser,
+      config: STRICT_RATE_LIMIT,
+      schema: {
+        tags: ["auth"],
+        summary: "Add a password to an account that signed up through a provider.",
+        body: setPasswordSchema,
+      },
+    },
+    async (request, reply) => {
+      const user = request.authenticated;
+      if (Option.isNone(user)) {
+        return sendDomainError(reply, { _tag: "Unauthenticated" });
+      }
+
+      const result = await service.setPassword({
+        userId: user.value.id,
+        password: request.body.password,
+      });
 
       return result.isErr()
         ? sendDomainError(reply, result.error)

@@ -10,14 +10,33 @@ import { AuthShell } from "../components/AuthShell.tsx";
 import { describeFailure } from "../components/error-message.tsx";
 import { tokenStore } from "../token-store.ts";
 
+/** The token React Router was handed, or "" when this page was opened cold. */
+const readChallengeToken = (): string =>
+  typeof history.state === "object" &&
+  history.state !== null &&
+  "usr" in history.state &&
+  typeof history.state.usr === "object" &&
+  history.state.usr !== null &&
+  "challengeToken" in history.state.usr &&
+  typeof history.state.usr.challengeToken === "string"
+    ? history.state.usr.challengeToken
+    : "";
+
 export const TwoFactorPage = () => {
   const navigate = useNavigate();
   const [failure, setFailure] = useState<Option<ReactNode>>(Option.none);
 
-  // Carried in navigation state rather than the URL: a challenge token in the
-  // address bar ends up in history and in any referrer header.
-  const challengeToken =
-    typeof history.state === "object" &&
+  /**
+   * Carried in navigation state rather than the URL: a challenge token in the
+   * address bar ends up in history and in any referrer header.
+   *
+   * Read once, at mount. Reading it every render means reading it again while
+   * a navigation is in flight — history has moved on by then, the token comes
+   * back empty, and the page renders "this needs a sign-in first" at the exact
+   * moment the sign-in succeeded. The token for this attempt cannot change
+   * under the component anyway.
+   */
+  const [challengeToken] = useState(readChallengeToken);
     history.state !== null &&
     "usr" in history.state &&
     typeof history.state.usr === "object" &&

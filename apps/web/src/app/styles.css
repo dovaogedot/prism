@@ -164,7 +164,12 @@
     display: block;
   }
 
+  /*
+   * Not themed. A scanner expects dark modules on a light ground, and plenty
+   * of them refuse an inverted code outright — so this one stays black on
+   * white in dark mode too.
+   */
   .qr svg path {
-    fill: var(--color-ink);
+    fill: #000;
   }
 }

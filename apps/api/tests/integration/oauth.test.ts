@@ -240,6 +240,90 @@ describe("an account with more than one provider", () => {
   });
 });
 
+describe("adding a password to a provider account", () => {
+  const setPassword = async (accessToken: string, password: string) =>
+    harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/password",
+      headers: { authorization: `Bearer ${accessToken}` },
+      payload: { password },
+    });
+
+  /** Signs in through a provider and returns a usable access token. */
+  const tokenFor = async (email: string): Promise<string> => {
+    const { refreshToken } = await signInWith("google", email);
+    const grant = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/refresh",
+      cookies: { hue_refresh: refreshToken },
+    });
+    return String(jsonOf(grant)["accessToken"]);
+  };
+
+  it("lets an account with no password set one", async () => {
+    const token = await tokenFor("adds-password@example.com");
+    const response = await setPassword(token, VALID_PASSWORD);
+
+    expect(response.statusCode).toBe(200);
+    expect(jsonOf(response)).toMatchObject({
+      hasPassword: true,
+      providers: ["google"],
+    });
+  });
+
+  it("makes email sign-in work afterwards", async () => {
+    const token = await tokenFor("then-logs-in@example.com");
+    await setPassword(token, VALID_PASSWORD);
+
+    const login = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      payload: { email: "then-logs-in@example.com", password: VALID_PASSWORD },
+    });
+
+    expect(jsonOf(login)["status"]).toBe("authenticated");
+  });
+
+  it("keeps the provider working too", async () => {
+    const token = await tokenFor("keeps-provider@example.com");
+    await setPassword(token, VALID_PASSWORD);
+
+    const { callback } = await signInWith("google", "keeps-provider@example.com");
+    const users = await harness.database
+      .sql`SELECT id FROM app_user WHERE email = 'keeps-provider@example.com'`;
+
+    expect(callback.statusCode).toBe(302);
+    expect(users).toHaveLength(1);
+  });
+
+  it("refuses to overwrite a password that already exists", async () => {
+    // A stolen session must not be able to change the password: that needs the
+    // old one, or a token mailed to the address.
+    const token = await tokenFor("has-password@example.com");
+    await setPassword(token, VALID_PASSWORD);
+
+    const second = await setPassword(token, `${VALID_PASSWORD}-again`);
+
+    expect(second.statusCode).toBe(409);
+    expect(jsonOf(second)["error"]).toMatchObject({ code: "PasswordAlreadySet" });
+  });
+
+  it("rejects a weak password", async () => {
+    const token = await tokenFor("weak@example.com");
+    expect((await setPassword(token, "password")).statusCode).toBe(422);
+  });
+
+  it("refuses an unauthenticated caller", async () => {
+    const response = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/password",
+      payload: { password: VALID_PASSWORD },
+    });
+
+    expect(response.statusCode).toBe(401);
+  });
+});
+
 describe("provider isolation", () => {
   it("refuses a code minted for another provider", async () => {
     const begin = await harness.app.inject({

@@ -10,13 +10,14 @@ import {
   enableTwoFactorSchema,
   messageOf,
   Option,
+  setPasswordSchema,
   type SessionUser,
   type TwoFactorSetup,
 } from "@prism/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
-import { Navigate } from "react-router";
+import { Link, Navigate } from "react-router";
 import { match } from "ts-pattern";
 import { api, toApiFailure } from "../../../shared/api/client.ts";
 import { useSession } from "../session.ts";
@@ -91,9 +92,10 @@ const TwoFactorSetupFlow = ({ onDone }: Readonly<{ onDone: () => void }>) => {
 
             <div className="flex flex-col items-start gap-4 sm:flex-row">
               <div
-                className="qr w-40 shrink-0 rounded-lg border border-line bg-surface p-3"
-                // The QR is server-generated SVG with a transparent background,
-                // so it inherits the page theme. It contains no user input.
+                className="qr w-40 shrink-0 rounded-lg border border-line bg-white p-3"
+                // Server-generated SVG with a transparent background, black
+                // paths, on white — see the note in styles.css. It contains no
+                // user input.
                 dangerouslySetInnerHTML={{ __html: value.qrCodeSvg }}
               />
 
@@ -172,6 +174,60 @@ const TwoFactorDisableFlow = ({ onDone }: Readonly<{ onDone: () => void }>) => {
 
       <Button type="submit" tone="danger" busy={form.formState.isSubmitting}>
         Turn off two-factor
+      </Button>
+    </form>
+  );
+};
+
+/**
+ * Adding a password to a provider-only account, so it gains email sign-in
+ * without losing the provider. There is no current-password field because
+ * there is no current password — the session is the authorization.
+ */
+const SetPasswordFlow = ({ onDone }: Readonly<{ onDone: () => void }>) => {
+  const [failure, setFailure] = useState<Option<string>>(Option.none);
+
+  const form = useForm({
+    resolver: zodResolver(setPasswordSchema),
+    defaultValues: { password: "" },
+  });
+
+  const submit = form.handleSubmit(async (values) => {
+    setFailure(Option.none);
+
+    await api
+      .post<SessionUser>("/auth/password", values)
+      .then((user) => {
+        tokenStore.updateUser(user);
+        form.reset();
+        onDone();
+      })
+      .catch((reason: unknown) => setFailure(Option.some(describe(reason))));
+  });
+
+  return (
+    <form onSubmit={(event) => void submit(event)} className="space-y-3" noValidate>
+      {match(failure)
+        .with({ _tag: "Some" }, ({ value }) => <Alert>{value}</Alert>)
+        .with({ _tag: "None" }, () => null)
+        .exhaustive()}
+
+      <p className="text-sm text-ink-soft">
+        You signed up through a provider, so this account has no password. Add
+        one and you can sign in with your email as well — the provider keeps
+        working either way.
+      </p>
+
+      <Field
+        label="New password"
+        type="password"
+        autoComplete="new-password"
+        error={form.formState.errors.password?.message}
+        {...form.register("password")}
+      />
+
+      <Button type="submit" busy={form.formState.isSubmitting}>
+        Set a password
       </Button>
     </form>
   );
@@ -260,14 +316,30 @@ export const AccountPage = () => {
               .exhaustive()}
           </ul>
 
+        </Card>
+
+        <Card className="p-5">
+          <h2 className="mb-3 font-semibold text-ink">Password</h2>
+
           {match(value.hasPassword)
-            .with(false, () => (
-              <p className="mt-2 text-xs text-ink-faint">
-                No password is set on this account, so password sign-in and
-                password reset do not apply to it.
+            .with(true, () => (
+              <p className="text-sm text-ink-soft">
+                A password is set. To change it, sign out and use the{" "}
+                <Link to="/forgot-password" className="text-accent hover:underline">
+                  reset link
+                </Link>{" "}
+                — changing it needs proof beyond a signed-in session.
               </p>
             ))
-            .with(true, () => null)
+            .with(false, () => (
+              <SetPasswordFlow
+                onDone={() =>
+                  setNotice(
+                    Option.some("Password set. You can now sign in with your email."),
+                  )
+                }
+              />
+            ))
             .exhaustive()}
         </Card>
       </div>
