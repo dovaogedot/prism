@@ -1,18 +1,18 @@
-name: hue-and-cry
+name: prism
 
 services:
   postgres:
     image: postgres:18-alpine
     environment:
-      POSTGRES_USER: hue
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hue}
-      POSTGRES_DB: hue
+      POSTGRES_USER: prism
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-prism}
+      POSTGRES_DB: prism
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
       # -d matters: the socket accepts connections before initdb has finished
       # creating the database, so checking the socket alone reports ready early.
-      test: ["CMD-SHELL", "pg_isready -U hue -d hue"]
+      test: ["CMD-SHELL", "pg_isready -U prism -d prism"]
       interval: 3s
       timeout: 3s
       retries: 30
@@ -32,7 +32,7 @@ services:
       timeout: 3s
       retries: 20
 
-  # One-shot: applies migrations, then seeds the catalogue. The api waits for
+  # One-shot: applies migrations, then seeds the catalog. The api waits for
   # this to exit 0, so it never serves a request against a half-built schema.
   migrate:
     build:
@@ -40,7 +40,7 @@ services:
       dockerfile: apps/api/Dockerfile
     command: ["sh", "-c", "node src/db/migrate.ts && node src/db/seed.ts"]
     environment:
-      DATABASE_URL: postgres://hue:${POSTGRES_PASSWORD:-hue}@postgres:5432/hue
+      DATABASE_URL: postgres://prism:${POSTGRES_PASSWORD:-prism}@postgres:5432/prism
       MEDIA_DIR: /srv/media
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
     volumes:
@@ -58,7 +58,7 @@ services:
       NODE_ENV: production
       LOG_LEVEL: ${LOG_LEVEL:-info}
       PORT: 8080
-      DATABASE_URL: postgres://hue:${POSTGRES_PASSWORD:-hue}@postgres:5432/hue
+      DATABASE_URL: postgres://prism:${POSTGRES_PASSWORD:-prism}@postgres:5432/prism
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       SMTP_HOST: mailpit

@@ -1,31 +1,32 @@
-export type { Brand } from "./brand.ts";
+export type { Brand } from "./fp/brand.ts";
 
-export { Option } from "./option.ts";
-export type { Some, None } from "./option.ts";
+export { Option } from "./fp/option.ts";
+export type { Some, None } from "./fp/option.ts";
 
 export {
   roundTo,
   gramsToOunces,
-  gramsToPounds,
-  millimetresToInches,
+  metersToFeet,
+  kelvinToCelsius,
+  kelvinToFahrenheit,
   toImperial,
   measure,
-} from "./units.ts";
+} from "./domain/units.ts";
 export type {
   MetricMeasurements,
   ImperialMeasurements,
   Measurements,
-} from "./units.ts";
+} from "./domain/units.ts";
 
 export {
   parseHex,
-  isHexColour,
+  isHexColor,
   toRgb,
   relativeLuminance,
   contrastRatio,
   readableInkOn,
-} from "./colour.ts";
-export type { HexColour, Rgb, Ink } from "./colour.ts";
+} from "./domain/color.ts";
+export type { HexColor, Rgb, Ink } from "./domain/color.ts";
 
 export {
   CURRENCY,
@@ -33,8 +34,8 @@ export {
   parseCents,
   formatAmount,
   formatPrice,
-} from "./money.ts";
-export type { Cents } from "./money.ts";
+} from "./domain/money.ts";
+export type { Cents } from "./domain/money.ts";
 
 export {
   httpStatusByTag,
@@ -43,14 +44,15 @@ export {
   messageOf,
   TAGLESS_ERRORS,
   toErrorResponse,
-} from "./error.ts";
+} from "./domain/errors.ts";
 export type {
   DomainError,
   DomainErrorTag,
   TaglessDomainErrorTag,
   ValidationIssue,
   ErrorResponse,
-} from "./error.ts";
+} from "./domain/errors.ts";
 
 export * from "./contracts/auth.ts";
 export * from "./contracts/catalog.ts";
+export * from "./contracts/tags.ts";

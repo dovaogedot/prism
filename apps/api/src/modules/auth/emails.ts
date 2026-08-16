@@ -15,9 +15,9 @@ export const passwordResetEmail = (input: {
   expiresInMinutes: number;
 }): Email => ({
   to: input.to,
-  subject: "Reset your Hue & Cry password",
+  subject: "Reset your Prism password",
   text: [
-    "Someone asked to reset the password on this Hue & Cry account.",
+    "Someone asked to reset the password on this Prism account.",
     "",
     `Open this link to choose a new one (it expires in ${input.expiresInMinutes} minutes):`,
     input.resetUrl,
@@ -28,7 +28,7 @@ export const passwordResetEmail = (input: {
 <html lang="en">
   <body style="margin:0;padding:32px;background:#f8fafc;font-family:ui-sans-serif,system-ui,sans-serif;color:#0f172a">
     <div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px;border:1px solid #e2e8f0">
-      <p style="margin:0 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#64748b">Hue &amp; Cry</p>
+      <p style="margin:0 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#64748b">Prism</p>
       <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3">Reset your password</h1>
       <p style="margin:0 0 24px;line-height:1.6;color:#334155">
         Someone asked to reset the password on this account. Choose a new one below —

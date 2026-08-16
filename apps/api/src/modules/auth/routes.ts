@@ -15,7 +15,7 @@ import {
   resetPasswordSchema,
   twoFactorLoginSchema,
   Option,
-} from "@hue/shared";
+} from "@prism/shared";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
@@ -30,7 +30,7 @@ import {
 } from "../../http/cookies.ts";
 import { sendDomainError } from "../../http/errors.ts";
 import type { createGuards } from "../../http/guard.ts";
-import { issueMockAuthorisationCode } from "../../platform/oauth.ts";
+import { issueMockAuthorizationCode } from "../../platform/oauth.ts";
 import type { AuthService, IssuedSession, RequestContext } from "./service.ts";
 import { renderMockConsentPage } from "./mock-consent.ts";
 
@@ -405,7 +405,7 @@ export const registerAuthRoutes = (
       },
     },
     async (request, reply) => {
-      const result = await service.oauthAuthorisationUrl({
+      const result = await service.oauthAuthorizationUrl({
         provider: request.params.provider,
         redirectUri: callbackUriFor(request.params.provider),
       });
@@ -426,7 +426,7 @@ export const registerAuthRoutes = (
       config: MODERATE_RATE_LIMIT,
       schema: {
         tags: ["auth"],
-        summary: "The provider redirects here with an authorisation code.",
+        summary: "The provider redirects here with an authorization code.",
         params: providerParamsSchema,
         querystring: z.object({
           code: z.string().min(1).max(2048),
@@ -518,7 +518,7 @@ export const registerAuthRoutes = (
         },
       },
       async (request, reply) => {
-        const code = issueMockAuthorisationCode(
+        const code = issueMockAuthorizationCode(
           request.params.provider,
           request.body.email,
           secret,

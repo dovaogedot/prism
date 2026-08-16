@@ -3,11 +3,11 @@
  *
  * This exists so the OAuth requirement can be demonstrated on a machine with
  * no Google account and no internet. Everything around it is real — the
- * redirect, the `state` check, the authorisation-code exchange, the account
+ * redirect, the `state` check, the authorization-code exchange, the account
  * link. Only the party asserting "yes, this is who they are" is local.
  */
 
-import { OAUTH_PROVIDER_LABELS, type OAuthProviderName } from "@hue/shared";
+import { OAUTH_PROVIDER_LABELS, type OAuthProviderName } from "@prism/shared";
 
 const escapeHtml = (value: string): string =>
   value

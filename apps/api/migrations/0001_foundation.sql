@@ -1,4 +1,4 @@
--- Extensions, enum types, and the colour maths.
+-- Extensions, enum types, and the color maths.
 --
 -- Hue, saturation and lightness are properties OF a hex value, not independent
 -- facts, so the application never computes or writes them. These IMMUTABLE
@@ -21,7 +21,7 @@ AS $$
   SELECT (('x' || substr(hex, channel_offset, 2))::bit(8)::int) / 255.0;
 $$;
 
--- Hue in degrees, 0..359. Achromatic colours report 0.
+-- Hue in degrees, 0..359. Achromatic colors report 0.
 CREATE FUNCTION hex_to_hue(hex text)
 RETURNS smallint
 LANGUAGE plpgsql

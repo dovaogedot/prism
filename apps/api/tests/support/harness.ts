@@ -8,7 +8,7 @@
  * the hasher (so argon2 does not dominate the runtime).
  *
  * Requests go through `app.inject`, which exercises the full Fastify pipeline
- * — routing, schema validation, guards, serialisation — without a socket.
+ * — routing, schema validation, guards, serialization — without a socket.
  */
 
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
@@ -64,14 +64,14 @@ export const testEnvironment = (
   DATABASE_POOL_SIZE: 5,
   PUBLIC_WEB_URL: "http://localhost:3000",
   JWT_SECRET: "test-secret-that-is-at-least-32-characters-long",
-  JWT_ISSUER: "hue-and-cry",
+  JWT_ISSUER: "prism",
   ACCESS_TOKEN_TTL_SECONDS: 900,
   REFRESH_TOKEN_TTL_SECONDS: 604800,
   TWO_FACTOR_CHALLENGE_TTL_SECONDS: 300,
   PASSWORD_RESET_TTL_SECONDS: 1800,
   SMTP_HOST: "unused",
   SMTP_PORT: 1025,
-  MAIL_FROM: "Hue & Cry <noreply@hueandcry.test>",
+  MAIL_FROM: "Prism <noreply@prism.test>",
   CAPTCHA_MODE: "test" as const,
   RECAPTCHA_SECRET_KEY: "",
   OAUTH_MODE: "mock" as const,
@@ -80,7 +80,7 @@ export const testEnvironment = (
   GITHUB_CLIENT_ID: "",
   GITHUB_CLIENT_SECRET: "",
   // Effectively off by default. The limiter keys on the client address and
-  // has no idea a new test started, so a realistic budget would exhaust
+  // has no idea a new test started, so a realiztic budget would exhaust
   // itself a few tests in and turn every later assertion into a 429. The
   // tests that exercise throttling build their own app with a low budget.
   AUTH_RATE_LIMIT_PER_MINUTE: authRateLimitPerMinute,
@@ -210,10 +210,10 @@ export const registerUser = async (
   };
 };
 
-/** Seeds a minimal catalogue: one category, one brand, and the given colours. */
-export const seedCatalogue = async (
+/** Seeds a minimal catalog: one category, one brand, and the given colors. */
+export const seedCatalog = async (
   harness: Harness,
-  colours: readonly Readonly<{
+  colors: readonly Readonly<{
     slug: string;
     name: string;
     hex: string;
@@ -226,16 +226,15 @@ export const seedCatalogue = async (
   await sql`INSERT INTO category (slug, name) VALUES ('reds', 'Reds')`;
   await sql`INSERT INTO brand (slug, name) VALUES ('chroma-labs', 'Chroma Labs')`;
 
-  for (const colour of colours) {
+  for (const color of colors) {
     await sql`
       INSERT INTO product (
         slug, name, description, price_cents, stock_quantity,
-        category_id, brand_id, hex, finish,
-        weight_grams, length_mm, width_mm, height_mm
+        category_id, brand_id, hex, finish
       )
-      SELECT ${colour.slug}, ${colour.name}, ${`${colour.name} description`},
-             ${colour.priceCents}, 10, c.id, b.id, ${colour.hex},
-             ${colour.finish ?? "matte"}::product_finish, 120, 30, 30, 90
+      SELECT ${color.slug}, ${color.name}, ${`${color.name} description`},
+             ${color.priceCents}, 10, c.id, b.id, ${color.hex},
+             ${color.finish ?? "matte"}::product_finish
       FROM category c, brand b
       WHERE c.slug = 'reds' AND b.slug = 'chroma-labs'
     `;

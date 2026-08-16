@@ -1,5 +1,5 @@
 /**
- * HTTP surface for the catalogue.
+ * HTTP surface for the catalog.
  *
  * The read endpoints are public and cacheable; the one write endpoint is
  * behind the admin guard.
@@ -9,7 +9,7 @@ import {
   productQueryParamsSchema,
   suggestQueryParamsSchema,
   toProductQuery,
-} from "@hue/shared";
+} from "@prism/shared";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
@@ -46,7 +46,7 @@ export const registerCatalogRoutes = (
     "/categories",
     {
       schema: {
-        tags: ["catalogue"],
+        tags: ["catalog"],
         summary: "The category tree, with a product count for each subtree.",
       },
     },
@@ -63,9 +63,9 @@ export const registerCatalogRoutes = (
     "/products",
     {
       schema: {
-        tags: ["catalogue"],
+        tags: ["catalog"],
         summary:
-          "Search, filter, sort and page the catalogue. Returns facet counts alongside the results.",
+          "Search, filter, sort and page the catalog. Returns facet counts alongside the results.",
         querystring: productQueryParamsSchema,
       },
     },
@@ -82,7 +82,7 @@ export const registerCatalogRoutes = (
     "/products/suggest",
     {
       schema: {
-        tags: ["catalogue"],
+        tags: ["catalog"],
         summary: "Typeahead suggestions for the search box.",
         querystring: suggestQueryParamsSchema,
       },
@@ -100,8 +100,8 @@ export const registerCatalogRoutes = (
     "/products/:slug",
     {
       schema: {
-        tags: ["catalogue"],
-        summary: "One colour, with its measurements in both unit systems.",
+        tags: ["catalog"],
+        summary: "One color, with its measurements in both unit systems.",
         params: slugParamsSchema,
       },
     },
@@ -121,7 +121,7 @@ export const registerCatalogRoutes = (
     {
       preHandler: guards.requireAdmin,
       schema: {
-        tags: ["catalogue"],
+        tags: ["catalog"],
         summary:
           "Upload a swatch image. The file type is decided by its magic bytes, not its name.",
         params: slugParamsSchema,
@@ -173,7 +173,7 @@ export const registerCatalogRoutes = (
 
 /**
  * Images are served from the root, not from under `/api/v1`, because the URLs
- * embedded in catalogue responses are `/media/<sha256>.png` and the reverse
+ * embedded in catalog responses are `/media/<sha256>.png` and the reverse
  * proxy routes `/media/*` here directly.
  */
 export const registerMediaRoutes = (app: FastifyInstance): void => {
@@ -181,7 +181,7 @@ export const registerMediaRoutes = (app: FastifyInstance): void => {
     "/media/:filename",
     {
       schema: {
-        tags: ["catalogue"],
+        tags: ["catalog"],
         summary: "Serve a stored swatch image.",
         params: z.object({
           // Only names `save` could have produced. Path traversal never reaches

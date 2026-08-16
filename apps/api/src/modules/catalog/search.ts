@@ -10,8 +10,8 @@
  * injection tests boring.
  */
 
-import type { Finish, NumericRange, ProductQuery, ProductSort } from "@hue/shared";
-import { Option } from "@hue/shared";
+import type { Finish, NumericRange, ProductQuery, ProductSort } from "@prism/shared";
+import { Option } from "@prism/shared";
 import { and, asc, desc, eq, gte, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 import { productListing } from "../../db/schema.ts";
 
@@ -24,8 +24,30 @@ export const toTsQuery = (text: string): SQL =>
   sql`plainto_tsquery('english', ${text})`;
 
 /**
+ * Escapes the LIKE metacharacters so a search for `50%` looks for the string
+ * `50%` rather than for anything starting with `50`.
+ */
+export const toLikePattern = (text: string): string =>
+  `%${text.replace(/([\\%_])/g, "\\$1")}%`;
+
+export const toPrefixPattern = (text: string): string =>
+  `${text.replace(/([\\%_])/g, "\\$1")}%`;
+
+/**
+ * Full-text search matches whole words: `plainto_tsquery('english', 'red')`
+ * finds "Reds" (same stem) but never "Powdered", because `red` is not a word
+ * in it. A shopper typing "red" reasonably expects both.
+ *
+ * So the name is also matched as a substring, using the trigram GIN index
+ * that already exists for the typeahead. Full-text stays for the ranked,
+ * word-aware half; the substring covers the literal half.
+ */
+export const nameContains = (text: string): SQL =>
+  sql`${productListing.name} ILIKE ${toLikePattern(text)}`;
+
+/**
  * A category filter includes everything beneath it — asking for "Reds" must
- * return the colours filed under "Reds → Crimsons". The recursive CTE walks
+ * return the colors filed under "Reds → Crimsons". The recursive CTE walks
  * down from the named slug.
  */
 export const descendantCategoryIds = (slug: string): SQL =>
@@ -36,6 +58,29 @@ export const descendantCategoryIds = (slug: string): SQL =>
       SELECT child.id FROM category child JOIN subtree ON child.parent_id = subtree.id
     )
     SELECT id FROM subtree
+  )`;
+
+/**
+ * Searching for a category name means the same thing as filtering by it: the
+ * whole subtree.
+ *
+ * Only leaf categories hold products, so matching a product against its own
+ * category alone makes a parent name unfindable — typing "yellows" would return
+ * nothing at all, even though "Yellows → Golds" is full of colors and the
+ * typeahead happily offers the parent. Matching first, then walking down, puts
+ * the two paths back in agreement.
+ *
+ * This subsumes the leaf case: a category that matches is in the result set
+ * before the recursive term ever runs.
+ */
+export const categorySubtreeMatching = (text: string): SQL =>
+  sql`(
+    WITH RECURSIVE matched AS (
+      SELECT id FROM category WHERE search_vector @@ ${toTsQuery(text)}
+      UNION ALL
+      SELECT child.id FROM category child JOIN matched ON child.parent_id = matched.id
+    )
+    SELECT id FROM matched
   )`;
 
 /**
@@ -76,7 +121,8 @@ export const buildConditions = (
     const matches = or(
       sql`${productListing.searchVector} @@ ${tsQuery}`,
       sql`${productListing.brandSearchVector} @@ ${tsQuery}`,
-      sql`${productListing.categorySearchVector} @@ ${tsQuery}`,
+      sql`${productListing.categoryId} IN ${categorySubtreeMatching(query.text.value)}`,
+      nameContains(query.text.value),
     );
     if (matches !== undefined) conditions.push(matches);
   }
@@ -113,6 +159,11 @@ export const buildConditions = (
     conditions.push(lte(productListing.saturation, query.saturation.value.max));
   }
 
+  if (Option.isSome(query.lightness)) {
+    conditions.push(gte(productListing.lightness, query.lightness.value.min));
+    conditions.push(lte(productListing.lightness, query.lightness.value.max));
+  }
+
   return conditions;
 };
 
@@ -120,14 +171,20 @@ export const combineConditions = (conditions: readonly SQL[]): Option<SQL> =>
   conditions.length === 0 ? Option.none : Option.fromNullable(and(...conditions));
 
 /**
- * Weighted relevance across the three vectors: a hit on the colour's own name
+ * Weighted relevance across the three vectors: a hit on the color's own name
  * outranks a hit on its foundry, which outranks a hit on its category.
  */
 export const relevanceExpression = (text: string): SQL => {
   const tsQuery = toTsQuery(text);
 
+  // A literal hit in the color's own name is the strongest signal there is,
+  // and one at the start of the name is stronger still — somebody typing
+  // "red" wants "Red Ochre" before "Powdered Rosé". Those two terms sit well
+  // above the ts_rank_cd scores, which land in the 0.0–0.2 range.
   return sql`(
-    ts_rank_cd(${productListing.searchVector}, ${tsQuery}) * 4
+    CASE WHEN ${productListing.name} ILIKE ${toPrefixPattern(text)} THEN 2 ELSE 0 END
+    + CASE WHEN ${productListing.name} ILIKE ${toLikePattern(text)} THEN 1 ELSE 0 END
+    + ts_rank_cd(${productListing.searchVector}, ${tsQuery}) * 4
     + ts_rank_cd(${productListing.brandSearchVector}, ${tsQuery}) * 2
     + ts_rank_cd(${productListing.categorySearchVector}, ${tsQuery})
   )`;
@@ -135,7 +192,7 @@ export const relevanceExpression = (text: string): SQL => {
 
 /**
  * Ordering. Every sort ends with the slug so that pagination is stable — two
- * colours at the same price must not swap places between page 1 and page 2.
+ * colors at the same price must not swap places between page 1 and page 2.
  */
 export const buildOrderBy = (
   sort: ProductSort,
@@ -146,7 +203,7 @@ export const buildOrderBy = (
   switch (sort) {
     case "relevance":
       // With no search term there is nothing to be relevant to, so the most
-      // recently stocked colours lead instead.
+      // recently stocked colors lead instead.
       return Option.isSome(text)
         ? [desc(relevanceExpression(text.value)), stable]
         : [desc(productListing.createdAt), stable];
@@ -163,10 +220,18 @@ export const buildOrderBy = (
   }
 };
 
-export const RATING_THRESHOLDS = [4, 3, 2, 1] as const;
+/**
+ * Five is included so the top star is selectable. Nothing rates above five,
+ * so "5 & up" is exactly five — which is what a shopper clicking the last
+ * star means. Without this entry the button has no count and stays disabled.
+ */
+export const RATING_THRESHOLDS = [5, 4, 3, 2, 1] as const;
 
 export const ratingFacetLabel = (threshold: number): string =>
-  `${threshold} star${threshold === 1 ? "" : "s"} & up`;
+  // "5 stars & up" would be a lie about a scale that stops at five.
+  threshold === 5
+    ? "5 stars"
+    : `${threshold} star${threshold === 1 ? "" : "s"} & up`;
 
 export const finishLabel = (finish: Finish): string =>
   finish.charAt(0).toUpperCase() + finish.slice(1);

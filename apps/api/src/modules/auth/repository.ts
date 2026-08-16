@@ -7,8 +7,8 @@
  */
 
 import { and, eq, gt, isNull } from "drizzle-orm";
-import type { DomainError, UserRole } from "@hue/shared";
-import { Option } from "@hue/shared";
+import type { DomainError, UserRole } from "@prism/shared";
+import { Option } from "@prism/shared";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import type { Database } from "../../db/client.ts";
 import {

@@ -1,17 +1,30 @@
-# Hue & Cry
+# Prism
 
-**A business-to-consumer storefront that sells colours.** Not paint — colours. Each SKU is a
-single hue, vacuum-sealed in a glass vial: `Screaming Pumpkin`, `Municipal Beige`,
-`Void Black`. Brands are pigment foundries. The catalogue is 240 colours across seven
-category branches, and every one of them has mass, dimensions, a finish, and opinions from
-customers.
+**A business-to-consumer storefront that sells colors.** Not paint — colors. Each SKU is a
+single hue, sold as itself: `Screaming Pumpkin`, `Municipal Beige`,
+`Void Black`. Brands are pigment foundries. The catalog is 240 colors across seven
+category branches, and every one of them has a finish, measurements of its own, and
+opinions from customers.
 
-The unusual product turns out to be a good fit for the requirements. A colour has real
+The unusual product turns out to be a good fit for the requirements. A color has real
 numeric attributes — hue angle, saturation, lightness — which makes faceted search
 genuinely interesting rather than a brand checkbox, and it means the swatch images can be
 generated at seed time instead of committed as binaries.
 
-This is **Project 1 (Foundation)**: accounts, the database, and the catalogue. Carts,
+The required weight and dimensions belong to the color rather than to a container, because
+there is no container. **Temperature** is how warm it burns (hue and saturation → K, °C,
+°F), **reach** is how far away it still reads as itself (saturation and finish → m, ft),
+and **weight** is how heavy it looks (lightness → g, oz) — the visual weight designers mean
+when they say a color is too heavy for a layout. One HSL channel each, so no two of them
+are the same fact twice, and all three are generated columns: `hex` and `finish` are the
+only stored facts about a color.
+
+Categories are a nested taxonomy in the database and **tags** in the shop: singular
+(`gold`), shown on every swatch, clickable, and typed straight into the search box in
+either number — "gold" and "golds" both land on the same filter. Selecting one takes its
+whole subtree, so `yellow` includes the golds and the acids.
+
+This is **Project 1 (Foundation)**: accounts, the database, and the catalog. Carts,
 checkout and orders are Project 2; the admin interface is Project 3.
 
 ---
@@ -24,7 +37,7 @@ checkout and orders are Project 2; the admin interface is Project 3.
 ./start.sh
 ```
 
-That builds the images, starts the stack, applies the migrations, seeds 240 colours with
+That builds the images, starts the stack, applies the migrations, seeds 240 colors with
 their swatch images, and waits until the storefront answers.
 
 | Service | URL |
@@ -33,12 +46,12 @@ their swatch images, and waits until the storefront answers.
 | API documentation | <http://localhost:3000/api/docs> |
 | Inbox (Mailpit) | <http://localhost:8025> |
 
-Two accounts are seeded, both with the password `colours are not paint`:
+Two accounts are seeded, both with the password `colors are not paint`:
 
 | Email | Role |
 | --- | --- |
-| `admin@hueandcry.test` | admin |
-| `shopper@hueandcry.test` | customer |
+| `admin@prism.test` | admin |
+| `shopper@prism.test` | customer |
 
 ```bash
 ./start.sh down     # stop
@@ -53,10 +66,10 @@ the only prerequisite" false. Both default to a mode that works offline:
 - **CAPTCHA** renders the genuine reCAPTCHA widget using Google's published always-pass
   test key pair. The widget is real and the server-side check is real; the key is the one
   Google provides for exactly this situation.
-- **OAuth** runs the full authorisation-code flow — for both Google and GitHub — against a
+- **OAuth** runs the full authorization-code flow — for both Google and GitHub — against a
   consent screen this API serves itself. The redirect, the `state` check, the code
   exchange, the profile lookup and the account linking are all real; only the identity
-  provider is local. Each provider signs its own authorisation codes, so a code minted for
+  provider is local. Each provider signs its own authorization codes, so a code minted for
   one is rejected by the other, exactly as two real providers behave.
 
 Set real credentials in `.env` and the same code paths verify against the real thing:
@@ -77,7 +90,7 @@ In `live` mode a provider is offered only when **both** halves of its credential
 set, so configuring GitHub alone is a valid setup — the sign-in page asks
 `GET /auth/oauth/providers` and renders only the buttons that can actually work.
 
-Authorised redirect URIs:
+Authorized redirect URIs:
 
 ```text
 http://localhost:3000/api/v1/auth/oauth/google/callback
@@ -92,12 +105,14 @@ accounts.
 ### Tests
 
 ```bash
-npm test              # everything: 365 tests
+npm test              # everything: 410 tests
 npm run test:unit     # the fast ones only
+npm run test:e2e      # 19 Playwright specs, against the running stack
 npm run typecheck
 ```
 
 The integration tests start a real Postgres via Testcontainers, so Docker must be running.
+The end-to-end specs drive a real browser and expect `./start.sh` to have been run first.
 
 ---
 
@@ -195,14 +210,13 @@ erDiagram
         uuid           brand_id       FK
         text           hex            "CHECK matches #rrggbb"
         product_finish finish         "matte | gloss | iridescent | fluorescent"
-        smallint       hue            "GENERATED from hex"
-        smallint       saturation     "GENERATED from hex"
-        smallint       lightness      "GENERATED from hex"
-        integer        weight_grams   "imperial is derived, never stored"
-        integer        length_mm
-        integer        width_mm
-        integer        height_mm
-        tsvector       search_vector  "GENERATED, name weighted above description"
+        smallint       hue                "GENERATED from hex"
+        smallint       saturation         "GENERATED from hex"
+        smallint       lightness          "GENERATED from hex"
+        smallint       temperature_kelvin "GENERATED from hue and saturation"
+        integer        reach_centimeters  "GENERATED from saturation and finish"
+        integer        weight_grams       "GENERATED from lightness"
+        tsvector       search_vector      "GENERATED, name weighted above description"
         timestamptz    created_at
     }
 
@@ -239,7 +253,7 @@ Everything else is zero-or-more.
 ### One view, no stored aggregates
 
 There is no `rating_avg` or `rating_count` column. A view owns the aggregation and every
-catalogue read goes through it:
+catalog read goes through it:
 
 ```sql
 CREATE VIEW product_listing AS
@@ -262,7 +276,8 @@ The same principle appears three times with three mechanisms:
 | Derived value | Mechanism | Why that one |
 | --- | --- | --- |
 | Ratings | SQL view | Aggregates across rows; only the database can |
-| Hue / saturation / lightness | `GENERATED ALWAYS … STORED` | Must be **indexable** for range faceting, so it has to be materialised — but Postgres owns the derivation, not the app |
+| Hue / saturation / lightness | `GENERATED ALWAYS … STORED` | Must be **indexable** for range faceting, so it has to be materialized — but Postgres owns the derivation, not the app |
+| Temperature / reach / weight | `GENERATED ALWAYS … STORED` | Same reason, and it leaves `hex` and `finish` as the only stored facts about a color |
 | Imperial units | Pure TypeScript function | Presentation only; never filtered or sorted on |
 
 ---
@@ -286,7 +301,7 @@ apps/api/src/
     catalog/     routes | service | repository | search
   db/            schema · migrate · seed · palette · swatch
 
-packages/shared/ Option · Result · units · colour · errors · Zod contracts
+packages/shared/ Option · Result · units · color · errors · Zod contracts
 apps/web/        React SPA
 ```
 
@@ -349,7 +364,7 @@ A JSON Web Token is three base64url segments separated by dots.
 ```json
 {
   "sub": "8f2c…", "sid": "b41e…", "role": "customer", "jti": "c7a9…",
-  "iss": "hue-and-cry", "aud": "access",
+  "iss": "prism", "aud": "access",
   "iat": 1786116800, "nbf": 1786116800, "exp": 1786117700
 }
 ```
@@ -406,9 +421,9 @@ order intact. Only `./start.sh reset` removes it.
 
 ### Postgres, and how it scales from here
 
-*Reads* scale first and cheapest: streaming replicas take the catalogue traffic, which is
+*Reads* scale first and cheapest: streaming replicas take the catalog traffic, which is
 almost all of it, while writes stay on the primary. The application is already ready for
-this — every catalogue read goes through one view and one repository, so a read/write split
+this — every catalog read goes through one view and one repository, so a read/write split
 is a connection-string change in `platform/`, not a refactor.
 
 *Connections* are the usual first wall, since each Postgres backend is a process. PgBouncer
@@ -430,7 +445,7 @@ network hop, no extra service. It stops being correct at two containers, which i
 `product_review` and, in Project 2, `order`. Both are naturally range-partitioned by
 `created_at`.
 
-The catalogue itself does not grow the way order history does, which is why none of this is
+The catalog itself does not grow the way order history does, which is why none of this is
 built yet. Building it now would be guessing at a shape the traffic has not taken.
 
 ### Testing
@@ -445,7 +460,7 @@ against disguised payloads; the search and facet SQL builders, asserting on gene
 and bound parameters; the PNG encoder; the seeded PRNG and `hslToHex`.
 
 *API integration* (55) — the real application over a real Postgres from Testcontainers,
-driven through `fastify.inject` so routing, schema validation, guards and serialisation all
+driven through `fastify.inject` so routing, schema validation, guards and serialization all
 run. Assertions read rows back rather than trusting the response: that the password was
 hashed, that the refresh token is stored only as a digest, that a replay set
 `revoked_reason = 'token_reuse'`.
@@ -493,31 +508,36 @@ validate the requests and is browsable at `/api/docs`.
 | `POST /auth/password/reset` | Single-use token; ends every session |
 | `POST /auth/2fa/setup` · `/enable` · `/disable` | TOTP enrolment |
 | `GET  /auth/oauth/providers` | Which third-party sign-ins are live |
-| `GET  /auth/oauth/:provider` + callback | Authorisation-code flow (`google`, `github`) |
+| `GET  /auth/oauth/:provider` + callback | Authorization-code flow (`google`, `github`) |
 
-### Catalogue
+### Catalog
 
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /categories` | Tree with per-subtree product counts |
 | `GET /products` | Search, filter, sort, page — with facet counts |
 | `GET /products/suggest` | Typeahead |
-| `GET /products/:slug` | One colour, both unit systems |
+| `GET /products/:slug` | One color, both unit systems |
 | `POST /admin/products/:slug/images` | Upload, admin only |
 | `GET /media/:filename` | Serve a swatch |
 
 ```text
 GET /api/v1/products
-  ?q=screaming            full-text, ranked across product, brand and category
-  &category=crimsons      includes everything beneath it
+  ?q=screaming            full-text across product and brand, plus a substring
+                          match on the color's own name — so "red" also finds
+                          "Powdered". A category hit takes its whole subtree,
+                          so "yellows" finds the golds filed beneath it
+
+  &category=crimson       a tag; includes everything beneath it
   &brands=cyan-and-sons   comma-separated, multi-select
   &finishes=gloss,matte
   &priceMin=1000&priceMax=5000
   &minRating=4
   &hueMin=340&hueMax=20   an arc through 0° — where the reds live
-  &saturationMin=60
+  &saturationMin=60&saturationMax=100
+  &lightnessMin=0&lightnessMax=40
   &sort=relevance|price_asc|price_desc|rating
-  &page=1&perPage=24
+  &page=1&perPage=12
 ```
 
 ---

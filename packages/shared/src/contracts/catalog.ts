@@ -1,5 +1,5 @@
 /**
- * The catalogue wire contract, in two halves.
+ * The catalog wire contract, in two halves.
  *
  * `productQueryParamsSchema` parses the raw query string, where an absent
  * filter really is `undefined`. `toProductQuery` then lifts that into the
@@ -9,8 +9,8 @@
  */
 
 import { z } from "zod";
-import { Option } from "../option.ts";
-import type { Measurements } from "../units.ts";
+import { Option } from "../fp/option.ts";
+import type { Measurements } from "../domain/units.ts";
 
 export const PRODUCT_SORTS = [
   "relevance",
@@ -25,10 +25,18 @@ export type Finish = (typeof FINISHES)[number];
 
 export const HUE_BOUNDS = { min: 0, max: 360 } as const;
 export const SATURATION_BOUNDS = { min: 0, max: 100 } as const;
+export const LIGHTNESS_BOUNDS = { min: 0, max: 100 } as const;
 export const PRICE_BOUNDS = { min: 0, max: 100_000_000 } as const;
 
 export const MAX_PER_PAGE = 60;
-export const DEFAULT_PER_PAGE = 24;
+
+/**
+ * Three rows of four on a desktop grid. The results column — count, grid and
+ * pagination controls together — then fits inside the height of the filter
+ * rail beside it, so narrowing 240 colors down to 3 cannot change the height
+ * of the document or move the scroll position under the pointer.
+ */
+export const DEFAULT_PER_PAGE = 12;
 
 /**
  * Multi-value filters travel comma-separated (`brands=chroma-labs,cyan-and-sons`)
@@ -88,6 +96,18 @@ export const productQueryParamsSchema = z.object({
     .min(SATURATION_BOUNDS.min)
     .max(SATURATION_BOUNDS.max)
     .optional(),
+  lightnessMin: z.coerce
+    .number()
+    .int()
+    .min(LIGHTNESS_BOUNDS.min)
+    .max(LIGHTNESS_BOUNDS.max)
+    .optional(),
+  lightnessMax: z.coerce
+    .number()
+    .int()
+    .min(LIGHTNESS_BOUNDS.min)
+    .max(LIGHTNESS_BOUNDS.max)
+    .optional(),
   sort: z.enum(PRODUCT_SORTS).default("relevance"),
   page: z.coerce.number().int().min(1).max(1000).default(1),
   perPage: z.coerce.number().int().min(1).max(MAX_PER_PAGE).default(DEFAULT_PER_PAGE),
@@ -114,6 +134,7 @@ export type ProductQuery = Readonly<{
   /** `min > max` is a wrap-around arc through 0°, which is where the reds live. */
   hue: Option<NumericRange>;
   saturation: Option<NumericRange>;
+  lightness: Option<NumericRange>;
   sort: ProductSort;
   page: number;
   perPage: number;
@@ -148,6 +169,9 @@ export const toProductQuery = (params: ProductQueryParams): ProductQuery => ({
   hue: rangeOf(params.hueMin, params.hueMax, HUE_BOUNDS),
   saturation: Option.map(ordered)(
     rangeOf(params.saturationMin, params.saturationMax, SATURATION_BOUNDS),
+  ),
+  lightness: Option.map(ordered)(
+    rangeOf(params.lightnessMin, params.lightnessMax, LIGHTNESS_BOUNDS),
   ),
   sort: params.sort,
   page: params.page,
@@ -190,6 +214,14 @@ export type ProductReview = Readonly<{
 export type ProductDetail = ProductSummary &
   Readonly<{
     description: string;
+    /**
+     * The tag chain, outermost first: an acid is tagged yellow, then acid.
+     *
+     * The grid works this out on the client — a search response already carries
+     * the whole category tree in its facets — but one product on its own has no
+     * tree to walk, so its detail carries the answer.
+     */
+    tags: readonly CategoryRef[];
     /** Metric is stored, imperial is derived — see `units.ts`. */
     measurements: Measurements;
     hue: number;
@@ -205,8 +237,21 @@ export type FacetBucket = Readonly<{
   count: number;
 }>;
 
+/**
+ * Categories are a tree, so their facet carries enough shape to be rendered as
+ * one. A parent is selectable in its own right — picking "Yellows" means every
+ * color beneath it — and its count is its whole subtree, which is why the
+ * numbers on a parent and its children do not sum to the total.
+ */
+export type CategoryFacetBucket = FacetBucket &
+  Readonly<{
+    parentSlug: Option<string>;
+    /** 0 for a root category, 1 for its children, and so on. */
+    depth: number;
+  }>;
+
 export type ProductFacets = Readonly<{
-  categories: readonly FacetBucket[];
+  categories: readonly CategoryFacetBucket[];
   brands: readonly FacetBucket[];
   finishes: readonly FacetBucket[];
   /** "4 stars & up", "3 stars & up", … */

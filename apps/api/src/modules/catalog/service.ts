@@ -1,5 +1,5 @@
 /**
- * Catalogue domain logic and the read-through cache in front of it.
+ * Catalog domain logic and the read-through cache in front of it.
  *
  * The cache sits here rather than in the repository so that the repository
  * stays a plain description of what the database can do, and so a cache miss
@@ -15,8 +15,8 @@ import type {
   ProductQuery,
   ProductSearchResult,
   Suggestion,
-} from "@hue/shared";
-import { Option } from "@hue/shared";
+} from "@prism/shared";
+import { Option } from "@prism/shared";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import type { Cache } from "../../platform/cache.ts";
 import { cacheKey } from "../../platform/cache.ts";

@@ -3,7 +3,7 @@
  *
  * Delivery is deliberately fire-and-forget from the caller's perspective:
  * `POST /auth/password/forgot` answers 204 whether or not the address exists,
- * and whether or not the SMTP server is reachable. Any other behaviour turns
+ * and whether or not the SMTP server is reachable. Any other behavior turns
  * the endpoint into an account-enumeration oracle.
  */
 

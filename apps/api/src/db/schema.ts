@@ -149,7 +149,7 @@ export const passwordResetTokens = pgTable(
   ],
 );
 
-/* ----------------------------------------------------------------- catalogue */
+/* ----------------------------------------------------------------- catalog */
 
 export const categories = pgTable(
   "category",
@@ -204,12 +204,12 @@ export const products = pgTable(
       .notNull()
       .references(() => brands.id, { onDelete: "restrict" }),
 
-    /** The one stored fact about the colour itself. */
+    /** The one stored fact about the color itself. */
     hex: text("hex").notNull(),
     finish: productFinish("finish").notNull(),
 
     /**
-     * Derived from `hex` by IMMUTABLE SQL functions and materialised by
+     * Derived from `hex` by IMMUTABLE SQL functions and materialized by
      * Postgres, so they can carry B-tree indexes for range faceting.
      *
      * Marked generated here so Drizzle omits them from insert types: writing
@@ -225,11 +225,20 @@ export const products = pgTable(
       .notNull()
       .generatedAlwaysAs(sql`hex_to_lightness(hex)`),
 
-    /** The vial the colour ships in. Imperial is derived in `@hue/shared`. */
-    weightGrams: integer("weight_grams").notNull(),
-    lengthMillimetres: integer("length_mm").notNull(),
-    widthMillimetres: integer("width_mm").notNull(),
-    heightMillimetres: integer("height_mm").notNull(),
+    /**
+     * The color's own measurements, one per HSL channel. Generated like the
+     * channels themselves, so the shop stores `hex` and `finish` and nothing
+     * else about how a color measures. Imperial is derived in `@prism/shared`.
+     */
+    temperatureKelvin: smallint("temperature_kelvin")
+      .notNull()
+      .generatedAlwaysAs(sql`hex_to_temperature(hex)`),
+    reachCentimeters: integer("reach_centimeters")
+      .notNull()
+      .generatedAlwaysAs(sql`hex_to_reach(hex, finish)`),
+    weightGrams: integer("weight_grams")
+      .notNull()
+      .generatedAlwaysAs(sql`hex_to_weight(hex)`),
 
     searchVector: tsvector("search_vector")
       .notNull()
@@ -285,7 +294,7 @@ export const productReviews = pgTable(
 
 /**
  * Ratings are aggregated here rather than stored on `product`, so a rating can
- * never disagree with the reviews it came from. Every catalogue read goes
+ * never disagree with the reviews it came from. Every catalog read goes
  * through this view. If it ever needs to be fast, `MATERIALIZED` is the only
  * word that changes — no application code moves.
  */
@@ -301,10 +310,9 @@ export const productListing = pgView("product_listing", {
   hue: smallint("hue").notNull(),
   saturation: smallint("saturation").notNull(),
   lightness: smallint("lightness").notNull(),
+  temperatureKelvin: smallint("temperature_kelvin").notNull(),
+  reachCentimeters: integer("reach_centimeters").notNull(),
   weightGrams: integer("weight_grams").notNull(),
-  lengthMillimetres: integer("length_mm").notNull(),
-  widthMillimetres: integer("width_mm").notNull(),
-  heightMillimetres: integer("height_mm").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   searchVector: tsvector("search_vector").notNull(),
   brandSearchVector: tsvector("brand_search_vector").notNull(),

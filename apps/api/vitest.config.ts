@@ -1,11 +1,11 @@
 import { defineConfig } from "vitest/config";
 
 /**
- * Two projects, because they have very different costs.
+ * Three projects, split by what they cost to run.
  *
- * `unit` touches nothing outside the process and finishes in milliseconds, so
- * it runs on every save. `integration` starts a real Postgres in a container
- * and is the slower gate before a commit.
+ * `unit` touches nothing outside the process and finishes in under a second,
+ * so it runs on every save. `integration` and `security` each start a real
+ * Postgres in a container and are the slower gate before a commit.
  */
 export default defineConfig({
   test: {
@@ -13,19 +13,29 @@ export default defineConfig({
       {
         test: {
           name: "unit",
-          include: ["src/**/*.test.ts"],
+          include: ["tests/unit/**/*.test.ts"],
           environment: "node",
         },
       },
       {
         test: {
           name: "integration",
-          include: ["tests/**/*.test.ts"],
+          include: ["tests/integration/**/*.test.ts"],
           environment: "node",
           // Pulling and starting the Postgres image dominates the first run.
           testTimeout: 60_000,
           hookTimeout: 180_000,
-          // One container, one schema — parallel files would race on the data.
+          // One container per file, and the files share a schema.
+          fileParallelism: false,
+        },
+      },
+      {
+        test: {
+          name: "security",
+          include: ["tests/security/**/*.test.ts"],
+          environment: "node",
+          testTimeout: 60_000,
+          hookTimeout: 180_000,
           fileParallelism: false,
         },
       },

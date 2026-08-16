@@ -11,7 +11,7 @@
  * for real.
  */
 
-import type { DomainError } from "@hue/shared";
+import type { DomainError } from "@prism/shared";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 
 export type CaptchaVerifier = Readonly<{

@@ -1,15 +1,15 @@
 /**
- * OAuth 2.0 authorisation-code sign-in.
+ * OAuth 2.0 authorization-code sign-in.
  *
  * Two adapters behind one port. `google` is the real thing. `mock` implements
- * the same authorisation-code exchange against a consent screen this API serves
+ * the same authorization-code exchange against a consent screen this API serves
  * itself, so the flow — redirect, state check, code exchange, profile lookup,
  * account link — is genuinely exercised on a machine with no Google account and
  * no internet. Only the identity provider is substituted.
  */
 
-import type { DomainError, OAuthProviderName } from "@hue/shared";
-import { Option } from "@hue/shared";
+import type { DomainError, OAuthProviderName } from "@prism/shared";
+import { Option } from "@prism/shared";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
@@ -22,7 +22,7 @@ export type OAuthProfile = Readonly<{
 
 export type OAuthProvider = Readonly<{
   name: OAuthProviderName;
-  authorisationUrl: (state: string, redirectUri: string) => string;
+  authorizationUrl: (state: string, redirectUri: string) => string;
   exchange: (
     code: string,
     redirectUri: string,
@@ -61,7 +61,7 @@ const exchangeFailed: DomainError = { _tag: "OAuthExchangeFailed" };
 /* ---------------------------------------------------------------- the mock */
 
 /**
- * The mock's "authorisation code" is `email.hmac`, signed with the JWT secret.
+ * The mock's "authorization code" is `email.hmac`, signed with the JWT secret.
  * That keeps the consent screen from being an open redirect into any account:
  * a code this API did not issue does not verify.
  *
@@ -72,7 +72,7 @@ const exchangeFailed: DomainError = { _tag: "OAuthExchangeFailed" };
 const mockPayload = (provider: OAuthProviderName, email: string): string =>
   `${provider}:${email}`;
 
-export const issueMockAuthorisationCode = (
+export const issueMockAuthorizationCode = (
   provider: OAuthProviderName,
   email: string,
   secret: Uint8Array,
@@ -114,7 +114,7 @@ export const createMockOAuthProvider = (
 ): OAuthProvider => ({
   name: provider,
 
-  authorisationUrl: (state, redirectUri) => {
+  authorizationUrl: (state, redirectUri) => {
     const params = new URLSearchParams({ state, redirect_uri: redirectUri });
     return `/api/v1/auth/oauth/${provider}/consent?${params.toString()}`;
   },
@@ -140,7 +140,7 @@ export const createMockOAuthProvider = (
 
 /* --------------------------------------------------------------- the real */
 
-const AUTHORISATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
+const AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const USERINFO_ENDPOINT = "https://openidconnect.googleapis.com/v1/userinfo";
 
@@ -168,7 +168,7 @@ export const createGoogleOAuthProvider = (
 ): OAuthProvider => ({
   name: "google",
 
-  authorisationUrl: (state, redirectUri) => {
+  authorizationUrl: (state, redirectUri) => {
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,
@@ -178,7 +178,7 @@ export const createGoogleOAuthProvider = (
       prompt: "select_account",
     });
 
-    return `${AUTHORISATION_ENDPOINT}?${params.toString()}`;
+    return `${AUTHORIZATION_ENDPOINT}?${params.toString()}`;
   },
 
   exchange: (code, redirectUri) =>
@@ -224,13 +224,13 @@ export const createGoogleOAuthProvider = (
 
 /* --------------------------------------------------------------- GitHub */
 
-const GITHUB_AUTHORISATION_ENDPOINT = "https://github.com/login/oauth/authorize";
+const GITHUB_AUTHORIZATION_ENDPOINT = "https://github.com/login/oauth/authorize";
 const GITHUB_TOKEN_ENDPOINT = "https://github.com/login/oauth/access_token";
 const GITHUB_USER_ENDPOINT = "https://api.github.com/user";
 const GITHUB_EMAILS_ENDPOINT = "https://api.github.com/user/emails";
 
 /** GitHub rejects API calls without one. */
-const GITHUB_USER_AGENT = "hue-and-cry";
+const GITHUB_USER_AGENT = "prism";
 
 type GitHubUser = Readonly<{ id: number; login: string }>;
 
@@ -285,7 +285,7 @@ export const createGitHubOAuthProvider = (
 ): OAuthProvider => ({
   name: "github",
 
-  authorisationUrl: (state, redirectUri) => {
+  authorizationUrl: (state, redirectUri) => {
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,
@@ -297,7 +297,7 @@ export const createGitHubOAuthProvider = (
       allow_signup: "false",
     });
 
-    return `${GITHUB_AUTHORISATION_ENDPOINT}?${params.toString()}`;
+    return `${GITHUB_AUTHORIZATION_ENDPOINT}?${params.toString()}`;
   },
 
   exchange: (code, redirectUri) =>

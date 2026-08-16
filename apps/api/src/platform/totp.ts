@@ -21,7 +21,7 @@ export type TotpService = Readonly<{
   qrCodeSvg: (uri: string) => Promise<string>;
 }>;
 
-const ISSUER = "Hue & Cry";
+const ISSUER = "Prism";
 const PERIOD_SECONDS = 30;
 
 export const createTotpService = (clock: Clock): TotpService => ({
@@ -53,7 +53,7 @@ export const createTotpService = (clock: Clock): TotpService => ({
       type: "svg",
       margin: 1,
       // Transparent background, black paths — the page's own theme shows through
-      // and CSS can recolour the strokes for dark mode.
+      // and CSS can recolor the strokes for dark mode.
       color: { dark: "#000000", light: "#00000000" },
     }),
 });

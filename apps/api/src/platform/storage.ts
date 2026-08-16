@@ -12,8 +12,8 @@
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { DomainError } from "@hue/shared";
-import { Option } from "@hue/shared";
+import type { DomainError } from "@prism/shared";
+import { Option } from "@prism/shared";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 
 export const IMAGE_TYPES = ["png", "jpg", "webp"] as const;

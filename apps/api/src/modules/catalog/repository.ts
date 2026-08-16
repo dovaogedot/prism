@@ -1,5 +1,5 @@
 /**
- * Every database statement the catalogue makes.
+ * Every database statement the catalog makes.
  *
  * Reads go through the `product_listing` view rather than the `product` table,
  * so a rating shown to a shopper is always the aggregate of the reviews that
@@ -8,6 +8,7 @@
 
 import type {
   CategoryNode,
+  CategoryRef,
   Finish,
   ProductDetail,
   ProductFacets,
@@ -16,11 +17,12 @@ import type {
   ProductReview,
   ProductSummary,
   Suggestion,
-} from "@hue/shared";
-import { measure, Option } from "@hue/shared";
+} from "@prism/shared";
+import { FINISHES, measure, Option } from "@prism/shared";
 import { asc, count, desc, eq, inArray, min, max, sql, type SQL } from "drizzle-orm";
 import type { Database } from "../../db/client.ts";
 import {
+  brands,
   categories,
   productImages,
   productListing,
@@ -51,10 +53,9 @@ type ListingRow = Readonly<{
   hue: number;
   saturation: number;
   lightness: number;
+  temperatureKelvin: number;
+  reachCentimeters: number;
   weightGrams: number;
-  lengthMillimetres: number;
-  widthMillimetres: number;
-  heightMillimetres: number;
   brandSlug: string;
   brandName: string;
   categorySlug: string;
@@ -75,10 +76,9 @@ const LISTING_COLUMNS = {
   hue: productListing.hue,
   saturation: productListing.saturation,
   lightness: productListing.lightness,
+  temperatureKelvin: productListing.temperatureKelvin,
+  reachCentimeters: productListing.reachCentimeters,
   weightGrams: productListing.weightGrams,
-  lengthMillimetres: productListing.lengthMillimetres,
-  widthMillimetres: productListing.widthMillimetres,
-  heightMillimetres: productListing.heightMillimetres,
   brandSlug: productListing.brandSlug,
   brandName: productListing.brandName,
   categorySlug: productListing.categorySlug,
@@ -189,9 +189,14 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
     },
 
     /**
-     * Each dimension is counted against the filters from every *other*
+     * Every dimension is counted against the filters from every *other*
      * dimension, so ticking a second brand widens the result rather than
-     * emptying it. The five queries run concurrently.
+     * emptying it.
+     *
+     * Counts are produced by joining *out* from the dimension's own table with
+     * the filters in the ON clause, so a brand that matches nothing still comes
+     * back with a count of zero. Putting them in a WHERE would drop the row
+     * entirely and the filter rail would reflow every time a box was ticked.
      */
     facets: async (query) => {
       const whereExcept = (dimension: FacetDimension): Option<SQL> =>
@@ -203,34 +208,92 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
         where: Option<SQL>,
       ): A => (Option.isSome(where) ? builder.where(where.value) : builder);
 
-      const [categoryRows, brandRows, finishRows, summaryRows] = await Promise.all([
-        scoped(
-          db
-            .select({
-              value: productListing.categorySlug,
-              label: productListing.categoryName,
-              total: count(),
-            })
-            .from(productListing)
-            .$dynamic(),
-          whereExcept("category"),
-        )
-          .groupBy(productListing.categorySlug, productListing.categoryName)
-          .orderBy(desc(count())),
+      /** Matching rows only, so `count()` over the join yields 0, not 1. */
+      const joinOn = (link: SQL, where: Option<SQL>): SQL =>
+        Option.match<SQL, SQL>({
+          onSome: (condition) => sql`${link} AND ${condition}`,
+          onNone: () => link,
+        })(where);
 
-        scoped(
-          db
-            .select({
-              value: productListing.brandSlug,
-              label: productListing.brandName,
-              total: count(),
-            })
-            .from(productListing)
-            .$dynamic(),
-          whereExcept("brand"),
-        )
-          .groupBy(productListing.brandSlug, productListing.brandName)
-          .orderBy(desc(count())),
+      /** The rating dimension's scope as a fragment usable inside FILTER. */
+      const ratingScope: SQL = Option.match<SQL, SQL>({
+        onSome: (condition) => condition,
+        onNone: () => sql`TRUE`,
+      })(whereExcept("rating"));
+
+      const categoryScope: SQL = Option.match<SQL, SQL>({
+        onSome: (condition) => condition,
+        onNone: () => sql`TRUE`,
+      })(whereExcept("category"));
+
+      const [categoryRows, brandRows, finishRows, summaryRows] = await Promise.all([
+        /**
+         * Every category, parents included, each counted over its whole
+         * subtree.
+         *
+         * `closure` pairs each category with itself and all its descendants,
+         * so joining through it attributes a color filed under "Golds" to
+         * "Yellows" as well. `ranked` carries the root's position down the
+         * tree, which is what keeps branches together in the output instead
+         * of interleaving them by their within-parent index.
+         */
+        db.execute<{
+          value: string;
+          label: string;
+          parent_slug: string | null;
+          depth: number;
+          total: number;
+        }>(sql`
+          WITH RECURSIVE closure AS (
+            SELECT id AS ancestor, id AS descendant FROM category
+            UNION ALL
+            SELECT c.ancestor, child.id
+            FROM closure c
+            JOIN category child ON child.parent_id = c.descendant
+          ),
+          ranked AS (
+            SELECT id, slug, name, parent_id, 0 AS depth,
+                   position AS root_position, position AS own_position
+            FROM category WHERE parent_id IS NULL
+            UNION ALL
+            SELECT child.id, child.slug, child.name, child.parent_id, r.depth + 1,
+                   r.root_position, child.position
+            FROM ranked r
+            JOIN category child ON child.parent_id = r.id
+          )
+          SELECT r.slug AS value,
+                 r.name AS label,
+                 parent.slug AS parent_slug,
+                 r.depth::int AS depth,
+                 count(${productListing.id})::int AS total
+          FROM ranked r
+          JOIN closure cl ON cl.ancestor = r.id
+          LEFT JOIN category parent ON parent.id = r.parent_id
+          -- Deliberately not aliased: the scope condition below is built by the
+          -- same condition builder the main query uses, so it names the view in
+          -- full. An alias here would leave those references dangling.
+          LEFT JOIN ${productListing}
+            ON ${productListing.categoryId} = cl.descendant AND ${categoryScope}
+          GROUP BY r.id, r.slug, r.name, r.depth, r.root_position, r.own_position, parent.slug
+          ORDER BY r.root_position, r.depth, r.own_position, r.name
+        `),
+
+        db
+          .select({
+            value: brands.slug,
+            label: brands.name,
+            total: count(productListing.id),
+          })
+          .from(brands)
+          .leftJoin(
+            productListing,
+            joinOn(
+              sql`${productListing.brandId} = ${brands.id}`,
+              whereExcept("brand"),
+            ),
+          )
+          .groupBy(brands.slug, brands.name)
+          .orderBy(asc(brands.name)),
 
         scoped(
           db
@@ -242,45 +305,59 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
           .groupBy(productListing.finish)
           .orderBy(desc(count())),
 
-        // Price bounds and the cumulative rating tiers in one pass. FILTER is
-        // what makes "4 stars & up" a column rather than four round trips.
-        scoped(
-          db
-            .select({
-              lowest: min(productListing.priceCents),
-              highest: max(productListing.priceCents),
-              atLeast4: sql<number>`count(*) FILTER (WHERE ${productListing.ratingAverage} >= 4)`,
-              atLeast3: sql<number>`count(*) FILTER (WHERE ${productListing.ratingAverage} >= 3)`,
-              atLeast2: sql<number>`count(*) FILTER (WHERE ${productListing.ratingAverage} >= 2)`,
-              atLeast1: sql<number>`count(*) FILTER (WHERE ${productListing.ratingAverage} >= 1)`,
-            })
-            .from(productListing)
-            .$dynamic(),
-          whereExcept("rating"),
-        ),
+        // Price extents and the cumulative rating tiers in one pass.
+        //
+        // The two want different scopes, which is why the rating filter is
+        // interpolated into the FILTER clauses rather than applied as a WHERE:
+        // price extents describe the whole catalog, so the slider's
+        // endpoints stay put while it is dragged, while the rating tiers
+        // describe the set narrowed by every *other* filter.
+        //
+        // `ratingScope` is a Drizzle SQL fragment, so its values are bound
+        // parameters here exactly as they are in a WHERE — nothing is spliced
+        // in as text.
+        db
+          .select({
+            lowest: min(productListing.priceCents),
+            highest: max(productListing.priceCents),
+            atLeast5: sql<number>`count(*) FILTER (WHERE ${productListing.ratingAverage} >= 5 AND ${ratingScope})`,
+            atLeast4: sql<number>`count(*) FILTER (WHERE ${productListing.ratingAverage} >= 4 AND ${ratingScope})`,
+            atLeast3: sql<number>`count(*) FILTER (WHERE ${productListing.ratingAverage} >= 3 AND ${ratingScope})`,
+            atLeast2: sql<number>`count(*) FILTER (WHERE ${productListing.ratingAverage} >= 2 AND ${ratingScope})`,
+            atLeast1: sql<number>`count(*) FILTER (WHERE ${productListing.ratingAverage} >= 1 AND ${ratingScope})`,
+          })
+          .from(productListing),
       ]);
 
       const summary = summaryRows[0];
 
       const cumulativeByThreshold: Record<(typeof RATING_THRESHOLDS)[number], number> = {
+        5: Number(summary?.atLeast5 ?? 0),
         4: Number(summary?.atLeast4 ?? 0),
         3: Number(summary?.atLeast3 ?? 0),
         2: Number(summary?.atLeast2 ?? 0),
         1: Number(summary?.atLeast1 ?? 0),
       };
 
+      // Every tier is returned, including empty ones — the rail must not
+      // reflow as filters change.
       const ratings = RATING_THRESHOLDS.map((threshold) => ({
         value: String(threshold),
         label: ratingFacetLabel(threshold),
         count: cumulativeByThreshold[threshold],
-      })).filter((bucket) => bucket.count > 0);
+      }));
 
-      const priceRow = summary;
+      // Same for finishes: the universe is the enum, not whatever matched.
+      const finishCounts = new Map(
+        finishRows.map((row) => [row.value, Number(row.total)]),
+      );
 
       return {
-        categories: categoryRows.map((row) => ({
+        categories: [...categoryRows].map((row) => ({
           value: row.value,
           label: row.label,
+          parentSlug: Option.fromNullable(row.parent_slug),
+          depth: Number(row.depth),
           count: Number(row.total),
         })),
         brands: brandRows.map((row) => ({
@@ -288,15 +365,15 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
           label: row.label,
           count: Number(row.total),
         })),
-        finishes: finishRows.map((row) => ({
-          value: row.value,
-          label: finishLabel(row.value),
-          count: Number(row.total),
+        finishes: FINISHES.map((finish) => ({
+          value: finish,
+          label: finishLabel(finish),
+          count: finishCounts.get(finish) ?? 0,
         })),
         ratings,
         priceCents: {
-          min: Number(priceRow?.lowest ?? 0),
-          max: Number(priceRow?.highest ?? 0),
+          min: Number(summary?.lowest ?? 0),
+          max: Number(summary?.highest ?? 0),
         },
       };
     },
@@ -311,7 +388,7 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
       const row = rows[0];
       if (row === undefined) return Option.none;
 
-      const [imageRows, reviewRows] = await Promise.all([
+      const [imageRows, reviewRows, tagRows] = await Promise.all([
         db
           .select({
             filename: productImages.filename,
@@ -334,6 +411,23 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
           .where(eq(productReviews.productId, row.id))
           .orderBy(desc(productReviews.createdAt))
           .limit(20),
+        /*
+         * The tag chain, outermost first — an acid is tagged yellow, then acid.
+         *
+         * The grid derives this on the client because a search response already
+         * carries the whole category tree in its facets. One product on its own
+         * carries no tree, so the walk happens here instead.
+         */
+        db.execute<{ slug: string; name: string }>(sql`
+          WITH RECURSIVE ancestors AS (
+            SELECT id, parent_id, slug, name, 0 AS depth
+            FROM category WHERE slug = ${row.categorySlug}
+            UNION ALL
+            SELECT parent.id, parent.parent_id, parent.slug, parent.name, ancestors.depth + 1
+            FROM category parent JOIN ancestors ON parent.id = ancestors.parent_id
+          )
+          SELECT slug, name FROM ancestors ORDER BY depth DESC
+        `),
       ]);
 
       const images: readonly ProductImage[] = imageRows.map((image) => ({
@@ -351,14 +445,21 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
         createdAt: review.createdAt.toISOString(),
       }));
 
+      const tags: readonly CategoryRef[] = tagRows.map((tag) => ({
+        slug: tag.slug,
+        name: tag.name,
+      }));
+
       const detail: ProductDetail = {
         ...toSummary(row, Option.fromNullable(images[0])),
         description: row.description,
+        tags,
         measurements: measure({
+          temperatureKelvin: row.temperatureKelvin,
+          // Stored in centimeters so the column stays an exact integer;
+          // metres is the unit a shopper reads.
+          reachMeters: row.reachCentimeters / 100,
           weightGrams: row.weightGrams,
-          lengthMillimetres: row.lengthMillimetres,
-          widthMillimetres: row.widthMillimetres,
-          heightMillimetres: row.heightMillimetres,
         }),
         hue: row.hue,
         saturation: row.saturation,

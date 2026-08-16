@@ -2,12 +2,12 @@
  * The single place a `DomainError` becomes an HTTP response.
  *
  * Routes never choose a status code. They hand back a tagged error and the
- * exhaustive table in @hue/shared decides — so a new error variant cannot be
+ * exhaustive table in @prism/shared decides — so a new error variant cannot be
  * introduced without the compiler demanding a status and a message for it.
  */
 
-import type { DomainError, ValidationIssue } from "@hue/shared";
-import { httpStatusOf, toErrorResponse } from "@hue/shared";
+import type { DomainError, ValidationIssue } from "@prism/shared";
+import { httpStatusOf, toErrorResponse } from "@prism/shared";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { hasZodFastifySchemaValidationErrors } from "fastify-type-provider-zod";
 

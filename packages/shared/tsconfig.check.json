@@ -1,0 +1,15 @@
+{
+  // Typechecks the tests too. The build config deliberately excludes them so
+  // they never reach dist/, which would leave them unchecked without this.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    // The build pins rootDir to src/; widening it here is what lets tests/
+    // be checked without ever being emitted.
+    "rootDir": "."
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts", "vitest.config.ts"]
+}

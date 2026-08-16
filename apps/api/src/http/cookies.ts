@@ -3,7 +3,7 @@
  *
  * httpOnly puts the refresh token out of reach of any script on the page, so
  * an XSS bug cannot read it. `Path` scopes it to the auth endpoints, so it is
- * not attached to ordinary catalogue requests. SameSite=Lax blocks it from
+ * not attached to ordinary catalog requests. SameSite=Lax blocks it from
  * cross-site POSTs while still surviving a normal top-level navigation, which
  * is what the OAuth redirect needs.
  */

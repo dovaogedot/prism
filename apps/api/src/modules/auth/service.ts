@@ -17,8 +17,8 @@ import type {
   SessionUser,
   TwoFactorSetup,
   UserRole,
-} from "@hue/shared";
-import { Option } from "@hue/shared";
+} from "@prism/shared";
+import { Option } from "@prism/shared";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import type { Clock } from "../../platform/clock.ts";
 import { secondsFromNow } from "../../platform/clock.ts";
@@ -112,7 +112,7 @@ export type AuthService = Readonly<{
   }) => ResultAsync<SessionUser, DomainError>;
 
   availableProviders: () => AvailableProviders;
-  oauthAuthorisationUrl: (input: {
+  oauthAuthorizationUrl: (input: {
     provider: string;
     redirectUri: string;
   }) => ResultAsync<Readonly<{ url: string; state: string }>, DomainError>;
@@ -337,7 +337,7 @@ export const createAuthService = (deps: AuthDependencies): AuthService => {
       ),
 
     /**
-     * Always succeeds, whether or not the address exists. Any other behaviour
+     * Always succeeds, whether or not the address exists. Any other behavior
      * turns this endpoint into a "does this person shop here" oracle.
      */
     requestPasswordReset: (email) =>
@@ -416,7 +416,7 @@ export const createAuthService = (deps: AuthDependencies): AuthService => {
         }
         if (Option.isNone(user.totpSecret)) {
           return errAsync<SessionUser, DomainError>({
-            _tag: "TwoFactorNotInitialised",
+            _tag: "TwoFactorNotInitialized",
           });
         }
         // Proving one live code confirms the secret actually reached the phone.
@@ -466,7 +466,7 @@ export const createAuthService = (deps: AuthDependencies): AuthService => {
 
     availableProviders: () => ({ providers: oauth.names, mock: oauth.isMock }),
 
-    oauthAuthorisationUrl: ({ provider, redirectUri }) => {
+    oauthAuthorizationUrl: ({ provider, redirectUri }) => {
       const chosen = oauth.find(provider);
 
       if (Option.isNone(chosen)) {
@@ -476,11 +476,11 @@ export const createAuthService = (deps: AuthDependencies): AuthService => {
       }
 
       // Signed into a cookie by the route, then compared on the way back —
-      // an authorisation response this app did not initiate is rejected.
+      // an authorization response this app did not initiate is rejected.
       const state = createOpaqueToken().plaintext;
 
       return okAsync({
-        url: chosen.value.authorisationUrl(state, redirectUri),
+        url: chosen.value.authorizationUrl(state, redirectUri),
         state,
       });
     },

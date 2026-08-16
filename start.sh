@@ -68,14 +68,14 @@ done
 
 cat <<BANNER
 
-  Hue & Cry is up.
+  Prism is up.
 
     Storefront      http://localhost:${web_port}
     API docs        http://localhost:${web_port}/api/docs
     Inbox (Mailpit) http://localhost:8025
 
-  Seeded admin      admin@hueandcry.test / colours are not paint
-  Seeded shopper    shopper@hueandcry.test / colours are not paint
+  Seeded admin      admin@prism.test / colors are not paint
+  Seeded shopper    shopper@prism.test / colors are not paint
 
   Logs   docker compose logs -f
   Stop   ./start.sh down

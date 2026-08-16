@@ -1,7 +1,7 @@
 # Build context is the repository root, so the workspace can be installed as one.
 #
 # There is no compile step for the API itself: Node 26 strips TypeScript types
-# natively. Only @hue/shared is built, because Node refuses to strip types for
+# natively. Only @prism/shared is built, because Node refuses to strip types for
 # files resolved inside node_modules, which is how the workspace link resolves.
 
 FROM node:26-slim AS build
@@ -20,7 +20,7 @@ COPY apps/web/package.json ./apps/web/
 RUN npm ci
 
 COPY packages/shared ./packages/shared
-RUN npm run build --workspace @hue/shared
+RUN npm run build --workspace @prism/shared
 
 COPY apps/api ./apps/api
 

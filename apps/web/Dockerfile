@@ -10,7 +10,7 @@ COPY apps/web/package.json ./apps/web/
 RUN npm ci --ignore-scripts
 
 COPY packages/shared ./packages/shared
-RUN npm run build --workspace @hue/shared
+RUN npm run build --workspace @prism/shared
 
 # Vite inlines these at build time, so they must arrive before the build runs.
 ARG VITE_CAPTCHA_MODE=test
@@ -19,7 +19,7 @@ ENV VITE_CAPTCHA_MODE=$VITE_CAPTCHA_MODE
 ENV VITE_RECAPTCHA_SITE_KEY=$VITE_RECAPTCHA_SITE_KEY
 
 COPY apps/web ./apps/web
-RUN npm run build --workspace @hue/web
+RUN npm run build --workspace @prism/web
 
 FROM caddy:2-alpine AS runtime
 

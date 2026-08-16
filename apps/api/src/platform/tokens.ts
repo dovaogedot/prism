@@ -8,7 +8,7 @@
  */
 
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
-import type { DomainError, UserRole } from "@hue/shared";
+import type { DomainError, UserRole } from "@prism/shared";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import { jwtVerify, SignJWT } from "jose";
 import type { Clock } from "./clock.ts";

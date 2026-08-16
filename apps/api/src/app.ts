@@ -16,7 +16,7 @@ import fastifyRateLimit from "@fastify/rate-limit";
 import fastifyStatic from "@fastify/static";
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
-import { OAUTH_PROVIDERS, Option } from "@hue/shared";
+import { OAUTH_PROVIDERS, Option } from "@prism/shared";
 import Fastify, { type FastifyInstance } from "fastify";
 import {
   jsonSchemaTransform,
@@ -195,14 +195,14 @@ export const buildApp = async (input: AppInput): Promise<FastifyInstance> => {
     openapi: {
       openapi: "3.1.0",
       info: {
-        title: "Hue & Cry API",
+        title: "Prism API",
         version: "1.0.0",
         description:
-          "A B2C storefront that sells colours. Every request schema below is the same Zod schema the browser validates against.",
+          "A B2C storefront that sells colors. Every request schema below is the same Zod schema the browser validates against.",
       },
       tags: [
         { name: "auth", description: "Accounts, sessions, tokens, 2FA" },
-        { name: "catalogue", description: "Categories, search, colours, images" },
+        { name: "catalog", description: "Categories, search, colors, images" },
       ],
     },
     transform: jsonSchemaTransform,
@@ -263,7 +263,7 @@ export const buildApp = async (input: AppInput): Promise<FastifyInstance> => {
     async (scope) => {
       scope.get(
         "/health",
-        { schema: { tags: ["catalogue"], summary: "Liveness probe." } },
+        { schema: { tags: ["catalog"], summary: "Liveness probe." } },
         async () => ({ status: "ok", time: clock.now().toISOString() }),
       );
 

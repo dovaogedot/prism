@@ -1,21 +1,23 @@
 {
-  "name": "hue-and-cry",
+  "name": "prism",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "A B2C storefront that sells colours.",
+  "description": "A B2C storefront that sells colors.",
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/*",
+    "e2e"
   ],
   "engines": {
     "node": ">=25.0.0"
   },
   "scripts": {
-    "build": "npm run build --workspace @hue/shared",
+    "build": "npm run build --workspace @prism/shared",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run build && npm run test --workspaces --if-present",
-    "test:unit": "npm run build && npm run test:unit --workspaces --if-present"
+    "test:unit": "npm run build && npm run test:unit --workspaces --if-present",
+    "test:e2e": "npm run e2e --workspace @prism/e2e"
   },
   "devDependencies": {
     "typescript": "^7.0.2"

@@ -1,13 +1,13 @@
 /**
- * The catalogue's vocabulary.
+ * The catalog's vocabulary.
  *
- * Colours are generated rather than listed: each leaf category owns an arc of
+ * Colors are generated rather than listed: each leaf category owns an arc of
  * the hue circle and a set of words, and the seed combines them. That gives a
  * few hundred distinct products from a page of data, and every product still
- * has a name someone would plausibly put on a vial.
+ * has a name someone would plausibly ask for by name.
  */
 
-import type { Finish } from "@hue/shared";
+import type { Finish } from "@prism/shared";
 
 export type CategorySeed = Readonly<{
   slug: string;
@@ -39,7 +39,7 @@ export const BRANDS = [
     slug: "vantablack-industries",
     name: "Vantablack Industries",
     description:
-      "Specialists in the darker end of the catalogue. Their showroom has never been successfully photographed.",
+      "Specializts in the darker end of the catalog. Their showroom has never been successfully photographed.",
   },
   {
     slug: "cyan-and-sons",
@@ -57,25 +57,25 @@ export const BRANDS = [
     slug: "munsell-and-daughters",
     name: "Munsell & Daughters",
     description:
-      "Rigorous, systematic, and quietly furious about how everyone else numbers their colours.",
+      "Rigorous, systematic, and quietly furious about how everyone else numbers their colors.",
   },
   {
     slug: "bauhaus-bros",
     name: "Bauhaus Bros",
     description:
-      "Three primaries, three shapes, no discussion. Their catalogue is one page and they are proud of it.",
+      "Three primaries, three shapes, no discussion. Their catalog is one page and they are proud of it.",
   },
   {
     slug: "hexadecimal-holdings",
     name: "Hexadecimal Holdings",
     description:
-      "Sells colours strictly by their hex value and considers names a marketing affectation.",
+      "Sells colors strictly by their hex value and considers names a marketing affectation.",
   },
   {
     slug: "perceptual-uniform",
     name: "Perceptual Uniform Ltd",
     description:
-      "Every colour is exactly as far from its neighbour as it looks. This took eleven years.",
+      "Every color is exactly as far from its neighbour as it looks. This took eleven years.",
   },
 ] as const;
 
@@ -86,7 +86,7 @@ export const FINISHES: readonly Finish[] = [
   "fluorescent",
 ];
 
-/** How the colour behaves once it is out of the vial. */
+/** How the color behaves once you have it. */
 export const FINISH_NOTES: Record<Finish, string> = {
   matte: "Absorbs light politely and returns none of it.",
   gloss: "Reflective enough to check your parting in.",
@@ -106,18 +106,18 @@ const CEREMONIAL = [
   "Ceremonial",
   "Contraband",
   "Provisional",
-  "Notarised",
+  "Notarized",
 ];
 
 export const CATEGORIES: readonly CategorySeed[] = [
   {
-    slug: "reds-and-pinks",
-    name: "Reds & Pinks",
+    slug: "red",
+    name: "Red",
     description: "Loud, arterial, or apologetic. There is no middle ground here.",
     children: [
       {
-        slug: "crimsons",
-        name: "Crimsons",
+        slug: "crimson",
+        name: "Crimson",
         description: "The serious reds. Wear a tie.",
         hue: { from: 348, to: 10 },
         saturation: { from: 62, to: 96 },
@@ -126,8 +126,8 @@ export const CATEGORIES: readonly CategorySeed[] = [
         nouns: ["Crimson", "Scarlet", "Vermilion", "Carmine", "Garnet", "Claret"],
       },
       {
-        slug: "blushes",
-        name: "Blushes",
+        slug: "blush",
+        name: "Blush",
         description: "Reds that have been asked a direct question.",
         hue: { from: 330, to: 355 },
         saturation: { from: 30, to: 72 },
@@ -138,13 +138,13 @@ export const CATEGORIES: readonly CategorySeed[] = [
     ],
   },
   {
-    slug: "oranges-and-browns",
-    name: "Oranges & Browns",
-    description: "Rust, terracotta, and the colour of a good afternoon.",
+    slug: "orange",
+    name: "Orange",
+    description: "Rust, terracotta, and the color of a good afternoon.",
     children: [
       {
-        slug: "rusts",
-        name: "Rusts",
+        slug: "rust",
+        name: "Rust",
         description: "Oxidised, weathered, faintly agricultural.",
         hue: { from: 12, to: 32 },
         saturation: { from: 48, to: 88 },
@@ -153,8 +153,8 @@ export const CATEGORIES: readonly CategorySeed[] = [
         nouns: ["Rust", "Terracotta", "Ochre", "Paprika", "Tangerine", "Ember"],
       },
       {
-        slug: "earths",
-        name: "Earths",
+        slug: "earth",
+        name: "Earth",
         description: "Browns for people who say 'browns' without flinching.",
         hue: { from: 20, to: 40 },
         saturation: { from: 18, to: 52 },
@@ -165,13 +165,13 @@ export const CATEGORIES: readonly CategorySeed[] = [
     ],
   },
   {
-    slug: "yellows",
-    name: "Yellows",
+    slug: "yellow",
+    name: "Yellow",
     description: "From gold leaf to hazard tape.",
     children: [
       {
-        slug: "golds",
-        name: "Golds",
+        slug: "gold",
+        name: "Gold",
         description: "Expensive-looking without the paperwork.",
         hue: { from: 38, to: 52 },
         saturation: { from: 52, to: 92 },
@@ -180,8 +180,8 @@ export const CATEGORIES: readonly CategorySeed[] = [
         nouns: ["Gold", "Saffron", "Amber", "Honey", "Bullion", "Marigold"],
       },
       {
-        slug: "acids",
-        name: "Acids",
+        slug: "acid",
+        name: "Acid",
         description: "Visible from orbit. Handle with sunglasses.",
         hue: { from: 52, to: 68 },
         saturation: { from: 76, to: 100 },
@@ -192,13 +192,13 @@ export const CATEGORIES: readonly CategorySeed[] = [
     ],
   },
   {
-    slug: "greens",
-    name: "Greens",
+    slug: "green",
+    name: "Green",
     description: "Everything from a damp wall to a traffic light.",
     children: [
       {
-        slug: "mosses",
-        name: "Mosses",
+        slug: "moss",
+        name: "Moss",
         description: "Quiet greens that have been there some time.",
         hue: { from: 82, to: 140 },
         saturation: { from: 18, to: 54 },
@@ -207,8 +207,8 @@ export const CATEGORIES: readonly CategorySeed[] = [
         nouns: ["Moss", "Fern", "Sage", "Bracken", "Thicket", "Lichen"],
       },
       {
-        slug: "limes",
-        name: "Limes",
+        slug: "lime",
+        name: "Lime",
         description: "Greens with somewhere to be.",
         hue: { from: 68, to: 96 },
         saturation: { from: 62, to: 98 },
@@ -219,13 +219,13 @@ export const CATEGORIES: readonly CategorySeed[] = [
     ],
   },
   {
-    slug: "blues",
-    name: "Blues",
-    description: "The largest section, because everyone's favourite colour is here.",
+    slug: "blue",
+    name: "Blue",
+    description: "The largest section, because everyone's favorite color is here.",
     children: [
       {
-        slug: "cyans",
-        name: "Cyans",
+        slug: "cyan",
+        name: "Cyan",
         description: "Swimming pools, hospital corridors, and the year 1998.",
         hue: { from: 168, to: 200 },
         saturation: { from: 48, to: 94 },
@@ -234,25 +234,25 @@ export const CATEGORIES: readonly CategorySeed[] = [
         nouns: ["Cyan", "Teal", "Turquoise", "Aqua", "Lagoon", "Verdigris"],
       },
       {
-        slug: "navies",
-        name: "Navies",
+        slug: "navy",
+        name: "Navy",
         description: "Blues that have read the terms and conditions.",
         hue: { from: 208, to: 242 },
         saturation: { from: 38, to: 88 },
         lightness: { from: 18, to: 48 },
-        adjectives: ["Admiralty", "Notarised", "Boardroom", "Deep", "Ceremonial", "Sworn"],
+        adjectives: ["Admiralty", "Notarized", "Boardroom", "Deep", "Ceremonial", "Sworn"],
         nouns: ["Navy", "Indigo", "Sapphire", "Midnight", "Cobalt", "Fathom"],
       },
     ],
   },
   {
-    slug: "purples",
-    name: "Purples",
+    slug: "purple",
+    name: "Purple",
     description: "Historically expensive. Still behaving like it.",
     children: [
       {
-        slug: "violets",
-        name: "Violets",
+        slug: "violet",
+        name: "Violet",
         description: "The end of the visible spectrum, and it knows.",
         hue: { from: 262, to: 290 },
         saturation: { from: 44, to: 92 },
@@ -261,8 +261,8 @@ export const CATEGORIES: readonly CategorySeed[] = [
         nouns: ["Violet", "Amethyst", "Iris", "Plum", "Orchid", "Aubergine"],
       },
       {
-        slug: "mauves",
-        name: "Mauves",
+        slug: "mauve",
+        name: "Mauve",
         description: "Invented by accident in 1856 and never fully forgiven.",
         hue: { from: 290, to: 322 },
         saturation: { from: 20, to: 60 },
@@ -273,33 +273,33 @@ export const CATEGORIES: readonly CategorySeed[] = [
     ],
   },
   {
-    slug: "neutrals",
-    name: "Neutrals",
-    description: "Colours for people who have been told to calm down.",
+    slug: "neutral",
+    name: "Neutral",
+    description: "Colors for people who have been told to calm down.",
     children: [
       {
-        slug: "greys",
-        name: "Greys",
+        slug: "gray",
+        name: "Gray",
         description: "Fifty is a conservative estimate.",
         hue: { from: 200, to: 230 },
         saturation: { from: 2, to: 12 },
         lightness: { from: 28, to: 72 },
         adjectives: ["Municipal", "Battleship", "Overcast", "Committee", "Concrete", "Provisional"],
-        nouns: ["Grey", "Slate", "Ash", "Pewter", "Graphite", "Drizzle"],
+        nouns: ["Gray", "Slate", "Ash", "Pewter", "Graphite", "Drizzle"],
       },
       {
-        slug: "off-whites",
-        name: "Off-whites",
+        slug: "off-white",
+        name: "Off-white",
         description: "White, but with a lawyer present.",
         hue: { from: 28, to: 56 },
         saturation: { from: 6, to: 24 },
         lightness: { from: 84, to: 96 },
-        adjectives: ["Municipal", "Landlord", "Eggshell", "Notarised", "Rental", "Beige"],
+        adjectives: ["Municipal", "Landlord", "Eggshell", "Notarized", "Rental", "Beige"],
         nouns: ["Bone", "Linen", "Chalk", "Oat", "Parchment", "Vanilla"],
       },
       {
-        slug: "blacks",
-        name: "Blacks",
+        slug: "black",
+        name: "Black",
         description: "Vantablack Industries' home turf. Mind the step.",
         hue: { from: 0, to: 300 },
         saturation: { from: 0, to: 22 },
@@ -313,29 +313,29 @@ export const CATEGORIES: readonly CategorySeed[] = [
 
 /** Sentences appended to descriptions, chosen at random. */
 export const DESCRIPTION_NOTES = [
-  "Ships in a 50 ml vial with a tamper-evident seal.",
-  "Not to be decanted near soft furnishings.",
+  "Delivered whole. There is nothing to open.",
+  "Not to be looked at near soft furnishings.",
   "Sold by the hue. Degrees are non-refundable.",
   "Sampled under D65 illumination, as one does.",
   "Discontinued once already. It came back.",
   "Best kept away from direct sunlight and strong opinions.",
   "Reformulated in 2019 to remove the humming.",
   "Popular with people who own exactly one chair.",
-  "Our second-most-returned colour, which we consider a compliment.",
+  "Our second-most-returned color, which we consider a compliment.",
   "Comes with a card explaining what it is not.",
 ];
 
 export const REVIEW_BODIES = [
-  "Exactly the colour on the vial. No notes.",
+  "Exactly the color on the listing. No notes.",
   "Arrived slightly more orange than advertised. Kept it anyway.",
   "Bought this for a room. The room is now about this.",
-  "Third vial this year. My partner has questions.",
+  "Third one this year. My partner has questions.",
   "Reads warmer under a bulb than in daylight, as you would expect.",
   "The finish is doing a lot of work here.",
   "Wanted something quieter. This is not quieter.",
   "Perfect. Would perceive again.",
   "Docked a star for the smell, which nobody mentions.",
-  "It is a colour. It does colour things. Content.",
+  "It is a color. It does color things. Content.",
   "Cheaper than the equivalent from Munsell and honestly indistinguishable.",
   "Absolute unit of a hue.",
 ];

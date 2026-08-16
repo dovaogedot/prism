@@ -1,5 +1,5 @@
 /**
- * A minimal PNG encoder, used to generate one swatch image per colour at seed
+ * A minimal PNG encoder, used to generate one swatch image per color at seed
  * time.
  *
  * Writing the bytes here rather than committing 250 binaries keeps the
@@ -7,7 +7,7 @@
  * an admin upload goes through — the mandatory image handling is real rather
  * than staged.
  *
- * Truecolour, 8 bits per channel, no alpha. That is the whole PNG feature set
+ * Truecolor, 8 bits per channel, no alpha. That is the whole PNG feature set
  * a flat swatch needs.
  */
 
@@ -72,7 +72,7 @@ export const encodePng = (
   header.writeUInt32BE(width, 0);
   header.writeUInt32BE(height, 4);
   header.writeUInt8(8, 8); // bit depth
-  header.writeUInt8(2, 9); // colour type 2: truecolour
+  header.writeUInt8(2, 9); // color type 2: truecolor
   header.writeUInt8(0, 10); // deflate
   header.writeUInt8(0, 11); // adaptive filtering
   header.writeUInt8(0, 12); // no interlace
@@ -118,7 +118,7 @@ const WHITE: Rgb = { red: 255, green: 255, blue: 255 };
 const BLACK: Rgb = { red: 0, green: 0, blue: 0 };
 
 /**
- * A swatch: the colour itself, lit from the top-left and falling away toward
+ * A swatch: the color itself, lit from the top-left and falling away toward
  * the bottom-right, so a grid of them reads as objects rather than as CSS
  * background rectangles.
  */

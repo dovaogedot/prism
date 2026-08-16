@@ -8,8 +8,8 @@
  * revocable stateless tokens.
  */
 
-import type { DomainError, UserRole } from "@hue/shared";
-import { Option } from "@hue/shared";
+import type { DomainError, UserRole } from "@prism/shared";
+import { Option } from "@prism/shared";
 import type { FastifyReply, FastifyRequest, preHandlerHookHandler } from "fastify";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import type { Clock } from "../platform/clock.ts";

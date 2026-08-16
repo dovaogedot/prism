@@ -9,7 +9,7 @@
  * hands back whatever the caller claims it stored is a cast with extra steps.
  */
 
-import { Option } from "@hue/shared";
+import { Option } from "@prism/shared";
 import type { Clock } from "./clock.ts";
 
 export type Cache<A> = Readonly<{

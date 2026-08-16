@@ -5,7 +5,7 @@
  * rather than at 3am when the first password reset email tries to send.
  */
 
-import type { OAuthProviderName } from "@hue/shared";
+import type { OAuthProviderName } from "@prism/shared";
 import { z } from "zod";
 
 const durationSeconds = (fallback: number) =>
@@ -30,7 +30,7 @@ const environmentSchema = z.object({
 
   /** 64 hex characters — `openssl rand -hex 32`. */
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters."),
-  JWT_ISSUER: z.string().min(1).default("hue-and-cry"),
+  JWT_ISSUER: z.string().min(1).default("prism"),
   ACCESS_TOKEN_TTL_SECONDS: durationSeconds(15 * 60),
   REFRESH_TOKEN_TTL_SECONDS: durationSeconds(7 * 24 * 60 * 60),
   TWO_FACTOR_CHALLENGE_TTL_SECONDS: durationSeconds(5 * 60),
@@ -38,7 +38,7 @@ const environmentSchema = z.object({
 
   SMTP_HOST: z.string().min(1).default("mailpit"),
   SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(1025),
-  MAIL_FROM: z.string().min(1).default("Hue & Cry <noreply@hueandcry.test>"),
+  MAIL_FROM: z.string().min(1).default("Prism <noreply@prism.test>"),
 
   /**
    * `test` accepts Google's official always-pass test token without a network

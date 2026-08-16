@@ -36,5 +36,5 @@ app.log.info(
     oauth: config.oauth.mode,
     docs: `${config.http.webOrigin}/api/docs`,
   },
-  "Hue & Cry API ready",
+  "Prism API ready",
 );

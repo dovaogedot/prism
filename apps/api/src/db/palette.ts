@@ -1,14 +1,14 @@
 /**
- * Colour generation for the seed.
+ * Color generation for the seed.
  *
  * `hslToHex` is the inverse of the `hex_to_hue`/`hex_to_saturation`/
- * `hex_to_lightness` functions in migration 0001 — the seed composes a colour
+ * `hex_to_lightness` functions in migration 0001 — the seed composes a color
  * from HSL and stores only the hex, and Postgres derives the HSL back. The
  * integration tests round-trip the two against each other, which is a stronger
  * check on the SQL than a hand-written table of expected values.
  */
 
-/** Deterministic PRNG, so `npm run seed` twice produces the same catalogue. */
+/** Deterministic PRNG, so `npm run seed` twice produces the same catalog. */
 export const mulberry32 = (seed: number): (() => number) => {
   let state = seed >>> 0;
 
@@ -43,6 +43,31 @@ export const createRandom = (seed: number): Random => {
       return chosen;
     },
   };
+};
+
+/**
+ * Fisher–Yates, driven by the seeded generator so a rebuild produces the same
+ * order twice. Used to scatter the catalog across its branches at insert time:
+ * `created_at` is what the default sort falls back to, so seeding branch by
+ * branch would open the shop on a wall of whichever branch went in last.
+ */
+export const shuffle = <A>(items: readonly A[], random: Random): readonly A[] => {
+  const copy = [...items];
+
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const target = random.between(0, index);
+    const here = copy[index];
+    const there = copy[target];
+
+    // Both indices are in range by construction; this satisfies the compiler
+    // without an assertion.
+    if (here === undefined || there === undefined) continue;
+
+    copy[index] = there;
+    copy[target] = here;
+  }
+
+  return copy;
 };
 
 const toHexPair = (channel: number): string =>

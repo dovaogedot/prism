@@ -1,5 +1,5 @@
 {
-  "name": "@hue/shared",
+  "name": "@prism/shared",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.check.json",
     "test": "vitest run",
     "test:unit": "vitest run"
   },
