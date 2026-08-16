@@ -16,6 +16,15 @@ export type CategorySeed = Readonly<{
   children: readonly LeafCategorySeed[];
 }>;
 
+/** A branch of the finisher or shifter taxonomy, and the stock it holds. */
+export type InstrumentSeed = Readonly<{
+  slug: string;
+  name: string;
+  description: string;
+  adjectives: readonly string[];
+  nouns: readonly string[];
+}>;
+
 export type LeafCategorySeed = Readonly<{
   slug: string;
   name: string;
@@ -309,6 +318,120 @@ export const CATEGORIES: readonly CategorySeed[] = [
       },
     ],
   },
+];
+
+/* ------------------------------------------------------------- finishers */
+
+/**
+ * Tools that put a finish back on a color you already own. They have a finish
+ * of their own — the one they apply — and a durability, being how many colors
+ * one will see through before it stops meaning it.
+ */
+export const FINISHER_BRANCHES: readonly InstrumentSeed[] = [
+  {
+    slug: "applicator",
+    name: "Applicator",
+    description: "Hand-held. Applied by someone who has read the leaflet.",
+    adjectives: [
+      "Bristled",
+      "Municipal",
+      "Two-handed",
+      "Trigger",
+      "Notarized",
+      "Weekday",
+      "Reconditioned",
+      "Union-approved",
+    ],
+    nouns: ["Applicator", "Wand", "Roller", "Nib", "Pad", "Trowel"],
+  },
+  {
+    slug: "bath",
+    name: "Bath",
+    description: "You lower the color in and wait. Do not agitate.",
+    adjectives: [
+      "Immersion",
+      "Overnight",
+      "Cold",
+      "Ceremonial",
+      "Industrial",
+      "Provisional",
+      "Unattended",
+      "Deep",
+    ],
+    nouns: ["Bath", "Dip", "Vat", "Soak", "Tank", "Steep"],
+  },
+];
+
+/** What a finisher's own finish says about it. */
+export const FINISHER_NOTES: Record<Finish, string> = {
+  matte:
+    "Leaves a surface that absorbs light and any follow-up questions. The most-returned finisher we stock, and the one we stand behind.",
+  gloss:
+    "Brings a color back to the reflectivity it had in the showroom. You will see yourself in it, which not everyone enjoys.",
+  iridescent:
+    "Restores the disagreement between where you stand and what you see. Apply in a room with more than one chair.",
+  fluorescent:
+    "Puts the shouting back. Certified for indoor use in three countries, none of which we will name.",
+};
+
+/* -------------------------------------------------------------- shifters */
+
+/**
+ * Tools that turn a color you own into one you would rather have. Sold by the
+ * degree, clockwise or counter-clockwise, and nothing else about them varies.
+ */
+export const SHIFTER_BRANCHES: readonly InstrumentSeed[] = [
+  {
+    slug: "nudge",
+    name: "Nudge",
+    description: "For colors that are nearly right and know it.",
+    adjectives: [
+      "Polite",
+      "Apologetic",
+      "Desk",
+      "Pocket",
+      "Sunday",
+      "Provisional",
+      "Committee",
+      "Hairline",
+    ],
+    nouns: ["Nudge", "Tap", "Correction", "Adjustment", "Note", "Hint"],
+  },
+  {
+    slug: "swing",
+    name: "Swing",
+    description:
+      "For colors that need to become a different argument entirely.",
+    adjectives: [
+      "Unrepentant",
+      "Operatic",
+      "Tactical",
+      "Contraband",
+      "Emergency",
+      "Absolute",
+      "Regrettable",
+      "Screaming",
+    ],
+    nouns: ["Swing", "Rotation", "Sweep", "Turn", "Lurch", "Reversal"],
+  },
+];
+
+/** Where a shifter leaves you, depending on which way it turns. */
+export const DIRECTION_NOTES = {
+  cw: "Walks toward the reds, and warms on the way.",
+  ccw: "Walks toward the blues, and cools on the way.",
+} as const;
+
+/** Sentences appended to a finisher's or shifter's description. */
+export const INSTRUMENT_NOTES = [
+  "Comes with a card explaining what it will not do.",
+  "Sold without a warranty, on principle.",
+  "Do not use on a color you are fond of.",
+  "Best kept away from direct sunlight and strong opinions.",
+  "Our returns desk has asked us to stop stocking this. We have declined.",
+  "Reformulated in 2019 to remove the humming.",
+  "Works on any color. Works well on fewer.",
+  "Instructions are printed on the inside, where you will find them later.",
 ];
 
 /** Sentences appended to descriptions, chosen at random. */

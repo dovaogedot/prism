@@ -23,7 +23,27 @@ export type ProductSort = (typeof PRODUCT_SORTS)[number];
 export const FINISHES = ["matte", "gloss", "iridescent", "fluorescent"] as const;
 export type Finish = (typeof FINISHES)[number];
 
+/**
+ * The three things the shop sells, and the discriminant of every product.
+ *
+ * A color is a color. A finisher puts a finish back onto one. A shifter turns
+ * one around the wheel. They share a price, a foundry and a rating, and share
+ * almost nothing else — which is why a product is a sum type here rather than
+ * one wide record with two thirds of its fields blank.
+ *
+ * The slug of each top-level category is exactly this string, so a category
+ * filter needs no lookup to become a `WHERE kind = …`.
+ */
+export const PRODUCT_KINDS = ["color", "finisher", "shifter"] as const;
+export type ProductKind = (typeof PRODUCT_KINDS)[number];
+
+/** Which way round the wheel a shifter turns. */
+export const SHIFT_DIRECTIONS = ["cw", "ccw"] as const;
+export type ShiftDirection = (typeof SHIFT_DIRECTIONS)[number];
+
 export const HUE_BOUNDS = { min: 0, max: 360 } as const;
+/** A shifter that turned 0° would not be a shifter. */
+export const ARC_BOUNDS = { min: 1, max: 360 } as const;
 export const SATURATION_BOUNDS = { min: 0, max: 100 } as const;
 export const LIGHTNESS_BOUNDS = { min: 0, max: 100 } as const;
 export const PRICE_BOUNDS = { min: 0, max: 100_000_000 } as const;
@@ -76,9 +96,15 @@ const searchTermSchema = z
 
 export const productQueryParamsSchema = z.object({
   q: searchTermSchema.optional(),
-  category: slugSchema.optional(),
+  /** The category, which is the kind. One at a time — a product is one thing. */
+  category: z.enum(PRODUCT_KINDS).optional(),
+  /** A node of the taxonomy beneath a category; matches its whole subtree. */
+  tag: slugSchema.optional(),
   brands: commaSeparated.pipe(z.array(slugSchema).max(20)),
   finishes: commaSeparated.pipe(z.array(z.enum(FINISHES)).max(FINISHES.length)),
+  direction: z.enum(SHIFT_DIRECTIONS).optional(),
+  arcMin: z.coerce.number().int().min(ARC_BOUNDS.min).max(ARC_BOUNDS.max).optional(),
+  arcMax: z.coerce.number().int().min(ARC_BOUNDS.min).max(ARC_BOUNDS.max).optional(),
   priceMin: z.coerce.number().int().min(PRICE_BOUNDS.min).max(PRICE_BOUNDS.max).optional(),
   priceMax: z.coerce.number().int().min(PRICE_BOUNDS.min).max(PRICE_BOUNDS.max).optional(),
   minRating: z.coerce.number().min(0).max(5).optional(),
@@ -126,8 +152,11 @@ export type NumericRange = Readonly<{ min: number; max: number }>;
 
 export type ProductQuery = Readonly<{
   text: Option<string>;
-  categorySlug: Option<string>;
+  /** The category. Absent means all three at once. */
+  kind: Option<ProductKind>;
+  tagSlug: Option<string>;
   brandSlugs: readonly string[];
+  /** Colors have one; so does a finisher, being the finish it puts back. */
   finishes: readonly Finish[];
   price: Option<NumericRange>;
   minRating: Option<number>;
@@ -135,6 +164,8 @@ export type ProductQuery = Readonly<{
   hue: Option<NumericRange>;
   saturation: Option<NumericRange>;
   lightness: Option<NumericRange>;
+  direction: Option<ShiftDirection>;
+  arc: Option<NumericRange>;
   sort: ProductSort;
   page: number;
   perPage: number;
@@ -160,7 +191,8 @@ export const toProductQuery = (params: ProductQueryParams): ProductQuery => ({
   text: Option.filter<string>((text) => text.length > 0)(
     Option.fromNullable(params.q),
   ),
-  categorySlug: Option.fromNullable(params.category),
+  kind: Option.fromNullable(params.category),
+  tagSlug: Option.fromNullable(params.tag),
   brandSlugs: params.brands,
   finishes: params.finishes,
   price: Option.map(ordered)(rangeOf(params.priceMin, params.priceMax, PRICE_BOUNDS)),
@@ -173,6 +205,9 @@ export const toProductQuery = (params: ProductQueryParams): ProductQuery => ({
   lightness: Option.map(ordered)(
     rangeOf(params.lightnessMin, params.lightnessMax, LIGHTNESS_BOUNDS),
   ),
+  direction: Option.fromNullable(params.direction),
+  // An arc is a span, not a position on a circle, so it orders like price.
+  arc: Option.map(ordered)(rangeOf(params.arcMin, params.arcMax, ARC_BOUNDS)),
   sort: params.sort,
   page: params.page,
   perPage: params.perPage,
@@ -189,15 +224,51 @@ export type Rating = Readonly<{ average: number; count: number }>;
 export type BrandRef = Readonly<{ slug: string; name: string }>;
 export type CategoryRef = Readonly<{ slug: string; name: string }>;
 
+/**
+ * What a color is: one stored hex and one stored finish. The three channels
+ * come back from the database derived, never written.
+ */
+export type ColorSpec = Readonly<{
+  kind: "color";
+  hex: string;
+  finish: Finish;
+  hue: number;
+  saturation: number;
+  lightness: number;
+}>;
+
+/** What a finisher is: the finish it puts back, and how many colors' worth. */
+export type FinisherSpec = Readonly<{
+  kind: "finisher";
+  finish: Finish;
+  durability: number;
+}>;
+
+/** What a shifter is: which way round the wheel, and how far. */
+export type ShifterSpec = Readonly<{
+  kind: "shifter";
+  direction: ShiftDirection;
+  arcDegrees: number;
+}>;
+
+/**
+ * The part of a product that differs by category.
+ *
+ * Everything outside this is common to all three, so nothing here is ever
+ * absent-but-typed: a shifter has no `hex` field at all, rather than a `hex`
+ * that is null.
+ */
+export type ProductSpec = ColorSpec | FinisherSpec | ShifterSpec;
+
 export type ProductSummary = Readonly<{
   id: string;
   slug: string;
   name: string;
-  hex: string;
-  finish: Finish;
+  spec: ProductSpec;
   priceCents: number;
   stockQuantity: number;
   brand: BrandRef;
+  /** The node it is filed under, which may be a tag beneath its category. */
   category: CategoryRef;
   rating: Rating;
   primaryImage: Option<ProductImage>;
@@ -216,17 +287,15 @@ export type ProductDetail = ProductSummary &
     description: string;
     /**
      * The tag chain, outermost first: an acid is tagged yellow, then acid.
+     * The category itself is not in it — that is what `spec.kind` says.
      *
      * The grid works this out on the client — a search response already carries
-     * the whole category tree in its facets — but one product on its own has no
+     * the whole taxonomy in its facets — but one product on its own has no
      * tree to walk, so its detail carries the answer.
      */
     tags: readonly CategoryRef[];
     /** Metric is stored, imperial is derived — see `units.ts`. */
     measurements: Measurements;
-    hue: number;
-    saturation: number;
-    lightness: number;
     images: readonly ProductImage[];
     reviews: readonly ProductReview[];
   }>;
@@ -238,20 +307,24 @@ export type FacetBucket = Readonly<{
 }>;
 
 /**
- * Categories are a tree, so their facet carries enough shape to be rendered as
- * one. A parent is selectable in its own right — picking "Yellows" means every
- * color beneath it — and its count is its whole subtree, which is why the
- * numbers on a parent and its children do not sum to the total.
+ * Tags are a tree, so their facet carries enough shape to be rendered as one.
+ * A parent is selectable in its own right — picking "Yellow" means every color
+ * beneath it — and its count is its whole subtree, which is why the numbers on
+ * a parent and its children do not sum to the total.
  */
-export type CategoryFacetBucket = FacetBucket &
+export type TagFacetBucket = FacetBucket &
   Readonly<{
     parentSlug: Option<string>;
-    /** 0 for a root category, 1 for its children, and so on. */
+    /** 0 for a tag directly under a category, 1 for its children, and so on. */
     depth: number;
+    /** Which category's taxonomy this tag belongs to. */
+    kind: ProductKind;
   }>;
 
 export type ProductFacets = Readonly<{
-  categories: readonly CategoryFacetBucket[];
+  /** The three categories, always all three, counted independently. */
+  categories: readonly FacetBucket[];
+  tags: readonly TagFacetBucket[];
   brands: readonly FacetBucket[];
   finishes: readonly FacetBucket[];
   /** "4 stars & up", "3 stars & up", … */
@@ -275,6 +348,24 @@ export type CategoryNode = Readonly<{
   productCount: number;
   children: readonly CategoryNode[];
 }>;
+
+/** Plural, because a category names a shelf rather than a product. */
+export const KIND_LABELS: Record<ProductKind, string> = {
+  color: "Colors",
+  finisher: "Finishers",
+  shifter: "Shifters",
+};
+
+export const DIRECTION_LABELS: Record<ShiftDirection, string> = {
+  cw: "Clockwise",
+  ccw: "Counter-clockwise",
+};
+
+/** Compact enough to sit on a card: red → yellow is ↻, red → violet is ↺. */
+export const DIRECTION_SYMBOLS: Record<ShiftDirection, string> = {
+  cw: "↻",
+  ccw: "↺",
+};
 
 export type Suggestion = Readonly<{
   kind: "product" | "brand" | "category";

@@ -13,7 +13,14 @@
  */
 
 import { Option } from "../fp/option.ts";
-import { FINISHES, type CategoryFacetBucket, type FacetBucket, type Finish } from "./catalog.ts";
+import {
+  FINISHES,
+  PRODUCT_KINDS,
+  type FacetBucket,
+  type Finish,
+  type ProductKind,
+  type TagFacetBucket,
+} from "./catalog.ts";
 
 /** Consonants that take "-es" rather than a bare "-s". */
 const SIBILANT_ENDINGS = ["s", "x", "z", "ch", "sh"] as const;
@@ -54,6 +61,7 @@ export const singular = (word: string): string => {
  * Everything else stays free text.
  */
 export type ResolvedTerm =
+  | Readonly<{ kind: "category"; category: ProductKind }>
   | Readonly<{ kind: "finish"; finish: Finish }>
   | Readonly<{ kind: "tag"; slug: string }>
   | Readonly<{ kind: "text"; text: string }>;
@@ -61,12 +69,23 @@ export type ResolvedTerm =
 const finishNamed = (word: string): Option<Finish> =>
   Option.fromNullable(FINISHES.find((finish) => finish === word));
 
+const categoryNamed = (word: string): Option<ProductKind> =>
+  Option.fromNullable(PRODUCT_KINDS.find((category) => category === word));
+
+/**
+ * Categories are tried first because they are the coarsest answer and the one
+ * a shopper typing "shifters" plainly means. Nothing collides: no finish and
+ * no tag in the catalog is called color, finisher or shifter.
+ */
 export const resolveSearchTerm = (
   term: string,
   tagSlugs: readonly string[],
 ): ResolvedTerm => {
   const trimmed = term.trim();
   const word = singular(trimmed);
+
+  const category = categoryNamed(word);
+  if (Option.isSome(category)) return { kind: "category", category: category.value };
 
   const finish = finishNamed(word);
   if (Option.isSome(finish)) return { kind: "finish", finish: finish.value };
@@ -85,11 +104,11 @@ export const resolveSearchTerm = (
  * answer while a stale facet list is still on screen.
  */
 export const tagChain = (
-  categories: readonly CategoryFacetBucket[],
+  tags: readonly TagFacetBucket[],
   slug: string,
 ): readonly FacetBucket[] => {
   const chain: FacetBucket[] = [];
-  let current = categories.find((bucket) => bucket.value === slug);
+  let current = tags.find((bucket) => bucket.value === slug);
 
   // The tree is finite and acyclic — `category_not_own_parent` and the closure
   // walk both depend on it — so following parents terminates.
@@ -98,7 +117,7 @@ export const tagChain = (
 
     const parent = current.parentSlug;
     current = Option.isSome(parent)
-      ? categories.find((bucket) => bucket.value === parent.value)
+      ? tags.find((bucket) => bucket.value === parent.value)
       : undefined;
   }
 

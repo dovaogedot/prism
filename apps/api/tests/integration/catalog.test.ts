@@ -5,7 +5,13 @@
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { hslToHex } from "../../src/db/palette.ts";
-import { jsonOf, seedCatalog, startHarness, type Harness } from "../support/harness.ts";
+import {
+  jsonOf,
+  seedCatalog,
+  seedInstruments,
+  startHarness,
+  type Harness,
+} from "../support/harness.ts";
 
 let harness: Harness;
 
@@ -40,21 +46,26 @@ describe("derived values", () => {
     const body = jsonOf(response);
 
     // #ff8800 is hsl(32, 100%, 50%). Nothing wrote these columns.
-    expect(body["hue"]).toBe(32);
-    expect(body["saturation"]).toBe(100);
-    expect(body["lightness"]).toBe(50);
+    expect(body["spec"]).toMatchObject({
+      kind: "color",
+      hex: "#ff8800",
+      finish: "gloss",
+      hue: 32,
+      saturation: 100,
+      lightness: 50,
+    });
   });
 
   it("agrees with the TypeScript conversion in the opposite direction", async () => {
     // hslToHex composes a color; the SQL functions take it apart again.
     // Round-tripping the two catches a drift in either.
     const response = await get("/api/v1/products/cathedral-moss");
-    const body = jsonOf(response);
+    const spec = jsonOf(response)["spec"] as Record<string, number>;
 
     const rebuilt = hslToHex(
-      Number(body["hue"]),
-      Number(body["saturation"]),
-      Number(body["lightness"]),
+      Number(spec["hue"]),
+      Number(spec["saturation"]),
+      Number(spec["lightness"]),
     );
 
     const channelsOf = (hex: string) =>
@@ -121,8 +132,8 @@ describe("derived values", () => {
     const { sql } = harness.database;
 
     await sql`
-      INSERT INTO category (slug, name, parent_id)
-      SELECT 'crimson', 'Crimson', id FROM category WHERE slug = 'reds'
+      INSERT INTO category (slug, name, kind, parent_id)
+      SELECT 'crimson', 'Crimson', 'color', id FROM category WHERE slug = 'reds'
     `;
     await sql`
       UPDATE product SET category_id = (SELECT id FROM category WHERE slug = 'crimson')
@@ -254,8 +265,8 @@ describe("GET /products", () => {
 
     // Nothing sits directly in "Reds" any more, only in "Reds → Crimsons".
     await sql`
-      INSERT INTO category (slug, name, parent_id)
-      SELECT 'crimsons', 'Crimsons', id FROM category WHERE slug = 'reds'
+      INSERT INTO category (slug, name, kind, parent_id)
+      SELECT 'crimsons', 'Crimsons', 'color', id FROM category WHERE slug = 'reds'
     `;
     await sql`
       UPDATE product SET category_id = (SELECT id FROM category WHERE slug = 'crimsons')
@@ -274,8 +285,8 @@ describe("GET /products", () => {
     const { sql } = harness.database;
 
     await sql`
-      INSERT INTO category (slug, name, parent_id)
-      SELECT 'crimsons', 'Crimsons', id FROM category WHERE slug = 'reds'
+      INSERT INTO category (slug, name, kind, parent_id)
+      SELECT 'crimsons', 'Crimsons', 'color', id FROM category WHERE slug = 'reds'
     `;
     await sql`
       UPDATE product SET category_id = (SELECT id FROM category WHERE slug = 'crimsons')
@@ -283,7 +294,7 @@ describe("GET /products", () => {
     `;
 
     const searched = jsonOf(await get("/api/v1/products?q=reds"));
-    const filtered = jsonOf(await get("/api/v1/products?category=reds"));
+    const filtered = jsonOf(await get("/api/v1/products?tag=reds"));
 
     expect(searched["total"]).toBe(filtered["total"]);
   });
@@ -341,8 +352,8 @@ describe("GET /products", () => {
   it("filters by a hue arc that wraps through zero", async () => {
     const { sql } = harness.database;
     await sql`
-      INSERT INTO product (slug, name, description, price_cents, category_id, brand_id, hex, finish)
-      SELECT 'crimson', 'Crimson', 'red', 1000, c.id, b.id, '#e01020', 'matte'
+      INSERT INTO product (slug, name, description, price_cents, category_id, brand_id, kind, hex, finish)
+      SELECT 'crimson', 'Crimson', 'red', 1000, c.id, b.id, 'color', '#e01020', 'matte'
       FROM category c, brand b WHERE c.slug = 'reds' AND b.slug = 'chroma-labs'
     `;
 
@@ -393,6 +404,7 @@ describe("facets", () => {
       "finishes",
       "priceCents",
       "ratings",
+      "tags",
     ]);
   });
 
@@ -440,8 +452,8 @@ describe("facets", () => {
 
     // Give "reds" a child and file a color under it.
     await sql`
-      INSERT INTO category (slug, name, parent_id)
-      SELECT 'crimsons', 'Crimsons', id FROM category WHERE slug = 'reds'
+      INSERT INTO category (slug, name, kind, parent_id)
+      SELECT 'crimsons', 'Crimsons', 'color', id FROM category WHERE slug = 'reds'
     `;
     await sql`
       UPDATE product SET category_id = (SELECT id FROM category WHERE slug = 'crimsons')
@@ -452,7 +464,7 @@ describe("facets", () => {
       string,
       unknown
     >;
-    const buckets = facets["categories"] as readonly Record<string, unknown>[];
+    const buckets = facets["tags"] as readonly Record<string, unknown>[];
 
     const parent = buckets.find((bucket) => bucket["value"] === "reds");
     const child = buckets.find((bucket) => bucket["value"] === "crimsons");
@@ -465,7 +477,7 @@ describe("facets", () => {
     expect(child?.["count"]).toBe(1);
   });
 
-  it("counts categories correctly while another filter is active", async () => {
+  it("counts tags correctly while another filter is active", async () => {
     // The subtree query joins the listing view without an alias so the shared
     // condition builder's column references resolve. Aliasing it made this
     // 500 — but only once a filter was applied, so an unfiltered check passed.
@@ -473,7 +485,7 @@ describe("facets", () => {
 
     expect(response.statusCode).toBe(200);
     expect(
-      (jsonOf(response)["facets"] as Record<string, unknown>)["categories"],
+      (jsonOf(response)["facets"] as Record<string, unknown>)["tags"],
     ).toBeDefined();
   });
 
@@ -534,6 +546,153 @@ describe("facets", () => {
   });
 });
 
+describe("the three categories", () => {
+  beforeEach(async () => {
+    await seedCatalog(harness, COLORS);
+    await seedInstruments(harness);
+  });
+
+  it("gives each kind its own spec and nothing of the others'", async () => {
+    const finisher = jsonOf(await get("/api/v1/products/test-applicator"));
+    const shifter = jsonOf(await get("/api/v1/products/test-swing"));
+
+    expect(finisher["spec"]).toEqual({
+      kind: "finisher",
+      finish: "gloss",
+      durability: 12,
+    });
+    expect(shifter["spec"]).toEqual({
+      kind: "shifter",
+      direction: "ccw",
+      arcDegrees: 120,
+    });
+  });
+
+  it("measures all three, from whatever each one carries", async () => {
+    // The requirement is a weight and a dimension on every product, so no kind
+    // is allowed to have none. A finisher's come from its finish and its
+    // durability; a shifter's from its arc and which way it turns.
+    for (const slug of ["test-applicator", "test-swing", "void-black"]) {
+      const measurements = jsonOf(await get(`/api/v1/products/${slug}`))[
+        "measurements"
+      ] as Record<string, Record<string, number>>;
+
+      expect(measurements["metric"]?.["weightGrams"]).toBeGreaterThan(0);
+      expect(measurements["metric"]?.["reachMeters"]).toBeGreaterThan(0);
+      expect(measurements["imperial"]?.["weightOunces"]).toBeGreaterThan(0);
+    }
+  });
+
+  it("turns a shifter's direction into its temperature", async () => {
+    // Counter-clockwise walks toward the blues, so it lands below the 6000 K
+    // neutral point; clockwise walks toward the reds and lands above it.
+    const { sql } = harness.database;
+
+    await sql`
+      INSERT INTO product (
+        slug, name, description, price_cents, category_id, brand_id,
+        kind, arc_degrees, direction
+      )
+      SELECT 'test-swing-cw', 'Test Swing CW', 'The other way.', 6900, c.id, b.id,
+             'shifter', 120, 'cw'
+      FROM category c, brand b WHERE c.slug = 'shifter' AND b.slug = 'chroma-labs'
+    `;
+
+    const kelvin = async (slug: string) =>
+      (
+        jsonOf(await get(`/api/v1/products/${slug}`))["measurements"] as Record<
+          string,
+          Record<string, number>
+        >
+      )["metric"]?.["temperatureKelvin"];
+
+    expect(await kelvin("test-swing")).toBeLessThan(6000);
+    expect(await kelvin("test-swing-cw")).toBeGreaterThan(6000);
+  });
+
+  it("filters by category", async () => {
+    expect(jsonOf(await get("/api/v1/products"))["total"]).toBe(COLORS.length + 2);
+    expect(jsonOf(await get("/api/v1/products?category=color"))["total"]).toBe(
+      COLORS.length,
+    );
+    expect(jsonOf(await get("/api/v1/products?category=finisher"))["total"]).toBe(1);
+    expect(jsonOf(await get("/api/v1/products?category=shifter"))["total"]).toBe(1);
+  });
+
+  it("filters shifters by arc and direction", async () => {
+    const totalOf = async (query: string) =>
+      jsonOf(await get(`/api/v1/products?category=shifter&${query}`))["total"];
+
+    expect(await totalOf("arcMin=100&arcMax=200")).toBe(1);
+    expect(await totalOf("arcMin=200&arcMax=300")).toBe(0);
+    expect(await totalOf("direction=ccw")).toBe(1);
+    expect(await totalOf("direction=cw")).toBe(0);
+  });
+
+  it("counts all three categories whatever else is filtered", async () => {
+    // A kind-specific filter must not zero the other categories: no color has
+    // an arc, so counting colors against one would answer a question the
+    // shopper never asked. Switching category clears those filters anyway.
+    const facets = jsonOf(
+      await get("/api/v1/products?category=shifter&arcMin=100&direction=ccw"),
+    )["facets"] as Record<string, unknown>;
+
+    const categories = facets["categories"] as readonly Record<string, unknown>[];
+    const countOf = (value: string) =>
+      categories.find((bucket) => bucket["value"] === value)?.["count"];
+
+    expect(categories).toHaveLength(3);
+    expect(countOf("color")).toBe(COLORS.length);
+    expect(countOf("finisher")).toBe(1);
+    expect(countOf("shifter")).toBe(1);
+  });
+
+  it("keeps tags out of the category facet and categories out of the tags", async () => {
+    const facets = jsonOf(await get("/api/v1/products"))["facets"] as Record<
+      string,
+      unknown
+    >;
+
+    const categories = (facets["categories"] as readonly Record<string, string>[]).map(
+      (bucket) => bucket["value"],
+    );
+    const tags = (facets["tags"] as readonly Record<string, string>[]).map(
+      (bucket) => bucket["value"],
+    );
+
+    expect(categories).toEqual(["color", "finisher", "shifter"]);
+    expect(tags).toEqual(["reds"]);
+  });
+
+  it("refuses a product carrying another variant's columns", async () => {
+    // The database rejects it, so no code path has to remember to.
+    await expect(
+      harness.database.sql`
+        INSERT INTO product (
+          slug, name, description, price_cents, category_id, brand_id,
+          kind, hex, arc_degrees, direction
+        )
+        SELECT 'impossible', 'Impossible', 'x', 100, c.id, b.id,
+               'shifter', '#ff0000', 90, 'cw'
+        FROM category c, brand b WHERE c.slug = 'shifter' AND b.slug = 'chroma-labs'
+      `,
+    ).rejects.toThrow();
+  });
+
+  it("refuses a product filed outside its own category", async () => {
+    await expect(
+      harness.database.sql`
+        INSERT INTO product (
+          slug, name, description, price_cents, category_id, brand_id,
+          kind, hex, finish
+        )
+        SELECT 'misfiled', 'Misfiled', 'x', 100, c.id, b.id, 'color', '#ff0000', 'matte'
+        FROM category c, brand b WHERE c.slug = 'shifter' AND b.slug = 'chroma-labs'
+      `,
+    ).rejects.toThrow();
+  });
+});
+
 describe("GET /products/suggest", () => {
   beforeEach(async () => {
     await seedCatalog(harness, COLORS);
@@ -564,26 +723,49 @@ describe("GET /categories", () => {
   it("nests children under their parent and counts the whole subtree", async () => {
     const { sql } = harness.database;
 
-    await sql`INSERT INTO category (slug, name) VALUES ('reds', 'Reds')`;
     await sql`
-      INSERT INTO category (slug, name, parent_id)
-      SELECT 'crimsons', 'Crimsons', id FROM category WHERE slug = 'reds'
+      INSERT INTO category (slug, name, kind, parent_id)
+      SELECT 'reds', 'Reds', 'color', id FROM category WHERE slug = 'color'
+    `;
+    await sql`
+      INSERT INTO category (slug, name, kind, parent_id)
+      SELECT 'crimsons', 'Crimsons', 'color', id FROM category WHERE slug = 'reds'
     `;
     await sql`INSERT INTO brand (slug, name) VALUES ('chroma-labs', 'Chroma Labs')`;
     await sql`
-      INSERT INTO product (slug, name, description, price_cents, category_id, brand_id, hex, finish)
-      SELECT 'deep-crimson', 'Deep Crimson', 'red', 1000, c.id, b.id, '#a00020', 'matte'
+      INSERT INTO product (slug, name, description, price_cents, category_id, brand_id, kind, hex, finish)
+      SELECT 'deep-crimson', 'Deep Crimson', 'red', 1000, c.id, b.id, 'color', '#a00020', 'matte'
       FROM category c, brand b WHERE c.slug = 'crimsons' AND b.slug = 'chroma-labs'
     `;
 
     const tree = JSON.parse((await get("/api/v1/categories")).body);
 
-    expect(tree).toHaveLength(1);
-    expect(tree[0].slug).toBe("reds");
-    expect(tree[0].children[0].slug).toBe("crimsons");
-    // The product sits in the child, but the parent counts it too.
-    expect(tree[0].productCount).toBe(1);
-    expect(tree[0].children[0].productCount).toBe(1);
+    // The three categories are the roots; the taxonomy hangs beneath them.
+    expect(tree.map((node: { slug: string }) => node.slug)).toEqual([
+      "color",
+      "finisher",
+      "shifter",
+    ]);
+
+    const colors = tree[0];
+    expect(colors.children[0].slug).toBe("reds");
+    expect(colors.children[0].children[0].slug).toBe("crimsons");
+    // The product sits two levels down, but every ancestor counts it.
+    expect(colors.productCount).toBe(1);
+    expect(colors.children[0].productCount).toBe(1);
+    expect(colors.children[0].children[0].productCount).toBe(1);
+  });
+
+  it("refuses a subtree that mixes kinds", async () => {
+    // The composite foreign key on (parent_id, kind) is what makes a category
+    // the root of its own taxonomy: a shifter tag cannot be filed under Colors,
+    // so no product can end up on a shelf its variant does not fit.
+    await expect(
+      harness.database.sql`
+        INSERT INTO category (slug, name, kind, parent_id)
+        SELECT 'wrong', 'Wrong', 'shifter', id FROM category WHERE slug = 'color'
+      `,
+    ).rejects.toThrow();
   });
 });
 

@@ -9,14 +9,20 @@
  */
 
 import {
+  ARC_BOUNDS,
+  DIRECTION_LABELS,
   formatPrice,
   isCents,
   LIGHTNESS_BOUNDS,
   Option,
+  PRODUCT_KINDS,
   SATURATION_BOUNDS,
+  SHIFT_DIRECTIONS,
   type FacetBucket,
   type NumericRange,
   type ProductFacets,
+  type ProductKind,
+  type ShiftDirection,
 } from "@prism/shared";
 import { useState, type ReactNode } from "react";
 import { match, P } from "ts-pattern";
@@ -24,9 +30,14 @@ import { HueRing } from "./HueRing.tsx";
 import { RangeSlider } from "./RangeSlider.tsx";
 
 export type FacetState = Readonly<{
+  /** The category, or "" for all three at once. */
   category: string;
+  tag: string;
   brands: readonly string[];
   finishes: readonly string[];
+  direction: string;
+  arcMin: string;
+  arcMax: string;
   minRating: string;
   priceMin: string;
   priceMax: string;
@@ -165,6 +176,129 @@ const CheckList = ({
   </ul>
 );
 
+/**
+ * The same list, exclusive. Clicking the chosen one clears it, so a category
+ * or a finish is never a one-way door.
+ */
+const RadioList = ({
+  buckets,
+  selected,
+  onSelect,
+  name,
+  /**
+   * Whether an empty bucket locks. The category list opts out: it is the first
+   * filter, and choosing one clears every filter below it — so a category
+   * showing zero under the current filters is still a live destination, not the
+   * dead end the strike-through means everywhere else.
+   */
+  lockEmpty = true,
+}: Readonly<{
+  buckets: readonly FacetBucket[];
+  selected: string;
+  onSelect: (value: string) => void;
+  name: string;
+  lockEmpty?: boolean;
+}>) => (
+  <ul className="space-y-0.5">
+    {buckets.map((bucket) => {
+      const isSelected = selected === bucket.value;
+      const locked = lockEmpty && bucket.count === 0 && !isSelected;
+
+      return (
+        <li key={bucket.value}>
+          <label className={bucketClasses(locked, isSelected)}>
+            <input
+              type="radio"
+              name={name}
+              checked={isSelected}
+              disabled={locked}
+              // `onChange` never fires for the already-checked radio, so
+              // clearing has to come from the click itself.
+              onChange={() => onSelect(bucket.value)}
+              onClick={() => {
+                if (isSelected) onSelect("");
+              }}
+              className="size-4 shrink-0 accent-[--color-accent] disabled:opacity-40"
+            />
+            <span className="flex-1 truncate text-ink">{bucket.label}</span>
+            <span className="shrink-0 text-xs tabular-nums text-ink-faint">
+              {bucket.count}
+            </span>
+          </label>
+        </li>
+      );
+    })}
+  </ul>
+);
+
+/**
+ * Two positions and a knob that slides between them. There are exactly two
+ * directions and no third, so a slider says more than two checkboxes would —
+ * and clearing it is a separate button rather than a phantom middle position.
+ */
+const DirectionToggle = ({
+  value,
+  onChange,
+}: Readonly<{
+  value: Option<ShiftDirection>;
+  onChange: (next: Option<ShiftDirection>) => void;
+}>) => {
+  const chosen = Option.match<ShiftDirection, ShiftDirection | "none">({
+    onSome: (direction) => direction,
+    onNone: () => "none",
+  })(value);
+
+  return (
+    <div className="space-y-2">
+      <div
+        role="group"
+        aria-label="Direction"
+        className="relative flex rounded-lg border border-line bg-sunken p-0.5"
+      >
+        {/* The knob, moved rather than redrawn, so the two states are one control. */}
+        {match(chosen)
+          .with("none", () => null)
+          .otherwise((direction) => (
+            <span
+              aria-hidden="true"
+              className={`absolute inset-y-0.5 w-[calc(50%-0.125rem)] rounded-md bg-accent transition-transform duration-200 ${
+                direction === "ccw" ? "translate-x-full" : ""
+              }`}
+            />
+          ))}
+
+        {SHIFT_DIRECTIONS.map((direction) => (
+          <button
+            key={direction}
+            type="button"
+            aria-pressed={chosen === direction}
+            onClick={() => onChange(Option.some(direction))}
+            className={`relative z-10 flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+              chosen === direction ? "text-accent-ink" : "text-ink-soft hover:text-ink"
+            }`}
+          >
+            {direction === "cw" ? "↻ CW" : "↺ CCW"}
+          </button>
+        ))}
+      </div>
+
+      {match(chosen)
+        .with("none", () => (
+          <p className="text-xs text-ink-faint">Either way round.</p>
+        ))
+        .otherwise((direction) => (
+          <button
+            type="button"
+            onClick={() => onChange(Option.none)}
+            className="w-full rounded-lg border border-line py-1.5 text-xs font-medium text-ink-soft hover:bg-sunken hover:text-ink"
+          >
+            {DIRECTION_LABELS[direction]} — clear
+          </button>
+        ))}
+    </div>
+  );
+};
+
 /* ------------------------------------------------------------- star rating */
 
 const Star = ({ filled }: Readonly<{ filled: boolean }>) => (
@@ -225,7 +359,7 @@ const StarRating = ({
           .with(0, () => "Any rating")
           .otherwise((threshold) => {
             const total = counts.get(threshold) ?? 0;
-            return `${threshold}★ & up — ${total} color${total === 1 ? "" : "s"}`;
+            return `${threshold}★ & up — ${total} item${total === 1 ? "" : "s"}`;
           })}
       </p>
     </div>
@@ -240,9 +374,36 @@ const numberOr = (raw: string, fallback: number): number =>
 /** The ring is shown in a neutral blue while no hue is selected. */
 const DEFAULT_RAMP_HUE = 220;
 
+const isKind = (value: string): value is ProductKind =>
+  PRODUCT_KINDS.some((kind) => kind === value);
+
+const isDirection = (value: string): value is ShiftDirection =>
+  SHIFT_DIRECTIONS.some((direction) => direction === value);
+
 export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
   const priceBounds = facets.priceCents;
   const hueActive = state.hueMin !== "" || state.hueMax !== "";
+
+  /**
+   * Which category's controls to show. A hue ring means nothing on a shelf of
+   * tins, so the kind-specific sections appear only once a category is chosen —
+   * and with none chosen the rail is just the four filters all three share.
+   */
+  const chosenKind: Option<ProductKind> = isKind(state.category)
+    ? Option.some(state.category)
+    : Option.none;
+
+  const showsKind = (kind: ProductKind): boolean =>
+    Option.isSome(chosenKind) && chosenKind.value === kind;
+
+  const arc: NumericRange = {
+    min: numberOr(state.arcMin, ARC_BOUNDS.min),
+    max: numberOr(state.arcMax, ARC_BOUNDS.max),
+  };
+
+  const direction: Option<ShiftDirection> = isDirection(state.direction)
+    ? Option.some(state.direction)
+    : Option.none;
 
   /** The hue under the pointer, which leads the committed value while dragging. */
   const [huePreview, setHuePreview] = useState<Option<number>>(Option.none);
@@ -301,10 +462,52 @@ export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
       </div>
 
       {/*
-        Color first. It is the only filter that is specific to this shop, it is
-        the one a shopper reaches for, and the three controls read as one
-        instrument when they sit together.
+        Category first, because it decides what the rest of the rail even is.
+        The three below it are exclusive: a product is one of these things, not
+        a combination of them.
       */}
+      <Section
+        title="Category"
+        summary={Option.match<ProductKind, string>({
+          onSome: (kind) => facets.categories.find((b) => b.value === kind)?.label ?? "",
+          onNone: () => "",
+        })(chosenKind)}
+      >
+        <RadioList
+          name="category"
+          lockEmpty={false}
+          buckets={facets.categories}
+          selected={state.category}
+          onSelect={(value) =>
+            // Every kind-specific filter goes with the category that owns it.
+            // Leaving an arc behind on a shelf of colors would silently return
+            // nothing, with no visible control to explain why.
+            onChange({
+              category: value,
+              tag: "",
+              finishes: [],
+              direction: "",
+              arcMin: "",
+              arcMax: "",
+              hueMin: "",
+              hueMax: "",
+              saturationMin: "",
+              saturationMax: "",
+              lightnessMin: "",
+              lightnessMax: "",
+            })
+          }
+        />
+      </Section>
+
+      {/*
+        Colors. The three controls read as one instrument when they sit
+        together, which is why they lead the color-specific half.
+      */}
+      {match(showsKind("color"))
+        .with(false, () => null)
+        .with(true, () => (
+          <>
       <Section title="Hue" summary={hueActive ? `${hue.min}°–${hue.max}°` : ""}>
         <div className="space-y-3">
           <HueRing
@@ -400,6 +603,88 @@ export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
           onToggle={(value) => onChange({ finishes: toggle(state.finishes, value) })}
         />
       </Section>
+          </>
+        ))
+        .exhaustive()}
+
+      {/*
+        Finishers. One finish at a time, because a finisher applies exactly one
+        and asking for two would be asking for a tool that does not exist.
+      */}
+      {match(showsKind("finisher"))
+        .with(false, () => null)
+        .with(true, () => (
+          <Section
+            title="Finish"
+            summary={state.finishes[0] ?? ""}
+          >
+            <RadioList
+              name="finisher-finish"
+              buckets={facets.finishes}
+              selected={state.finishes[0] ?? ""}
+              onSelect={(value) =>
+                onChange({ finishes: value === "" ? [] : [value] })
+              }
+            />
+          </Section>
+        ))
+        .exhaustive()}
+
+      {/* Shifters: how far it turns a color, and which way round. */}
+      {match(showsKind("shifter"))
+        .with(false, () => null)
+        .with(true, () => (
+          <>
+            <Section
+              title="Arc"
+              summary={
+                state.arcMin === "" && state.arcMax === ""
+                  ? ""
+                  : `${arc.min}°–${arc.max}°`
+              }
+            >
+              <RangeSlider
+                label="Arc"
+                min={ARC_BOUNDS.min}
+                max={ARC_BOUNDS.max}
+                step={5}
+                value={arc}
+                format={(value) => `${value}°`}
+                // Deliberately not the hue wheel: an arc is how far a shifter
+                // turns, not where on the wheel it lands. The ramp reads as
+                // "a nudge" on the left and "all the way round" on the right.
+                trackBackground="linear-gradient(to right, var(--color-sunken), var(--color-accent))"
+                onChange={(next) =>
+                  onChange({
+                    arcMin: next.min <= ARC_BOUNDS.min ? "" : String(next.min),
+                    arcMax: next.max >= ARC_BOUNDS.max ? "" : String(next.max),
+                  })
+                }
+              />
+            </Section>
+
+            <Section
+              title="Direction"
+              summary={Option.match<ShiftDirection, string>({
+                onSome: (chosen) => (chosen === "cw" ? "CW" : "CCW"),
+                onNone: () => "",
+              })(direction)}
+            >
+              <DirectionToggle
+                value={direction}
+                onChange={(next) =>
+                  onChange({
+                    direction: Option.match<ShiftDirection, string>({
+                      onSome: (chosen) => chosen,
+                      onNone: () => "",
+                    })(next),
+                  })
+                }
+              />
+            </Section>
+          </>
+        ))
+        .exhaustive()}
 
       <Section
         title="Foundry"

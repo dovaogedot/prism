@@ -101,7 +101,7 @@ describe("toProductQuery", () => {
     const result = query({});
 
     expect(result.text).toEqual(Option.none);
-    expect(result.categorySlug).toEqual(Option.none);
+    expect(result.tagSlug).toEqual(Option.none);
     expect(result.price).toEqual(Option.none);
     expect(result.minRating).toEqual(Option.none);
     expect(result.hue).toEqual(Option.none);

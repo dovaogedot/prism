@@ -79,8 +79,8 @@ export const SearchBox = ({ value, onSubmit }: SearchBoxProps) => {
     setOpen(false);
 
     match(suggestion.kind)
-      .with("product", () => void navigate(`/color/${suggestion.slug}`))
-      .with("category", () => void navigate(`/?category=${suggestion.slug}`))
+      .with("product", () => void navigate(`/item/${suggestion.slug}`))
+      .with("category", () => void navigate(`/?tag=${suggestion.slug}`))
       .with("brand", () => void navigate(`/?brands=${suggestion.slug}`))
       .exhaustive();
   };
@@ -121,7 +121,7 @@ export const SearchBox = ({ value, onSubmit }: SearchBoxProps) => {
             aria-controls="search-suggestions"
             aria-autocomplete="list"
             autoComplete="off"
-            placeholder="Search colors, foundries, tags…"
+            placeholder="Search colors, tools, foundries, tags…"
             onChange={(event) => {
               setTerm(event.target.value);
               setOpen(true);

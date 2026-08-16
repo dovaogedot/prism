@@ -32,14 +32,25 @@ import {
   BRANDS,
   CATEGORIES,
   DESCRIPTION_NOTES,
+  DIRECTION_NOTES,
+  FINISHER_BRANCHES,
+  FINISHER_NOTES,
   FINISHES,
   FINISH_NOTES,
+  INSTRUMENT_NOTES,
   REVIEW_BODIES,
+  SHIFTER_BRANCHES,
+  type InstrumentSeed,
   type LeafCategorySeed,
 } from "./seed-data.ts";
+import type { Finish, ProductKind, ShiftDirection } from "@prism/shared";
+import { SHIFT_DIRECTIONS } from "@prism/shared";
+import { match } from "ts-pattern";
 
 const SEED = 20260807;
 const COLORS_PER_LEAF = 16;
+const FINISHERS_PER_FINISH = 4;
+const SHIFTERS_PER_BRANCH = 12;
 const DEMO_PASSWORD = "colors are not paint";
 
 const DEMO_ACCOUNTS = [
@@ -66,33 +77,59 @@ const hueWithin = (
   return (arc.from + random.between(0, span)) % 360;
 };
 
-type PlannedProduct = Readonly<{
+/** What every product has, whatever kind it turns out to be. */
+type PlannedCommon = Readonly<{
   slug: string;
   name: string;
   description: string;
-  hex: string;
-  finish: (typeof FINISHES)[number];
   priceCents: number;
   stockQuantity: number;
 }>;
 
-const planColorsFor = (
-  leaf: LeafCategorySeed,
+/** Mirrors `ProductSpec`, so a planned product cannot be half a variant. */
+type PlannedProduct = PlannedCommon &
+  Readonly<
+    | { kind: "color"; hex: string; finish: Finish }
+    | { kind: "finisher"; finish: Finish; durability: number }
+    | { kind: "shifter"; direction: ShiftDirection; arcDegrees: number }
+  >;
+
+/**
+ * Names are generated from a branch's own vocabulary, so the same generator
+ * serves all three kinds. Returns fewer than asked for rather than looping
+ * forever when a small vocabulary runs out of unused combinations.
+ */
+const planNamed = <A>(
+  wanted: number,
+  words: Readonly<{ adjectives: readonly string[]; nouns: readonly string[] }>,
   random: Random,
   takenSlugs: Set<string>,
-): readonly PlannedProduct[] => {
-  const planned: PlannedProduct[] = [];
+  build: (name: string, slug: string) => A,
+): readonly A[] => {
+  const planned: A[] = [];
   let attempts = 0;
 
-  while (planned.length < COLORS_PER_LEAF && attempts < COLORS_PER_LEAF * 40) {
+  while (planned.length < wanted && attempts < wanted * 40) {
     attempts += 1;
 
-    const name = `${random.pick(leaf.adjectives)} ${random.pick(leaf.nouns)}`;
+    const name = `${random.pick(words.adjectives)} ${random.pick(words.nouns)}`;
     const slug = slugify(name);
 
     if (takenSlugs.has(slug)) continue;
     takenSlugs.add(slug);
 
+    planned.push(build(name, slug));
+  }
+
+  return planned;
+};
+
+const planColorsFor = (
+  leaf: LeafCategorySeed,
+  random: Random,
+  takenSlugs: Set<string>,
+): readonly PlannedProduct[] =>
+  planNamed(COLORS_PER_LEAF, leaf, random, takenSlugs, (name, slug) => {
     const finish = random.pick(FINISHES);
     const hex = hslToHex(
       hueWithin(leaf.hue, random),
@@ -100,7 +137,8 @@ const planColorsFor = (
       random.between(leaf.lightness.from, leaf.lightness.to),
     );
 
-    planned.push({
+    return {
+      kind: "color",
       slug,
       name,
       description: [
@@ -112,11 +150,61 @@ const planColorsFor = (
       finish,
       priceCents: random.between(6, 48) * 100 + random.pick([0, 50, 99]),
       stockQuantity: random.between(0, 140),
-    });
-  }
+    };
+  });
 
-  return planned;
-};
+/**
+ * One run of finishers per finish, so every finish is buyable back and the
+ * radio in the rail never has an empty option.
+ */
+const planFinishersFor = (
+  branch: InstrumentSeed,
+  random: Random,
+  takenSlugs: Set<string>,
+): readonly PlannedProduct[] =>
+  FINISHES.flatMap((finish) =>
+    planNamed(FINISHERS_PER_FINISH, branch, random, takenSlugs, (name, slug) => ({
+      kind: "finisher",
+      slug,
+      name,
+      description: [
+        `${name}. ${branch.description}`,
+        FINISHER_NOTES[finish],
+        random.pick(INSTRUMENT_NOTES),
+      ].join(" "),
+      finish,
+      // How many colors it will see through. The expensive ones last.
+      durability: random.between(3, 60),
+      priceCents: random.between(9, 70) * 100 + random.pick([0, 50, 99]),
+      stockQuantity: random.between(0, 90),
+    })),
+  );
+
+/** Nudges turn a color a little; swings turn it into somebody else's problem. */
+const planShiftersFor = (
+  branch: InstrumentSeed,
+  arc: Readonly<{ from: number; to: number }>,
+  random: Random,
+  takenSlugs: Set<string>,
+): readonly PlannedProduct[] =>
+  planNamed(SHIFTERS_PER_BRANCH, branch, random, takenSlugs, (name, slug) => {
+    const direction = random.pick(SHIFT_DIRECTIONS);
+
+    return {
+      kind: "shifter",
+      slug,
+      name,
+      description: [
+        `${name}. ${branch.description}`,
+        DIRECTION_NOTES[direction],
+        random.pick(INSTRUMENT_NOTES),
+      ].join(" "),
+      direction,
+      arcDegrees: random.between(arc.from, arc.to),
+      priceCents: random.between(12, 90) * 100 + random.pick([0, 50, 99]),
+      stockQuantity: random.between(0, 70),
+    };
+  });
 
 const seedUsers = async (db: Database): Promise<readonly string[]> => {
   const passwordHash = await argon2.hash(DEMO_PASSWORD, {
@@ -143,6 +231,61 @@ const seedUsers = async (db: Database): Promise<readonly string[]> => {
     .map((row) => row.id);
 };
 
+/** The three roots come from migration 0005 — one per `product_kind`. */
+const categoryIdBySlug = async (db: Database, slug: string): Promise<string> => {
+  const rows = await db
+    .select({ id: categories.id })
+    .from(categories)
+    .where(eq(categories.slug, slug))
+    .limit(1);
+
+  const id = rows[0]?.id;
+  if (id === undefined) throw new Error(`category ${slug} missing`);
+
+  return id;
+};
+
+/** Inserts a branch if it is not already there, and returns its id either way. */
+const upsertCategory = async (
+  db: Database,
+  values: Readonly<{
+    slug: string;
+    name: string;
+    description: string;
+    parentId: string;
+    kind: ProductKind;
+    position: number;
+  }>,
+): Promise<string> => {
+  const [inserted] = await db
+    .insert(categories)
+    .values(values)
+    .onConflictDoNothing()
+    .returning({ id: categories.id });
+
+  return inserted?.id ?? (await categoryIdBySlug(db, values.slug));
+};
+
+/** The variant columns for one planned product, and none of the others'. */
+const variantColumnsOf = (planned: PlannedProduct) =>
+  match(planned)
+    .with({ kind: "color" }, ({ hex, finish }) => ({
+      kind: "color" as const,
+      hex,
+      finish,
+    }))
+    .with({ kind: "finisher" }, ({ finish, durability }) => ({
+      kind: "finisher" as const,
+      finish,
+      durability,
+    }))
+    .with({ kind: "shifter" }, ({ direction, arcDegrees }) => ({
+      kind: "shifter" as const,
+      direction,
+      arcDegrees,
+    }))
+    .exhaustive();
+
 const seedCatalog = async (
   db: Database,
   mediaDirectory: string,
@@ -162,54 +305,29 @@ const seedCatalog = async (
   const takenSlugs = new Set<string>();
   const pending: { categoryId: string; product: PlannedProduct }[] = [];
 
-  for (const parent of CATEGORIES) {
-    const [parentRow] = await db
-      .insert(categories)
-      .values({
-        slug: parent.slug,
-        name: parent.name,
-        description: parent.description,
-        position: CATEGORIES.indexOf(parent),
-      })
-      .onConflictDoNothing()
-      .returning({ id: categories.id });
+  /* ------------------------------------------------------------- colors */
 
-    const parentId =
-      parentRow?.id ??
-      (
-        await db
-          .select({ id: categories.id })
-          .from(categories)
-          .where(eq(categories.slug, parent.slug))
-          .limit(1)
-      )[0]?.id;
+  const colorRootId = await categoryIdBySlug(db, "color");
 
-    if (parentId === undefined) throw new Error(`category ${parent.slug} missing`);
+  for (const family of CATEGORIES) {
+    const familyId = await upsertCategory(db, {
+      slug: family.slug,
+      name: family.name,
+      description: family.description,
+      parentId: colorRootId,
+      kind: "color",
+      position: CATEGORIES.indexOf(family),
+    });
 
-    for (const leaf of parent.children) {
-      const [leafRow] = await db
-        .insert(categories)
-        .values({
-          slug: leaf.slug,
-          name: leaf.name,
-          description: leaf.description,
-          parentId,
-          position: parent.children.indexOf(leaf),
-        })
-        .onConflictDoNothing()
-        .returning({ id: categories.id });
-
-      const leafId =
-        leafRow?.id ??
-        (
-          await db
-            .select({ id: categories.id })
-            .from(categories)
-            .where(eq(categories.slug, leaf.slug))
-            .limit(1)
-        )[0]?.id;
-
-      if (leafId === undefined) throw new Error(`category ${leaf.slug} missing`);
+    for (const leaf of family.children) {
+      const leafId = await upsertCategory(db, {
+        slug: leaf.slug,
+        name: leaf.name,
+        description: leaf.description,
+        parentId: familyId,
+        kind: "color",
+        position: family.children.indexOf(leaf),
+      });
 
       for (const planned of planColorsFor(leaf, random, takenSlugs)) {
         pending.push({ categoryId: leafId, product: planned });
@@ -217,10 +335,56 @@ const seedCatalog = async (
     }
   }
 
+  /* ---------------------------------------------------------- finishers */
+
+  const finisherRootId = await categoryIdBySlug(db, "finisher");
+
+  for (const branch of FINISHER_BRANCHES) {
+    const branchId = await upsertCategory(db, {
+      slug: branch.slug,
+      name: branch.name,
+      description: branch.description,
+      parentId: finisherRootId,
+      kind: "finisher",
+      position: FINISHER_BRANCHES.indexOf(branch),
+    });
+
+    for (const planned of planFinishersFor(branch, random, takenSlugs)) {
+      pending.push({ categoryId: branchId, product: planned });
+    }
+  }
+
+  /* ----------------------------------------------------------- shifters */
+
+  const shifterRootId = await categoryIdBySlug(db, "shifter");
+
+  // A nudge and a swing are the same tool at different settings, so the arc
+  // range is the only thing that separates the two branches.
+  const arcRanges = { nudge: { from: 5, to: 45 }, swing: { from: 90, to: 300 } };
+
+  for (const branch of SHIFTER_BRANCHES) {
+    const branchId = await upsertCategory(db, {
+      slug: branch.slug,
+      name: branch.name,
+      description: branch.description,
+      parentId: shifterRootId,
+      kind: "shifter",
+      position: SHIFTER_BRANCHES.indexOf(branch),
+    });
+
+    const arc = branch.slug === "nudge" ? arcRanges.nudge : arcRanges.swing;
+
+    for (const planned of planShiftersFor(branch, arc, random, takenSlugs)) {
+      pending.push({ categoryId: branchId, product: planned });
+    }
+  }
+
+  /* ------------------------------------------------------------ insert */
+
   // Planned per branch, inserted in one shuffled pass. Insertion order is the
   // only thing `created_at` records, and `created_at` is what the default sort
   // falls back to with no search term — so seeding branch by branch would open
-  // the shop on sixteen consecutive blacks.
+  // the shop on sixteen consecutive blacks, then a shelf of tins.
   for (const { categoryId, product: planned } of shuffle(pending, random)) {
     const brandId = brandIds[random.between(0, brandIds.length - 1)];
     if (brandId === undefined) throw new Error("no brands seeded");
@@ -235,13 +399,17 @@ const seedCatalog = async (
         stockQuantity: planned.stockQuantity,
         categoryId,
         brandId,
-        hex: planned.hex,
-        finish: planned.finish,
+        ...variantColumnsOf(planned),
       })
       .onConflictDoNothing()
       .returning({ id: products.id });
 
     if (inserted === undefined) continue;
+
+    // Only a color has a swatch to render. A finisher and a shifter draw
+    // themselves in the browser from what they are, which is one fewer file on
+    // the volume and one fewer thing that can disagree with the data.
+    if (planned.kind !== "color") continue;
 
     // Content-addressed, exactly as the upload endpoint would store it.
     const png = renderSwatch(planned.hex);
@@ -333,7 +501,7 @@ if (isEntrypoint) {
 
   process.stdout.write(
     report.reviews === 0 && report.products > 0
-      ? `Catalog already seeded (${report.products} colors).\n`
-      : `Seeded ${report.products} colors and ${report.reviews} reviews.\n`,
+      ? `Catalog already seeded (${report.products} products).\n`
+      : `Seeded ${report.products} products and ${report.reviews} reviews.\n`,
   );
 }

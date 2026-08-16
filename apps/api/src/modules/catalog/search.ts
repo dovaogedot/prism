@@ -46,9 +46,9 @@ export const nameContains = (text: string): SQL =>
   sql`${productListing.name} ILIKE ${toLikePattern(text)}`;
 
 /**
- * A category filter includes everything beneath it — asking for "Reds" must
- * return the colors filed under "Reds → Crimsons". The recursive CTE walks
- * down from the named slug.
+ * A tag filter includes everything beneath it — asking for "Red" must return
+ * the colors filed under "Red → Crimson". The recursive CTE walks down from
+ * the named slug.
  */
 export const descendantCategoryIds = (slug: string): SQL =>
   sql`(
@@ -96,7 +96,17 @@ export const hueCondition = (range: NumericRange): SQL => {
     : sql`(${productListing.hue} BETWEEN ${range.min} AND ${range.max})`;
 };
 
-export type FacetDimension = "category" | "brand" | "finish" | "rating" | "price";
+/**
+ * `kind` is the category dimension; `tag` is the taxonomy beneath it. They are
+ * separate filters and separate facets, so they are separate dimensions.
+ */
+export type FacetDimension =
+  | "kind"
+  | "tag"
+  | "brand"
+  | "finish"
+  | "rating"
+  | "price";
 
 /**
  * Conditions for a query, optionally omitting one dimension.
@@ -104,6 +114,13 @@ export type FacetDimension = "category" | "brand" | "finish" | "rating" | "price
  * Facet counts must be computed against everything *except* their own filter,
  * or selecting one brand would show every other brand with a count of zero and
  * multi-select would be impossible.
+ *
+ * Omitting `kind` drops more than the kind filter: it drops every filter only
+ * one kind can satisfy. Counting how many shifters exist while an arc range is
+ * applied is a fair question; counting how many *colors* satisfy that arc is
+ * not — no color has an arc, so the answer would be zero for a reason that has
+ * nothing to do with the shopper's question. Those filters belong to the
+ * category, so they leave with it.
  */
 export const buildConditions = (
   query: ProductQuery,
@@ -114,6 +131,7 @@ export const buildConditions = (
     onNone: () => "none",
   })(exclude);
 
+  const acrossKinds = omitted === "kind";
   const conditions: SQL[] = [];
 
   if (Option.isSome(query.text)) {
@@ -127,9 +145,13 @@ export const buildConditions = (
     if (matches !== undefined) conditions.push(matches);
   }
 
-  if (omitted !== "category" && Option.isSome(query.categorySlug)) {
+  if (!acrossKinds && Option.isSome(query.kind)) {
+    conditions.push(eq(productListing.kind, query.kind.value));
+  }
+
+  if (omitted !== "tag" && Option.isSome(query.tagSlug)) {
     conditions.push(
-      sql`${productListing.categoryId} IN ${descendantCategoryIds(query.categorySlug.value)}`,
+      sql`${productListing.categoryId} IN ${descendantCategoryIds(query.tagSlug.value)}`,
     );
   }
 
@@ -137,7 +159,7 @@ export const buildConditions = (
     conditions.push(inArray(productListing.brandSlug, [...query.brandSlugs]));
   }
 
-  if (omitted !== "finish" && query.finishes.length > 0) {
+  if (!acrossKinds && omitted !== "finish" && query.finishes.length > 0) {
     conditions.push(inArray(productListing.finish, [...query.finishes]));
   }
 
@@ -150,18 +172,27 @@ export const buildConditions = (
     conditions.push(gte(productListing.ratingAverage, query.minRating.value));
   }
 
-  if (Option.isSome(query.hue)) {
+  if (!acrossKinds && Option.isSome(query.hue)) {
     conditions.push(hueCondition(query.hue.value));
   }
 
-  if (Option.isSome(query.saturation)) {
+  if (!acrossKinds && Option.isSome(query.saturation)) {
     conditions.push(gte(productListing.saturation, query.saturation.value.min));
     conditions.push(lte(productListing.saturation, query.saturation.value.max));
   }
 
-  if (Option.isSome(query.lightness)) {
+  if (!acrossKinds && Option.isSome(query.lightness)) {
     conditions.push(gte(productListing.lightness, query.lightness.value.min));
     conditions.push(lte(productListing.lightness, query.lightness.value.max));
+  }
+
+  if (!acrossKinds && Option.isSome(query.direction)) {
+    conditions.push(eq(productListing.direction, query.direction.value));
+  }
+
+  if (!acrossKinds && Option.isSome(query.arc)) {
+    conditions.push(gte(productListing.arcDegrees, query.arc.value.min));
+    conditions.push(lte(productListing.arcDegrees, query.arc.value.max));
   }
 
   return conditions;

@@ -54,7 +54,7 @@ const router = createBrowserRouter([
     element: <Root />,
     children: [
       { index: true, element: <CatalogPage /> },
-      { path: "color/:slug", element: <ProductPage /> },
+      { path: "item/:slug", element: <ProductPage /> },
 
       // Signing in when already signed in is a no-op with a form attached.
       {

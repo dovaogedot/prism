@@ -19,7 +19,7 @@ import { useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { api, toQueryString } from "../../../shared/api/client.ts";
 import { Facets, type FacetState } from "../components/Facets.tsx";
-import { ProductCard } from "../components/ProductCard.tsx";
+import { ProductCard, ProductCardSlot } from "../components/ProductCard.tsx";
 import { SearchBox } from "../components/SearchBox.tsx";
 import { Alert, Button, Skeleton } from "../../../shared/ui/index.ts";
 
@@ -46,8 +46,12 @@ export const CatalogPage = () => {
 
   const facetState: FacetState = {
     category: params.get("category") ?? "",
+    tag: params.get("tag") ?? "",
     brands: splitList(params.get("brands") ?? ""),
     finishes: splitList(params.get("finishes") ?? ""),
+    direction: params.get("direction") ?? "",
+    arcMin: params.get("arcMin") ?? "",
+    arcMax: params.get("arcMax") ?? "",
     minRating: params.get("minRating") ?? "",
     priceMin: params.get("priceMin") ?? "",
     priceMax: params.get("priceMax") ?? "",
@@ -107,9 +111,12 @@ export const CatalogPage = () => {
    * request of its own.
    */
   const submitSearch = (raw: string): void => {
-    const tags = (results.data?.facets.categories ?? []).map((bucket) => bucket.value);
+    const tags = (results.data?.facets.tags ?? []).map((bucket) => bucket.value);
 
     match(resolveSearchTerm(raw, tags))
+      .with({ kind: "category" }, ({ category }) =>
+        update({ q: "", category, tag: "" }),
+      )
       .with({ kind: "finish" }, ({ finish }) =>
         update({
           q: "",
@@ -118,7 +125,15 @@ export const CatalogPage = () => {
             : [...facetState.finishes, finish],
         }),
       )
-      .with({ kind: "tag" }, ({ slug }) => update({ q: "", category: slug }))
+      .with({ kind: "tag" }, ({ slug }) => {
+        // A tag belongs to one category, so selecting it selects that too —
+        // otherwise the rail would show no sign of the filter that is running.
+        const owner = results.data?.facets.tags.find(
+          (bucket) => bucket.value === slug,
+        );
+
+        update({ q: "", tag: slug, category: owner?.kind ?? facetState.category });
+      })
       .with({ kind: "text" }, ({ text }) => update({ q: text }))
       .exhaustive();
   };
@@ -142,8 +157,8 @@ export const CatalogPage = () => {
             Every color, on its own terms
           </h1>
           <p className="text-ink-soft">
-            Sealed at source, sold by the hue. Filter by foundry, finish, or the
-            arc of the color wheel you happen to be after.
+            Sealed at source, sold by the hue. Plus the tools to put a finish
+            back on one, and the tools to turn it into something else entirely.
           </p>
         </div>
 
@@ -192,7 +207,7 @@ export const CatalogPage = () => {
           not collapse the document height and yank the scroll position with it.
         */}
         <section
-          aria-label="Colors"
+          aria-label="Results"
           aria-busy={results.isFetching}
           className="min-h-[70dvh]"
         >
@@ -230,7 +245,7 @@ export const CatalogPage = () => {
                   <>
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <p className="text-sm text-ink-faint">
-                        {data.total} color{data.total === 1 ? "" : "s"}
+                        {data.total} item{data.total === 1 ? "" : "s"}
                         {data.totalPages > 1
                           ? ` · page ${data.page} of ${data.totalPages}`
                           : ""}
@@ -241,12 +256,12 @@ export const CatalogPage = () => {
                         so it is shown here — and removable, or a tag arrived at
                         from a card would be a one-way door.
                       */}
-                      {match(tagChain(data.facets.categories, facetState.category))
+                      {match(tagChain(data.facets.tags, facetState.tag))
                         .with([], () => null)
                         .otherwise((chain) => (
                           <button
                             type="button"
-                            onClick={() => update({ category: "" })}
+                            onClick={() => update({ tag: "" })}
                             className="flex items-center gap-1 rounded-full bg-accent-wash px-2.5 py-0.5 text-xs font-medium text-ink hover:bg-sunken"
                           >
                             {chain.map((tag) => tag.label).join(" › ")}
@@ -265,39 +280,51 @@ export const CatalogPage = () => {
                         <ProductCard
                           key={product.id}
                           product={product}
-                          tags={tagChain(data.facets.categories, product.category.slug)}
-                          onSelectTag={(slug) => update({ category: slug })}
+                          tags={tagChain(data.facets.tags, product.category.slug)}
+                          onSelectTag={(slug) => update({ tag: slug })}
                         />
                       ))}
+
+                      {/* A full page of slots, however few results there are. */}
+                      {Array.from(
+                        { length: Math.max(0, data.perPage - data.items.length) },
+                        (_, index) => <ProductCardSlot key={`slot-${index}`} />,
+                      )}
                     </div>
 
-                    {match(data.totalPages > 1)
-                      .with(true, () => (
-                        <nav
-                          aria-label="Pagination"
-                          className="mt-5 flex items-center justify-center gap-3"
-                        >
-                          <Button
-                            tone="quiet"
-                            disabled={data.page <= 1}
-                            onClick={() => goToPage(data.page - 1)}
-                          >
-                            Previous
-                          </Button>
-                          <span className="text-sm tabular-nums text-ink-soft">
-                            {data.page} / {data.totalPages}
-                          </span>
-                          <Button
-                            tone="quiet"
-                            disabled={data.page >= data.totalPages}
-                            onClick={() => goToPage(data.page + 1)}
-                          >
-                            Next
-                          </Button>
-                        </nav>
-                      ))
-                      .with(false, () => null)
-                      .exhaustive()}
+                    {/*
+                      Reserved whether or not there is a second page, for the
+                      same reason as the slots above.
+                    */}
+                    <nav
+                      aria-label="Pagination"
+                      className="mt-5 flex h-9 items-center justify-center gap-3"
+                    >
+                      {match(data.totalPages > 1)
+                        .with(true, () => (
+                          <>
+                            <Button
+                              tone="quiet"
+                              disabled={data.page <= 1}
+                              onClick={() => goToPage(data.page - 1)}
+                            >
+                              Previous
+                            </Button>
+                            <span className="text-sm tabular-nums text-ink-soft">
+                              {data.page} / {data.totalPages}
+                            </span>
+                            <Button
+                              tone="quiet"
+                              disabled={data.page >= data.totalPages}
+                              onClick={() => goToPage(data.page + 1)}
+                            >
+                              Next
+                            </Button>
+                          </>
+                        ))
+                        .with(false, () => null)
+                        .exhaustive()}
+                    </nav>
                   </>
                 )),
             )}

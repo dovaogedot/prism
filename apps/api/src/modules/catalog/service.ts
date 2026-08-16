@@ -9,6 +9,7 @@
 import type {
   CategoryNode,
   DomainError,
+  NumericRange,
   ProductDetail,
   ProductFacets,
   ProductImage,
@@ -51,29 +52,36 @@ export type CatalogService = Readonly<{
   }) => ResultAsync<ProductImage, DomainError>;
 }>;
 
-/** The cache key must capture every input that changes the answer. */
+/** Ranges all key the same way, and an absent one keys as the empty string. */
+const rangeKey = Option.match<NumericRange, string>({
+  onSome: (range) => `${range.min}-${range.max}`,
+  onNone: () => "",
+});
+
+/**
+ * The cache key must capture every input that changes the answer — every
+ * filter, in other words, since each one moves the counts in every other
+ * dimension. Sort and page are absent because facets do not depend on them.
+ */
 const facetCacheKey = (query: ProductQuery): string =>
   cacheKey("facets", {
     text: Option.getOrElse(() => "")(query.text),
-    category: Option.getOrElse(() => "")(query.categorySlug),
+    kind: Option.getOrElse<string>(() => "")(query.kind),
+    tag: Option.getOrElse(() => "")(query.tagSlug),
     brands: query.brandSlugs,
     finishes: query.finishes,
-    price: Option.match<{ min: number; max: number }, string>({
-      onSome: (range) => `${range.min}-${range.max}`,
-      onNone: () => "",
-    })(query.price),
+    direction: Option.getOrElse<string>(() => "")(query.direction),
+    arc: rangeKey(query.arc),
+    price: rangeKey(query.price),
     rating: Option.match<number, string>({
       onSome: (value) => String(value),
       onNone: () => "",
     })(query.minRating),
-    hue: Option.match<{ min: number; max: number }, string>({
-      onSome: (range) => `${range.min}-${range.max}`,
-      onNone: () => "",
-    })(query.hue),
-    saturation: Option.match<{ min: number; max: number }, string>({
-      onSome: (range) => `${range.min}-${range.max}`,
-      onNone: () => "",
-    })(query.saturation),
+    hue: rangeKey(query.hue),
+    saturation: rangeKey(query.saturation),
+    // Was missing, and silently so: two searches differing only in their
+    // lightness range shared one set of facet counts.
+    lightness: rangeKey(query.lightness),
   });
 
 export const createCatalogService = (deps: CatalogDependencies): CatalogService => {

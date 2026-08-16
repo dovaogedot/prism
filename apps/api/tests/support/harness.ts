@@ -100,7 +100,14 @@ export const testEnvironment = (
   PRODUCT_CACHE_TTL_SECONDS: 60,
 });
 
-/** Every table the tests write to, in an order that respects the FKs. */
+/**
+ * Every table the tests write to, in an order that respects the FKs.
+ *
+ * `category` is not among them: its three roots are created by migration 0005,
+ * one per `product_kind`, and truncating them would leave a schema no product
+ * could satisfy — the composite foreign key requires a product's category to
+ * exist with its own kind. `reset` clears the taxonomy beneath them instead.
+ */
 const MUTABLE_TABLES = [
   "refresh_token",
   "password_reset_token",
@@ -110,7 +117,6 @@ const MUTABLE_TABLES = [
   "product_image",
   "product",
   "brand",
-  "category",
   "app_user",
 ];
 
@@ -165,6 +171,10 @@ export const startHarness = async (): Promise<Harness> => {
       await database.sql.unsafe(
         `TRUNCATE ${MUTABLE_TABLES.join(", ")} RESTART IDENTITY CASCADE`,
       );
+      // One statement, so the parent references are all gone by the time the
+      // foreign key is checked — which is what lets a whole branch go at once
+      // rather than leaf by leaf.
+      await database.sql`DELETE FROM category WHERE parent_id IS NOT NULL`;
       epoch += 60 * 60 * 1000;
       clock.set(new Date(epoch));
       mailer.clear();
@@ -227,7 +237,15 @@ export const registerUser = async (
   };
 };
 
-/** Seeds a minimal catalog: one category, one brand, and the given colors. */
+/**
+ * Seeds a minimal catalog: one tag under the Colors category, one brand, and
+ * the given colors.
+ *
+ * The three categories are not created here — migration 0005 creates them, one
+ * per `product_kind`, because they are part of what the schema means rather
+ * than sample data. `reds` hangs off the color root, which is what makes it a
+ * tag rather than a category.
+ */
 export const seedCatalog = async (
   harness: Harness,
   colors: readonly Readonly<{
@@ -240,20 +258,57 @@ export const seedCatalog = async (
 ): Promise<void> => {
   const { sql } = harness.database;
 
-  await sql`INSERT INTO category (slug, name) VALUES ('reds', 'Reds')`;
+  await sql`
+    INSERT INTO category (slug, name, kind, parent_id)
+    SELECT 'reds', 'Reds', 'color', id FROM category WHERE slug = 'color'
+  `;
   await sql`INSERT INTO brand (slug, name) VALUES ('chroma-labs', 'Chroma Labs')`;
 
   for (const color of colors) {
     await sql`
       INSERT INTO product (
         slug, name, description, price_cents, stock_quantity,
-        category_id, brand_id, hex, finish
+        category_id, brand_id, kind, hex, finish
       )
       SELECT ${color.slug}, ${color.name}, ${`${color.name} description`},
-             ${color.priceCents}, 10, c.id, b.id, ${color.hex},
+             ${color.priceCents}, 10, c.id, b.id, 'color', ${color.hex},
              ${color.finish ?? "matte"}::product_finish
       FROM category c, brand b
       WHERE c.slug = 'reds' AND b.slug = 'chroma-labs'
     `;
   }
+};
+
+/**
+ * Adds a finisher and a shifter to a catalog already seeded by `seedCatalog`,
+ * filed directly on their own categories.
+ *
+ * Everything about them but the price is fixed: these exist so that tests which
+ * care about the other two kinds have one of each to find, not so that they can
+ * vary.
+ */
+export const seedInstruments = async (harness: Harness): Promise<void> => {
+  const { sql } = harness.database;
+
+  await sql`
+    INSERT INTO product (
+      slug, name, description, price_cents, stock_quantity,
+      category_id, brand_id, kind, finish, durability
+    )
+    SELECT 'test-applicator', 'Test Applicator', 'Puts gloss back on.',
+           4200, 10, c.id, b.id, 'finisher', 'gloss', 12
+    FROM category c, brand b
+    WHERE c.slug = 'finisher' AND b.slug = 'chroma-labs'
+  `;
+
+  await sql`
+    INSERT INTO product (
+      slug, name, description, price_cents, stock_quantity,
+      category_id, brand_id, kind, arc_degrees, direction
+    )
+    SELECT 'test-swing', 'Test Swing', 'Turns a color right round.',
+           6900, 10, c.id, b.id, 'shifter', 120, 'ccw'
+    FROM category c, brand b
+    WHERE c.slug = 'shifter' AND b.slug = 'chroma-labs'
+  `;
 };

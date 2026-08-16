@@ -1,18 +1,30 @@
 /**
- * One color.
+ * One product, whichever of the three it is.
  *
  * The measurements block is where the metric/imperial requirement shows up:
- * the server sends both, derived from one stored set of metric values, and the
- * toggle just picks which vocabulary to read them in.
+ * the server sends both, derived from one set of metric values it derived in
+ * turn, and the toggle just picks which vocabulary to read them in. All three
+ * kinds have all three measurements — each computed from whatever that kind
+ * actually carries — so the block is the same on every page.
+ *
+ * The spec block above it is not: it is the variant part of the product, and
+ * it is rendered by matching on the variant.
  */
 
-import { formatPrice, isCents, type ProductDetail } from "@prism/shared";
+import {
+  DIRECTION_LABELS,
+  formatPrice,
+  isCents,
+  KIND_LABELS,
+  type ProductDetail,
+  type ProductSpec,
+} from "@prism/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { api } from "../../../shared/api/client.ts";
-import { Swatch } from "../components/Swatch.tsx";
+import { Artwork } from "../components/Artwork.tsx";
 import { Alert, Card, Skeleton, Stars } from "../../../shared/ui/index.ts";
 
 type UnitSystem = "metric" | "imperial";
@@ -83,7 +95,7 @@ const Measurements = ({ product }: Readonly<{ product: ProductDetail }>) => {
 
       {/*
         Three numbers nobody has met before, so each gets six words. They are
-        properties of the color itself — none of them describes a container,
+        properties of the thing itself — none of them describes a container,
         because there is no container.
       */}
       <p className="mt-2 text-xs leading-relaxed text-ink-faint">
@@ -91,6 +103,54 @@ const Measurements = ({ product }: Readonly<{ product: ProductDetail }>) => {
       </p>
     </div>
   );
+};
+
+/**
+ * The variant half of the product. Each kind lists exactly the facts it has:
+ * there is no row here that says "—" because this particular product happens
+ * not to be a color.
+ */
+const SpecRows = ({ spec }: Readonly<{ spec: ProductSpec }>) =>
+  match(spec)
+    .with({ kind: "color" }, (color) => (
+      <>
+        <Spec label="Hex" value={color.hex} />
+        <Spec label="Hue" value={`${color.hue}°`} />
+        <Spec label="Saturation" value={`${color.saturation}%`} />
+        <Spec label="Lightness" value={`${color.lightness}%`} />
+        <Spec
+          label="Finish"
+          value={color.finish.charAt(0).toUpperCase() + color.finish.slice(1)}
+        />
+      </>
+    ))
+    .with({ kind: "finisher" }, (finisher) => (
+      <>
+        <Spec
+          label="Applies"
+          value={
+            finisher.finish.charAt(0).toUpperCase() + finisher.finish.slice(1)
+          }
+        />
+        <Spec
+          label="Durability"
+          value={`${finisher.durability} color${finisher.durability === 1 ? "" : "s"}`}
+        />
+      </>
+    ))
+    .with({ kind: "shifter" }, (shifter) => (
+      <>
+        <Spec label="Direction" value={DIRECTION_LABELS[shifter.direction]} />
+        <Spec label="Arc" value={`${shifter.arcDegrees}°`} />
+      </>
+    ))
+    .exhaustive();
+
+/** What the spec block is called, which is not the same on all three shelves. */
+const SPEC_TITLES: Record<ProductSpec["kind"], string> = {
+  color: "The color",
+  finisher: "The finisher",
+  shifter: "The shifter",
 };
 
 export const ProductPage = () => {
@@ -113,7 +173,7 @@ export const ProductPage = () => {
 
       {match(product)
         .with({ status: "error" }, () => (
-          <Alert title="No such color">
+          <Alert title="No such item">
             We could not find that one. It may have been discontinued.
           </Alert>
         ))
@@ -129,21 +189,30 @@ export const ProductPage = () => {
         ))
         .otherwise(({ data }) => (
           <article className="grid gap-10 lg:grid-cols-2">
-            <Swatch
-              hex={data.hex}
+            <Artwork
+              spec={data.spec}
+              name={data.name}
               image={data.primaryImage}
-              alt={`${data.name} — ${data.hex}`}
               className="aspect-square w-full rounded-[--radius-card] border border-line"
             />
 
             <div className="space-y-6">
               <header className="space-y-2">
-                <Link
-                  to={`/?brands=${data.brand.slug}`}
-                  className="text-xs font-medium uppercase tracking-wider text-ink-faint hover:text-accent"
-                >
-                  {data.brand.name}
-                </Link>
+                <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-ink-faint">
+                  <Link
+                    to={`/?brands=${data.brand.slug}`}
+                    className="hover:text-accent"
+                  >
+                    {data.brand.name}
+                  </Link>
+                  <span aria-hidden="true">·</span>
+                  <Link
+                    to={`/?category=${data.spec.kind}`}
+                    className="hover:text-accent"
+                  >
+                    {KIND_LABELS[data.spec.kind]}
+                  </Link>
+                </div>
                 <h1 className="text-3xl font-semibold tracking-tight text-ink">
                   {data.name}
                 </h1>
@@ -176,37 +245,37 @@ export const ProductPage = () => {
               <p className="leading-relaxed text-ink-soft">{data.description}</p>
 
               <Card className="p-4">
-                <h2 className="mb-1 text-sm font-semibold text-ink">The color</h2>
+                <h2 className="mb-1 text-sm font-semibold text-ink">
+                  {SPEC_TITLES[data.spec.kind]}
+                </h2>
                 <dl className="divide-y divide-line">
-                  <Spec label="Hex" value={data.hex} />
-                  <Spec label="Hue" value={`${data.hue}°`} />
-                  <Spec label="Saturation" value={`${data.saturation}%`} />
-                  <Spec label="Lightness" value={`${data.lightness}%`} />
-                  <Spec
-                    label="Finish"
-                    value={data.finish.charAt(0).toUpperCase() + data.finish.slice(1)}
-                  />
+                  <SpecRows spec={data.spec} />
                   {/*
                     The whole chain, as on the swatches in the grid — an acid is
                     a yellow too, and showing only the leaf hid that. Each one
-                    is a filter, so each links back to it.
+                    is a filter, so each links back to it. The category is not
+                    among them; it is in the header, beside the foundry.
                   */}
-                  <div className="flex items-baseline justify-between gap-4 py-2">
-                    <dt className="text-sm text-ink-soft">
-                      {data.tags.length === 1 ? "Tag" : "Tags"}
-                    </dt>
-                    <dd className="flex flex-wrap justify-end gap-1">
-                      {data.tags.map((tag) => (
-                        <Link
-                          key={tag.slug}
-                          to={`/?category=${tag.slug}`}
-                          className="rounded-full bg-sunken px-2 py-0.5 text-xs font-medium text-ink-soft hover:bg-accent-wash hover:text-ink"
-                        >
-                          {tag.name}
-                        </Link>
-                      ))}
-                    </dd>
-                  </div>
+                  {match(data.tags.length)
+                    .with(0, () => null)
+                    .otherwise(() => (
+                      <div className="flex items-baseline justify-between gap-4 py-2">
+                        <dt className="text-sm text-ink-soft">
+                          {data.tags.length === 1 ? "Tag" : "Tags"}
+                        </dt>
+                        <dd className="flex flex-wrap justify-end gap-1">
+                          {data.tags.map((tag) => (
+                            <Link
+                              key={tag.slug}
+                              to={`/?tag=${tag.slug}`}
+                              className="rounded-full bg-sunken px-2 py-0.5 text-xs font-medium text-ink-soft hover:bg-accent-wash hover:text-ink"
+                            >
+                              {tag.name}
+                            </Link>
+                          ))}
+                        </dd>
+                      </div>
+                    ))}
                 </dl>
               </Card>
 

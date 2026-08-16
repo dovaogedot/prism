@@ -44,6 +44,13 @@ export const productFinish = pgEnum("product_finish", [
   "iridescent",
   "fluorescent",
 ]);
+/** The discriminant of the product union; also the slug of its category. */
+export const productKind = pgEnum("product_kind", [
+  "color",
+  "finisher",
+  "shifter",
+]);
+export const shiftDirection = pgEnum("shift_direction", ["cw", "ccw"]);
 
 /* ------------------------------------------------------------------ identity */
 
@@ -161,6 +168,12 @@ export const categories = pgTable(
     parentId: uuid("parent_id").references((): AnyPgColumn => categories.id, {
       onDelete: "restrict",
     }),
+    /**
+     * Which of the three shelves this node belongs to. A composite foreign key
+     * in migration 0005 ties it to the parent's, so a subtree cannot mix kinds
+     * and the three roots are the only place a kind is chosen.
+     */
+    kind: productKind("kind").notNull(),
     position: integer("position").notNull().default(0),
     // Marked generated so Drizzle keeps it out of insert types — the DDL in
     // migration 0003 is what actually defines the expression.
@@ -204,41 +217,52 @@ export const products = pgTable(
       .notNull()
       .references(() => brands.id, { onDelete: "restrict" }),
 
-    /** The one stored fact about the color itself. */
-    hex: text("hex").notNull(),
-    finish: productFinish("finish").notNull(),
+    /**
+     * The discriminant. Every nullable column below belongs to exactly one
+     * value of it, and `product_variant_shape` in migration 0005 says which.
+     */
+    kind: productKind("kind").notNull(),
+
+    /** Colors only. The two stored facts about a color. */
+    hex: text("hex"),
+    /** Colors and finishers: what the color is, or what the tin puts back. */
+    finish: productFinish("finish"),
+
+    /** Finishers only: how many colors one of them will see you through. */
+    durability: integer("durability"),
+
+    /** Shifters only. */
+    arcDegrees: smallint("arc_degrees"),
+    direction: shiftDirection("direction"),
 
     /**
      * Derived from `hex` by IMMUTABLE SQL functions and materialized by
-     * Postgres, so they can carry B-tree indexes for range faceting.
+     * Postgres, so they can carry B-tree indexes for range faceting. Null for
+     * anything that is not a color, because those functions are STRICT.
      *
      * Marked generated here so Drizzle omits them from insert types: writing
      * one is a compile error, and Postgres rejects it at runtime too.
      */
-    hue: smallint("hue")
-      .notNull()
-      .generatedAlwaysAs(sql`hex_to_hue(hex)`),
-    saturation: smallint("saturation")
-      .notNull()
-      .generatedAlwaysAs(sql`hex_to_saturation(hex)`),
-    lightness: smallint("lightness")
-      .notNull()
-      .generatedAlwaysAs(sql`hex_to_lightness(hex)`),
+    hue: smallint("hue").generatedAlwaysAs(sql`hex_to_hue(hex)`),
+    saturation: smallint("saturation").generatedAlwaysAs(sql`hex_to_saturation(hex)`),
+    lightness: smallint("lightness").generatedAlwaysAs(sql`hex_to_lightness(hex)`),
 
     /**
-     * The color's own measurements, one per HSL channel. Generated like the
-     * channels themselves, so the shop stores `hex` and `finish` and nothing
-     * else about how a color measures. Imperial is derived in `@prism/shared`.
+     * Measurements, which every kind has — each derived from whatever that
+     * kind actually carries. Nothing about how a product measures is stored.
+     * Imperial is derived again in `@prism/shared`.
      */
     temperatureKelvin: smallint("temperature_kelvin")
       .notNull()
-      .generatedAlwaysAs(sql`hex_to_temperature(hex)`),
+      .generatedAlwaysAs(
+        sql`product_temperature(kind, hex, finish, arc_degrees, direction)`,
+      ),
     reachCentimeters: integer("reach_centimeters")
       .notNull()
-      .generatedAlwaysAs(sql`hex_to_reach(hex, finish)`),
+      .generatedAlwaysAs(sql`product_reach(kind, hex, finish, durability, arc_degrees)`),
     weightGrams: integer("weight_grams")
       .notNull()
-      .generatedAlwaysAs(sql`hex_to_weight(hex)`),
+      .generatedAlwaysAs(sql`product_weight(kind, hex, durability, arc_degrees)`),
 
     searchVector: tsvector("search_vector")
       .notNull()
@@ -253,6 +277,8 @@ export const products = pgTable(
     index("product_brand_idx").on(table.brandId),
     index("product_price_idx").on(table.priceCents),
     index("product_hue_idx").on(table.hue),
+    index("product_kind_idx").on(table.kind),
+    index("product_arc_idx").on(table.arcDegrees),
   ],
 );
 
@@ -305,11 +331,15 @@ export const productListing = pgView("product_listing", {
   description: text("description").notNull(),
   priceCents: integer("price_cents").notNull(),
   stockQuantity: integer("stock_quantity").notNull(),
-  hex: text("hex").notNull(),
-  finish: productFinish("finish").notNull(),
-  hue: smallint("hue").notNull(),
-  saturation: smallint("saturation").notNull(),
-  lightness: smallint("lightness").notNull(),
+  kind: productKind("kind").notNull(),
+  hex: text("hex"),
+  finish: productFinish("finish"),
+  hue: smallint("hue"),
+  saturation: smallint("saturation"),
+  lightness: smallint("lightness"),
+  durability: integer("durability"),
+  arcDegrees: smallint("arc_degrees"),
+  direction: shiftDirection("direction"),
   temperatureKelvin: smallint("temperature_kelvin").notNull(),
   reachCentimeters: integer("reach_centimeters").notNull(),
   weightGrams: integer("weight_grams").notNull(),

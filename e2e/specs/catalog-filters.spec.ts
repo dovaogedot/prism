@@ -13,7 +13,7 @@ const rail = (page: Page) => page.getByRole("complementary");
 const searchBox = (page: Page) =>
   page.getByRole("combobox", { name: "Search colors" });
 
-const results = (page: Page) => page.getByRole("region", { name: "Colors" });
+const results = (page: Page) => page.getByRole("region", { name: "Results" });
 
 const sectionToggle = (page: Page, title: string) =>
   page.getByRole("button", { name: new RegExp(`^${title}`, "i") });
@@ -30,7 +30,10 @@ const documentY = async (page: Page, title: string): Promise<number> => {
 };
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/");
+  // Inside the Colors category: the hue ring, the two ramps and the finish
+  // list only exist there, since none of them means anything on a shelf of
+  // tins. `catalog-categories.spec.ts` covers the switch itself.
+  await page.goto("/?category=color");
   await expect(page.getByRole("heading", { name: "Every color, on its own terms" })).toBeVisible();
 
   // The heading renders before the facets arrive — the rail is skeletons until
@@ -67,19 +70,19 @@ test.describe("layout stability", () => {
   });
 
   test("the page is the same height however few results there are", async ({ page }) => {
-    // The filter rail is taller than a full page of results and does not
-    // change with the filters, so it — and only it — sets the document height.
-    // If a page of results ever outgrows it, filtering starts moving the page
-    // under the pointer again.
+    // Two things hold this still: the rail never reflows, and the grid always
+    // holds a full page of slots whether or not there is stock to fill them.
+    // Either one alone would be enough here; both matter, because which of the
+    // two columns is the taller now depends on the category.
     const height = () => page.evaluate(() => document.documentElement.scrollHeight);
 
     const full = await height();
 
-    await page.goto("/?minRating=5&finishes=matte");
+    await page.goto("/?category=color&minRating=5&finishes=matte");
     await page.waitForLoadState("networkidle");
     expect(await height()).toBe(full);
 
-    await page.goto("/?q=zzzznothingatall");
+    await page.goto("/?category=color&q=zzzznothingatall");
     await page.waitForLoadState("networkidle");
     expect(await height()).toBe(full);
   });
@@ -98,7 +101,7 @@ test.describe("layout stability", () => {
 
   test("an empty bucket is struck through rather than removed", async ({ page }) => {
     // Narrow hard enough that some foundry stocks nothing matching.
-    await page.goto("/?category=black&finishes=fluorescent");
+    await page.goto("/?category=color&tag=black&finishes=fluorescent");
     await page.waitForLoadState("networkidle");
 
     const struck = rail(page).locator("label.line-through");
@@ -115,7 +118,7 @@ test.describe("star rating", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page).toHaveURL(/minRating=4/);
-    await expect(page.getByText(/4★ & up — \d+ color/)).toBeVisible();
+    await expect(page.getByText(/4★ & up — \d+ item/)).toBeVisible();
   });
 
   test("clicking the same star again clears it", async ({ page }) => {
@@ -148,7 +151,7 @@ test.describe("hue ring", () => {
   });
 
   test("dragging a thumb changes only that end", async ({ page }) => {
-    await page.goto("/?hueMin=0&hueMax=60");
+    await page.goto("/?category=color&hueMin=0&hueMax=60");
     await page.waitForLoadState("networkidle");
 
     const endThumb = page.getByRole("slider", { name: "Hue range end" });
@@ -171,7 +174,7 @@ test.describe("hue ring", () => {
   });
 
   test("the arc does not flicker back to its old value on release", async ({ page }) => {
-    await page.goto("/?hueMin=0&hueMax=60");
+    await page.goto("/?category=color&hueMin=0&hueMax=60");
     await page.waitForLoadState("networkidle");
 
     const readout = page.getByText(/\d+° – \d+°/);
@@ -203,7 +206,7 @@ test.describe("hue ring", () => {
   });
 
   test("the saturation ramp follows the hue mid-drag", async ({ page }) => {
-    await page.goto("/?hueMin=0&hueMax=60");
+    await page.goto("/?category=color&hueMin=0&hueMax=60");
     await page.waitForLoadState("networkidle");
 
     // The saturation track. Its gradient is written in `hsl()` and serialised
@@ -313,7 +316,9 @@ test.describe("search", () => {
 
     // Tags are stored singular. Nothing is filed directly under "yellow"
     // either — the colors are in its children, gold and acid.
-    await expect(page).toHaveURL(/category=yellow/);
+    await expect(page).toHaveURL(/tag=yellow/);
+    // A tag belongs to one category, so picking it picks that category too.
+    await expect(page).toHaveURL(/category=color/);
     await expect(page.getByText("Nothing matches that.")).toBeHidden();
     await expect(results(page).getByRole("article").first()).toBeVisible();
   });
@@ -334,9 +339,9 @@ test.describe("search", () => {
     await tag.click();
     await page.waitForLoadState("networkidle");
 
-    await expect(page).toHaveURL(/category=/);
-    // The active tag is shown above the results, since the rail has no
-    // category section to show it in.
+    await expect(page).toHaveURL(/tag=/);
+    // The active tag is shown above the results, since the rail has a
+    // category section but no tag section to show it in.
     await expect(results(page).getByRole("button", { name: /Clear this tag/ })).toContainText(
       label ?? "",
     );

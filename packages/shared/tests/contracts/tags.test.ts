@@ -4,7 +4,7 @@ import {
   resolveSearchTerm,
   singular,
   tagChain,
-  type CategoryFacetBucket,
+  type TagFacetBucket,
 } from "../../src/index.ts";
 
 describe("singular", () => {
@@ -65,6 +65,25 @@ describe("resolveSearchTerm", () => {
     });
   });
 
+  it("resolves a category name, in either number", () => {
+    expect(resolveSearchTerm("shifters", tags)).toEqual({
+      kind: "category",
+      category: "shifter",
+    });
+    expect(resolveSearchTerm("Finisher", tags)).toEqual({
+      kind: "category",
+      category: "finisher",
+    });
+  });
+
+  it("prefers a category over a tag of the same name", () => {
+    // The coarsest reading wins: somebody typing "color" wants the shelf.
+    expect(resolveSearchTerm("color", ["color"])).toEqual({
+      kind: "category",
+      category: "color",
+    });
+  });
+
   it("prefers a finish over a tag of the same name", () => {
     // Nothing collides today; this pins the precedence if something ever does.
     expect(resolveSearchTerm("matte", ["matte"])).toEqual({
@@ -80,15 +99,16 @@ describe("tagChain", () => {
     label: string,
     parent: string | undefined,
     depth: number,
-  ): CategoryFacetBucket => ({
+  ): TagFacetBucket => ({
     value,
     label,
     count: 1,
     parentSlug: Option.fromNullable(parent),
     depth,
+    kind: "color",
   });
 
-  const categories: readonly CategoryFacetBucket[] = [
+  const categories: readonly TagFacetBucket[] = [
     bucket("yellow", "Yellow", undefined, 0),
     bucket("gold", "Gold", "yellow", 1),
     bucket("blue", "Blue", undefined, 0),

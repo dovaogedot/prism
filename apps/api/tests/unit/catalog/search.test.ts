@@ -35,7 +35,8 @@ const render = (fragment: Parameters<typeof dialect.sqlToQuery>[0]) =>
 
 const baseQuery: ProductQuery = {
   text: Option.none,
-  categorySlug: Option.none,
+  kind: Option.none,
+  tagSlug: Option.none,
   brandSlugs: [],
   finishes: [],
   price: Option.none,
@@ -43,6 +44,8 @@ const baseQuery: ProductQuery = {
   hue: Option.none,
   saturation: Option.none,
   lightness: Option.none,
+  direction: Option.none,
+  arc: Option.none,
   sort: "relevance",
   page: 1,
   perPage: 24,
@@ -134,7 +137,7 @@ describe("buildConditions", () => {
   it("adds one condition per active filter", () => {
     const conditions = buildConditions({
       ...baseQuery,
-      categorySlug: Option.some("reds"),
+      tagSlug: Option.some("red"),
       brandSlugs: ["chroma-labs"],
       finishes: ["matte"],
       minRating: Option.some(4),
@@ -171,7 +174,7 @@ describe("buildConditions", () => {
   describe("facet exclusion", () => {
     const filtered: ProductQuery = {
       ...baseQuery,
-      categorySlug: Option.some("reds"),
+      tagSlug: Option.some("red"),
       brandSlugs: ["chroma-labs"],
       finishes: ["matte"],
       minRating: Option.some(4),
@@ -186,8 +189,8 @@ describe("buildConditions", () => {
       expect(withoutBrand).toHaveLength(withAll.length - 1);
     });
 
-    it("omits the category filter when counting categories", () => {
-      expect(buildConditions(filtered, Option.some("category"))).toHaveLength(3);
+    it("omits the tag filter when counting tags", () => {
+      expect(buildConditions(filtered, Option.some("tag"))).toHaveLength(3);
     });
 
     it("omits both price bounds when computing price extents", () => {
@@ -197,11 +200,52 @@ describe("buildConditions", () => {
       expect(buildConditions(priced, Option.some("price"))).toHaveLength(4);
     });
 
+    it("drops every kind-specific filter when counting categories", () => {
+      // Asking how many shifters match an arc is fair. Asking how many colors
+      // match it is not — no color has one, so the answer would be zero for a
+      // reason the shopper never expressed.
+      const shifters: ProductQuery = {
+        ...baseQuery,
+        kind: Option.some("shifter"),
+        brandSlugs: ["chroma-labs"],
+        direction: Option.some("cw"),
+        arc: Option.some({ min: 90, max: 180 }),
+      };
+
+      // kind, brand, direction, and two arc bounds.
+      expect(buildConditions(shifters)).toHaveLength(5);
+      // Only the brand survives; it means the same thing on all three shelves.
+      expect(buildConditions(shifters, Option.some("kind"))).toHaveLength(1);
+    });
+
+    it("drops the color filters too, since only a color can satisfy them", () => {
+      const colors: ProductQuery = {
+        ...baseQuery,
+        kind: Option.some("color"),
+        finishes: ["matte"],
+        hue: Option.some({ min: 0, max: 60 }),
+        saturation: Option.some({ min: 10, max: 90 }),
+        lightness: Option.some({ min: 10, max: 90 }),
+        minRating: Option.some(4),
+      };
+
+      // The rating is the only filter left that a finisher could also meet.
+      expect(buildConditions(colors, Option.some("kind"))).toHaveLength(1);
+    });
+
+    it("keeps the tag filter when counting categories", () => {
+      // A tag belongs to exactly one category, so it does not distort the
+      // others' counts — it zeroes them honestly.
+      const tagged = { ...baseQuery, tagSlug: Option.some("acid") };
+
+      expect(buildConditions(tagged, Option.some("kind"))).toHaveLength(1);
+    });
+
     it("keeps the search term in every facet count", () => {
       // The term narrows the result set itself; it is not a facet dimension.
       const searched = { ...filtered, text: Option.some("red") };
 
-      for (const dimension of ["brand", "category", "finish", "rating"] as const) {
+      for (const dimension of ["brand", "tag", "finish", "rating"] as const) {
         const conditions = buildConditions(searched, Option.some(dimension));
         const rendered = conditions.map((condition) => render(condition).sql);
 

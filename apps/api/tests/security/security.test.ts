@@ -157,13 +157,16 @@ describe("cross-site scripting", () => {
   it("stores and returns markup as inert text, never as HTML", async () => {
     const { sql } = harness.database;
 
-    await sql`INSERT INTO category (slug, name) VALUES ('reds', 'Reds')`;
+    await sql`
+      INSERT INTO category (slug, name, kind, parent_id)
+      SELECT 'reds', 'Reds', 'color', id FROM category WHERE slug = 'color'
+    `;
     await sql`INSERT INTO brand (slug, name) VALUES ('chroma-labs', 'Chroma Labs')`;
 
     for (const [index, payload] of XSS_PAYLOADS.entries()) {
       await sql`
-        INSERT INTO product (slug, name, description, price_cents, category_id, brand_id, hex, finish)
-        SELECT ${`xss-${index}`}, ${payload}, ${payload}, 1000, c.id, b.id, '#ff0000', 'matte'
+        INSERT INTO product (slug, name, description, price_cents, category_id, brand_id, kind, hex, finish)
+        SELECT ${`xss-${index}`}, ${payload}, ${payload}, 1000, c.id, b.id, 'color', '#ff0000', 'matte'
         FROM category c, brand b WHERE c.slug = 'reds' AND b.slug = 'chroma-labs'
       `;
     }
