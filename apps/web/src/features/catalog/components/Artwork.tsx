@@ -44,24 +44,22 @@ const FINISH_INK: Record<Finish, string> = {
 
 const FinishTile = ({
   finish,
-  durability,
   label,
-}: Readonly<{ finish: Finish; durability: number; label: string }>) => (
+}: Readonly<{ finish: Finish; label: string }>) => (
   <div
     role="img"
     aria-label={label}
     className="relative size-full"
     style={{ backgroundImage: FINISH_GROUNDS[finish] }}
   >
+    {/*
+      The finish is the whole picture. The durability is on the card's badge
+      rather than here, so the two facts appear once each.
+    */}
     <span
       className={`absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-[13px] font-semibold uppercase tracking-[0.2em] ${FINISH_INK[finish]}`}
     >
       {finish}
-    </span>
-    <span
-      className={`absolute bottom-2 right-2 font-mono text-[10px] uppercase tracking-wider ${FINISH_INK[finish]}`}
-    >
-      ×{durability}
     </span>
   </div>
 );
@@ -151,7 +149,6 @@ export const Artwork = ({
       <div className={`overflow-hidden ${className}`}>
         <FinishTile
           finish={finisher.finish}
-          durability={finisher.durability}
           label={`${name} — puts back a ${finisher.finish} finish, ${finisher.durability} colors' worth`}
         />
       </div>

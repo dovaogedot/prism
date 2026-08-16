@@ -16,6 +16,7 @@ import {
   formatPrice,
   isCents,
   KIND_LABELS,
+  type Measurements,
   type ProductDetail,
   type ProductSpec,
 } from "@prism/shared";
@@ -36,9 +37,76 @@ const Spec = ({ label, value }: Readonly<{ label: string; value: string }>) => (
   </div>
 );
 
+/**
+ * The measurement rows, which differ by kind because what there is to measure
+ * differs by kind. A tin of finisher has no temperature and no reach; it has a
+ * coverage and a grain. A shifter is a mechanism, so it has a torque and the
+ * play in its gear. Weight is the one all three share.
+ *
+ * Kelvin is deliberately absent. It is what the column stores, being the unit
+ * the derivation is defined in, but "6208 K" describes a light source rather
+ * than this color — °C and °F are the two a shopper can act on.
+ */
+const MeasurementRows = ({
+  measurements,
+  system,
+}: Readonly<{ measurements: Measurements; system: UnitSystem }>) =>
+  match([measurements, system] as const)
+    .with([{ of: "color" }, "metric"], ([{ metric }]) => (
+      <>
+        <Spec label="Temperature" value={`${metric.temperatureCelsius} °C`} />
+        <Spec label="Reach" value={`${metric.reachMeters} m`} />
+        <Spec label="Weight" value={`${metric.weightGrams} g`} />
+      </>
+    ))
+    .with([{ of: "color" }, "imperial"], ([{ imperial }]) => (
+      <>
+        <Spec label="Temperature" value={`${imperial.temperatureFahrenheit} °F`} />
+        <Spec label="Reach" value={`${imperial.reachFeet} ft`} />
+        <Spec label="Weight" value={`${imperial.weightOunces} oz`} />
+      </>
+    ))
+    .with([{ of: "finisher" }, "metric"], ([{ metric }]) => (
+      <>
+        <Spec label="Coverage" value={`${metric.coverageSquareMeters} m²`} />
+        <Spec label="Grain" value={`${metric.grainMicrometers} µm`} />
+        <Spec label="Weight" value={`${metric.weightGrams} g`} />
+      </>
+    ))
+    .with([{ of: "finisher" }, "imperial"], ([{ imperial }]) => (
+      <>
+        <Spec label="Coverage" value={`${imperial.coverageSquareFeet} ft²`} />
+        <Spec label="Grain" value={`${imperial.grainMils} mil`} />
+        <Spec label="Weight" value={`${imperial.weightOunces} oz`} />
+      </>
+    ))
+    .with([{ of: "shifter" }, "metric"], ([{ metric }]) => (
+      <>
+        <Spec label="Torque" value={`${metric.torqueNewtonMeters} N·m`} />
+        <Spec label="Backlash" value={`${metric.backlashMillimeters} mm`} />
+        <Spec label="Weight" value={`${metric.weightGrams} g`} />
+      </>
+    ))
+    .with([{ of: "shifter" }, "imperial"], ([{ imperial }]) => (
+      <>
+        <Spec label="Torque" value={`${imperial.torquePoundFeet} lbf·ft`} />
+        <Spec label="Backlash" value={`${imperial.backlashInches} in`} />
+        <Spec label="Weight" value={`${imperial.weightOunces} oz`} />
+      </>
+    ))
+    .exhaustive();
+
+/** Six words each, since nobody has met any of these numbers before. */
+const MEASUREMENT_NOTES: Record<Measurements["of"], string> = {
+  color: "How warm it burns, how far it still reads, and how heavy it looks.",
+  finisher:
+    "How much surface it will see through, how much texture it leaves, and how heavy the tin is.",
+  shifter:
+    "How hard it has to turn, how much play there is before the color moves, and how heavy the gear is.",
+};
+
 const Measurements = ({ product }: Readonly<{ product: ProductDetail }>) => {
   const [system, setSystem] = useState<UnitSystem>("metric");
-  const { metric, imperial } = product.measurements;
 
   return (
     <div>
@@ -69,37 +137,15 @@ const Measurements = ({ product }: Readonly<{ product: ProductDetail }>) => {
       </div>
 
       <dl className="divide-y divide-line">
-        {match(system)
-          .with("metric", () => (
-            <>
-              <Spec
-                label="Temperature"
-                value={`${metric.temperatureKelvin} K · ${metric.temperatureCelsius} °C`}
-              />
-              <Spec label="Reach" value={`${metric.reachMeters} m`} />
-              <Spec label="Weight" value={`${metric.weightGrams} g`} />
-            </>
-          ))
-          .with("imperial", () => (
-            <>
-              <Spec
-                label="Temperature"
-                value={`${imperial.temperatureFahrenheit} °F`}
-              />
-              <Spec label="Reach" value={`${imperial.reachFeet} ft`} />
-              <Spec label="Weight" value={`${imperial.weightOunces} oz`} />
-            </>
-          ))
-          .exhaustive()}
+        <MeasurementRows measurements={product.measurements} system={system} />
       </dl>
 
       {/*
-        Three numbers nobody has met before, so each gets six words. They are
-        properties of the thing itself — none of them describes a container,
+        Properties of the thing itself — none of them describes a container,
         because there is no container.
       */}
       <p className="mt-2 text-xs leading-relaxed text-ink-faint">
-        How warm it burns, how far it still reads, and how heavy it looks.
+        {MEASUREMENT_NOTES[product.measurements.of]}
       </p>
     </div>
   );

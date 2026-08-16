@@ -12,11 +12,18 @@
 
 import type {
   Finish,
+  Measurements,
   ProductKind,
   ProductSpec,
   ShiftDirection,
 } from "@prism/shared";
-import { Option } from "@prism/shared";
+import {
+  measureColor,
+  measureFinisher,
+  measureShifter,
+  Option,
+  roundTo,
+} from "@prism/shared";
 import { match, P } from "ts-pattern";
 
 /** Exactly the columns a spec is built from, and nothing else. */
@@ -69,5 +76,79 @@ export const toProductSpec = (columns: SpecColumns): Option<ProductSpec> =>
       { kind: "shifter", direction: P.not(P.nullish), arcDegrees: P.number },
       ({ direction, arcDegrees }) =>
         Option.some<ProductSpec>({ kind: "shifter", direction, arcDegrees }),
+    )
+    .otherwise(() => Option.none);
+
+/**
+ * The measurement columns, which are nullable for the same reason: each is
+ * generated from facts only one kind has, so each is present exactly where it
+ * belongs. `weight_grams` is the one every kind has and the only one NOT NULL.
+ */
+export type MeasurementColumns = Readonly<{
+  kind: ProductKind;
+  temperatureKelvin: number | null;
+  reachCentimeters: number | null;
+  coverageSquareCentimeters: number | null;
+  grainMicrometers: number | null;
+  torqueMillinewtonMeters: number | null;
+  backlashMicrometers: number | null;
+  weightGrams: number;
+}>;
+
+/**
+ * Columns to measurements, scaling each to the unit a shopper reads on the way.
+ *
+ * The database stores the smallest whole unit so the columns stay exact
+ * integers — centimetres, square centimetres, millinewton-metres, micrometres.
+ * Dividing here rather than in SQL keeps that decision in one place, and keeps
+ * the generated columns free of a rounding rule that is really presentation.
+ *
+ * `None` is unreachable while `product_variant_shape` holds, for the same
+ * reason as `toProductSpec`.
+ */
+export const toMeasurements = (
+  columns: MeasurementColumns,
+): Option<Measurements> =>
+  match(columns)
+    .with(
+      { kind: "color", temperatureKelvin: P.number, reachCentimeters: P.number },
+      ({ temperatureKelvin, reachCentimeters, weightGrams }) =>
+        Option.some<Measurements>(
+          measureColor({
+            temperatureKelvin,
+            reachMeters: roundTo(2, reachCentimeters / 100),
+            weightGrams,
+          }),
+        ),
+    )
+    .with(
+      {
+        kind: "finisher",
+        coverageSquareCentimeters: P.number,
+        grainMicrometers: P.number,
+      },
+      ({ coverageSquareCentimeters, grainMicrometers, weightGrams }) =>
+        Option.some<Measurements>(
+          measureFinisher({
+            coverageSquareMeters: roundTo(1, coverageSquareCentimeters / 10_000),
+            grainMicrometers,
+            weightGrams,
+          }),
+        ),
+    )
+    .with(
+      {
+        kind: "shifter",
+        torqueMillinewtonMeters: P.number,
+        backlashMicrometers: P.number,
+      },
+      ({ torqueMillinewtonMeters, backlashMicrometers, weightGrams }) =>
+        Option.some<Measurements>(
+          measureShifter({
+            torqueNewtonMeters: roundTo(2, torqueMillinewtonMeters / 1000),
+            backlashMillimeters: roundTo(2, backlashMicrometers / 1000),
+            weightGrams,
+          }),
+        ),
     )
     .otherwise(() => Option.none);

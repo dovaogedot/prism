@@ -93,9 +93,11 @@ describe("derived values", () => {
     // reach of the four finishes.
     const body = jsonOf(await get("/api/v1/products/void-black"));
 
-    expect(body["measurements"]).toMatchObject({
+    expect(body["measurements"]).toEqual({
+      of: "color",
       metric: {
-        temperatureKelvin: 6000,
+        // Kelvin is what the column holds and what these two come from; it is
+        // not a number the shop shows anyone.
         temperatureCelsius: 5726.9,
         reachMeters: 4,
         weightGrams: 236,
@@ -119,7 +121,7 @@ describe("derived values", () => {
 
     // Orange is the warm end of the wheel, so it sits well below the neutral
     // 6000 K — kelvin runs backwards from how the word "warm" is used.
-    expect(pumpkin["metric"]?.["temperatureKelvin"]).toBeLessThan(3000);
+    expect(pumpkin["metric"]?.["temperatureCelsius"]).toBeLessThan(2727);
     // Fully saturated and gloss, against achromatic and matte.
     expect(pumpkin["metric"]?.["reachMeters"]).toBeGreaterThan(300);
     // Mid lightness against near-black.
@@ -568,24 +570,54 @@ describe("the three categories", () => {
     });
   });
 
-  it("measures all three, from whatever each one carries", async () => {
-    // The requirement is a weight and a dimension on every product, so no kind
-    // is allowed to have none. A finisher's come from its finish and its
-    // durability; a shifter's from its arc and which way it turns.
-    for (const slug of ["test-applicator", "test-swing", "void-black"]) {
+  it("measures each kind by what that kind actually has", async () => {
+    // A tin of finisher has no temperature and no reach; a shifter has neither
+    // and no grain either. What they share is a weight, because the
+    // requirement names one and because everything in the shop has some.
+    const metricOf = async (slug: string) =>
+      Object.keys(
+        (
+          jsonOf(await get(`/api/v1/products/${slug}`))["measurements"] as Record<
+            string,
+            Record<string, number>
+          >
+        )["metric"] ?? {},
+      ).sort();
+
+    expect(await metricOf("void-black")).toEqual([
+      "reachMeters",
+      "temperatureCelsius",
+      "weightGrams",
+    ]);
+    expect(await metricOf("test-applicator")).toEqual([
+      "coverageSquareMeters",
+      "grainMicrometers",
+      "weightGrams",
+    ]);
+    expect(await metricOf("test-swing")).toEqual([
+      "backlashMillimeters",
+      "torqueNewtonMeters",
+      "weightGrams",
+    ]);
+  });
+
+  it("gives every kind a weight and a dimension in both systems", async () => {
+    // TASK.md asks for both systems on every product, so no kind may have none.
+    for (const slug of ["void-black", "test-applicator", "test-swing"]) {
       const measurements = jsonOf(await get(`/api/v1/products/${slug}`))[
         "measurements"
       ] as Record<string, Record<string, number>>;
 
       expect(measurements["metric"]?.["weightGrams"]).toBeGreaterThan(0);
-      expect(measurements["metric"]?.["reachMeters"]).toBeGreaterThan(0);
       expect(measurements["imperial"]?.["weightOunces"]).toBeGreaterThan(0);
+      expect(Object.keys(measurements["imperial"] ?? {})).toHaveLength(3);
     }
   });
 
-  it("turns a shifter's direction into its temperature", async () => {
-    // Counter-clockwise walks toward the blues, so it lands below the 6000 K
-    // neutral point; clockwise walks toward the reds and lands above it.
+  it("gives a counter-clockwise shifter more backlash than a clockwise one", async () => {
+    // Every shifter ever built was cut for clockwise. Going the other way takes
+    // up the slack on the wrong face of the tooth, and it is the one number
+    // that genuinely differs by direction.
     const { sql } = harness.database;
 
     await sql`
@@ -598,16 +630,22 @@ describe("the three categories", () => {
       FROM category c, brand b WHERE c.slug = 'shifter' AND b.slug = 'chroma-labs'
     `;
 
-    const kelvin = async (slug: string) =>
+    const metric = async (slug: string, key: string) =>
       (
         jsonOf(await get(`/api/v1/products/${slug}`))["measurements"] as Record<
           string,
           Record<string, number>
         >
-      )["metric"]?.["temperatureKelvin"];
+      )["metric"]?.[key];
 
-    expect(await kelvin("test-swing")).toBeLessThan(6000);
-    expect(await kelvin("test-swing-cw")).toBeGreaterThan(6000);
+    expect(await metric("test-swing", "backlashMillimeters")).toBeGreaterThan(
+      (await metric("test-swing-cw", "backlashMillimeters")) ?? 0,
+    );
+
+    // The arc is the same on both, so the torque must be too.
+    expect(await metric("test-swing", "torqueNewtonMeters")).toBe(
+      await metric("test-swing-cw", "torqueNewtonMeters"),
+    );
   });
 
   it("filters by category", async () => {

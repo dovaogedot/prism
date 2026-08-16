@@ -21,13 +21,7 @@ import type {
   ShiftDirection,
   Suggestion,
 } from "@prism/shared";
-import {
-  FINISHES,
-  KIND_LABELS,
-  measure,
-  Option,
-  PRODUCT_KINDS,
-} from "@prism/shared";
+import { FINISHES, KIND_LABELS, Option, PRODUCT_KINDS } from "@prism/shared";
 import { asc, count, desc, eq, inArray, min, max, sql, type SQL } from "drizzle-orm";
 import type { Database } from "../../db/client.ts";
 import {
@@ -49,7 +43,7 @@ import {
   ratingFacetLabel,
   toOffset,
 } from "./search.ts";
-import { toProductSpec } from "./spec.ts";
+import { toMeasurements, toProductSpec } from "./spec.ts";
 
 type ListingRow = Readonly<{
   id: string;
@@ -67,8 +61,12 @@ type ListingRow = Readonly<{
   durability: number | null;
   arcDegrees: number | null;
   direction: ShiftDirection | null;
-  temperatureKelvin: number;
-  reachCentimeters: number;
+  temperatureKelvin: number | null;
+  reachCentimeters: number | null;
+  coverageSquareCentimeters: number | null;
+  grainMicrometers: number | null;
+  torqueMillinewtonMeters: number | null;
+  backlashMicrometers: number | null;
   weightGrams: number;
   brandSlug: string;
   brandName: string;
@@ -96,6 +94,10 @@ const LISTING_COLUMNS = {
   direction: productListing.direction,
   temperatureKelvin: productListing.temperatureKelvin,
   reachCentimeters: productListing.reachCentimeters,
+  coverageSquareCentimeters: productListing.coverageSquareCentimeters,
+  grainMicrometers: productListing.grainMicrometers,
+  torqueMillinewtonMeters: productListing.torqueMillinewtonMeters,
+  backlashMicrometers: productListing.backlashMicrometers,
   weightGrams: productListing.weightGrams,
   brandSlug: productListing.brandSlug,
   brandName: productListing.brandName,
@@ -439,7 +441,8 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
       if (row === undefined) return Option.none;
 
       const spec = toProductSpec(row);
-      if (Option.isNone(spec)) return Option.none;
+      const measurements = toMeasurements(row);
+      if (Option.isNone(spec) || Option.isNone(measurements)) return Option.none;
 
       const [imageRows, reviewRows, tagRows] = await Promise.all([
         db
@@ -514,13 +517,7 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
         ...toSummary(row, spec.value, Option.fromNullable(images[0])),
         description: row.description,
         tags,
-        measurements: measure({
-          temperatureKelvin: row.temperatureKelvin,
-          // Stored in centimeters so the column stays an exact integer;
-          // metres is the unit a shopper reads.
-          reachMeters: row.reachCentimeters / 100,
-          weightGrams: row.weightGrams,
-        }),
+        measurements: measurements.value,
         images,
         reviews,
       };

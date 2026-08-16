@@ -30,14 +30,23 @@ one place that turns those nullable columns back into a discriminated union, aft
 nothing downstream sees a null.
 
 The required weight and dimensions belong to the thing itself rather than to a container,
-because there is no container. **Temperature** is how warm it burns (K, °C, °F), **reach**
-is how far away it still reads (m, ft), and **weight** is how heavy it looks (g, oz) — the
-visual weight designers mean when they say a color is too heavy for a layout. All three
-exist for all three categories, each derived from whatever that category actually carries:
-a color measures by its HSL channels and finish, a finisher by the finish it applies and
-its durability, a shifter by its arc and which way it turns. Every one is a generated
-column, so `hex`, `finish`, `durability`, `arc_degrees` and `direction` are the only stored
-facts about any product.
+because there is no container — and what there is to measure follows from what the thing is:
+
+| | Colors | Finishers | Shifters |
+| --- | --- | --- | --- |
+| | **Temperature** how warm it burns · °C / °F | **Coverage** how much surface it will see through · m² / ft² | **Torque** how hard it has to turn · N·m / lbf·ft |
+| | **Reach** how far away it still reads · m / ft | **Grain** how much texture it leaves · µm / mil | **Backlash** the play before the color moves · mm / in |
+| | **Weight** how heavy it looks · g / oz | **Weight** the tin and its contents · g / oz | **Weight** the gear itself · g / oz |
+
+Weight is the one all three share, because the requirement names it and because everything
+in the shop has some. A color has three independent facts, so it gets three independent
+measurements; the other two have only two each, so their three are three different functions
+of those two — which is the honest limit of what they carry.
+
+Every one is a generated column, so `hex`, `finish`, `durability`, `arc_degrees` and
+`direction` are the only stored facts about any product. Kelvin is what the temperature
+column holds, being the unit the derivation is defined in, and nothing displays it: "6208 K"
+describes a light source rather than a color.
 
 Beneath the three categories is a nested taxonomy, presented as **tags**: singular (`gold`),
 shown on every swatch, clickable, and typed straight into the search box in either number —
@@ -137,9 +146,9 @@ accounts.
 ### Tests
 
 ```bash
-npm test              # everything: 455 tests
+npm test              # everything: 471 tests
 npm run test:unit     # the fast ones only
-npm run test:e2e      # 43 Playwright specs, against the running stack
+npm run test:e2e      # 48 Playwright specs, against the running stack
 npm run typecheck
 ```
 
@@ -250,9 +259,13 @@ erDiagram
         smallint        hue                "GENERATED from hex; NULL for the other two"
         smallint        saturation         "GENERATED from hex; NULL for the other two"
         smallint        lightness          "GENERATED from hex; NULL for the other two"
-        smallint        temperature_kelvin "GENERATED, by kind"
-        integer         reach_centimeters  "GENERATED, by kind"
-        integer         weight_grams       "GENERATED, by kind"
+        smallint        temperature_kelvin "GENERATED; colors"
+        integer         reach_centimeters  "GENERATED; colors"
+        integer         coverage_square_centimeters "GENERATED; finishers"
+        smallint        grain_micrometers  "GENERATED from finish"
+        integer         torque_millinewton_meters   "GENERATED; shifters"
+        integer         backlash_micrometers        "GENERATED; shifters"
+        integer         weight_grams       "GENERATED, by kind; the one every kind has"
         tsvector        search_vector      "GENERATED, name weighted above description"
         timestamptz     created_at
     }
@@ -338,9 +351,16 @@ The same principle appears three times with three mechanisms:
 | Temperature / reach / weight | `GENERATED ALWAYS … STORED` | Same reason, and it leaves the five variant columns as the only stored facts about any product |
 | Imperial units | Pure TypeScript function | Presentation only; never filtered or sorted on |
 
-The measurement functions dispatch on `kind` and have no `ELSE`, which is the same trick as
-the CHECK above: a fourth kind produces a NULL in a `NOT NULL` column and the insert fails,
+Every measurement column but weight is generated straight from the facts of the kind it
+belongs to, and those functions are `STRICT` — so a column goes null exactly when the facts
+it is made of are absent, with no `CASE` needed to say so twice. Weight is the one every
+kind has, so weight alone dispatches on `kind`, and it has no `ELSE`: the same trick as the
+CHECK above, so a fourth kind produces a NULL in a `NOT NULL` column and the insert fails
 rather than the shop quietly selling something with no measurements.
+
+Each is stored in the smallest whole unit — centimetres, square centimetres,
+millinewton-metres, micrometres — so the columns stay exact integers. Scaling to a readable
+unit is presentation, and happens in `@prism/shared` alongside the imperial conversion.
 
 ---
 
@@ -512,9 +532,9 @@ built yet. Building it now would be guessing at a shape the traffic has not take
 
 ### Testing
 
-**455 tests**, in three layers with deliberately different costs, plus 43 in a real browser.
+**471 tests**, in three layers with deliberately different costs, plus 48 in a real browser.
 
-*Unit* (306) — pure functions and injected fakes, no I/O, ~1 second. `Option` combinators
+*Unit* (321) — pure functions and injected fakes, no I/O, ~1 second. `Option` combinators
 and their laws; metric↔imperial conversion; WCAG luminance and contrast; every Zod schema
 across valid, invalid and boundary input; JWT generation, validation and expiration against
 a controllable clock; the TTL cache's expiry and eviction order; image type detection
@@ -523,7 +543,7 @@ and bound parameters; the PNG encoder; the seeded PRNG and `hslToHex`; and the s
 the product table's nullable columns become a discriminated union, including every shape
 the variant constraint forbids.
 
-*API integration* (121) — the real application over a real Postgres from Testcontainers,
+*API integration* (122) — the real application over a real Postgres from Testcontainers,
 driven through `fastify.inject` so routing, schema validation, guards and serialization all
 run. Assertions read rows back rather than trusting the response: that the password was
 hashed, that the refresh token is stored only as a digest, that a replay set
@@ -540,7 +560,7 @@ and returns zero results, because it is genuinely free text and the protection i
 parameterisation rather than a blocklist. A blocklist that rejected `O'Brien's Red` would
 be a worse product and no safer.
 
-*End-to-end* (43) — Playwright against the running stack, for the things that only exist in
+*End-to-end* (48) — Playwright against the running stack, for the things that only exist in
 a browser: that the filter rail does not reflow, that dragging the hue ring works, that the
 rail offers each category only the controls that category has, and that the auth routes send
 you where they should — including that signing in lands on the catalog rather than the

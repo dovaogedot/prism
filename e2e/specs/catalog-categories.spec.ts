@@ -142,13 +142,16 @@ test.describe("the shifter controls", () => {
     await expect(page).not.toHaveURL(/direction=/);
   });
 
-  test("every shifter card states its turn", async ({ page }) => {
+  test("every shifter card states both of its facts, once each", async ({ page }) => {
     await page.goto("/?category=shifter");
     await ready(page);
 
-    // The badge is the one number that says what this particular tool is.
-    const badges = results(page).getByText(/^[↻↺] \d+°$/);
-    expect(await badges.count()).toBeGreaterThan(0);
+    const cards = await results(page).getByRole("article").count();
+
+    // The dial draws the arc, so the badge names the way round — between them a
+    // card states both facts without saying either twice.
+    await expect(results(page).getByText(/^[↻↺] (cw|ccw)$/i)).toHaveCount(cards);
+    await expect(results(page).getByText(/^\d+°$/)).toHaveCount(cards);
   });
 });
 
@@ -170,4 +173,64 @@ test.describe("layout stability across categories", () => {
       expect(await documentHeight(page)).toBe(full);
     });
   }
+});
+
+test.describe("measurements differ by category", () => {
+  const measurementLabels = async (page: Page): Promise<readonly string[]> =>
+    page.locator("dl").last().locator("dt").allTextContents();
+
+  const openFirst = async (page: Page, category: string): Promise<void> => {
+    await page.goto(`/?category=${category}`);
+    await ready(page);
+    await results(page).getByRole("article").first().getByRole("link").click();
+    await expect(page.getByRole("heading", { name: "Measurements" })).toBeVisible();
+  };
+
+  test("a color measures how it burns, reads and looks", async ({ page }) => {
+    await openFirst(page, "color");
+    expect(await measurementLabels(page)).toEqual(["Temperature", "Reach", "Weight"]);
+  });
+
+  test("a finisher measures the tin instead", async ({ page }) => {
+    await openFirst(page, "finisher");
+    expect(await measurementLabels(page)).toEqual(["Coverage", "Grain", "Weight"]);
+  });
+
+  test("a shifter measures the mechanism", async ({ page }) => {
+    await openFirst(page, "shifter");
+    expect(await measurementLabels(page)).toEqual(["Torque", "Backlash", "Weight"]);
+  });
+
+  test("temperature is shown in Celsius and Fahrenheit, never Kelvin", async ({ page }) => {
+    // Kelvin is what the column stores and what both of these come from, but
+    // "6208 K" describes a light source rather than a color.
+    await openFirst(page, "color");
+
+    const temperature = page.locator("dl").last().locator("dd").first();
+    await expect(temperature).toHaveText(/°C$/);
+    await expect(temperature).not.toHaveText(/K/);
+
+    await page.getByRole("button", { name: "imperial" }).click();
+    await expect(temperature).toHaveText(/°F$/);
+  });
+
+  test("the toggle swaps every row into the other vocabulary", async ({ page }) => {
+    await openFirst(page, "shifter");
+
+    const values = () => page.locator("dl").last().locator("dd").allTextContents();
+
+    expect(await values()).toEqual([
+      expect.stringContaining("N·m"),
+      expect.stringContaining("mm"),
+      expect.stringContaining("g"),
+    ]);
+
+    await page.getByRole("button", { name: "imperial" }).click();
+
+    expect(await values()).toEqual([
+      expect.stringContaining("lbf·ft"),
+      expect.stringContaining("in"),
+      expect.stringContaining("oz"),
+    ]);
+  });
 });

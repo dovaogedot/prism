@@ -8,7 +8,12 @@
 
 import { describe, expect, it } from "vitest";
 import { Option } from "@prism/shared";
-import { toProductSpec, type SpecColumns } from "../../../src/modules/catalog/spec.ts";
+import {
+  toMeasurements,
+  toProductSpec,
+  type MeasurementColumns,
+  type SpecColumns,
+} from "../../../src/modules/catalog/spec.ts";
 
 /** Every column null, so each case below names only what it needs. */
 const empty: SpecColumns = {
@@ -121,5 +126,129 @@ describe("toProductSpec", () => {
     expect(toProductSpec(empty)).toEqual(Option.none);
     expect(toProductSpec({ ...empty, kind: "finisher" })).toEqual(Option.none);
     expect(toProductSpec({ ...empty, kind: "shifter" })).toEqual(Option.none);
+  });
+});
+
+/* ---------------------------------------------------------- measurements */
+
+const noMeasurements: MeasurementColumns = {
+  kind: "color",
+  temperatureKelvin: null,
+  reachCentimeters: null,
+  coverageSquareCentimeters: null,
+  grainMicrometers: null,
+  torqueMillinewtonMeters: null,
+  backlashMicrometers: null,
+  weightGrams: 120,
+};
+
+const colorColumns: MeasurementColumns = {
+  ...noMeasurements,
+  kind: "color",
+  temperatureKelvin: 2596,
+  reachCentimeters: 29_350,
+  // A color has a grain too, because grain comes from the finish and a color
+  // has one. It is simply never part of a color's measurements.
+  grainMicrometers: 3,
+  weightGrams: 99,
+};
+
+const finisherColumns: MeasurementColumns = {
+  ...noMeasurements,
+  kind: "finisher",
+  coverageSquareCentimeters: 252_000,
+  grainMicrometers: 34,
+  weightGrams: 235,
+};
+
+const shifterColumns: MeasurementColumns = {
+  ...noMeasurements,
+  kind: "shifter",
+  torqueMillinewtonMeters: 5400,
+  backlashMicrometers: 636,
+  weightGrams: 249,
+};
+
+describe("toMeasurements", () => {
+  it("scales a color's columns to the units a shopper reads", () => {
+    // Centimetres in the column so it stays an exact integer; metres on screen.
+    expect(toMeasurements(colorColumns)).toEqual(
+      Option.some({
+        of: "color",
+        metric: {
+          temperatureCelsius: 2322.9,
+          reachMeters: 293.5,
+          weightGrams: 99,
+        },
+        imperial: {
+          temperatureFahrenheit: 4213.1,
+          reachFeet: 962.9,
+          weightOunces: 3.49,
+        },
+      }),
+    );
+  });
+
+  it("scales a finisher's coverage from square centimetres", () => {
+    // The area trap: 252 000 cm² is 25.2 m², not 2520.
+    const measurements = toMeasurements(finisherColumns);
+
+    expect(measurements).toEqual(
+      Option.some({
+        of: "finisher",
+        metric: {
+          coverageSquareMeters: 25.2,
+          grainMicrometers: 34,
+          weightGrams: 235,
+        },
+        imperial: {
+          coverageSquareFeet: 271.3,
+          grainMils: 1.34,
+          weightOunces: 8.29,
+        },
+      }),
+    );
+  });
+
+  it("scales a shifter's torque and backlash out of their thousandths", () => {
+    expect(toMeasurements(shifterColumns)).toEqual(
+      Option.some({
+        of: "shifter",
+        metric: {
+          torqueNewtonMeters: 5.4,
+          backlashMillimeters: 0.64,
+          weightGrams: 249,
+        },
+        imperial: {
+          torquePoundFeet: 3.98,
+          backlashInches: 0.025,
+          weightOunces: 8.78,
+        },
+      }),
+    );
+  });
+
+  it("leaves out the columns that belong to another kind", () => {
+    const finisher = toMeasurements(finisherColumns);
+
+    // A color's grain is present in the row and absent from the answer.
+    expect(Option.isSome(finisher) && "grainMicrometers" in finisher.value.metric).toBe(
+      true,
+    );
+
+    const color = toMeasurements(colorColumns);
+    expect(Option.isSome(color) && "grainMicrometers" in color.value.metric).toBe(false);
+  });
+
+  it("refuses a row missing the measurement its kind requires", () => {
+    expect(toMeasurements({ ...colorColumns, reachCentimeters: null })).toEqual(
+      Option.none,
+    );
+    expect(
+      toMeasurements({ ...finisherColumns, coverageSquareCentimeters: null }),
+    ).toEqual(Option.none);
+    expect(toMeasurements({ ...shifterColumns, backlashMicrometers: null })).toEqual(
+      Option.none,
+    );
   });
 });

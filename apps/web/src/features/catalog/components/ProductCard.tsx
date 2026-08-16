@@ -35,8 +35,12 @@ const SHELL =
   "relative flex flex-col overflow-hidden rounded-[--radius-card] border border-line bg-surface";
 const BODY = "flex flex-1 flex-col gap-2 p-3";
 const BRAND = "truncate text-[11px] font-medium uppercase tracking-wider text-ink-faint";
+/**
+ * Frosted rather than tinted, like the tags, so legibility does not depend on
+ * whatever colour it happens to sit on.
+ */
 const BADGE =
-  "shrink-0 rounded-full border border-line px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-ink-faint";
+  "rounded-full bg-surface/75 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-soft backdrop-blur-sm";
 /**
  * Two lines, always. Names run from "Bone" to "Union-approved Applicator", and
  * a title free to be one line or two would make a row of cards a different
@@ -65,10 +69,33 @@ export const ProductCard = ({ product, tags, onSelectTag }: ProductCardProps) =>
       />
 
       {/*
-        Over the swatch rather than under the title: the card has to stay
-        shorter than the filter rail beside it, and this is the one part of it
-        with room to spare. Frosted rather than tinted, so legibility does not
-        depend on the color underneath.
+        The one fact that says what this particular thing is: a color's finish,
+        a finisher's durability, a shifter's turn.
+
+        On the artwork rather than beside the foundry, where it used to squeeze
+        "The Pigment Exchange" down to "The Pigment Exchan…" on every card. The
+        artwork is the part of the card with room to spare.
+      */}
+      <span className={`absolute right-2 top-2 z-10 ${BADGE}`}>
+        {/*
+          Whichever of the thing's two facts the artwork does not already
+          draw: a finisher's tile is the finish, so the badge is the
+          durability; a shifter's dial is the arc, so the badge is the way
+          round. Between them a card states both without saying either twice.
+        */}
+        {match(product.spec)
+          .with({ kind: "color" }, ({ finish }) => finish)
+          .with({ kind: "finisher" }, ({ durability }) => `${durability} colors`)
+          .with(
+            { kind: "shifter" },
+            ({ direction }) => `${DIRECTION_SYMBOLS[direction]} ${direction}`,
+          )
+          .exhaustive()}
+      </span>
+
+      {/*
+        Over the artwork for the same reason: the card has to stay shorter than
+        the filter rail beside it.
       */}
       <ul className="absolute bottom-2 left-2 z-10 flex flex-wrap gap-1">
         {tags.map((tag) => (
@@ -87,25 +114,8 @@ export const ProductCard = ({ product, tags, onSelectTag }: ProductCardProps) =>
 
     <div className={BODY}>
       <div className="space-y-0.5">
-        <div className="flex items-center justify-between gap-2">
-          <p className={BRAND}>{product.brand.name}</p>
-          {/*
-            The one number that says what this particular thing is: a color's
-            finish, a finisher's reach, a shifter's turn. It belongs beside the
-            foundry that made it — it used to share the price row with the stock
-            note, which made "Gloss" and "Only 3 left" look like two answers to
-            the same question.
-          */}
-          <span className={BADGE}>
-            {match(product.spec)
-              .with({ kind: "color" }, ({ finish }) => finish)
-              .with({ kind: "finisher" }, ({ durability }) => `${durability} colors`)
-              .with({ kind: "shifter" }, ({ direction, arcDegrees }) =>
-                `${DIRECTION_SYMBOLS[direction]} ${arcDegrees}°`,
-              )
-              .exhaustive()}
-          </span>
-        </div>
+        {/* The full width of the card, now that nothing shares the row. */}
+        <p className={BRAND}>{product.brand.name}</p>
 
         <h3 className={`${TITLE} text-ink group-hover:text-accent`}>
           <Link
@@ -157,10 +167,7 @@ export const ProductCardSlot = () => (
     <div className="aspect-square w-full" />
     <div className={BODY}>
       <div className="space-y-0.5">
-        <div className="flex items-center justify-between gap-2">
-          <p className={BRAND}>&nbsp;</p>
-          <span className={BADGE}>&nbsp;</span>
-        </div>
+        <p className={BRAND}>&nbsp;</p>
         <h3 className={TITLE}>&nbsp;</h3>
       </div>
       <Stars rating={0} count={0} />

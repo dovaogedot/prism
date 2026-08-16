@@ -9,12 +9,21 @@ export {
   metersToFeet,
   kelvinToCelsius,
   kelvinToFahrenheit,
-  toImperial,
-  measure,
+  squareMetersToSquareFeet,
+  micrometersToMils,
+  newtonMetersToPoundFeet,
+  millimetersToInches,
+  measureColor,
+  measureFinisher,
+  measureShifter,
 } from "./domain/units.ts";
 export type {
-  MetricMeasurements,
-  ImperialMeasurements,
+  ColorMetric,
+  FinisherMetric,
+  ShifterMetric,
+  ColorMeasurements,
+  FinisherMeasurements,
+  ShifterMeasurements,
   Measurements,
 } from "./domain/units.ts";
 

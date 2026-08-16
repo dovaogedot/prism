@@ -248,21 +248,34 @@ export const products = pgTable(
     lightness: smallint("lightness").generatedAlwaysAs(sql`hex_to_lightness(hex)`),
 
     /**
-     * Measurements, which every kind has — each derived from whatever that
-     * kind actually carries. Nothing about how a product measures is stored.
-     * Imperial is derived again in `@prism/shared`.
+     * Measurements, each generated from the facts of the kind it belongs to
+     * and null for the kinds it does not — see migration 0006. Weight is the
+     * one every kind has. Imperial is derived again in `@prism/shared`, and
+     * the scale to a readable unit happens there too.
      */
-    temperatureKelvin: smallint("temperature_kelvin")
-      .notNull()
-      .generatedAlwaysAs(
-        sql`product_temperature(kind, hex, finish, arc_degrees, direction)`,
-      ),
-    reachCentimeters: integer("reach_centimeters")
-      .notNull()
-      .generatedAlwaysAs(sql`product_reach(kind, hex, finish, durability, arc_degrees)`),
+    temperatureKelvin: smallint("temperature_kelvin").generatedAlwaysAs(
+      sql`hex_to_temperature(hex)`,
+    ),
+    reachCentimeters: integer("reach_centimeters").generatedAlwaysAs(
+      sql`hex_to_reach(hex, finish)`,
+    ),
+    coverageSquareCentimeters: integer("coverage_square_centimeters").generatedAlwaysAs(
+      sql`finisher_coverage(durability)`,
+    ),
+    grainMicrometers: smallint("grain_micrometers").generatedAlwaysAs(
+      sql`finish_grain(finish)`,
+    ),
+    torqueMillinewtonMeters: integer("torque_millinewton_meters").generatedAlwaysAs(
+      sql`shift_torque(arc_degrees)`,
+    ),
+    backlashMicrometers: integer("backlash_micrometers").generatedAlwaysAs(
+      sql`shift_backlash(direction, arc_degrees)`,
+    ),
     weightGrams: integer("weight_grams")
       .notNull()
-      .generatedAlwaysAs(sql`product_weight(kind, hex, durability, arc_degrees)`),
+      .generatedAlwaysAs(
+        sql`product_weight(kind, hex, finish, durability, arc_degrees, direction)`,
+      ),
 
     searchVector: tsvector("search_vector")
       .notNull()
@@ -340,8 +353,12 @@ export const productListing = pgView("product_listing", {
   durability: integer("durability"),
   arcDegrees: smallint("arc_degrees"),
   direction: shiftDirection("direction"),
-  temperatureKelvin: smallint("temperature_kelvin").notNull(),
-  reachCentimeters: integer("reach_centimeters").notNull(),
+  temperatureKelvin: smallint("temperature_kelvin"),
+  reachCentimeters: integer("reach_centimeters"),
+  coverageSquareCentimeters: integer("coverage_square_centimeters"),
+  grainMicrometers: smallint("grain_micrometers"),
+  torqueMillinewtonMeters: integer("torque_millinewton_meters"),
+  backlashMicrometers: integer("backlash_micrometers"),
   weightGrams: integer("weight_grams").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   searchVector: tsvector("search_vector").notNull(),

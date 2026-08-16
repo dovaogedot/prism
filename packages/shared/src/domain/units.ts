@@ -2,40 +2,32 @@
  * Metric is stored; imperial is derived.
  *
  * TASK.md requires product measurements in both systems. Storing both would
- * create two sources of truth for one fact, so imperial exists only as this
- * pure function over the metric values.
+ * create two sources of truth for one fact, so imperial exists only as these
+ * pure functions over the metric values.
  *
- * The measurements themselves belong to the color rather than to a container:
- * how warm it burns, how far it still reads, how heavy it looks. Postgres
- * derives all three from the hex, so nothing here is ever the second copy of
- * anything.
+ * The measurements belong to the thing itself rather than to a container,
+ * because there is no container — and what there is to measure depends on what
+ * the thing is. A color has a temperature, a reach and a weight. A tin of
+ * finisher has none of those; it has a coverage, a grain and a weight. A
+ * shifter is a mechanism, so it has a torque, a backlash and a weight.
+ *
+ * Weight is the one they share, because the requirement names it and because
+ * everything in the shop has some.
+ *
+ * Postgres derives every metric value from the product's own stored facts, so
+ * nothing here is ever the second copy of anything.
  */
 
 const GRAMS_PER_OUNCE = 28.349523125;
 const METERS_PER_FOOT = 0.3048;
+const MILLIMETERS_PER_INCH = 25.4;
+/** A mil is a thousandth of an inch, which is where surface grain is measured. */
+const MICROMETERS_PER_MIL = 25.4;
+const SQUARE_FEET_PER_SQUARE_METER = 10.763910416709722;
+const NEWTON_METERS_PER_POUND_FOOT = 1.3558179483314004;
 
 /** Absolute zero, in degrees Celsius. */
 const CELSIUS_OFFSET = 273.15;
-
-export type MetricMeasurements = Readonly<{
-  /** Warmth. Kelvin is the stored form; Celsius is one subtraction away. */
-  temperatureKelvin: number;
-  /** How far away the color still reads as itself. */
-  reachMeters: number;
-  /** Visual weight — how heavy the color looks, not the mass of anything. */
-  weightGrams: number;
-}>;
-
-export type ImperialMeasurements = Readonly<{
-  temperatureFahrenheit: number;
-  reachFeet: number;
-  weightOunces: number;
-}>;
-
-export type Measurements = Readonly<{
-  metric: MetricMeasurements & Readonly<{ temperatureCelsius: number }>;
-  imperial: ImperialMeasurements;
-}>;
 
 /**
  * Half-away-from-zero to `decimals` places, avoiding float display artefacts.
@@ -68,14 +60,119 @@ export const kelvinToCelsius = (kelvin: number): number =>
 export const kelvinToFahrenheit = (kelvin: number): number =>
   roundTo(1, (kelvin - CELSIUS_OFFSET) * (9 / 5) + 32);
 
-export const toImperial = (metric: MetricMeasurements): ImperialMeasurements => ({
-  temperatureFahrenheit: kelvinToFahrenheit(metric.temperatureKelvin),
-  reachFeet: metersToFeet(metric.reachMeters),
-  weightOunces: gramsToOunces(metric.weightGrams),
+export const squareMetersToSquareFeet = (squareMeters: number): number =>
+  roundTo(1, squareMeters * SQUARE_FEET_PER_SQUARE_METER);
+
+export const micrometersToMils = (micrometers: number): number =>
+  roundTo(2, micrometers / MICROMETERS_PER_MIL);
+
+export const newtonMetersToPoundFeet = (newtonMeters: number): number =>
+  roundTo(2, newtonMeters / NEWTON_METERS_PER_POUND_FOOT);
+
+export const millimetersToInches = (millimeters: number): number =>
+  roundTo(3, millimeters / MILLIMETERS_PER_INCH);
+
+/* --------------------------------------------------------------- by kind */
+
+/**
+ * What a color measures. Temperature is carried in kelvin because that is what
+ * the column stores; nothing displays it, since a shopper reading "6208 K" is
+ * being told about a light source rather than about this color.
+ */
+export type ColorMetric = Readonly<{
+  temperatureKelvin: number;
+  reachMeters: number;
+  weightGrams: number;
+}>;
+
+export type ColorMeasurements = Readonly<{
+  of: "color";
+  metric: Readonly<{
+    temperatureCelsius: number;
+    reachMeters: number;
+    weightGrams: number;
+  }>;
+  imperial: Readonly<{
+    temperatureFahrenheit: number;
+    reachFeet: number;
+    weightOunces: number;
+  }>;
+}>;
+
+/** What a tin of finisher measures. */
+export type FinisherMetric = Readonly<{
+  coverageSquareMeters: number;
+  grainMicrometers: number;
+  weightGrams: number;
+}>;
+
+export type FinisherMeasurements = Readonly<{
+  of: "finisher";
+  metric: FinisherMetric;
+  imperial: Readonly<{
+    coverageSquareFeet: number;
+    grainMils: number;
+    weightOunces: number;
+  }>;
+}>;
+
+/** What a shifter measures. */
+export type ShifterMetric = Readonly<{
+  torqueNewtonMeters: number;
+  backlashMillimeters: number;
+  weightGrams: number;
+}>;
+
+export type ShifterMeasurements = Readonly<{
+  of: "shifter";
+  metric: ShifterMetric;
+  imperial: Readonly<{
+    torquePoundFeet: number;
+    backlashInches: number;
+    weightOunces: number;
+  }>;
+}>;
+
+/**
+ * One set of facts, two vocabularies — and a different set of facts per kind,
+ * mirroring `ProductSpec`. The tag is `of` rather than `kind` so that a
+ * measurement block and the product carrying it can be matched on separately.
+ */
+export type Measurements =
+  | ColorMeasurements
+  | FinisherMeasurements
+  | ShifterMeasurements;
+
+export const measureColor = (metric: ColorMetric): ColorMeasurements => ({
+  of: "color",
+  metric: {
+    temperatureCelsius: kelvinToCelsius(metric.temperatureKelvin),
+    reachMeters: metric.reachMeters,
+    weightGrams: metric.weightGrams,
+  },
+  imperial: {
+    temperatureFahrenheit: kelvinToFahrenheit(metric.temperatureKelvin),
+    reachFeet: metersToFeet(metric.reachMeters),
+    weightOunces: gramsToOunces(metric.weightGrams),
+  },
 });
 
-/** What the API hands to clients: one set of facts, two vocabularies. */
-export const measure = (metric: MetricMeasurements): Measurements => ({
-  metric: { ...metric, temperatureCelsius: kelvinToCelsius(metric.temperatureKelvin) },
-  imperial: toImperial(metric),
+export const measureFinisher = (metric: FinisherMetric): FinisherMeasurements => ({
+  of: "finisher",
+  metric,
+  imperial: {
+    coverageSquareFeet: squareMetersToSquareFeet(metric.coverageSquareMeters),
+    grainMils: micrometersToMils(metric.grainMicrometers),
+    weightOunces: gramsToOunces(metric.weightGrams),
+  },
+});
+
+export const measureShifter = (metric: ShifterMetric): ShifterMeasurements => ({
+  of: "shifter",
+  metric,
+  imperial: {
+    torquePoundFeet: newtonMetersToPoundFeet(metric.torqueNewtonMeters),
+    backlashInches: millimetersToInches(metric.backlashMillimeters),
+    weightOunces: gramsToOunces(metric.weightGrams),
+  },
 });
