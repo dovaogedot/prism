@@ -117,7 +117,7 @@ accounts.
 ```bash
 npm test              # everything: 430 tests
 npm run test:unit     # the fast ones only
-npm run test:e2e      # 19 Playwright specs, against the running stack
+npm run test:e2e      # 31 Playwright specs, against the running stack
 npm run typecheck
 ```
 
@@ -460,16 +460,16 @@ built yet. Building it now would be guessing at a shape the traffic has not take
 
 ### Testing
 
-**319 tests**, in three layers with deliberately different costs.
+**430 tests**, in three layers with deliberately different costs, plus 31 in a real browser.
 
-*Unit* (236) — pure functions and injected fakes, no I/O, ~1 second. `Option` combinators
+*Unit* (291) — pure functions and injected fakes, no I/O, ~1 second. `Option` combinators
 and their laws; metric↔imperial conversion; WCAG luminance and contrast; every Zod schema
 across valid, invalid and boundary input; JWT generation, validation and expiration against
 a controllable clock; the TTL cache's expiry and eviction order; image type detection
 against disguised payloads; the search and facet SQL builders, asserting on generated SQL
 and bound parameters; the PNG encoder; the seeded PRNG and `hslToHex`.
 
-*API integration* (55) — the real application over a real Postgres from Testcontainers,
+*API integration* (111) — the real application over a real Postgres from Testcontainers,
 driven through `fastify.inject` so routing, schema validation, guards and serialization all
 run. Assertions read rows back rather than trusting the response: that the password was
 hashed, that the refresh token is stored only as a digest, that a replay set
@@ -485,6 +485,12 @@ have a known shape, so anything else is malformed. The free-text search term is 
 and returns zero results, because it is genuinely free text and the protection is
 parameterisation rather than a blocklist. A blocklist that rejected `O'Brien's Red` would
 be a worse product and no safer.
+
+*End-to-end* (31) — Playwright against the running stack, for the things that only exist in
+a browser: that the filter rail does not reflow, that dragging the hue ring works, and that
+the auth routes send you where they should — including that signing in lands on the catalog
+rather than the account page, which depends on a redirect and a form navigation resolving in
+the same tick.
 
 **Manual tests**, run before each review because they involve a human or a third party:
 the CAPTCHA renders and gates registration; Google and GitHub OAuth complete against real

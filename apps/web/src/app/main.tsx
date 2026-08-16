@@ -12,6 +12,7 @@ import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router";
 import { Layout } from "../shared/layout/Layout.tsx";
 import { useSessionBootstrap } from "../features/auth/session.ts";
+import { GuestOnly } from "../features/auth/components/GuestOnly.tsx";
 import {
   AccountPage,
   ForgotPasswordPage,
@@ -54,12 +55,31 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <CatalogPage /> },
       { path: "color/:slug", element: <ProductPage /> },
-      { path: "login", element: <LoginPage /> },
-      { path: "login/2fa", element: <TwoFactorPage /> },
-      { path: "register", element: <RegisterPage /> },
+
+      // Signing in when already signed in is a no-op with a form attached.
+      {
+        element: <GuestOnly />,
+        children: [
+          { path: "login", element: <LoginPage /> },
+          { path: "login/2fa", element: <TwoFactorPage /> },
+          { path: "register", element: <RegisterPage /> },
+        ],
+      },
+
+      /*
+       * Deliberately reachable while signed in. Holding a session and having
+       * forgotten your password are not mutually exclusive, and the account
+       * page cannot help there — changing a password in place needs the
+       * current one, which is precisely what has been forgotten.
+       */
       { path: "forgot-password", element: <ForgotPasswordPage /> },
       { path: "reset-password", element: <ResetPasswordPage /> },
+
+      // Unguarded because it is the page that establishes the session; a guard
+      // would race the very refresh it is waiting for.
       { path: "oauth/complete", element: <OAuthCompletePage /> },
+
+      // The mirror image: AccountPage sends a signed-out visitor to /login.
       { path: "account", element: <AccountPage /> },
       {
         path: "*",

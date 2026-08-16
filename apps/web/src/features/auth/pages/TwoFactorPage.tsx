@@ -37,14 +37,6 @@ export const TwoFactorPage = () => {
    * under the component anyway.
    */
   const [challengeToken] = useState(readChallengeToken);
-    history.state !== null &&
-    "usr" in history.state &&
-    typeof history.state.usr === "object" &&
-    history.state.usr !== null &&
-    "challengeToken" in history.state.usr &&
-    typeof history.state.usr.challengeToken === "string"
-      ? history.state.usr.challengeToken
-      : "";
 
   const form = useForm({
     resolver: zodResolver(twoFactorLoginSchema),
