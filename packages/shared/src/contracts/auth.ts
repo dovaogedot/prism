@@ -118,6 +118,11 @@ export type SessionUser = Readonly<{
   twoFactorEnabled: boolean;
   /** Whether a password is set — OAuth-only accounts cannot use password login. */
   hasPassword: boolean;
+  /**
+   * Linked OAuth providers, alphabetically. An account can have several: two
+   * providers reporting the same verified address land on the same user.
+   */
+  providers: readonly string[];
 }>;
 
 /**

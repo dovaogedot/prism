@@ -235,12 +235,40 @@ export const AccountPage = () => {
 
         <Card className="p-5">
           <h2 className="mb-2 font-semibold text-ink">Sign-in method</h2>
-          <p className="text-sm text-ink-soft">
+          {/*
+            Both halves are read from the account rather than assumed. This
+            used to name Google outright, which was true when Google was the
+            only provider and a lie the moment GitHub arrived.
+          */}
+          <ul className="space-y-1 text-sm text-ink-soft">
             {match(value.hasPassword)
-              .with(true, () => "Email and password.")
-              .with(false, () => "Google. This account has no password set.")
+              .with(true, () => <li>Email and password.</li>)
+              .with(false, () => null)
               .exhaustive()}
-          </p>
+
+            {value.providers.map((provider) => (
+              <li key={provider} className="capitalize">
+                {provider}.
+              </li>
+            ))}
+
+            {/* An account always has at least one way in; say so when neither
+                branch above fired rather than rendering an empty box. */}
+            {match(value.hasPassword === false && value.providers.length === 0)
+              .with(true, () => <li>No sign-in method on record.</li>)
+              .with(false, () => null)
+              .exhaustive()}
+          </ul>
+
+          {match(value.hasPassword)
+            .with(false, () => (
+              <p className="mt-2 text-xs text-ink-faint">
+                No password is set on this account, so password sign-in and
+                password reset do not apply to it.
+              </p>
+            ))
+            .with(true, () => null)
+            .exhaustive()}
         </Card>
       </div>
     ))

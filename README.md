@@ -105,7 +105,7 @@ accounts.
 ### Tests
 
 ```bash
-npm test              # everything: 410 tests
+npm test              # everything: 419 tests
 npm run test:unit     # the fast ones only
 npm run test:e2e      # 19 Playwright specs, against the running stack
 npm run typecheck

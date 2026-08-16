@@ -58,12 +58,27 @@ export type IssuedSession = Readonly<{
   refreshExpiresAt: Date;
 }>;
 
+/**
+ * The record as it stands once a provider has just been linked.
+ *
+ * `providers` is read with the user, so a record loaded before the link is a
+ * provider short — which is exactly the session being issued on a first
+ * sign-in. Re-reading the row would work; adding the provider that was just
+ * linked is cheaper and lands on the same answer, in the same alphabetical
+ * order the SQL produces.
+ */
+export const withProvider = (user: UserRecord, provider: string): UserRecord => ({
+  ...user,
+  providers: [...new Set([...user.providers, provider])].sort(),
+});
+
 export const toSessionUser = (user: UserRecord): SessionUser => ({
   id: user.id,
   email: user.email,
   role: user.role,
   twoFactorEnabled: Option.isSome(user.totpEnabledAt),
   hasPassword: Option.isSome(user.passwordHash),
+  providers: user.providers,
 });
 
 export type AuthService = Readonly<{
@@ -513,7 +528,7 @@ export const createAuthService = (deps: AuthDependencies): AuthService => {
                       provider: profile.provider,
                       subject: profile.subject,
                     })
-                    .then(() => existing.value),
+                    .then(() => withProvider(existing.value, profile.provider)),
                 ).andThen((user) => issueSession(user, context))
               : repository
                   .createUser({ email: profile.email, passwordHash: Option.none })
@@ -525,7 +540,7 @@ export const createAuthService = (deps: AuthDependencies): AuthService => {
                           provider: profile.provider,
                           subject: profile.subject,
                         })
-                        .then(() => user),
+                        .then(() => withProvider(user, profile.provider)),
                     ),
                   )
                   .andThen((user) => issueSession(user, context)),

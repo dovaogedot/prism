@@ -6,7 +6,7 @@
  * sees a `null` again.
  */
 
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, getTableColumns, gt, isNull, sql } from "drizzle-orm";
 import type { DomainError, UserRole } from "@prism/shared";
 import { Option } from "@prism/shared";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
@@ -26,6 +26,8 @@ export type UserRecord = Readonly<{
   role: UserRole;
   totpSecret: Option<string>;
   totpEnabledAt: Option<Date>;
+  /** Every OAuth provider linked to this account, alphabetically. */
+  providers: readonly string[];
   createdAt: Date;
 }>;
 
@@ -39,7 +41,33 @@ export type SessionRecord = Readonly<{
 /** Why a session ended. Stored so an investigation can tell logout from attack. */
 export type RevocationReason = "logout" | "token_reuse" | "password_reset";
 
-type UserRow = typeof users.$inferSelect;
+/**
+ * The providers linked to a user, as a column rather than a second query.
+ *
+ * Every caller that loads a user goes on to build a `SessionUser` from it, and
+ * none of them is in a position to await another round trip — `toSessionUser`
+ * is a pure function in the middle of a `ResultAsync` chain. The correlated
+ * subquery rides along with the row instead.
+ *
+ * The reference to the outer row is the table followed by a literal column
+ * name, because Drizzle renders a column differently depending on where it is
+ * used: bare `"id"` in a single-table select, qualified `"app_user"."id"` in a
+ * join. Interpolating the column gives one query a reference that resolves to
+ * `oauth_identity.id` — matching nothing, silently — and the other a doubled
+ * `"app_user"."app_user"."id"`. The table alone renders the same in both.
+ */
+const linkedProviders = sql<readonly string[]>`COALESCE(
+  (
+    SELECT array_agg(DISTINCT link.provider ORDER BY link.provider)
+    FROM oauth_identity link
+    WHERE link.user_id = ${users}."id"
+  ),
+  ARRAY[]::text[]
+)`;
+
+const USER_COLUMNS = { ...getTableColumns(users), providers: linkedProviders } as const;
+
+type UserRow = typeof users.$inferSelect & Readonly<{ providers: readonly string[] }>;
 
 const toUserRecord = (row: UserRow): UserRecord => ({
   id: row.id,
@@ -48,6 +76,7 @@ const toUserRecord = (row: UserRow): UserRecord => ({
   role: row.role,
   totpSecret: Option.fromNullable(row.totpSecret),
   totpEnabledAt: Option.fromNullable(row.totpEnabledAt),
+  providers: row.providers,
   createdAt: row.createdAt,
 });
 
@@ -159,17 +188,20 @@ export type AuthRepository = Readonly<{
 export const createAuthRepository = (db: Database): AuthRepository => ({
   findUserByEmail: async (email) =>
     Option.map(toUserRecord)(
-      firstOf(await db.select().from(users).where(eq(users.email, email)).limit(1)),
+      firstOf(await db.select(USER_COLUMNS).from(users).where(eq(users.email, email)).limit(1)),
     ),
 
   findUserById: async (id) =>
     Option.map(toUserRecord)(
-      firstOf(await db.select().from(users).where(eq(users.id, id)).limit(1)),
+      firstOf(await db.select(USER_COLUMNS).from(users).where(eq(users.id, id)).limit(1)),
     ),
 
   findUserByOAuthIdentity: async (provider, subject) => {
+    // Nested under a key rather than spread: `getTableColumns` emits bare
+    // column names, and `"id"` is ambiguous once this joins two tables that
+    // both have one.
     const rows = await db
-      .select({ user: users })
+      .select({ user: users, providers: linkedProviders })
       .from(oauthIdentities)
       .innerJoin(users, eq(users.id, oauthIdentities.userId))
       .where(
@@ -180,9 +212,10 @@ export const createAuthRepository = (db: Database): AuthRepository => ({
       )
       .limit(1);
 
-    return Option.map((row: { user: UserRow }) => toUserRecord(row.user))(
-      firstOf(rows),
-    );
+    return Option.map(
+      (row: { user: typeof users.$inferSelect; providers: readonly string[] }) =>
+        toUserRecord({ ...row.user, providers: row.providers }),
+    )(firstOf(rows));
   },
 
   createUser: ({ email, passwordHash }) =>
@@ -198,7 +231,11 @@ export const createAuthRepository = (db: Database): AuthRepository => ({
     ).andThen((rows) => {
       const created = firstOf(rows);
       return Option.isSome(created)
-        ? okAsync<UserRecord, DomainError>(toUserRecord(created.value))
+        ? // A user this new has nothing linked yet; the OAuth flow links a
+          // provider immediately afterwards.
+          okAsync<UserRecord, DomainError>(
+            toUserRecord({ ...created.value, providers: [] }),
+          )
         : errAsync<UserRecord, DomainError>({ _tag: "Conflict" });
     }),
 

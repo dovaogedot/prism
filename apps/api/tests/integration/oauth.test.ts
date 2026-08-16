@@ -149,6 +149,45 @@ describe.each(OAUTH_PROVIDERS)("signing in with %s", (provider) => {
     expect(jsonOf(grant)["status"]).toBe("authenticated");
   });
 
+  it("reports the provider it was actually signed in with", async () => {
+    // The account page reads this. It used to name Google whatever you had
+    // signed in with, because the provider was never on the wire at all.
+    const { refreshToken } = await signInWith(
+      provider,
+      `${provider}-named@example.com`,
+    );
+
+    const grant = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/refresh",
+      cookies: { hue_refresh: refreshToken },
+    });
+
+    expect(jsonOf(grant)["user"]).toMatchObject({
+      hasPassword: false,
+      providers: [provider],
+    });
+  });
+
+  it("adds the provider to an account that already had a password", async () => {
+    await registerUser(harness, `${provider}-fresh@example.com`);
+    const { refreshToken } = await signInWith(
+      provider,
+      `${provider}-fresh@example.com`,
+    );
+
+    const grant = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/refresh",
+      cookies: { hue_refresh: refreshToken },
+    });
+
+    expect(jsonOf(grant)["user"]).toMatchObject({
+      hasPassword: true,
+      providers: [provider],
+    });
+  });
+
   it("rejects a callback whose state does not match the cookie", async () => {
     const code = issueMockAuthorizationCode(
       provider === "github" ? "github" : "google",
@@ -174,6 +213,30 @@ describe.each(OAUTH_PROVIDERS)("signing in with %s", (provider) => {
     });
 
     expect(response.statusCode).toBe(400);
+  });
+});
+
+describe("an account with more than one provider", () => {
+  it("lists every provider linked to it", async () => {
+    // Two providers reporting the same verified address are one person, so
+    // the second sign-in links rather than duplicating — and the account has
+    // to be able to say both.
+    await signInWith("google", "both@example.com");
+    const { refreshToken } = await signInWith("github", "both@example.com");
+
+    const users = await harness.database
+      .sql`SELECT id FROM app_user WHERE email = 'both@example.com'`;
+
+    const grant = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/refresh",
+      cookies: { hue_refresh: refreshToken },
+    });
+
+    expect(users).toHaveLength(1);
+    expect(jsonOf(grant)["user"]).toMatchObject({
+      providers: ["github", "google"],
+    });
   });
 });
 
