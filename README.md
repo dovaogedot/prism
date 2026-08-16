@@ -97,6 +97,16 @@ http://localhost:3000/api/v1/auth/oauth/google/callback
 http://localhost:3000/api/v1/auth/oauth/github/callback
 ```
 
+Two-factor is enforced on **every** path. A provider proves who owns the third-party
+account, not that the second factor this account asked for was satisfied — and since a
+provider reporting a matching verified address links itself, that is not a bar the owner
+controls. An OAuth sign-in into an account with TOTP lands on the same challenge page
+password sign-in uses, with the token in an httpOnly cookie rather than the URL.
+
+Password-reset email goes to the **Mailpit** container, a local inbox at
+<http://localhost:8025> — not to a real address. Set `SMTP_HOST`, `SMTP_USER`,
+`SMTP_PASSWORD` and `SMTP_SECURE` in `.env` to send through a real relay.
+
 The GitHub app needs the `read:user` and `user:email` scopes. Without `user:email` the
 emails endpoint returns 403 and any account with a private address cannot sign in at
 all — GitHub's `/user` returns `email: null` for those, which is the default for many
@@ -105,7 +115,7 @@ accounts.
 ### Tests
 
 ```bash
-npm test              # everything: 425 tests
+npm test              # everything: 430 tests
 npm run test:unit     # the fast ones only
 npm run test:e2e      # 19 Playwright specs, against the running stack
 npm run typecheck

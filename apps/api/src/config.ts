@@ -6,6 +6,7 @@
  */
 
 import type { OAuthProviderName } from "@prism/shared";
+import { Option } from "@prism/shared";
 import { z } from "zod";
 
 const durationSeconds = (fallback: number) =>
@@ -38,6 +39,11 @@ const environmentSchema = z.object({
 
   SMTP_HOST: z.string().min(1).default("mailpit"),
   SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(1025),
+  // Empty means an unauthenticated relay, which is what Mailpit is. A real
+  // provider needs both, and almost always TLS on 465 or STARTTLS on 587.
+  SMTP_USER: z.string().default(""),
+  SMTP_PASSWORD: z.string().default(""),
+  SMTP_SECURE: z.stringbool().default(false),
   MAIL_FROM: z.string().min(1).default("Prism <noreply@prism.test>"),
 
   /**
@@ -89,7 +95,13 @@ export type Config = Readonly<{
     twoFactorChallengeTtlSeconds: number;
     passwordResetTtlSeconds: number;
   }>;
-  mail: Readonly<{ host: string; port: number; from: string }>;
+  mail: Readonly<{
+    host: string;
+    port: number;
+    secure: boolean;
+    credentials: Option<Readonly<{ user: string; password: string }>>;
+    from: string;
+  }>;
   captcha:
     | Readonly<{ mode: "test" }>
     | Readonly<{ mode: "google"; secretKey: string }>;
@@ -171,6 +183,14 @@ export const toConfig = (environment: Environment): Config => ({
   mail: {
     host: environment.SMTP_HOST,
     port: environment.SMTP_PORT,
+    secure: environment.SMTP_SECURE,
+    credentials:
+      environment.SMTP_USER.length > 0 && environment.SMTP_PASSWORD.length > 0
+        ? Option.some({
+            user: environment.SMTP_USER,
+            password: environment.SMTP_PASSWORD,
+          })
+        : Option.none,
     from: environment.MAIL_FROM,
   },
   captcha: toCaptchaConfig(environment),

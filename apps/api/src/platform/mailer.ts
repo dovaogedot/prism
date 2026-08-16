@@ -7,6 +7,7 @@
  * the endpoint into an account-enumeration oracle.
  */
 
+import { Option } from "@prism/shared";
 import { createTransport, type Transporter } from "nodemailer";
 
 export type Email = Readonly<{
@@ -20,9 +21,15 @@ export type Mailer = Readonly<{
   send: (email: Email) => Promise<boolean>;
 }>;
 
+export type SmtpCredentials = Readonly<{ user: string; password: string }>;
+
 export type MailerOptions = Readonly<{
   host: string;
   port: number;
+  /** TLS from the first byte — port 465. STARTTLS on 587 is negotiated. */
+  secure: boolean;
+  /** Absent for a local relay like Mailpit, which accepts anything. */
+  credentials: Option<SmtpCredentials>;
   from: string;
   onFailure: (reason: unknown) => void;
 }>;
@@ -31,9 +38,14 @@ export const createSmtpMailer = (options: MailerOptions): Mailer => {
   const transport: Transporter = createTransport({
     host: options.host,
     port: options.port,
-    // Mailpit speaks plain SMTP on 1025; there is no certificate to verify.
-    secure: false,
-    ignoreTLS: true,
+    secure: options.secure,
+    // Mailpit speaks plain SMTP on 1025 with no certificate and no login. A
+    // real provider supplies both, and then TLS is not optional.
+    ignoreTLS: Option.isNone(options.credentials) && !options.secure,
+    ...Option.match<SmtpCredentials, object>({
+      onSome: ({ user, password }) => ({ auth: { user, pass: password } }),
+      onNone: () => ({}),
+    })(options.credentials),
   });
 
   return {

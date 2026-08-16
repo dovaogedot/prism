@@ -108,6 +108,8 @@ export const buildApp = async (input: AppInput): Promise<FastifyInstance> => {
     createSmtpMailer({
       host: config.mail.host,
       port: config.mail.port,
+      secure: config.mail.secure,
+      credentials: config.mail.credentials,
       from: config.mail.from,
       onFailure: (reason) => app.log.error({ err: reason }, "email delivery failed"),
     });

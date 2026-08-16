@@ -54,10 +54,20 @@ export const TwoFactorPage = () => {
   const submit = form.handleSubmit(async (values) => {
     setFailure(Option.none);
 
+    /*
+     * A provider sign-in redirects here with the challenge in an httpOnly
+     * cookie, which this page cannot read — so it sends the code alone and
+     * lets the server find the challenge.
+     */
+    const body =
+      values.challengeToken === "" || values.challengeToken === undefined
+        ? { code: values.code }
+        : { challengeToken: values.challengeToken, code: values.code };
+
     await api
       .postWithoutRetry<{ status: "authenticated"; grant: AccessGrant }>(
         "/auth/login/2fa",
-        values,
+        body,
       )
       .then((outcome) => {
         tokenStore.set(outcome.grant.accessToken, outcome.grant.user);
@@ -77,14 +87,6 @@ export const TwoFactorPage = () => {
       }
     >
       <form onSubmit={(event) => void submit(event)} className="space-y-4" noValidate>
-        {match(challengeToken)
-          .with("", () => (
-            <Alert title="This page needs a sign-in first">
-              Go back and enter your email and password.
-            </Alert>
-          ))
-          .otherwise(() => null)}
-
         {match(failure)
           .with({ _tag: "Some" }, ({ value }) => <Alert>{value}</Alert>)
           .with({ _tag: "None" }, () => null)
@@ -104,7 +106,6 @@ export const TwoFactorPage = () => {
         <Button
           type="submit"
           busy={form.formState.isSubmitting}
-          disabled={challengeToken === ""}
           className="w-full"
         >
           Verify

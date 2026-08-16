@@ -13,7 +13,7 @@ import {
   oauthProviderSchema,
   registerSchema,
   resetPasswordSchema,
-  setPasswordSchema,
+  changePasswordSchema,
   twoFactorLoginSchema,
   Option,
 } from "@prism/shared";
@@ -22,6 +22,9 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import {
   clearOAuthStateCookie,
+  clearTwoFactorCookie,
+  setTwoFactorCookie,
+  TWO_FACTOR_COOKIE,
   clearRefreshCookie,
   OAUTH_STATE_COOKIE,
   REFRESH_COOKIE,
@@ -154,13 +157,27 @@ export const registerAuthRoutes = (
       },
     },
     async (request, reply) => {
+      /*
+       * The body's token wins; the cookie is the fallback the OAuth redirect
+       * leaves behind. Neither means this page was opened cold.
+       */
+      const challengeToken = Option.orElse(() =>
+        Option.fromNullable(request.cookies[TWO_FACTOR_COOKIE]),
+      )(Option.fromNullable(request.body.challengeToken));
+
+      if (Option.isNone(challengeToken)) {
+        return sendDomainError(reply, { _tag: "Unauthenticated" });
+      }
+
       const result = await service.completeTwoFactorLogin({
-        ...request.body,
+        challengeToken: challengeToken.value,
+        code: request.body.code,
         context: contextOf(request),
       });
 
       if (result.isErr()) return sendDomainError(reply, result.error);
 
+      clearTwoFactorCookie(reply, cookies);
       setRefreshCookie(
         reply,
         result.value.refreshToken,
@@ -322,8 +339,8 @@ export const registerAuthRoutes = (
       config: STRICT_RATE_LIMIT,
       schema: {
         tags: ["auth"],
-        summary: "Add a password to an account that signed up through a provider.",
-        body: setPasswordSchema,
+        summary: "Change the password, or set the first one on a provider account.",
+        body: changePasswordSchema,
       },
     },
     async (request, reply) => {
@@ -332,8 +349,9 @@ export const registerAuthRoutes = (
         return sendDomainError(reply, { _tag: "Unauthenticated" });
       }
 
-      const result = await service.setPassword({
+      const result = await service.changePassword({
         userId: user.value.id,
+        currentPassword: Option.fromNullable(request.body.currentPassword),
         password: request.body.password,
       });
 
@@ -484,6 +502,17 @@ export const registerAuthRoutes = (
           `${deps.publicWebOrigin}/login?error=${result.error._tag}`,
           302,
         );
+      }
+
+      /*
+       * A provider proves who owns the third-party account, not that the
+       * second factor this account asked for was satisfied. When one is
+       * enabled the flow lands on the same challenge page password sign-in
+       * uses, with the token in a cookie rather than the URL.
+       */
+      if ("status" in result.value) {
+        setTwoFactorCookie(reply, result.value.challengeToken, cookies);
+        return reply.redirect(`${deps.publicWebOrigin}/login/2fa`, 302);
       }
 
       setRefreshCookie(

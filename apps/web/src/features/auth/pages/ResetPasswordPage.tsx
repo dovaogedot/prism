@@ -1,4 +1,4 @@
-import { resetPasswordSchema, Option, type ResetPasswordInput } from "@prism/shared";
+import { resetPasswordFormSchema, Option } from "@prism/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
@@ -16,16 +16,25 @@ export const ResetPasswordPage = () => {
   const [failure, setFailure] = useState<Option<ReactNode>>(Option.none);
   const [done, setDone] = useState(false);
 
-  const form = useForm<ResetPasswordInput>({
-    resolver: zodResolver(resetPasswordSchema),
-    defaultValues: { token: params.get("token") ?? "", password: "" },
+  const form = useForm({
+    resolver: zodResolver(resetPasswordFormSchema),
+    defaultValues: {
+      token: params.get("token") ?? "",
+      password: "",
+      confirmPassword: "",
+    },
   });
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(Option.none);
 
     await api
-      .postEmptyWithoutRetry("/auth/password/reset", values)
+      // The confirmation is a browser-side typo guard; the server has no use
+      // for it.
+      .postEmptyWithoutRetry("/auth/password/reset", {
+        token: values.token,
+        password: values.password,
+      })
       .then(() => {
         // Every session was revoked server-side, so the visitor signs in fresh.
         tokenStore.clear();
@@ -60,6 +69,14 @@ export const ResetPasswordPage = () => {
               hint="At least 12 characters."
               error={form.formState.errors.password?.message}
               {...form.register("password")}
+            />
+
+            <Field
+              label="Confirm new password"
+              type="password"
+              autoComplete="new-password"
+              error={form.formState.errors.confirmPassword?.message}
+              {...form.register("confirmPassword")}
             />
 
             <Button type="submit" busy={form.formState.isSubmitting} className="w-full">

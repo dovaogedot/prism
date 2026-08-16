@@ -61,8 +61,12 @@ services:
       DATABASE_URL: postgres://prism:${POSTGRES_PASSWORD:-prism}@postgres:5432/prism
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
-      SMTP_HOST: mailpit
-      SMTP_PORT: 1025
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      MAIL_FROM: ${MAIL_FROM:-Prism <noreply@prism.test>}
       MEDIA_DIR: /srv/media
       CAPTCHA_MODE: ${CAPTCHA_MODE:-test}
       RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}

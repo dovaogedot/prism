@@ -10,14 +10,15 @@ import {
   enableTwoFactorSchema,
   messageOf,
   Option,
-  setPasswordSchema,
+  changePasswordFormSchema,
+  setPasswordFormSchema,
   type SessionUser,
   type TwoFactorSetup,
 } from "@prism/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
-import { Link, Navigate } from "react-router";
+import { Navigate } from "react-router";
 import { match } from "ts-pattern";
 import { api, toApiFailure } from "../../../shared/api/client.ts";
 import { useSession } from "../session.ts";
@@ -180,23 +181,36 @@ const TwoFactorDisableFlow = ({ onDone }: Readonly<{ onDone: () => void }>) => {
 };
 
 /**
- * Adding a password to a provider-only account, so it gains email sign-in
- * without losing the provider. There is no current-password field because
- * there is no current password — the session is the authorization.
+ * Changing the password, or setting the first one.
+ *
+ * The current-password field appears only when there is a current password —
+ * an account created through a provider has nothing to confirm. The server
+ * decides which case applies regardless of what this form sends.
  */
-const SetPasswordFlow = ({ onDone }: Readonly<{ onDone: () => void }>) => {
+const PasswordFlow = ({
+  hasPassword,
+  onDone,
+}: Readonly<{ hasPassword: boolean; onDone: () => void }>) => {
   const [failure, setFailure] = useState<Option<string>>(Option.none);
 
   const form = useForm({
-    resolver: zodResolver(setPasswordSchema),
-    defaultValues: { password: "" },
+    resolver: zodResolver(
+      hasPassword ? changePasswordFormSchema : setPasswordFormSchema,
+    ),
+    defaultValues: { currentPassword: "", password: "", confirmPassword: "" },
   });
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(Option.none);
 
+    // The confirmation never leaves the browser, and neither does an empty
+    // current password on an account that has none.
+    const body = hasPassword
+      ? { currentPassword: values.currentPassword, password: values.password }
+      : { password: values.password };
+
     await api
-      .post<SessionUser>("/auth/password", values)
+      .post<SessionUser>("/auth/password", body)
       .then((user) => {
         tokenStore.updateUser(user);
         form.reset();
@@ -212,11 +226,29 @@ const SetPasswordFlow = ({ onDone }: Readonly<{ onDone: () => void }>) => {
         .with({ _tag: "None" }, () => null)
         .exhaustive()}
 
-      <p className="text-sm text-ink-soft">
-        You signed up through a provider, so this account has no password. Add
-        one and you can sign in with your email as well — the provider keeps
-        working either way.
-      </p>
+      {match(hasPassword)
+        .with(false, () => (
+          <p className="text-sm text-ink-soft">
+            You signed up through a provider, so this account has no password.
+            Add one and you can sign in with your email as well — the provider
+            keeps working either way.
+          </p>
+        ))
+        .with(true, () => null)
+        .exhaustive()}
+
+      {match(hasPassword)
+        .with(true, () => (
+          <Field
+            label="Current password"
+            type="password"
+            autoComplete="current-password"
+            error={form.formState.errors.currentPassword?.message}
+            {...form.register("currentPassword")}
+          />
+        ))
+        .with(false, () => null)
+        .exhaustive()}
 
       <Field
         label="New password"
@@ -226,8 +258,16 @@ const SetPasswordFlow = ({ onDone }: Readonly<{ onDone: () => void }>) => {
         {...form.register("password")}
       />
 
+      <Field
+        label="Confirm new password"
+        type="password"
+        autoComplete="new-password"
+        error={form.formState.errors.confirmPassword?.message}
+        {...form.register("confirmPassword")}
+      />
+
       <Button type="submit" busy={form.formState.isSubmitting}>
-        Set a password
+        {hasPassword ? "Change password" : "Set a password"}
       </Button>
     </form>
   );
@@ -321,26 +361,18 @@ export const AccountPage = () => {
         <Card className="p-5">
           <h2 className="mb-3 font-semibold text-ink">Password</h2>
 
-          {match(value.hasPassword)
-            .with(true, () => (
-              <p className="text-sm text-ink-soft">
-                A password is set. To change it, sign out and use the{" "}
-                <Link to="/forgot-password" className="text-accent hover:underline">
-                  reset link
-                </Link>{" "}
-                — changing it needs proof beyond a signed-in session.
-              </p>
-            ))
-            .with(false, () => (
-              <SetPasswordFlow
-                onDone={() =>
-                  setNotice(
-                    Option.some("Password set. You can now sign in with your email."),
-                  )
-                }
-              />
-            ))
-            .exhaustive()}
+          <PasswordFlow
+            hasPassword={value.hasPassword}
+            onDone={() =>
+              setNotice(
+                Option.some(
+                  value.hasPassword
+                    ? "Password changed."
+                    : "Password set. You can now sign in with your email.",
+                ),
+              )
+            }
+          />
         </Card>
       </div>
     ))

@@ -241,12 +241,19 @@ describe("an account with more than one provider", () => {
 });
 
 describe("adding a password to a provider account", () => {
-  const setPassword = async (accessToken: string, password: string) =>
+  const setPassword = async (
+    accessToken: string,
+    password: string,
+    currentPassword?: string,
+  ) =>
     harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/password",
       headers: { authorization: `Bearer ${accessToken}` },
-      payload: { password },
+      payload:
+        currentPassword === undefined
+          ? { password }
+          : { currentPassword, password },
     });
 
   /** Signs in through a provider and returns a usable access token. */
@@ -296,16 +303,40 @@ describe("adding a password to a provider account", () => {
     expect(users).toHaveLength(1);
   });
 
-  it("refuses to overwrite a password that already exists", async () => {
-    // A stolen session must not be able to change the password: that needs the
-    // old one, or a token mailed to the address.
+  it("needs the current password once one exists", async () => {
+    // A stolen session must not be able to change the password on its own.
     const token = await tokenFor("has-password@example.com");
     await setPassword(token, VALID_PASSWORD);
 
-    const second = await setPassword(token, `${VALID_PASSWORD}-again`);
+    const blind = await setPassword(token, `${VALID_PASSWORD}-again`);
+    const wrong = await setPassword(token, `${VALID_PASSWORD}-again`, "not-it-at-all");
 
-    expect(second.statusCode).toBe(409);
-    expect(jsonOf(second)["error"]).toMatchObject({ code: "PasswordAlreadySet" });
+    expect(blind.statusCode).toBe(401);
+    expect(wrong.statusCode).toBe(401);
+  });
+
+  it("changes the password when the current one is right", async () => {
+    const token = await tokenFor("changes-password@example.com");
+    await setPassword(token, VALID_PASSWORD);
+
+    const changed = await setPassword(
+      token,
+      `${VALID_PASSWORD}-again`,
+      VALID_PASSWORD,
+    );
+
+    expect(changed.statusCode).toBe(200);
+
+    const login = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      payload: {
+        email: "changes-password@example.com",
+        password: `${VALID_PASSWORD}-again`,
+      },
+    });
+
+    expect(jsonOf(login)["status"]).toBe("authenticated");
   });
 
   it("rejects a weak password", async () => {
@@ -318,6 +349,102 @@ describe("adding a password to a provider account", () => {
       method: "POST",
       url: "/api/v1/auth/password",
       payload: { password: VALID_PASSWORD },
+    });
+
+    expect(response.statusCode).toBe(401);
+  });
+});
+
+describe("a provider sign-in into an account with two-factor", () => {
+  /** Enrols the signed-in account in TOTP and returns nothing but the effect. */
+  const enableTwoFactor = async (accessToken: string): Promise<void> => {
+    const setup = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/2fa/setup",
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+
+    const uri = String(jsonOf(setup)["uri"]);
+    const secret = new URL(uri).searchParams.get("secret") ?? "";
+
+    await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/2fa/enable",
+      headers: { authorization: `Bearer ${accessToken}` },
+      payload: { code: harness.totpCodeFor(secret) },
+    });
+  };
+
+  const signedInToken = async (email: string): Promise<string> => {
+    const { refreshToken } = await signInWith("google", email);
+    const grant = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/refresh",
+      cookies: { hue_refresh: refreshToken },
+    });
+    return String(jsonOf(grant)["accessToken"]);
+  };
+
+  it("challenges instead of signing straight in", async () => {
+    // Otherwise the provider is a way around a factor the owner asked for —
+    // and since a matching verified address links itself, that is not a bar
+    // the owner controls.
+    await enableTwoFactor(await signedInToken("guarded@example.com"));
+
+    const { callback } = await signInWith("google", "guarded@example.com");
+
+    expect(callback.statusCode).toBe(302);
+    expect(callback.headers["location"]).toContain("/login/2fa");
+    expect(cookieValue(callback, "hue_refresh")).toBe("");
+    expect(cookieValue(callback, "hue_2fa_challenge")).not.toBe("");
+  });
+
+  it("keeps the challenge out of the redirect URL", async () => {
+    await enableTwoFactor(await signedInToken("no-token-in-url@example.com"));
+    const { callback } = await signInWith("google", "no-token-in-url@example.com");
+
+    expect(String(callback.headers["location"])).not.toContain("challenge");
+    expect(String(callback.headers["location"])).not.toContain("eyJ");
+  });
+
+  it("completes with a code and the cookie alone", async () => {
+    const token = await signedInToken("finishes@example.com");
+    const setup = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/2fa/setup",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const secret =
+      new URL(String(jsonOf(setup)["uri"])).searchParams.get("secret") ?? "";
+    await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/2fa/enable",
+      headers: { authorization: `Bearer ${token}` },
+      payload: { code: harness.totpCodeFor(secret) },
+    });
+
+    const { callback } = await signInWith("google", "finishes@example.com");
+    const challenge = cookieValue(callback, "hue_2fa_challenge");
+
+    // No challenge token in the body: the page that collects the code cannot
+    // read an httpOnly cookie, so the server finds it.
+    const done = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login/2fa",
+      cookies: { hue_2fa_challenge: challenge },
+      payload: { code: harness.totpCodeFor(secret) },
+    });
+
+    expect(done.statusCode).toBe(200);
+    expect(jsonOf(done)["status"]).toBe("authenticated");
+    expect(cookieValue(done, "hue_refresh")).not.toBe("");
+  });
+
+  it("refuses a code with no challenge anywhere", async () => {
+    const response = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login/2fa",
+      payload: { code: "123456" },
     });
 
     expect(response.statusCode).toBe(401);

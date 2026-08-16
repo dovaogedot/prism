@@ -1,4 +1,4 @@
-import { registerSchema, Option, type AccessGrant, type RegisterInput } from "@prism/shared";
+import { registerFormSchema, Option, type AccessGrant } from "@prism/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
@@ -19,16 +19,22 @@ export const RegisterPage = () => {
   const [captchaToken, setCaptchaToken] = useState("");
   const [failure, setFailure] = useState<Option<ReactNode>>(Option.none);
 
-  const form = useForm<RegisterInput>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: { email: "", password: "", captchaToken: "" },
+  const form = useForm({
+    resolver: zodResolver(registerFormSchema),
+    defaultValues: { email: "", password: "", confirmPassword: "", captchaToken: "" },
   });
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(Option.none);
 
     await api
-      .postWithoutRetry<AccessGrant>("/auth/register", { ...values, captchaToken })
+      // `confirmPassword` is a browser-side guard against a typo; the server
+      // has no use for it.
+      .postWithoutRetry<AccessGrant>("/auth/register", {
+        email: values.email,
+        password: values.password,
+        captchaToken,
+      })
       .then((grant) => {
         tokenStore.set(grant.accessToken, grant.user);
         void navigate("/");
@@ -69,6 +75,14 @@ export const RegisterPage = () => {
           hint="At least 12 characters. Length beats punctuation."
           error={form.formState.errors.password?.message}
           {...form.register("password")}
+        />
+
+        <Field
+          label="Confirm password"
+          type="password"
+          autoComplete="new-password"
+          error={form.formState.errors.confirmPassword?.message}
+          {...form.register("confirmPassword")}
         />
 
         <Captcha

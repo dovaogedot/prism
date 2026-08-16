@@ -13,6 +13,16 @@ import type { FastifyReply } from "fastify";
 export const REFRESH_COOKIE = "hue_refresh";
 export const OAUTH_STATE_COOKIE = "hue_oauth_state";
 
+/**
+ * The two-factor challenge, when a provider sign-in raised one.
+ *
+ * A redirect has no SPA to hand the token to, and putting it in the URL would
+ * leave it in history and in referrer headers. It is httpOnly, so the page
+ * that collects the code never sees it — the server reads it back off the
+ * request instead.
+ */
+export const TWO_FACTOR_COOKIE = "hue_2fa_challenge";
+
 /** Everything under here, and nothing else, receives these cookies. */
 const COOKIE_PATH = "/api/v1/auth";
 
@@ -66,6 +76,33 @@ export const clearOAuthStateCookie = (
   options: CookieOptions,
 ): void => {
   reply.clearCookie(OAUTH_STATE_COOKIE, {
+    httpOnly: true,
+    secure: options.secure,
+    sameSite: "lax",
+    path: COOKIE_PATH,
+  });
+};
+
+/** Short-lived: the challenge itself expires, this just stops it lingering. */
+export const setTwoFactorCookie = (
+  reply: FastifyReply,
+  challengeToken: string,
+  options: CookieOptions,
+): void => {
+  reply.setCookie(TWO_FACTOR_COOKIE, challengeToken, {
+    httpOnly: true,
+    secure: options.secure,
+    sameSite: "lax",
+    path: COOKIE_PATH,
+    maxAge: 600,
+  });
+};
+
+export const clearTwoFactorCookie = (
+  reply: FastifyReply,
+  options: CookieOptions,
+): void => {
+  reply.clearCookie(TWO_FACTOR_COOKIE, {
     httpOnly: true,
     secure: options.secure,
     sameSite: "lax",

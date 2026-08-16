@@ -21,7 +21,6 @@ export type DomainError =
   | Readonly<{ _tag: "SessionRevoked" }>
   // Two-factor authentication
   | Readonly<{ _tag: "TwoFactorRequired" }>
-  | Readonly<{ _tag: "PasswordAlreadySet" }>
   | Readonly<{ _tag: "TwoFactorCodeInvalid" }>
   | Readonly<{ _tag: "TwoFactorAlreadyEnabled" }>
   | Readonly<{ _tag: "TwoFactorNotEnabled" }>
@@ -65,7 +64,6 @@ export const httpStatusByTag: Record<DomainErrorTag, number> = {
   SessionRevoked: 401,
 
   TwoFactorRequired: 401,
-  PasswordAlreadySet: 409,
   TwoFactorCodeInvalid: 401,
   TwoFactorAlreadyEnabled: 409,
   TwoFactorNotEnabled: 409,
@@ -107,8 +105,6 @@ export const messageByTag: Record<DomainErrorTag, string> = {
   SessionRevoked: "This session has been signed out.",
 
   TwoFactorRequired: "Enter the code from your authenticator app.",
-  PasswordAlreadySet:
-    "This account already has a password. Use the reset link to change it.",
   TwoFactorCodeInvalid: "That code is not right. Codes change every 30 seconds.",
   TwoFactorAlreadyEnabled: "Two-factor authentication is already on.",
   TwoFactorNotEnabled: "Two-factor authentication is not turned on.",
@@ -161,7 +157,6 @@ export const TAGLESS_ERRORS = {
   SessionRevoked: { _tag: "SessionRevoked" },
 
   TwoFactorRequired: { _tag: "TwoFactorRequired" },
-  PasswordAlreadySet: { _tag: "PasswordAlreadySet" },
   TwoFactorCodeInvalid: { _tag: "TwoFactorCodeInvalid" },
   TwoFactorAlreadyEnabled: { _tag: "TwoFactorAlreadyEnabled" },
   TwoFactorNotEnabled: { _tag: "TwoFactorNotEnabled" },

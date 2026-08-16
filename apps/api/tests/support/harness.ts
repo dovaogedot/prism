@@ -16,6 +16,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import postgres from "postgres";
+import { generateSync } from "otplib";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../src/app.ts";
 import { toConfig, type Config } from "../../src/config.ts";
@@ -27,6 +28,9 @@ import type { MemoryMailer } from "../../src/platform/mailer.ts";
 import type { Hasher } from "../../src/platform/hasher.ts";
 
 export const TEST_START = new Date("2026-08-07T12:00:00.000Z");
+
+/** Matches `PERIOD_SECONDS` in the TOTP adapter. */
+const TOTP_PERIOD_SECONDS = 30;
 
 /**
  * Argon2 at production parameters costs ~50 ms per call, which across a full
@@ -46,6 +50,8 @@ export type Harness = Readonly<{
   clock: MutableClock;
   mailer: MemoryMailer;
   config: Config;
+  /** A live TOTP code for the harness clock, which is not the wall clock. */
+  totpCodeFor: (secret: string) => string;
   mediaDirectory: string;
   reset: () => Promise<void>;
   stop: () => Promise<void>;
@@ -71,6 +77,9 @@ export const testEnvironment = (
   PASSWORD_RESET_TTL_SECONDS: 1800,
   SMTP_HOST: "unused",
   SMTP_PORT: 1025,
+  SMTP_USER: "",
+  SMTP_PASSWORD: "",
+  SMTP_SECURE: false,
   MAIL_FROM: "Prism <noreply@prism.test>",
   CAPTCHA_MODE: "test" as const,
   RECAPTCHA_SECRET_KEY: "",
@@ -144,6 +153,14 @@ export const startHarness = async (): Promise<Harness> => {
 
     // Truncate rather than re-migrate: it is far quicker, and RESTART IDENTITY
     // plus CASCADE leaves the schema exactly as the migrations built it.
+    totpCodeFor: (secret) =>
+      generateSync({
+        secret,
+        period: TOTP_PERIOD_SECONDS,
+        digits: 6,
+        epoch: Math.floor(clock.now().getTime() / 1000),
+      }),
+
     reset: async () => {
       await database.sql.unsafe(
         `TRUNCATE ${MUTABLE_TABLES.join(", ")} RESTART IDENTITY CASCADE`,

@@ -56,8 +56,16 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Enter your password."),
 });
 
+/**
+ * The challenge may arrive in the body or in a short-lived httpOnly cookie.
+ *
+ * Password sign-in hands the token to the SPA, which carries it in navigation
+ * state. The OAuth callback has no SPA to hand it to — it is a redirect — so it
+ * leaves the token in a cookie instead of putting it in the URL, where it would
+ * land in history and in referrer headers.
+ */
 export const twoFactorLoginSchema = z.object({
-  challengeToken: z.string().min(1),
+  challengeToken: z.string().min(1).optional(),
   code: totpCodeSchema,
 });
 
@@ -71,13 +79,59 @@ export const resetPasswordSchema = z.object({
 });
 
 /**
- * Adding a password to an account that signed up through a provider. There is
- * no current password to confirm, because there is no current password — the
- * authenticated session is the proof.
+ * Changing the password from the account page.
+ *
+ * `currentPassword` is required of an account that has one and meaningless to
+ * an account that does not — one created through a provider has nothing to
+ * confirm, and the authenticated session is the proof. The server decides
+ * which case applies; it does not take the client's word for it.
  */
-export const setPasswordSchema = z.object({
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).optional(),
   password: passwordSchema,
 });
+
+/**
+ * The confirmation field never leaves the browser — it guards against a typo
+ * in a value nobody can read back. Written out per form rather than through a
+ * generic wrapper, which erases the shape and makes `values.password` an index
+ * lookup.
+ */
+const confirmField = z.string().min(1, "Repeat the password.");
+
+/** Zod wants a mutable `path`, so this is not `as const`. */
+const MISMATCH = {
+  message: "The two passwords do not match.",
+  path: ["confirmPassword"],
+};
+
+const matches = (values: Readonly<{ password: string; confirmPassword: string }>) =>
+  values.password === values.confirmPassword;
+
+export const registerFormSchema = registerSchema
+  .extend({ confirmPassword: confirmField })
+  .refine(matches, MISMATCH);
+
+export const resetPasswordFormSchema = resetPasswordSchema
+  .extend({ confirmPassword: confirmField })
+  .refine(matches, MISMATCH);
+
+export const changePasswordFormSchema = changePasswordSchema
+  .extend({
+    currentPassword: z.string().min(1, "Enter your current password."),
+    confirmPassword: confirmField,
+  })
+  .refine(matches, MISMATCH);
+
+/**
+ * No current password to confirm: the account signed up through a provider.
+ *
+ * The field is still in the shape, unvalidated, so both password forms infer
+ * the same values type and one component can serve either.
+ */
+export const setPasswordFormSchema = changePasswordSchema
+  .extend({ currentPassword: z.string(), confirmPassword: confirmField })
+  .refine(matches, MISMATCH);
 
 export const enableTwoFactorSchema = z.object({
   code: totpCodeSchema,
@@ -92,7 +146,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type TwoFactorLoginInput = z.infer<typeof twoFactorLoginSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
-export type SetPasswordInput = z.infer<typeof setPasswordSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type EnableTwoFactorInput = z.infer<typeof enableTwoFactorSchema>;
 export type DisableTwoFactorInput = z.infer<typeof disableTwoFactorSchema>;
 
@@ -149,9 +203,15 @@ export type AccessGrant = Readonly<{
  * Sign-in is not one outcome but two, so it is a tagged union rather than a
  * response with half its fields optional.
  */
+/** Named on its own because the OAuth flow returns this variant and no other. */
+export type TwoFactorChallenge = Readonly<{
+  status: "two_factor_required";
+  challengeToken: string;
+}>;
+
 export type LoginOutcome =
   | Readonly<{ status: "authenticated"; grant: AccessGrant }>
-  | Readonly<{ status: "two_factor_required"; challengeToken: string }>;
+  | TwoFactorChallenge;
 
 export type TwoFactorSetup = Readonly<{
   /** `otpauth://` URI for manual entry. */

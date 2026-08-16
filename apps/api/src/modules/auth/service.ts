@@ -14,6 +14,7 @@ import type {
   AvailableProviders,
   DomainError,
   LoginOutcome,
+  TwoFactorChallenge,
   SessionUser,
   TwoFactorSetup,
   UserRole,
@@ -111,8 +112,9 @@ export type AuthService = Readonly<{
 
   requestPasswordReset: (email: string) => ResultAsync<void, DomainError>;
 
-  setPassword: (input: {
+  changePassword: (input: {
     userId: string;
+    currentPassword: Option<string>;
     password: string;
   }) => ResultAsync<SessionUser, DomainError>;
 
@@ -136,12 +138,13 @@ export type AuthService = Readonly<{
     provider: string;
     redirectUri: string;
   }) => ResultAsync<Readonly<{ url: string; state: string }>, DomainError>;
+  /** A challenge rather than a session when the account has a second factor. */
   completeOAuthLogin: (input: {
     provider: string;
     code: string;
     redirectUri: string;
     context: RequestContext;
-  }) => ResultAsync<IssuedSession, DomainError>;
+  }) => ResultAsync<TwoFactorChallenge | IssuedSession, DomainError>;
 }>;
 
 export const createAuthService = (deps: AuthDependencies): AuthService => {
@@ -195,6 +198,28 @@ export const createAuthService = (deps: AuthDependencies): AuthService => {
         })),
     );
   };
+
+  /**
+   * The end of a provider sign-in.
+   *
+   * A provider proves who owns the third-party account; it says nothing about
+   * the second factor this account asked for. Skipping TOTP here would make
+   * the account only as strong as the weakest thing linked to it — and since
+   * a provider reporting a matching verified address links itself
+   * automatically, that is not a bar the owner controls.
+   */
+  const signInOAuth = (
+    user: UserRecord,
+    context: RequestContext,
+  ): ResultAsync<TwoFactorChallenge | IssuedSession, DomainError> =>
+    Option.isSome(user.totpEnabledAt)
+      ? tokens
+          .issueTwoFactorChallenge({ subject: user.id })
+          .map((challengeToken): TwoFactorChallenge => ({
+            status: "two_factor_required",
+            challengeToken,
+          }))
+      : issueSession(user, context);
 
   const issueAccessForRotatedSession = (
     userId: string,
@@ -385,33 +410,49 @@ export const createAuthService = (deps: AuthDependencies): AuthService => {
       ),
 
     /**
-     * Adds a password to an account that has none — one created through a
-     * provider, which until now could only sign in that way.
+     * Changes the password, or sets the first one.
      *
-     * The authenticated session is the authorization: there is no current
-     * password to confirm. An account that already has one is refused rather
-     * than overwritten, because that request needs the old password or a
-     * mailed token to prove it is the owner and not a stolen session.
+     * Which of the two it is depends on the account, not on what the client
+     * sent: an account with a password must prove it knows the old one, so a
+     * stolen session cannot lock the owner out. An account created through a
+     * provider has nothing to prove, and the session is the authorization.
+     *
+     * Sessions elsewhere are left alone. Whoever did this already knew the
+     * current password or held the provider; the reset-by-email flow is the
+     * one that assumes compromise, and that one does revoke.
      */
-    setPassword: ({ userId, password }) =>
+    changePassword: ({ userId, currentPassword, password }) =>
       ResultAsync.fromSafePromise(repository.findUserById(userId)).andThen((found) => {
         if (Option.isNone(found)) {
           return errAsync<SessionUser, DomainError>({ _tag: "Unauthenticated" });
         }
 
-        if (Option.isSome(found.value.passwordHash)) {
-          return errAsync<SessionUser, DomainError>({ _tag: "PasswordAlreadySet" });
-        }
+        const user = found.value;
 
-        return ResultAsync.fromSafePromise(
-          hasher.hash(password).then(async (passwordHash) => {
-            await repository.setPasswordHash(userId, passwordHash);
-            // Sessions stay: nothing was compromised, an option was added.
-            return toSessionUser({
-              ...found.value,
-              passwordHash: Option.some(passwordHash),
-            });
-          }),
+        const confirmed: ResultAsync<void, DomainError> = Option.isNone(
+          user.passwordHash,
+        )
+          ? okAsync(undefined)
+          : Option.isNone(currentPassword)
+            ? errAsync<void, DomainError>({ _tag: "InvalidCredentials" })
+            : ResultAsync.fromSafePromise(
+                hasher.verify(user.passwordHash.value, currentPassword.value),
+              ).andThen((matches) =>
+                matches
+                  ? okAsync<void, DomainError>(undefined)
+                  : errAsync<void, DomainError>({ _tag: "InvalidCredentials" }),
+              );
+
+        return confirmed.andThen(() =>
+          ResultAsync.fromSafePromise(
+            hasher.hash(password).then(async (passwordHash) => {
+              await repository.setPasswordHash(userId, passwordHash);
+              return toSessionUser({
+                ...user,
+                passwordHash: Option.some(passwordHash),
+              });
+            }),
+          ),
         );
       }),
 
@@ -549,7 +590,7 @@ export const createAuthService = (deps: AuthDependencies): AuthService => {
         ResultAsync.fromSafePromise(
           repository.findUserByOAuthIdentity(profile.provider, profile.subject),
         ).andThen((linked) => {
-          if (Option.isSome(linked)) return issueSession(linked.value, context);
+          if (Option.isSome(linked)) return signInOAuth(linked.value, context);
 
           // First sign-in with this provider. If the address already has an
           // account, link to it rather than creating a duplicate person.
@@ -565,7 +606,7 @@ export const createAuthService = (deps: AuthDependencies): AuthService => {
                       subject: profile.subject,
                     })
                     .then(() => withProvider(existing.value, profile.provider)),
-                ).andThen((user) => issueSession(user, context))
+                ).andThen((user) => signInOAuth(user, context))
               : repository
                   .createUser({ email: profile.email, passwordHash: Option.none })
                   .andThen((user) =>
@@ -579,7 +620,7 @@ export const createAuthService = (deps: AuthDependencies): AuthService => {
                         .then(() => withProvider(user, profile.provider)),
                     ),
                   )
-                  .andThen((user) => issueSession(user, context)),
+                  .andThen((user) => signInOAuth(user, context)),
           );
         }),
       );
