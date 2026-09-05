@@ -1,14 +1,20 @@
 /**
- * Builds a catalog worth browsing: two demo accounts, eight foundries, a
- * seven-branch category tree, a few hundred colors, a generated swatch image
- * for each, and enough reviews that sorting by rating means something.
+ * Builds a catalog worth browsing: two demo accounts, a shelf of foundries, a
+ * few hundred colors with a generated swatch image each, the tins and gears
+ * that work on them, and enough reviews that sorting by rating means something.
+ *
+ * The palettes below are how a plausible color gets invented — a patch of HSL
+ * space and some words to name it with. None of that is stored: a color keeps
+ * its hex, and which family it lands in is the database's answer, not a label
+ * chosen here.
  *
  * Idempotent — running it twice leaves the same catalog, so `docker compose
  * up` on an existing volume does not double the shop.
  *
  * Note what is never written: hue, saturation, lightness, temperature, reach,
- * weight and every rating. Postgres derives the first six from `hex` and
- * `finish`, and `product_listing` derives the ratings from `product_review`.
+ * grain, weight and every rating. Postgres derives the first seven from the
+ * hex and the three amounts, and `product_listing` derives the ratings from
+ * `product_review`.
  */
 
 import { fileURLToPath } from "node:url";
@@ -20,10 +26,12 @@ import argon2 from "argon2";
 import { createDatabase, type Database } from "./client.ts";
 import {
   brands,
-  categories,
+  colors,
+  finishers,
   productImages,
   productReviews,
   products,
+  shifters,
   users,
 } from "./schema.ts";
 import { createRandom, hslToHex, shuffle, slugify, type Random } from "./palette.ts";
@@ -36,7 +44,6 @@ import {
   FINISHER_BRANCHES,
   FINISHER_NOTES,
   FINISHES,
-  FINISH_NOTES,
   INSTRUMENT_NOTES,
   REVIEW_BODIES,
   SHIFTER_BRANCHES,
@@ -44,7 +51,22 @@ import {
   type LeafCategorySeed,
 } from "./seed-data.ts";
 import type { Finish, ProductKind, ShiftDirection } from "@prism/shared";
-import { SHIFT_DIRECTIONS } from "@prism/shared";
+import {
+  EMISSION_BOUNDS,
+  EMISSION_SPEAKS,
+  FINISH_BANDS,
+  FLUORESCENCE_FLOOR,
+  COATING_BOUNDS,
+  COATING_ROUGHNESS_CEILING,
+  MATTE_FLOOR,
+  Option,
+  parseHex,
+  ROUGHNESS_BOUNDS,
+  saturationOf,
+  SHIFT_DIRECTIONS,
+  toRgb,
+  type HexColor,
+} from "@prism/shared";
 import { match } from "ts-pattern";
 
 const SEED = 20260807;
@@ -63,7 +85,7 @@ const REVIEWER_EMAILS = [
   "iris@prism.test",
   "hex@prism.test",
   "sable@prism.test",
-  "ochre@prism.test",
+  "ocher@prism.test",
   "indigo@prism.test",
   "cerise@prism.test",
 ];
@@ -77,6 +99,13 @@ const hueWithin = (
   return (arc.from + random.between(0, span)) % 360;
 };
 
+/** The three amounts a finish is made of, which a color has and a tin leaves. */
+type Finishing = Readonly<{
+  roughness: number;
+  coatingNanometers: number;
+  emission: number;
+}>;
+
 /** What every product has, whatever kind it turns out to be. */
 type PlannedCommon = Readonly<{
   slug: string;
@@ -89,8 +118,14 @@ type PlannedCommon = Readonly<{
 /** Mirrors `ProductSpec`, so a planned product cannot be half a variant. */
 type PlannedProduct = PlannedCommon &
   Readonly<
-    | { kind: "color"; hex: string; finish: Finish }
-    | { kind: "finisher"; finish: Finish; durability: number }
+    | {
+        kind: "color";
+        hex: string;
+        roughness: number;
+        coatingNanometers: number;
+        emission: number;
+      }
+    | ({ kind: "finisher" } & Finishing)
     | { kind: "shifter"; direction: ShiftDirection; arcDegrees: number }
   >;
 
@@ -124,38 +159,117 @@ const planNamed = <A>(
   return planned;
 };
 
+/** Three colors in ten carry a coating; the rest of the shelf is bare paint. */
+const COATED_IN_TEN = 3;
+
+/** And rather fewer glow, which is what makes the ones that do worth stocking. */
+const GLOWING_IN_TEN = 2;
+
+/** The saturation Postgres will derive from a hex this file just composed. */
+const saturationOfHex = (hex: string): number =>
+  Option.match<HexColor, number>({
+    onSome: (parsed) => saturationOf(toRgb(parsed)),
+    onNone: () => 0,
+  })(parseHex(hex));
+
+/**
+ * The three amounts one color is made of.
+ *
+ * Two of the three are constrained by physics rather than by taste, and both
+ * constraints run the same way — a finish that has nothing to happen in does
+ * not happen. Fluorescence needs a band, so only a vivid enough pigment is
+ * offered the roll. Interference needs a reflection, so a coated color is
+ * given a surface smooth enough to have one; an uncoated color's roughness is
+ * free across the whole axis.
+ */
+const planFinish = (random: Random, saturation: number): Finishing => {
+  const coatingNanometers =
+    random.between(1, 10) <= COATED_IN_TEN
+      ? random.between(COATING_BOUNDS.min, COATING_BOUNDS.max)
+      : 0;
+
+  return {
+    roughness: random.between(
+      ROUGHNESS_BOUNDS.min,
+      coatingNanometers > 0 ? COATING_ROUGHNESS_CEILING : ROUGHNESS_BOUNDS.max,
+    ),
+    coatingNanometers,
+    // Never a barely-there glow: a pigment that fluoresces does it visibly or
+    // is not sold as one.
+    emission:
+      saturation >= FLUORESCENCE_FLOOR && random.between(1, 10) <= GLOWING_IN_TEN
+        ? random.between(EMISSION_SPEAKS, EMISSION_BOUNDS.max)
+        : 0,
+  };
+};
+
 const planColorsFor = (
   leaf: LeafCategorySeed,
   random: Random,
   takenSlugs: Set<string>,
 ): readonly PlannedProduct[] =>
   planNamed(COLORS_PER_LEAF, leaf, random, takenSlugs, (name, slug) => {
-    const finish = random.pick(FINISHES);
     const hex = hslToHex(
       hueWithin(leaf.hue, random),
       random.between(leaf.saturation.from, leaf.saturation.to),
       random.between(leaf.lightness.from, leaf.lightness.to),
     );
+    // Read back off the hex rather than off the roll that made it: the hex is
+    // what gets stored, and it is what the constraint on the glow is checked
+    // against.
+    const finish = planFinish(random, saturationOfHex(hex));
 
     return {
       kind: "color",
       slug,
       name,
-      description: [
-        `${name}. ${leaf.description}`,
-        FINISH_NOTES[finish],
-        random.pick(DESCRIPTION_NOTES),
-      ].join(" "),
+      description: [`${name}. ${leaf.description}`, random.pick(DESCRIPTION_NOTES)].join(
+        " ",
+      ),
       hex,
-      finish,
+      ...finish,
       priceCents: random.between(6, 48) * 100 + random.pick([0, 50, 99]),
       stockQuantity: random.between(0, 140),
     };
   });
 
 /**
- * One run of finishers per finish, so every finish is buyable back and the
- * radio in the rail never has an empty option.
+ * The amounts one tin leaves behind.
+ *
+ * Rolled inside the band the finish names, so a run of gloss tins is a run of
+ * genuinely different products — one leaves a surface at 20 and the next at 15,
+ * and a shopper who wants the second is not served by being sold the first.
+ *
+ * A coating and a glow both need a surface that returns light, so a tin that
+ * leaves either also leaves a surface smooth enough for it.
+ */
+const planFinisherFinish = (finish: Finish, random: Random): Finishing => {
+  const band = FINISH_BANDS[finish];
+  const amount = random.between(band.range.min, band.range.max);
+  const smooth = random.between(ROUGHNESS_BOUNDS.min, COATING_ROUGHNESS_CEILING);
+
+  return match(band.property)
+    .with("roughness", () => ({
+      roughness: amount,
+      coatingNanometers: 0,
+      emission: 0,
+    }))
+    .with("coating", () => ({
+      roughness: smooth,
+      coatingNanometers: amount,
+      emission: 0,
+    }))
+    .with("emission", () => ({
+      roughness: smooth,
+      coatingNanometers: 0,
+      emission: amount,
+    }))
+    .exhaustive();
+};
+
+/**
+ * One run of finishers per finish, so every part of the space a finish name
+ * covers has tins in it.
  */
 const planFinishersFor = (
   branch: InstrumentSeed,
@@ -163,21 +277,23 @@ const planFinishersFor = (
   takenSlugs: Set<string>,
 ): readonly PlannedProduct[] =>
   FINISHES.flatMap((finish) =>
-    planNamed(FINISHERS_PER_FINISH, branch, random, takenSlugs, (name, slug) => ({
-      kind: "finisher",
-      slug,
-      name,
-      description: [
-        `${name}. ${branch.description}`,
-        FINISHER_NOTES[finish],
-        random.pick(INSTRUMENT_NOTES),
-      ].join(" "),
-      finish,
-      // How many colors it will see through. The expensive ones last.
-      durability: random.between(3, 60),
-      priceCents: random.between(9, 70) * 100 + random.pick([0, 50, 99]),
-      stockQuantity: random.between(0, 90),
-    })),
+    planNamed(FINISHERS_PER_FINISH, branch, random, takenSlugs, (name, slug) => {
+      const finishing = planFinisherFinish(finish, random);
+
+      return {
+        kind: "finisher",
+        slug,
+        name,
+        description: [
+          `${name}. ${branch.description}`,
+          FINISHER_NOTES[finish],
+          random.pick(INSTRUMENT_NOTES),
+        ].join(" "),
+        ...finishing,
+        priceCents: random.between(9, 70) * 100 + random.pick([0, 50, 99]),
+        stockQuantity: random.between(0, 90),
+      };
+    }),
   );
 
 /** Nudges turn a color a little; swings turn it into somebody else's problem. */
@@ -231,59 +347,27 @@ const seedUsers = async (db: Database): Promise<readonly string[]> => {
     .map((row) => row.id);
 };
 
-/** The three roots come from migration 0005 — one per `product_kind`. */
-const categoryIdBySlug = async (db: Database, slug: string): Promise<string> => {
-  const rows = await db
-    .select({ id: categories.id })
-    .from(categories)
-    .where(eq(categories.slug, slug))
-    .limit(1);
-
-  const id = rows[0]?.id;
-  if (id === undefined) throw new Error(`category ${slug} missing`);
-
-  return id;
-};
-
-/** Inserts a branch if it is not already there, and returns its id either way. */
-const upsertCategory = async (
+/**
+ * Writes the row that holds whatever this kind of product is made of.
+ *
+ * The base row is already in; this puts its variant beside it, in the one
+ * table that has columns for it.
+ */
+const insertVariant = (
   db: Database,
-  values: Readonly<{
-    slug: string;
-    name: string;
-    description: string;
-    parentId: string;
-    kind: ProductKind;
-    position: number;
-  }>,
-): Promise<string> => {
-  const [inserted] = await db
-    .insert(categories)
-    .values(values)
-    .onConflictDoNothing()
-    .returning({ id: categories.id });
-
-  return inserted?.id ?? (await categoryIdBySlug(db, values.slug));
-};
-
-/** The variant columns for one planned product, and none of the others'. */
-const variantColumnsOf = (planned: PlannedProduct) =>
+  productId: string,
+  planned: PlannedProduct,
+): Promise<unknown> =>
   match(planned)
-    .with({ kind: "color" }, ({ hex, finish }) => ({
-      kind: "color" as const,
-      hex,
-      finish,
-    }))
-    .with({ kind: "finisher" }, ({ finish, durability }) => ({
-      kind: "finisher" as const,
-      finish,
-      durability,
-    }))
-    .with({ kind: "shifter" }, ({ direction, arcDegrees }) => ({
-      kind: "shifter" as const,
-      direction,
-      arcDegrees,
-    }))
+    .with({ kind: "color" }, ({ hex, roughness, coatingNanometers, emission }) =>
+      db.insert(colors).values({ productId, hex, roughness, coatingNanometers, emission }),
+    )
+    .with({ kind: "finisher" }, ({ roughness, coatingNanometers, emission }) =>
+      db.insert(finishers).values({ productId, roughness, coatingNanometers, emission }),
+    )
+    .with({ kind: "shifter" }, ({ direction, arcDegrees }) =>
+      db.insert(shifters).values({ productId, direction, arcDegrees }),
+    )
     .exhaustive();
 
 const seedCatalog = async (
@@ -303,80 +387,25 @@ const seedCatalog = async (
   await mkdir(mediaDirectory, { recursive: true });
 
   const takenSlugs = new Set<string>();
-  const pending: { categoryId: string; product: PlannedProduct }[] = [];
+  const pending: PlannedProduct[] = [];
 
-  /* ------------------------------------------------------------- colors */
-
-  const colorRootId = await categoryIdBySlug(db, "color");
-
-  for (const family of CATEGORIES) {
-    const familyId = await upsertCategory(db, {
-      slug: family.slug,
-      name: family.name,
-      description: family.description,
-      parentId: colorRootId,
-      kind: "color",
-      position: CATEGORIES.indexOf(family),
-    });
-
-    for (const leaf of family.children) {
-      const leafId = await upsertCategory(db, {
-        slug: leaf.slug,
-        name: leaf.name,
-        description: leaf.description,
-        parentId: familyId,
-        kind: "color",
-        position: family.children.indexOf(leaf),
-      });
-
-      for (const planned of planColorsFor(leaf, random, takenSlugs)) {
-        pending.push({ categoryId: leafId, product: planned });
-      }
+  for (const palette of CATEGORIES) {
+    for (const leaf of palette.children) {
+      pending.push(...planColorsFor(leaf, random, takenSlugs));
     }
   }
-
-  /* ---------------------------------------------------------- finishers */
-
-  const finisherRootId = await categoryIdBySlug(db, "finisher");
 
   for (const branch of FINISHER_BRANCHES) {
-    const branchId = await upsertCategory(db, {
-      slug: branch.slug,
-      name: branch.name,
-      description: branch.description,
-      parentId: finisherRootId,
-      kind: "finisher",
-      position: FINISHER_BRANCHES.indexOf(branch),
-    });
-
-    for (const planned of planFinishersFor(branch, random, takenSlugs)) {
-      pending.push({ categoryId: branchId, product: planned });
-    }
+    pending.push(...planFinishersFor(branch, random, takenSlugs));
   }
 
-  /* ----------------------------------------------------------- shifters */
-
-  const shifterRootId = await categoryIdBySlug(db, "shifter");
-
   // A nudge and a swing are the same tool at different settings, so the arc
-  // range is the only thing that separates the two branches.
+  // range is the only thing that separates the two runs.
   const arcRanges = { nudge: { from: 5, to: 45 }, swing: { from: 90, to: 300 } };
 
   for (const branch of SHIFTER_BRANCHES) {
-    const branchId = await upsertCategory(db, {
-      slug: branch.slug,
-      name: branch.name,
-      description: branch.description,
-      parentId: shifterRootId,
-      kind: "shifter",
-      position: SHIFTER_BRANCHES.indexOf(branch),
-    });
-
     const arc = branch.slug === "nudge" ? arcRanges.nudge : arcRanges.swing;
-
-    for (const planned of planShiftersFor(branch, arc, random, takenSlugs)) {
-      pending.push({ categoryId: branchId, product: planned });
-    }
+    pending.push(...planShiftersFor(branch, arc, random, takenSlugs));
   }
 
   /* ------------------------------------------------------------ insert */
@@ -385,7 +414,7 @@ const seedCatalog = async (
   // only thing `created_at` records, and `created_at` is what the default sort
   // falls back to with no search term — so seeding branch by branch would open
   // the shop on sixteen consecutive blacks, then a shelf of tins.
-  for (const { categoryId, product: planned } of shuffle(pending, random)) {
+  for (const planned of shuffle(pending, random)) {
     const brandId = brandIds[random.between(0, brandIds.length - 1)];
     if (brandId === undefined) throw new Error("no brands seeded");
 
@@ -397,14 +426,15 @@ const seedCatalog = async (
         description: planned.description,
         priceCents: planned.priceCents,
         stockQuantity: planned.stockQuantity,
-        categoryId,
         brandId,
-        ...variantColumnsOf(planned),
+        kind: planned.kind,
       })
       .onConflictDoNothing()
       .returning({ id: products.id });
 
     if (inserted === undefined) continue;
+
+    await insertVariant(db, inserted.id, planned);
 
     // Only a color has a swatch to render. A finisher and a shifter draw
     // themselves in the browser from what they are, which is one fewer file on
@@ -420,7 +450,7 @@ const seedCatalog = async (
     await db.insert(productImages).values({
       productId: inserted.id,
       filename,
-      alt: `${planned.name}, a ${planned.finish} swatch of ${planned.hex}`,
+      alt: `${planned.name}, a swatch of ${planned.hex}`,
       position: 0,
     });
   }
@@ -461,6 +491,13 @@ const seedReviews = async (
   }
 };
 
+/**
+ * Fills an empty database with the catalog, and writes a swatch for each color.
+ *
+ * Does nothing to a database that already holds products, so it is safe to run
+ * on every start. Every value is drawn from a seeded generator, so two runs
+ * against an empty database produce the same catalog.
+ */
 export const seed = async (
   db: Database,
   mediaDirectory: string,

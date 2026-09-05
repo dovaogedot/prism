@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { api, refreshSession } from "../../shared/api/client.ts";
 import { tokenStore } from "./token-store.ts";
 
+/** Who is signed in, or `None`. Re-renders on every sign-in and sign-out. */
 export const useSession = (): Option<SessionUser> => {
   const held = useSyncExternalStore(tokenStore.subscribe, tokenStore.snapshot);
   return Option.map((value: { user: SessionUser }) => value.user)(held);
@@ -39,6 +40,7 @@ export const useSessionBootstrap = (): boolean => {
   return ready;
 };
 
+/** Signs out. The in-memory token is dropped whether or not the server answers. */
 export const useSignOut = (): (() => Promise<void>) =>
   useCallback(async () => {
     // Best effort: the cookie is cleared by the server, but a failed request

@@ -21,6 +21,12 @@ const announce = (): void => {
   for (const listener of listeners) listener();
 };
 
+/**
+ * The access token and its user, held for the life of the tab.
+ *
+ * `subscribe` and `snapshot` are shaped for `useSyncExternalStore`, so React
+ * reads this store rather than a copy of it.
+ */
 export const tokenStore = {
   get: (): Option<string> =>
     Option.map((value: Held) => value.token)(held),

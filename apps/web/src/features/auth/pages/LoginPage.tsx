@@ -11,6 +11,7 @@ import { describeFailure } from "../components/error-message.tsx";
 import { ProviderButtons } from "../components/ProviderButtons.tsx";
 import { tokenStore } from "../token-store.ts";
 
+/** Sign-in, which lands either on the catalog or on the second-factor page. */
 export const LoginPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();

@@ -13,6 +13,5 @@ export type { FieldProps } from "./Field.tsx";
 export { Alert, IssueList } from "./Alert.tsx";
 export type { AlertProps } from "./Alert.tsx";
 
-export { Card, PageHeading, Skeleton } from "./Card.tsx";
+export { Card, Skeleton } from "./Card.tsx";
 export { Stars } from "./Stars.tsx";
-export { WhenSome } from "./WhenSome.tsx";

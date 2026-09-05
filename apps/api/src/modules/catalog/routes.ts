@@ -17,6 +17,7 @@ import { sendDomainError } from "../../http/errors.ts";
 import type { createGuards } from "../../http/guard.ts";
 import type { CatalogService } from "./service.ts";
 
+/** What the catalog routes need beyond the service itself. */
 export type CatalogRouteDependencies = Readonly<{
   service: CatalogService;
   guards: ReturnType<typeof createGuards>;
@@ -33,6 +34,7 @@ const slugParamsSchema = z.object({
     .max(120),
 });
 
+/** Mounts every catalog endpoint, each carrying the schema its OpenAPI entry is generated from. */
 export const registerCatalogRoutes = (
   app: FastifyInstance,
   deps: CatalogRouteDependencies,
@@ -41,23 +43,6 @@ export const registerCatalogRoutes = (
   const { service, guards } = deps;
 
   const publicCacheHeader = `public, max-age=${deps.publicCacheSeconds}`;
-
-  routes.get(
-    "/categories",
-    {
-      schema: {
-        tags: ["catalog"],
-        summary: "The category tree, with a product count for each subtree.",
-      },
-    },
-    async (_request, reply) => {
-      const result = await service.categories();
-
-      return result.isErr()
-        ? sendDomainError(reply, result.error)
-        : reply.header("cache-control", publicCacheHeader).send(result.value);
-    },
-  );
 
   routes.get(
     "/products",

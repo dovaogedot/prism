@@ -6,4 +6,5 @@
 
 declare const tag: unique symbol;
 
+/** `A`, distinguishable at compile time from every other brand of `A`. */
 export type Brand<A, B extends string> = A & { readonly [tag]: B };

@@ -13,6 +13,7 @@ import { describeFailure } from "../components/error-message.tsx";
 import { ProviderButtons } from "../components/ProviderButtons.tsx";
 import { tokenStore } from "../token-store.ts";
 
+/** Opening an account, which signs in on success. */
 export const RegisterPage = () => {
   const navigate = useNavigate();
   const { theme } = useTheme();

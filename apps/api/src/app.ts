@@ -65,6 +65,7 @@ export type AppOverrides = Readonly<{
   oauth?: OAuthRegistry;
 }>;
 
+/** Everything the application is built from. */
 export type AppInput = Readonly<{
   config: Config;
   database: DatabaseHandle;
@@ -73,6 +74,12 @@ export type AppInput = Readonly<{
 
 const API_PREFIX = "/api/v1";
 
+/**
+ * The composition root: builds every adapter and wires the modules onto them.
+ *
+ * Anything named in `overrides` is used in place of the real adapter, which is
+ * how the tests run the real logic against a fake clock and an in-memory mailer.
+ */
 export const buildApp = async (input: AppInput): Promise<FastifyInstance> => {
   const { config, database } = input;
   const overrides = input.overrides ?? {};
@@ -243,11 +250,6 @@ export const buildApp = async (input: AppInput): Promise<FastifyInstance> => {
     repository: catalogRepository,
     storage,
     caches: {
-      categories: createTtlCache({
-        clock,
-        ttlSeconds: config.cache.categoryTtlSeconds,
-        maxEntries: 4,
-      }),
       facets: createTtlCache({
         clock,
         ttlSeconds: config.cache.facetTtlSeconds,

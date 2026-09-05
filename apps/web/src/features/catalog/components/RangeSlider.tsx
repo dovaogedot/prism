@@ -13,6 +13,7 @@ import type { NumericRange } from "@prism/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { match } from "ts-pattern";
 
+/** The axis, the span selected on it, and where to report a new one. */
 export type RangeSliderProps = Readonly<{
   label: string;
   min: number;
@@ -30,6 +31,7 @@ type Thumb = "min" | "max";
 const clamp = (value: number, low: number, high: number): number =>
   Math.min(high, Math.max(low, value));
 
+/** Two thumbs on one track. Either may pass the other; the pair is ordered on the way out. */
 export const RangeSlider = ({
   label,
   min,

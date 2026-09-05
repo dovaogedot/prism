@@ -1,7 +1,7 @@
 /**
- * The account page, which in project 1 exists mainly to switch 2FA on and off.
+ * The account page: the password, the second factor, and how sign-in happens.
  *
- * Enrolment is two steps on purpose: the secret is stored when setup begins,
+ * Enrollment is two steps on purpose: the secret is stored when setup begins,
  * but 2FA is not active until a live code proves the secret actually reached
  * an authenticator app. Otherwise a mistyped scan would lock the account out.
  */
@@ -273,6 +273,7 @@ const PasswordFlow = ({
   );
 };
 
+/** The signed-in account's own page. */
 export const AccountPage = () => {
   const session = useSession();
   const [notice, setNotice] = useState<Option<ReactNode>>(Option.none);
@@ -332,9 +333,8 @@ export const AccountPage = () => {
         <Card className="p-5">
           <h2 className="mb-2 font-semibold text-ink">Sign-in method</h2>
           {/*
-            Both halves are read from the account rather than assumed. This
-            used to name Google outright, which was true when Google was the
-            only provider and a lie the moment GitHub arrived.
+            Both halves are read from the account rather than assumed, so the
+            list names whichever providers this account actually carries.
           */}
           <ul className="space-y-1 text-sm text-ink-soft">
             {match(value.hasPassword)

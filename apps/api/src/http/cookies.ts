@@ -10,7 +10,9 @@
 
 import type { FastifyReply } from "fastify";
 
+/** Carries the refresh token, which is the only credential that survives a reload. */
 export const REFRESH_COOKIE = "hue_refresh";
+/** Carries the value a provider must hand back, which is what proves the callback is ours. */
 export const OAUTH_STATE_COOKIE = "hue_oauth_state";
 
 /**
@@ -26,8 +28,10 @@ export const TWO_FACTOR_COOKIE = "hue_2fa_challenge";
 /** Everything under here, and nothing else, receives these cookies. */
 const COOKIE_PATH = "/api/v1/auth";
 
+/** Whether the connection is https, which decides the `Secure` attribute. */
 export type CookieOptions = Readonly<{ secure: boolean }>;
 
+/** Puts a refresh token in the browser, expiring when the token does. */
 export const setRefreshCookie = (
   reply: FastifyReply,
   token: string,
@@ -45,6 +49,7 @@ export const setRefreshCookie = (
   });
 };
 
+/** Takes the refresh token back, which is what signing out does to the browser. */
 export const clearRefreshCookie = (
   reply: FastifyReply,
   options: CookieOptions,
@@ -57,6 +62,7 @@ export const clearRefreshCookie = (
   });
 };
 
+/** Puts the state value in the browser for the length of one sign-in. */
 export const setOAuthStateCookie = (
   reply: FastifyReply,
   state: string,
@@ -71,6 +77,7 @@ export const setOAuthStateCookie = (
   });
 };
 
+/** Takes the state value back once the callback has checked it. */
 export const clearOAuthStateCookie = (
   reply: FastifyReply,
   options: CookieOptions,
@@ -98,6 +105,7 @@ export const setTwoFactorCookie = (
   });
 };
 
+/** Takes the challenge back once the code has been accepted or the flow abandoned. */
 export const clearTwoFactorCookie = (
   reply: FastifyReply,
   options: CookieOptions,

@@ -1,9 +1,9 @@
 /**
  * Color generation for the seed.
  *
- * `hslToHex` is the inverse of the `hex_to_hue`/`hex_to_saturation`/
- * `hex_to_lightness` functions in migration 0001 — the seed composes a color
- * from HSL and stores only the hex, and Postgres derives the HSL back. The
+ * `hslToHex` is the inverse of the database's `hex_to_hue`, `hex_to_saturation`
+ * and `hex_to_lightness` — the seed composes a color from HSL and stores only
+ * the hex, and Postgres derives the HSL back. The
  * integration tests round-trip the two against each other, which is a stronger
  * check on the SQL than a hand-written table of expected values.
  */
@@ -20,6 +20,7 @@ export const mulberry32 = (seed: number): (() => number) => {
   };
 };
 
+/** The three ways the seed asks for a random value. */
 export type Random = Readonly<{
   /** Float in [0, 1). */
   next: () => number;
@@ -28,6 +29,7 @@ export type Random = Readonly<{
   pick: <A>(items: readonly A[]) => A;
 }>;
 
+/** A generator that produces the same sequence for the same seed. `pick` raises on an empty list. */
 export const createRandom = (seed: number): Random => {
   const next = mulberry32(seed);
 
@@ -103,6 +105,7 @@ export const hslToHex = (
   return `#${toHexPair(red + offset)}${toHexPair(green + offset)}${toHexPair(blue + offset)}`;
 };
 
+/** A name as a URL slug: lowercase, accents dropped, runs of anything else a single dash. */
 export const slugify = (value: string): string =>
   value
     .toLowerCase()

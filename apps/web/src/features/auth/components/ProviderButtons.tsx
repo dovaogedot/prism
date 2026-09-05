@@ -70,6 +70,7 @@ export const ProviderButtons = () => {
     ));
 };
 
+/** The "or" between the provider buttons and the email form. */
 export const Divider = () => (
   <div className="my-5 flex items-center gap-3">
     <span className="h-px flex-1 bg-line" />

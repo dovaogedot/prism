@@ -9,6 +9,7 @@
 
 import argon2 from "argon2";
 
+/** Turning a password into something safe to store, and checking it again. */
 export type Hasher = Readonly<{
   hash: (plaintext: string) => Promise<string>;
   /** Never throws: a malformed stored hash is a failed verification, not a crash. */
@@ -33,6 +34,7 @@ const OPTIONS = {
  */
 const decoyHash = argon2.hash("decoy-for-constant-time-signin", OPTIONS);
 
+/** The hasher the application runs on. */
 export const argon2Hasher: Hasher = {
   hash: (plaintext) => argon2.hash(plaintext, OPTIONS),
 

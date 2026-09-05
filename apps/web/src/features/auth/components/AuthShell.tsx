@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { match, P } from "ts-pattern";
 
+/** The card every sign-in page sits in: a heading, the form, and a line beneath. */
 export const AuthShell = ({
   title,
   lede,

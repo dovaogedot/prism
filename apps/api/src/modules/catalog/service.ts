@@ -7,7 +7,6 @@
  */
 
 import type {
-  CategoryNode,
   DomainError,
   NumericRange,
   ProductDetail,
@@ -25,22 +24,23 @@ import type { MediaStorage } from "../../platform/storage.ts";
 import type { CatalogRepository } from "./repository.ts";
 import { toTotalPages } from "./search.ts";
 
+/** The three things worth holding between requests, each with its own lifetime. */
 export type CatalogCaches = Readonly<{
-  categories: Cache<readonly CategoryNode[]>;
   facets: Cache<ProductFacets>;
   products: Cache<ProductDetail>;
 }>;
 
+/** Every port the catalog module works through. */
 export type CatalogDependencies = Readonly<{
   repository: CatalogRepository;
   storage: MediaStorage;
   caches: CatalogCaches;
 }>;
 
+/** Everything the shopfront can ask of the catalog, with every failure a `DomainError`. */
 export type CatalogService = Readonly<{
   search: (query: ProductQuery) => ResultAsync<ProductSearchResult, DomainError>;
   detail: (slug: string) => ResultAsync<ProductDetail, DomainError>;
-  categories: () => ResultAsync<readonly CategoryNode[], DomainError>;
   suggest: (
     term: string,
     limit: number,
@@ -67,9 +67,9 @@ const facetCacheKey = (query: ProductQuery): string =>
   cacheKey("facets", {
     text: Option.getOrElse(() => "")(query.text),
     kind: Option.getOrElse<string>(() => "")(query.kind),
-    tag: Option.getOrElse(() => "")(query.tagSlug),
+    family: Option.getOrElse<string>(() => "")(query.family),
     brands: query.brandSlugs,
-    finishes: query.finishes,
+    finish: Option.getOrElse<string>(() => "")(query.finish),
     direction: Option.getOrElse<string>(() => "")(query.direction),
     arc: rangeKey(query.arc),
     price: rangeKey(query.price),
@@ -79,11 +79,18 @@ const facetCacheKey = (query: ProductQuery): string =>
     })(query.minRating),
     hue: rangeKey(query.hue),
     saturation: rangeKey(query.saturation),
-    // Was missing, and silently so: two searches differing only in their
-    // lightness range shared one set of facet counts.
     lightness: rangeKey(query.lightness),
+    roughness: rangeKey(query.roughness),
+    coating: rangeKey(query.coating),
+    emission: rangeKey(query.emission),
   });
 
+/**
+ * The catalog module over the ports it is given.
+ *
+ * Writing an image clears the caches a write makes wrong, so a read after a
+ * write never serves the answer from before it.
+ */
 export const createCatalogService = (deps: CatalogDependencies): CatalogService => {
   const { repository, storage, caches } = deps;
 
@@ -133,17 +140,6 @@ export const createCatalogService = (deps: CatalogDependencies): CatalogService 
           return okAsync<ProductDetail, DomainError>(found.value);
         },
       );
-    },
-
-    categories: () => {
-      const cached = caches.categories.get("tree");
-
-      if (Option.isSome(cached)) return okAsync(cached.value);
-
-      return ResultAsync.fromSafePromise(repository.categoryTree()).map((tree) => {
-        caches.categories.set("tree", tree);
-        return tree;
-      });
     },
 
     // Not cached: the key is whatever the shopper has typed so far, so the hit

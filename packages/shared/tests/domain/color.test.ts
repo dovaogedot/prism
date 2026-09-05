@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  contrastRatio,
   isHexColor,
   parseHex,
-  readableInkOn,
   relativeLuminance,
+  saturationOf,
   toRgb,
   type HexColor,
 } from "../../src/domain/color.ts";
@@ -61,6 +60,32 @@ describe("toRgb", () => {
   });
 });
 
+describe("saturationOf", () => {
+  it("calls a gray unsaturated whatever its lightness", () => {
+    for (const gray of ["#000000", "#808080", "#ffffff", "#3b3b3b"]) {
+      expect(saturationOf(toRgb(hex(gray))), gray).toBe(0);
+    }
+  });
+
+  it("calls a pure hue fully saturated whatever its lightness", () => {
+    // The HSL definition, where saturation is chroma relative to the most a
+    // color of that lightness could have — so a pale pink is as saturated as
+    // the red it was mixed from.
+    for (const pure of ["#ff0000", "#00ff00", "#0000ff", "#ffcccc", "#330000"]) {
+      expect(saturationOf(toRgb(hex(pure))), pure).toBe(100);
+    }
+  });
+
+  it("agrees with the database, which derives the same number from the hex", () => {
+    // Values checked against the database's `hex_to_saturation`. A drift
+    // here is a color the seed judges fit to fluoresce and Postgres does not.
+    expect(saturationOf(toRgb(hex("#d8c8a8")))).toBe(38);
+    expect(saturationOf(toRgb(hex("#4a7c40")))).toBe(32);
+    expect(saturationOf(toRgb(hex("#6a2d8f")))).toBe(52);
+    expect(saturationOf(toRgb(hex("#e4dfd8")))).toBe(18);
+  });
+});
+
 describe("relativeLuminance", () => {
   it("anchors black at 0 and white at 1", () => {
     expect(relativeLuminance(toRgb(hex("#000000")))).toBeCloseTo(0, 5);
@@ -85,44 +110,3 @@ describe("relativeLuminance", () => {
   });
 });
 
-describe("contrastRatio", () => {
-  it("gives 21:1 for black against white", () => {
-    expect(contrastRatio(hex("#000000"), hex("#ffffff"))).toBeCloseTo(21, 5);
-  });
-
-  it("gives 1:1 for a color against itself", () => {
-    expect(contrastRatio(hex("#3b82f6"), hex("#3b82f6"))).toBeCloseTo(1, 5);
-  });
-
-  it("is symmetric in its arguments", () => {
-    expect(contrastRatio(hex("#123456"), hex("#fedcba"))).toBeCloseTo(
-      contrastRatio(hex("#fedcba"), hex("#123456")),
-      10,
-    );
-  });
-});
-
-describe("readableInkOn", () => {
-  it("puts dark ink on light swatches", () => {
-    expect(readableInkOn(hex("#ffffff"))).toBe("dark");
-    expect(readableInkOn(hex("#ffe066"))).toBe("dark");
-  });
-
-  it("puts light ink on dark swatches", () => {
-    expect(readableInkOn(hex("#000000"))).toBe("light");
-    expect(readableInkOn(hex("#1e3a8a"))).toBe("light");
-  });
-
-  it("always clears WCAG AA large-text contrast (3:1) for its own choice", () => {
-    const swatches = [
-      "#ffffff", "#000000", "#ff8800", "#3b82f6", "#facc15",
-      "#14532d", "#f5f5f4", "#7f1d1d", "#818cf8", "#a3e635",
-    ];
-
-    for (const swatch of swatches) {
-      const color = hex(swatch);
-      const ink = readableInkOn(color) === "dark" ? hex("#000000") : hex("#ffffff");
-      expect(contrastRatio(color, ink)).toBeGreaterThanOrEqual(3);
-    }
-  });
-});

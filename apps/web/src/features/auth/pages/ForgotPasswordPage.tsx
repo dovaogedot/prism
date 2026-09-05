@@ -10,6 +10,7 @@ import { AuthShell } from "../components/AuthShell.tsx";
 
 const forgotSchema = z.object({ email: z.string().min(1) });
 
+/** Asks for an address to send a reset link to, and says the same thing either way. */
 export const ForgotPasswordPage = () => {
   const [sent, setSent] = useState(false);
   const form = useForm({

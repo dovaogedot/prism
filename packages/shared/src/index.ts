@@ -9,8 +9,8 @@ export {
   metersToFeet,
   kelvinToCelsius,
   kelvinToFahrenheit,
-  squareMetersToSquareFeet,
   micrometersToMils,
+  nanometersToMicroinches,
   newtonMetersToPoundFeet,
   millimetersToInches,
   measureColor,
@@ -31,19 +31,12 @@ export {
   parseHex,
   isHexColor,
   toRgb,
+  saturationOf,
   relativeLuminance,
-  contrastRatio,
-  readableInkOn,
 } from "./domain/color.ts";
-export type { HexColor, Rgb, Ink } from "./domain/color.ts";
+export type { HexColor, Rgb } from "./domain/color.ts";
 
-export {
-  CURRENCY,
-  isCents,
-  parseCents,
-  formatAmount,
-  formatPrice,
-} from "./domain/money.ts";
+export { CURRENCY, isCents, formatPrice } from "./domain/money.ts";
 export type { Cents } from "./domain/money.ts";
 
 export {
@@ -64,4 +57,4 @@ export type {
 
 export * from "./contracts/auth.ts";
 export * from "./contracts/catalog.ts";
-export * from "./contracts/tags.ts";
+export * from "./contracts/search-terms.ts";

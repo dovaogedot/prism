@@ -7,8 +7,11 @@
 
 import { z } from "zod";
 
+/** The longest address RFC 5321 allows, which is what the column is sized for. */
 export const EMAIL_MAX_LENGTH = 254;
+/** The shortest password accepted, in characters. */
 export const PASSWORD_MIN_LENGTH = 12;
+/** The longest password accepted, in characters. */
 export const PASSWORD_MAX_LENGTH = 128;
 
 /**
@@ -25,12 +28,14 @@ const COMMON_PASSWORDS: ReadonlySet<string> = new Set([
   "administrator",
 ]);
 
+/** An email address, trimmed and lowercased so equality is string equality. */
 export const emailSchema = z
   .string()
   .trim()
   .toLowerCase()
   .pipe(z.email("Enter a valid email address.").max(EMAIL_MAX_LENGTH));
 
+/** A password a new account is allowed to have: long enough, and not a guess. */
 export const passwordSchema = z
   .string()
   .min(PASSWORD_MIN_LENGTH, `Use at least ${PASSWORD_MIN_LENGTH} characters.`)
@@ -40,17 +45,25 @@ export const passwordSchema = z
     "That password is too easy to guess.",
   );
 
+/** A six-digit authenticator code. */
 export const totpCodeSchema = z
   .string()
   .trim()
   .regex(/^\d{6}$/, "Enter the 6-digit code from your authenticator app.");
 
+/** The body of `POST /auth/register`. */
 export const registerSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
   captchaToken: z.string().min(1, "Complete the CAPTCHA to continue."),
 });
 
+/**
+ * The body of `POST /auth/login`.
+ *
+ * The password is checked for presence only. Sign-in must not tell an attacker
+ * that a stored password would have been rejected by the registration rules.
+ */
 export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, "Enter your password."),
@@ -69,10 +82,12 @@ export const twoFactorLoginSchema = z.object({
   code: totpCodeSchema,
 });
 
+/** The body of `POST /auth/forgot-password`. */
 export const forgotPasswordSchema = z.object({
   email: emailSchema,
 });
 
+/** The body of `POST /auth/reset-password`. */
 export const resetPasswordSchema = z.object({
   token: z.string().min(1),
   password: passwordSchema,
@@ -108,14 +123,17 @@ const MISMATCH = {
 const matches = (values: Readonly<{ password: string; confirmPassword: string }>) =>
   values.password === values.confirmPassword;
 
+/** The register form: the request body plus the browser-only confirmation. */
 export const registerFormSchema = registerSchema
   .extend({ confirmPassword: confirmField })
   .refine(matches, MISMATCH);
 
+/** The reset form: the request body plus the browser-only confirmation. */
 export const resetPasswordFormSchema = resetPasswordSchema
   .extend({ confirmPassword: confirmField })
   .refine(matches, MISMATCH);
 
+/** The change-password form, for an account that has a password to confirm. */
 export const changePasswordFormSchema = changePasswordSchema
   .extend({
     currentPassword: z.string().min(1, "Enter your current password."),
@@ -133,24 +151,36 @@ export const setPasswordFormSchema = changePasswordSchema
   .extend({ currentPassword: z.string(), confirmPassword: confirmField })
   .refine(matches, MISMATCH);
 
+/** The body that confirms enrollment by proving the secret was scanned. */
 export const enableTwoFactorSchema = z.object({
   code: totpCodeSchema,
 });
 
+/** The body that turns two-factor off, which needs a live code like enabling does. */
 export const disableTwoFactorSchema = z.object({
   code: totpCodeSchema,
 });
 
+/** A validated `POST /auth/register` body. */
 export type RegisterInput = z.infer<typeof registerSchema>;
+/** A validated `POST /auth/login` body. */
 export type LoginInput = z.infer<typeof loginSchema>;
+/** A validated second-factor body. */
 export type TwoFactorLoginInput = z.infer<typeof twoFactorLoginSchema>;
+/** A validated `POST /auth/forgot-password` body. */
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+/** A validated `POST /auth/reset-password` body. */
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+/** A validated change-password body. */
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+/** A validated enable-two-factor body. */
 export type EnableTwoFactorInput = z.infer<typeof enableTwoFactorSchema>;
+/** A validated disable-two-factor body. */
 export type DisableTwoFactorInput = z.infer<typeof disableTwoFactorSchema>;
 
+/** Every role an account can hold. */
 export const USER_ROLES = ["customer", "admin"] as const;
+/** What an account is allowed to reach. */
 export type UserRole = (typeof USER_ROLES)[number];
 
 /**
@@ -159,10 +189,13 @@ export type UserRole = (typeof USER_ROLES)[number];
  * and the sign-in buttons are all driven off this list.
  */
 export const OAUTH_PROVIDERS = ["google", "github"] as const;
+/** One third-party sign-in, named the way its routes and columns name it. */
 export type OAuthProviderName = (typeof OAUTH_PROVIDERS)[number];
 
+/** A provider name arriving from a client, which may be anything at all. */
 export const oauthProviderSchema = z.enum(OAUTH_PROVIDERS);
 
+/** How each provider spells its own name on a button. */
 export const OAUTH_PROVIDER_LABELS: Record<OAuthProviderName, string> = {
   google: "Google",
   github: "GitHub",
@@ -175,6 +208,7 @@ export type AvailableProviders = Readonly<{
   mock: boolean;
 }>;
 
+/** Who is signed in, as every authenticated response reports it. */
 export type SessionUser = Readonly<{
   id: string;
   email: string;
@@ -199,20 +233,21 @@ export type AccessGrant = Readonly<{
   user: SessionUser;
 }>;
 
-/**
- * Sign-in is not one outcome but two, so it is a tagged union rather than a
- * response with half its fields optional.
- */
 /** Named on its own because the OAuth flow returns this variant and no other. */
 export type TwoFactorChallenge = Readonly<{
   status: "two_factor_required";
   challengeToken: string;
 }>;
 
+/**
+ * Sign-in is not one outcome but two, so it is a tagged union rather than a
+ * response with half its fields optional.
+ */
 export type LoginOutcome =
   | Readonly<{ status: "authenticated"; grant: AccessGrant }>
   | TwoFactorChallenge;
 
+/** The secret being enrolled, in the two forms an authenticator app accepts. */
 export type TwoFactorSetup = Readonly<{
   /** `otpauth://` URI for manual entry. */
   uri: string;

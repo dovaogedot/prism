@@ -41,6 +41,7 @@ const pointAt = (degrees: number, radius: number) => {
   };
 };
 
+/** The arc currently selected, and where to report a new one. */
 export type HueRingProps = Readonly<{
   /** `None` is expressed as an inactive ring; the caller owns that decision. */
   value: NumericRange;
@@ -61,6 +62,11 @@ type Grab =
   | { kind: "end" }
   | { kind: "rotate"; grabbedAt: number; from: NumericRange };
 
+/**
+ * The hue wheel, whose selected arc is dragged by either end or turned whole.
+ *
+ * The arc may wrap through 0°, since that is where the reds are.
+ */
 export const HueRing = ({
   value,
   active,
@@ -143,7 +149,7 @@ export const HueRing = ({
     onChange(draft);
   };
 
-  /** Clicking bare ring starts a 60° selection centred where you clicked. */
+  /** Clicking bare ring starts a 60° selection centered where you clicked. */
   const onRingPointerDown = (event: React.PointerEvent) => {
     const angle = angleAt(event.clientX, event.clientY);
     const fresh = { min: (angle - 30 + 360) % 360, max: (angle + 30) % 360 };
@@ -280,7 +286,7 @@ export const HueRing = ({
           ))
           .exhaustive()}
 
-        {/* The centre reads out the selection, and clears it. */}
+        {/* The center reads out the selection, and clears it. */}
         <div className="pointer-events-none absolute inset-0 grid place-items-center">
           {match(active)
             .with(true, () => (

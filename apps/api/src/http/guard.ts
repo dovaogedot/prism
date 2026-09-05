@@ -17,6 +17,7 @@ import type { TokenService } from "../platform/tokens.ts";
 import type { AuthRepository } from "../modules/auth/repository.ts";
 import { sendDomainError } from "./errors.ts";
 
+/** Who a request is from, once its token has been checked against a live session. */
 export type AuthenticatedUser = Readonly<{
   id: string;
   sessionId: string;
@@ -40,6 +41,7 @@ declare module "fastify" {
  */
 const attachedUsers = new WeakMap<FastifyRequest, Option<AuthenticatedUser>>();
 
+/** Gives every request an `authenticated` property, which starts out `None`. */
 export const registerAuthenticatedDecorator = (app: {
   decorateRequest: (
     name: "authenticated",
@@ -61,6 +63,7 @@ export const registerAuthenticatedDecorator = (app: {
   });
 };
 
+/** What a guard needs to turn a bearer token into a user. */
 export type GuardDependencies = Readonly<{
   tokens: TokenService;
   repository: AuthRepository;
@@ -106,6 +109,12 @@ const authenticate = (
   );
 };
 
+/**
+ * The three preHandlers a route can be given.
+ *
+ * `required` answers 401 to an anonymous request, `optional` lets it through
+ * with `authenticated` left `None`, and `admin` answers 403 to anyone else.
+ */
 export const createGuards = (deps: GuardDependencies) => {
   const attach = async (
     request: FastifyRequest,
@@ -143,11 +152,3 @@ export const createGuards = (deps: GuardDependencies) => {
   return { requireUser, requireAdmin, optionalUser };
 };
 
-/**
- * Reads the user a guard attached. Routes behind `requireUser` always have
- * one; this converts that guarantee into a value without an optional check
- * at every call site.
- */
-export const requireAuthenticated = (
-  request: FastifyRequest,
-): Option<AuthenticatedUser> => request.authenticated;

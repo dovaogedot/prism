@@ -30,9 +30,9 @@ const documentY = async (page: Page, title: string): Promise<number> => {
 };
 
 test.beforeEach(async ({ page }) => {
-  // Inside the Colors category: the hue ring, the two ramps and the finish
-  // list only exist there, since none of them means anything on a shelf of
-  // tins. `catalog-categories.spec.ts` covers the switch itself.
+  // Inside the Colors category: the hue ring and the two ramps only exist
+  // there, since neither means anything on a shelf of tins.
+  // `catalog-categories.spec.ts` covers the switch itself.
   await page.goto("/?category=color");
   await expect(page.getByRole("heading", { name: "Every color, on its own terms" })).toBeVisible();
 
@@ -78,7 +78,7 @@ test.describe("layout stability", () => {
 
     const full = await height();
 
-    await page.goto("/?category=color&minRating=5&finishes=matte");
+    await page.goto("/?category=color&minRating=5&roughnessMin=80");
     await page.waitForLoadState("networkidle");
     expect(await height()).toBe(full);
 
@@ -100,15 +100,17 @@ test.describe("layout stability", () => {
   });
 
   test("an empty bucket is struck through rather than removed", async ({ page }) => {
-    // Narrow hard enough that some foundry stocks nothing matching.
-    await page.goto("/?category=color&tag=black&finishes=fluorescent");
+    // Narrow hard enough that some foundry stocks nothing matching. A glow
+    // needs a vivid pigment, and the blacks are the least vivid shelf there is.
+    await page.goto("/?category=color&tag=black&finish=emission");
     await page.waitForLoadState("networkidle");
 
     const struck = rail(page).locator("label.line-through");
     await expect(struck.first()).toBeVisible();
 
-    // Struck rows are disabled, so they cannot be clicked into a dead end.
-    await expect(struck.first().getByRole("checkbox")).toBeDisabled();
+    // Struck rows are disabled, so they cannot be clicked into a dead end —
+    // whichever control the row happens to carry.
+    await expect(struck.first().locator("input")).toBeDisabled();
   });
 });
 
@@ -159,13 +161,13 @@ test.describe("hue ring", () => {
     const box = await endThumb.boundingBox();
     const ring = await page.getByRole("button", { name: "Select a hue range" }).boundingBox();
 
-    const centreX = (ring?.x ?? 0) + (ring?.width ?? 0) / 2;
-    const centreY = (ring?.y ?? 0) + (ring?.height ?? 0) / 2;
+    const centerX = (ring?.x ?? 0) + (ring?.width ?? 0) / 2;
+    const centerY = (ring?.y ?? 0) + (ring?.height ?? 0) / 2;
 
     await page.mouse.move((box?.x ?? 0) + 10, (box?.y ?? 0) + 10);
     await page.mouse.down();
     // Drag round to roughly 180° — the bottom of the ring.
-    await page.mouse.move(centreX, centreY + 80, { steps: 12 });
+    await page.mouse.move(centerX, centerY + 80, { steps: 12 });
     await page.mouse.up();
     await page.waitForLoadState("networkidle");
 
@@ -177,7 +179,12 @@ test.describe("hue ring", () => {
     await page.goto("/?category=color&hueMin=0&hueMax=60");
     await page.waitForLoadState("networkidle");
 
-    const readout = page.getByText(/\d+° – \d+°/);
+    // Scoped to the ring's own section, so the assertion is pinned to the
+    // readout under test rather than to whatever else prints a degree.
+    const readout = page
+      .locator("section")
+      .filter({ has: page.getByRole("button", { name: "Select a hue range" }) })
+      .getByText(/\d+° – \d+°/);
     await expect(readout).toContainText("0° – 60°");
 
     const endThumb = page.getByRole("slider", { name: "Hue range end" });
@@ -209,7 +216,7 @@ test.describe("hue ring", () => {
     await page.goto("/?category=color&hueMin=0&hueMax=60");
     await page.waitForLoadState("networkidle");
 
-    // The saturation track. Its gradient is written in `hsl()` and serialised
+    // The saturation track. Its gradient is written in `hsl()` and serialized
     // back as `rgb()`, so the assertion is that it moves, not what it says.
     const ramp = page.locator("[style*='linear-gradient']").first();
     const before = await ramp.getAttribute("style");
@@ -309,42 +316,58 @@ test.describe("search", () => {
     await expect(page.getByRole("link", { name: /Powdered/ }).first()).toBeVisible();
   });
 
-  test("a tag typed in the plural selects the tag", async ({ page }) => {
-    await searchBox(page).fill("yellows");
+  test("a color family typed in the plural selects that family", async ({ page }) => {
+    await searchBox(page).fill("golds");
     await searchBox(page).press("Enter");
     await page.waitForLoadState("networkidle");
 
-    // Tags are stored singular. Nothing is filed directly under "yellow"
-    // either — the colors are in its children, gold and acid.
-    await expect(page).toHaveURL(/tag=yellow/);
-    // A tag belongs to one category, so picking it picks that category too.
+    // Nothing is filed under "gold". The word is a landmark in RGB space, and
+    // the colors nearest to it are the answer.
+    await expect(page).toHaveURL(/family=gold/);
+    // Only a color has a family, so the word picks the shelf as well.
     await expect(page).toHaveURL(/category=color/);
     await expect(page.getByText("Nothing matches that.")).toBeHidden();
     await expect(results(page).getByRole("article").first()).toBeVisible();
   });
 
-  test("a finish name ticks that finish", async ({ page }) => {
+  test("a direction goes to the shifters that turn that way", async ({ page }) => {
+    await searchBox(page).fill("clock-wise");
+    await searchBox(page).press("Enter");
+    await page.waitForLoadState("networkidle");
+
+    // Only a shifter turns, so the word picks the shelf as well as the way.
+    await expect(page).toHaveURL(/category=shifter/);
+    await expect(page).toHaveURL(/direction=cw/);
+    await expect(results(page).getByRole("article").first()).toBeVisible();
+  });
+
+  test("a finish name goes to the tins that apply it", async ({ page }) => {
+    // A finish is a thing a shopper buys, so the name of one is a shelf rather
+    // than a search through the prose.
     await searchBox(page).fill("gloss");
     await searchBox(page).press("Enter");
     await page.waitForLoadState("networkidle");
 
-    await expect(page).toHaveURL(/finishes=gloss/);
-    await expect(rail(page).getByRole("checkbox", { name: /Gloss/ })).toBeChecked();
+    await expect(page).toHaveURL(/category=finisher/);
+    // Gloss is the smooth half of the roughness axis, so it is that axis with
+    // its top end brought down.
+    await expect(page).toHaveURL(/finish=roughness/);
+    await expect(page).toHaveURL(/roughnessMax=80/);
+    await expect(rail(page).getByRole("radio", { name: /^Roughness/ })).toBeChecked();
   });
 
-  test("clicking a tag on a card filters by it", async ({ page }) => {
-    const tag = results(page).getByRole("button").first();
-    const label = await tag.textContent();
-
-    await tag.click();
+  test("the family a search landed on can be cleared again", async ({ page }) => {
+    await searchBox(page).fill("teal");
+    await searchBox(page).press("Enter");
     await page.waitForLoadState("networkidle");
 
-    await expect(page).toHaveURL(/tag=/);
-    // The active tag is shown above the results, since the rail has a
-    // category section but no tag section to show it in.
-    await expect(results(page).getByRole("button", { name: /Clear this tag/ })).toContainText(
-      label ?? "",
-    );
+    // The rail has no family section, so the active one is shown above the
+    // results — otherwise a search for a color family is a one-way door.
+    const clear = results(page).getByRole("button", { name: /Clear this color family/ });
+    await expect(clear).toContainText("teal");
+
+    await clear.click();
+    await expect(page).not.toHaveURL(/family=/);
   });
 
   test("suggests as you type", async ({ page }) => {

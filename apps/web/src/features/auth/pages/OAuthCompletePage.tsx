@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
+/** Where a provider's callback lands the browser, on its way to the catalog. */
 export const OAuthCompletePage = () => {
   const navigate = useNavigate();
 

@@ -74,13 +74,14 @@ const environmentSchema = z.object({
   MEDIA_DIR: z.string().min(1).default("/srv/media"),
   MEDIA_MAX_BYTES: z.coerce.number().int().positive().default(2 * 1024 * 1024),
 
-  CATEGORY_CACHE_TTL_SECONDS: durationSeconds(300),
   FACET_CACHE_TTL_SECONDS: durationSeconds(60),
   PRODUCT_CACHE_TTL_SECONDS: durationSeconds(60),
 });
 
+/** The environment as it arrived, once parsed. */
 export type Environment = z.infer<typeof environmentSchema>;
 
+/** The environment as the application reads it, grouped by what uses it. */
 export type Config = Readonly<{
   environment: Environment["NODE_ENV"];
   isProduction: boolean;
@@ -111,7 +112,6 @@ export type Config = Readonly<{
   rateLimit: Readonly<{ authPerMinute: number }>;
   media: Readonly<{ directory: string; maxBytes: number }>;
   cache: Readonly<{
-    categoryTtlSeconds: number;
     facetTtlSeconds: number;
     productTtlSeconds: number;
   }>;
@@ -126,6 +126,7 @@ const toCaptchaConfig = (environment: Environment): Config["captcha"] =>
     ? { mode: "google", secretKey: environment.RECAPTCHA_SECRET_KEY }
     : { mode: "test" };
 
+/** One provider's client pair. */
 export type OAuthCredential = Readonly<{
   provider: OAuthProviderName;
   clientId: string;
@@ -159,6 +160,7 @@ const toOAuthConfig = (environment: Environment): Config["oauth"] =>
     ? { mode: "live", credentials: configuredCredentials(environment) }
     : { mode: "mock" };
 
+/** A parsed environment as the shape the application asks questions of. */
 export const toConfig = (environment: Environment): Config => ({
   environment: environment.NODE_ENV,
   isProduction: environment.NODE_ENV === "production",
@@ -201,7 +203,6 @@ export const toConfig = (environment: Environment): Config => ({
     maxBytes: environment.MEDIA_MAX_BYTES,
   },
   cache: {
-    categoryTtlSeconds: environment.CATEGORY_CACHE_TTL_SECONDS,
     facetTtlSeconds: environment.FACET_CACHE_TTL_SECONDS,
     productTtlSeconds: environment.PRODUCT_CACHE_TTL_SECONDS,
   },

@@ -13,6 +13,7 @@ import { generateSecret, generateURI, verifySync } from "otplib";
 import QRCode from "qrcode";
 import type { Clock } from "./clock.ts";
 
+/** Enrolling a second factor, and checking the codes it produces. */
 export type TotpService = Readonly<{
   generateSecret: () => string;
   /** The `otpauth://` URI an authenticator app consumes. */
@@ -24,6 +25,7 @@ export type TotpService = Readonly<{
 const ISSUER = "Prism";
 const PERIOD_SECONDS = 30;
 
+/** Codes read against the injected clock, one 30-second step of tolerance either side. */
 export const createTotpService = (clock: Clock): TotpService => ({
   generateSecret: () => generateSecret(),
 

@@ -7,8 +7,11 @@
  * so absence is a value the type system can reason about everywhere else.
  */
 
+/** A value that is present. */
 export type Some<A> = Readonly<{ _tag: "Some"; value: A }>;
+/** A value that is absent. */
 export type None = Readonly<{ _tag: "None" }>;
+/** An `A` that may be absent, where absence is a value rather than a hole. */
 export type Option<A> = Some<A> | None;
 
 const some = <A>(value: A): Option<A> => ({ _tag: "Some", value });
@@ -77,6 +80,12 @@ const all = <A>(options: readonly Option<A>[]): Option<readonly A[]> => {
 const compact = <A>(options: readonly Option<A>[]): readonly A[] =>
   options.filter(isSome).map((option) => option.value);
 
+/**
+ * The combinators over `Option`, gathered under one name.
+ *
+ * Exported as a value so call sites read `Option.map`, and so the type and its
+ * operations are imported together.
+ */
 export const Option = {
   some,
   none,

@@ -8,9 +8,9 @@ There are three categories, and they have almost nothing in common:
 
 | Category | What it is | What it carries |
 | --- | --- | --- |
-| **Colors** (240) | A color, sold whole | A hex and a finish |
-| **Finishers** (32) | Puts a finish back on a color you own | The finish it applies, and a durability — how many colors it will see through |
-| **Shifters** (24) | Turns a color you own into a different one | A direction round the wheel, and an arc in degrees |
+| **Colors** | A color, sold whole | A hex, and three amounts of finish |
+| **Finishers** | Puts a finish back on a color you own | The same three amounts, being the finish it applies |
+| **Shifters** | Turns a color you own into a different one | A direction round the wheel, and an arc in degrees |
 
 The unusual product turns out to be a good fit for the requirements. A color has real
 numeric attributes — hue angle, saturation, lightness — which makes faceted search
@@ -19,43 +19,50 @@ generated at seed time instead of committed as binaries. A finisher and a shifte
 image at all: the grid draws them from their own spec, so there is nothing on disk that
 could disagree with the numbers beside it.
 
-Three categories with disjoint attributes is the interesting modelling problem here, and it
-is solved as a **tagged union in the table**: one `kind` discriminant, one column per
-variant field, and a CHECK constraint that spells out the exact shape of each variant. A
-shifter with a hex is rejected by the database rather than by a code path somebody has to
-remember to write. Two composite foreign keys do the part a CHECK cannot, because a CHECK
-may not look at another row — a category subtree cannot mix kinds, and a product cannot be
-filed outside its own category. [`spec.ts`](apps/api/src/modules/catalog/spec.ts) is the
-one place that turns those nullable columns back into a discriminated union, after which
-nothing downstream sees a null.
+Three categories with disjoint attributes is the interesting modeling problem here, and it
+is solved the normalized way: a `product` table for what all three share, and a `color`,
+`finisher` and `shifter` table for what they do not. Every column in those three is NOT
+NULL, because a column only exists where it applies — there is no `hex` on a shifter to be
+null. Each keys back to `product (id, kind)` rather than to `product (id)`, so a color row
+attached to a shifter is rejected by the database rather than by a code path somebody has to
+remember to write. [`spec.ts`](apps/api/src/modules/catalog/spec.ts) is the one place that
+turns the joined row back into a discriminated union, after which nothing downstream sees a
+null.
 
 The required weight and dimensions belong to the thing itself rather than to a container,
 because there is no container — and what there is to measure follows from what the thing is:
 
 | | Colors | Finishers | Shifters |
 | --- | --- | --- | --- |
-| | **Temperature** how warm it burns · °C / °F | **Coverage** how much surface it will see through · m² / ft² | **Torque** how hard it has to turn · N·m / lbf·ft |
+| | **Temperature** how warm it burns · °C / °F | **Coating** the layer it lays down · nm / µin | **Torque** how hard it has to turn · N·m / lbf·ft |
 | | **Reach** how far away it still reads · m / ft | **Grain** how much texture it leaves · µm / mil | **Backlash** the play before the color moves · mm / in |
+| | **Coating** the interference layer over it · nm / µin | | |
 | | **Weight** how heavy it looks · g / oz | **Weight** the tin and its contents · g / oz | **Weight** the gear itself · g / oz |
 
 Weight is the one all three share, because the requirement names it and because everything
-in the shop has some. A color has three independent facts, so it gets three independent
-measurements; the other two have only two each, so their three are three different functions
-of those two — which is the honest limit of what they carry.
+in the shop has some. The coating is shared by two, because the layer a tin lays down is the
+layer a color wears. Otherwise a kind measures exactly what it carries — a tin never runs
+out, so there is nothing to measure about how long it lasts.
 
-Every one is a generated column, so `hex`, `finish`, `durability`, `arc_degrees` and
+The coating is where the two systems stop being the same number under a different name. It
+is a layer a few hundred nanometers thick, which is below the mil every other surface in the
+shop is quoted in, so the imperial half drops three decimal places to the **microinch** —
+25.4 nm, the same ratio as the mil, and the unit an inch-shop measures a coating in.
+
+Every one is a generated column, so `hex`, the three finish amounts, `arc_degrees` and
 `direction` are the only stored facts about any product. Kelvin is what the temperature
 column holds, being the unit the derivation is defined in, and nothing displays it: "6208 K"
 describes a light source rather than a color.
 
-Beneath the three categories is a nested taxonomy, presented as **tags**: singular (`gold`),
-shown on every swatch, clickable, and typed straight into the search box in either number —
-"gold" and "golds" both land on the same filter. Selecting one takes its whole subtree, so
-`yellow` includes the golds and the acids. The category itself is never a tag; it is the
-first filter in the rail, and it decides which controls the rest of the rail even offers.
+**Every word resolves against what a product is.** Adding a color says what the color *is*,
+and nothing else — no taxonomy, no label, no shelf chosen by hand.
+`shifters` is a category, `cw` and `clock-wise` are a direction, `matte` is a stretch of the
+roughness axis, and `gold` is a point in RGB space — every color belongs to the landmark
+nearest it, which partitions the color cube into one Voronoi cell per name. `color_family`
+holds those landmarks and a generated column holds the answer, so the family is indexed and
+countable without anyone having decided that this particular color is a gold.
 
-This is **Project 1 (Foundation)**: accounts, the database, and the catalog. Carts,
-checkout and orders are Project 2; the admin interface is Project 3.
+This is **Project 1 (Foundation)**: accounts, the database, and the catalog.
 
 ---
 
@@ -67,9 +74,9 @@ checkout and orders are Project 2; the admin interface is Project 3.
 ./start.sh
 ```
 
-That builds the images, starts the stack, applies the migrations, seeds 296 products —
-240 colors with their swatch images, 32 finishers and 24 shifters — and waits until the
-storefront answers.
+That builds the images, starts the stack, sets up the database, seeds the catalog —
+every color with its swatch image, and the finishers and shifters beside them — and
+waits until the storefront answers.
 
 | Service | URL |
 | --- | --- |
@@ -146,9 +153,9 @@ accounts.
 ### Tests
 
 ```bash
-npm test              # everything: 471 tests
+npm test              # everything
 npm run test:unit     # the fast ones only
-npm run test:e2e      # 48 Playwright specs, against the running stack
+npm run test:e2e      # Playwright, against the running stack
 npm run typecheck
 ```
 
@@ -169,9 +176,10 @@ erDiagram
     APP_USER ||--o{ PRODUCT_REVIEW : writes
     SESSION  ||--|{ REFRESH_TOKEN : "rotates through"
 
-    CATEGORY ||--o{ CATEGORY : "contains"
-    CATEGORY ||--o{ PRODUCT : classifies
     BRAND    ||--o{ PRODUCT : produces
+    PRODUCT  ||--o| COLOR : "is a"
+    PRODUCT  ||--o| FINISHER : "is a"
+    PRODUCT  ||--o| SHIFTER : "is a"
     PRODUCT  ||--o{ PRODUCT_IMAGE : "is shown by"
     PRODUCT  ||--o{ PRODUCT_REVIEW : "is rated by"
 
@@ -222,17 +230,6 @@ erDiagram
         timestamptz created_at
     }
 
-    CATEGORY {
-        uuid         id            PK
-        text         slug          UK
-        text         name
-        text         description
-        uuid         parent_id     FK "NULL at the root; self-referencing"
-        product_kind kind          "UK with id; FK with parent_id, so a subtree cannot mix kinds"
-        integer      position
-        tsvector     search_vector "GENERATED from name and description"
-    }
-
     BRAND {
         uuid     id            PK
         text     slug          UK
@@ -242,32 +239,49 @@ erDiagram
     }
 
     PRODUCT {
-        uuid            id             PK
-        text            slug           UK
-        text            name
-        text            description
-        integer         price_cents    "CHECK >= 0"
-        integer         stock_quantity "CHECK >= 0"
-        uuid            category_id    FK "with kind, so the two cannot disagree"
-        uuid            brand_id       FK
-        product_kind    kind           "the discriminant: color | finisher | shifter"
-        text            hex            "colors only; CHECK matches #rrggbb"
-        product_finish  finish         "colors and finishers; matte | gloss | iridescent | fluorescent"
-        integer         durability     "finishers only; how many colors it will see through"
-        smallint        arc_degrees    "shifters only; CHECK between 1 and 360"
-        shift_direction direction      "shifters only; cw | ccw"
-        smallint        hue                "GENERATED from hex; NULL for the other two"
-        smallint        saturation         "GENERATED from hex; NULL for the other two"
-        smallint        lightness          "GENERATED from hex; NULL for the other two"
-        smallint        temperature_kelvin "GENERATED; colors"
-        integer         reach_centimeters  "GENERATED; colors"
-        integer         coverage_square_centimeters "GENERATED; finishers"
-        smallint        grain_micrometers  "GENERATED from finish"
-        integer         torque_millinewton_meters   "GENERATED; shifters"
-        integer         backlash_micrometers        "GENERATED; shifters"
-        integer         weight_grams       "GENERATED, by kind; the one every kind has"
-        tsvector        search_vector      "GENERATED, name weighted above description"
-        timestamptz     created_at
+        uuid         id             PK
+        text         slug           UK
+        text         name
+        text         description
+        integer      price_cents    "CHECK >= 0"
+        integer      stock_quantity "CHECK >= 0"
+        uuid         brand_id       FK
+        product_kind kind           "the discriminant: color | finisher | shifter"
+        tsvector     search_vector  "GENERATED, name weighted above description"
+        timestamptz  created_at
+    }
+
+    COLOR {
+        uuid     product_id         PK "FK with kind, so it can only be a color"
+        text     hex                "CHECK matches #rrggbb"
+        smallint roughness          "5 mirror .. 95 chalk"
+        smallint coating_nanometers "interference layer, or 0 for bare paint"
+        smallint emission           "how hard it glows, or 0"
+        smallint hue                "GENERATED from hex"
+        smallint saturation         "GENERATED from hex"
+        smallint lightness          "GENERATED from hex"
+        text     family             "GENERATED; nearest landmark in RGB space"
+        smallint temperature_kelvin "GENERATED"
+        integer  reach_centimeters  "GENERATED"
+        integer  weight_grams       "GENERATED"
+    }
+
+    FINISHER {
+        uuid     product_id         PK "FK with kind, so it can only be a finisher"
+        smallint roughness          "the surface it leaves"
+        smallint coating_nanometers "the layer it lays down, or 0"
+        smallint emission           "the glow it leaves, or 0"
+        smallint grain_micrometers  "GENERATED from roughness"
+        integer  weight_grams       "GENERATED"
+    }
+
+    SHIFTER {
+        uuid            product_id                PK "FK with kind, so it can only be a shifter"
+        shift_direction direction                 "cw | ccw"
+        smallint        arc_degrees               "CHECK between 1 and 360"
+        integer         torque_millinewton_meters "GENERATED"
+        integer         backlash_micrometers      "GENERATED"
+        integer         weight_grams              "GENERATED"
     }
 
     PRODUCT_IMAGE {
@@ -289,33 +303,30 @@ erDiagram
     }
 ```
 
-**Modality.** Every foreign key above is mandatory except `category.parent_id`, which is
-optional and marks one of the three category roots. A `session` need not have a
+**Modality.** Every foreign key above is mandatory. A `session` need not have a
 `revoked_at`; a `refresh_token` need not have a `used_at`; an `app_user` need not have a
 `password_hash` (OAuth-only) or a `totp_secret` (2FA off). Each of those is mapped to an
 `Option` at the repository boundary, so nothing above that layer sees a `null`.
 
-`product`'s nullable columns are a different thing and are not optional data: they are the
-arms of a sum type, and `product_variant_shape` requires exactly the right set of them to be
-present for each `kind`. They become a discriminated union at the same boundary, so a
-shifter has no `hex` field at all rather than a `hex` that is null.
+Nothing in `color`, `finisher` or `shifter` is nullable, because a column only exists in the
+table it applies to. There is no `hex` on a shifter to be null and no CHECK constraint
+standing in for a shape the tables already have. What the database does have to say is that
+a variant row belongs to a product of its own kind, and a plain foreign key on `product_id`
+cannot say it — so the key is composite:
 
 ```sql
-CONSTRAINT product_variant_shape CHECK (
-  CASE kind
-    WHEN 'color'    THEN hex IS NOT NULL AND finish IS NOT NULL
-                     AND durability IS NULL AND arc_degrees IS NULL AND direction IS NULL
-    WHEN 'finisher' THEN hex IS NULL AND finish IS NOT NULL AND durability IS NOT NULL
-                     AND arc_degrees IS NULL AND direction IS NULL
-    WHEN 'shifter'  THEN hex IS NULL AND finish IS NULL AND durability IS NULL
-                     AND arc_degrees IS NOT NULL AND direction IS NOT NULL
-  END
-)
+CREATE TABLE color (
+  product_id uuid         PRIMARY KEY,
+  kind       product_kind NOT NULL DEFAULT 'color',
+  …
+  CONSTRAINT color_is_a_color CHECK (kind = 'color'),
+  FOREIGN KEY (product_id, kind) REFERENCES product (id, kind) ON DELETE CASCADE
+);
 ```
 
-Each branch names every variant column, including the ones it forbids, so adding a fourth
-kind without deciding what it carries fails the insert rather than quietly admitting a row
-with nothing in it.
+`product` carries `UNIQUE (id, kind)` for those three keys to point at. A color row attached
+to a shifter is rejected by the database rather than by a code path somebody has to remember
+to write.
 
 **Cardinality.** A session has *at least one* refresh token (`||--|{`) — it is created
 with its first one in the same transaction, because a session with no token is unusable.
@@ -328,15 +339,24 @@ catalog read goes through it:
 
 ```sql
 CREATE VIEW product_listing AS
-SELECT p.*, b.name AS brand_name, c.name AS category_name,
+SELECT p.*, b.name AS brand_name,
+       c.hex, c.family, s.direction, s.arc_degrees,
+       COALESCE(c.roughness, f.roughness)                       AS roughness,
+       COALESCE(c.weight_grams, f.weight_grams, s.weight_grams) AS weight_grams,
        COALESCE(AVG(r.rating), 0)::numeric(3,2) AS rating_average,
        COUNT(r.id)::integer                     AS rating_count
 FROM product p
 JOIN brand b ON b.id = p.brand_id
-JOIN category c ON c.id = p.category_id
+LEFT JOIN color c ON c.product_id = p.id
+LEFT JOIN finisher f ON f.product_id = p.id
+LEFT JOIN shifter s ON s.product_id = p.id
 LEFT JOIN product_review r ON r.product_id = p.id
-GROUP BY p.id, b.id, c.id;
+GROUP BY p.id, b.id, c.product_id, f.product_id, s.product_id;
 ```
+
+The view is also where a search stops caring which table a column lives in. The three finish
+amounts are `COALESCE`d across the two kinds that have them, so one filter on roughness
+finds it wherever it is.
 
 A displayed rating therefore cannot disagree with the reviews it came from. If aggregation
 ever costs too much, `CREATE MATERIALIZED VIEW` is the only word that changes — no
@@ -348,19 +368,18 @@ The same principle appears three times with three mechanisms:
 | --- | --- | --- |
 | Ratings | SQL view | Aggregates across rows; only the database can |
 | Hue / saturation / lightness | `GENERATED ALWAYS … STORED` | Must be **indexable** for range faceting, so it has to be materialized — but Postgres owns the derivation, not the app |
-| Temperature / reach / weight | `GENERATED ALWAYS … STORED` | Same reason, and it leaves the five variant columns as the only stored facts about any product |
+| Color family | `GENERATED ALWAYS … STORED` | Same reason: searching for "gold" is a `WHERE family = 'gold'` against an index, and nobody ever files a color under a name |
+| Temperature / reach / weight | `GENERATED ALWAYS … STORED` | Same reason, and it leaves the variant columns as the only stored facts about any product |
 | Imperial units | Pure TypeScript function | Presentation only; never filtered or sorted on |
 
-Every measurement column but weight is generated straight from the facts of the kind it
-belongs to, and those functions are `STRICT` — so a column goes null exactly when the facts
-it is made of are absent, with no `CASE` needed to say so twice. Weight is the one every
-kind has, so weight alone dispatches on `kind`, and it has no `ELSE`: the same trick as the
-CHECK above, so a fourth kind produces a NULL in a `NOT NULL` column and the insert fails
-rather than the shop quietly selling something with no measurements.
+Every measurement lives in the table of the kind that has it, generated from that kind's own
+columns. Weight is the one all three carry, and each derives its own: a color's from its
+lightness, a tin's from the solids it must hold, a gear's from its arc. Nothing dispatches on
+`kind` any more, because nothing has to.
 
-Each is stored in the smallest whole unit — centimetres, square centimetres,
-millinewton-metres, micrometres — so the columns stay exact integers. Scaling to a readable
-unit is presentation, and happens in `@prism/shared` alongside the imperial conversion.
+Each is stored in the smallest whole unit — centimeters, millinewton-meters, micrometers,
+nanometers — so the columns stay exact integers. Scaling to a readable unit is presentation,
+and happens in `@prism/shared` alongside the imperial conversion.
 
 ---
 
@@ -389,7 +408,8 @@ apps/web/        React SPA
 
 Services never import a concrete adapter. They receive `{ clock, hasher, tokens, repo }` as
 an argument, which is what lets the tests run the real logic against a fake clock and an
-in-memory mailer — and what will let Project 2 reuse `createAuthService` untouched.
+in-memory mailer, and what lets `createAuthService` be reused wherever its adapters are
+supplied.
 
 ### The stack
 
@@ -429,6 +449,143 @@ There are no `as` casts anywhere in the codebase. `unknown` appears only in type
 predicates at genuine parse boundaries — JWT payloads, Fastify's error handler, OAuth
 provider responses, and the `grecaptcha` global — where the value really is unknown until
 checked.
+
+### Drawing a color
+
+A color has two stored facts, and a flat rectangle of hex states only one of them. The other
+is three **amounts**, rolled independently, because a real surface is several things at once:
+
+| Amount | Range | What it means, and what the slab does |
+| --- | --- | --- |
+| `roughness` | 5–95 | How scattered the surface is. Low is lacquered: a clearcoat over the pigment returns the strip lamp as a broad soft band. High is chalk — no band at all, a sheen lobe, and visible relief. Matte and gloss are the two ends of this one axis, which is why they share it |
+| `coating` | 0, or 100–600 nm | The thickness of a transparent interference layer over the paint. Not a color and not an arc: the thickness *is* the color, and everything the layer does follows from it |
+| `emission` | 0, or 35–100 | How hard the pigment gives off its own light, on top of the light it returns rather than instead of it |
+
+None of the three says what the color *is*. A color can be lacquered and iridescent at once,
+which real paint routinely is. The four words are still how the shop talks about itself, but
+they are **readings** of the numbers rather than values anything stores: `dominantFinish`
+picks whichever shows most strongly, each measured as a fraction of its own range, for the
+one word a screen reader is given, and `FINISH_BANDS` runs the other way so that typing
+"gloss" into the search box lands somewhere sensible.
+
+The rail asks about the amounts instead, one at a time, because they are three different
+questions: a roughness is a percentage, a coating is a thickness in nanometers and a glow is
+neither. Picking one brings its own slider and nothing else. Matte and gloss are *not* two
+of the three — they are the two ends of the first one, so the roughness slider spans the
+whole axis and a shopper drags toward whichever end they mean, rather than the shop picking
+the point where one word becomes the other.
+
+Picking an amount is itself a filter for two of the three, and this falls out of what the
+amounts are rather than being a rule on top of them. A coating and a glow are things a
+surface either has or has not got, so their ranges start where having one begins and asking
+about a coating is asking for the things that carry one. Every surface has a roughness, so
+asking about that narrows nothing and the slider does all the work.
+
+The three counts overlap, and are meant to: a coated color has a roughness as well and is
+counted under both, so the three sum to more than the shelf holds. Each is counted with
+every finish filter dropped, the range included, or picking one would show the other two
+holding nothing.
+
+A finisher carries the same three, being the finish it puts back. There is no such thing as
+*the* gloss finisher: one tin leaves a surface at 20 and the next at 15, and a shopper who
+wants the second is not served by being sold the first.
+
+[`surfaces.ts`](apps/web/src/features/catalog/artwork/surfaces.ts) is where those amounts
+become rendering parameters, and every one of its outputs is a **continuous** function of
+its input: two colors a point apart render a point apart. That is the property the unit
+tests are built around, because a band anywhere in that function is a place where a filter
+returns two colors whose pictures disagree about what they are.
+
+**One WebGL context draws the whole page.** A browser will not hand a dozen contexts to one
+document, so there is exactly one renderer, one scene, one slab and one material — with
+every shader feature it can use switched on permanently at a value near zero, because
+three's program key is built from which of them are above zero and a material that turned
+one off between two colors would compile a second shader mid-scroll. Only one stage is ever
+under the pointer; the others are still pictures holding whatever was last drawn on them.
+
+**The room is a room.** A gloss face is a picture of its surroundings, so a scene with
+lights and nothing to reflect renders as plastic. `PMREMGenerator` convolves a small scene
+of bright panels — including the strip, on the same line as the real one, because it is the
+same lamp — into the environment every material samples. On top of that: a key light for
+shape and a soft shadow; a `RectAreaLight` for the strip itself; and a hemisphere light for
+fill, which contributes irradiance and no highlight of its own.
+
+Where that lamp goes is not a matter of taste. A flat face reflects whatever is directly
+behind the viewer and spans about seven degrees of that reflection, so a lamp further round
+than that cannot appear on a slab standing square on at any brightness — which would leave a
+lacquered color reading as matte in a grid nobody has hovered.
+
+**Fluorescence is absorption and re-emission**, so a pigment that fluoresces is an ordinary
+lit surface that also adds: it keeps its shading, its highlight and its edges, and its own
+band comes back stronger than it went in. Two things follow. The albedo is that band at full
+strength — a pigment fluoresces in a narrow band and returns nearly all of it, which is why
+one is never dark whatever hue it is sold as. And a pigment with no band has none to hand
+back: gray does not glow gray, it goes white, so an emission is only allowed on a hex
+saturated enough to have a band, and `product_fluorescence_needs_a_band` says so in the
+database rather than in a comment.
+
+The amount is a claim about brightness, so it is spent as luminance and not as energy. A
+saturated yellow at the top of its band carries four times the luminance of a saturated
+violet at the top of its, and `emissiveScale` divides that out — without it an emission of
+60 is legible on the top half of the wheel and does nothing on the bottom. Measured on one
+violet with the glow switched off and on: the same face reads 93 mean luminance against 159,
+a lift of seven tenths.
+
+**The spill has a ceiling.** A bloom is the display admitting it has run out of range, and
+one wide enough to reach the wall says instead that the room is that color — the background
+takes the pigment's hue, the slab loses its edge, and a shelf of glowing colors is painful
+to look at. So the radius is small and the strength smaller, and the bound is checked rather
+than eyeballed: in the dark room the background behind every glowing color stays under 20%
+lightness, against a non-glowing control that sits around 8%. In the lit room, where the
+wall is gray to begin with, what is bounded is color rather than brightness: the background
+stays under 12% saturation, so it stays the gray it was.
+[`catalog-artwork.spec.ts`](e2e/specs/catalog-artwork.spec.ts) measures every card on the
+shelf and fails on either.
+
+**Neutral tone mapping, because the color is the product.** ACES is the usual default and it
+desaturates exactly the saturated colors this shop is selling. Under Khronos PBR Neutral,
+which compresses highlights and leaves the rest alone, a face turned to the camera comes
+back within single digits of 255 per channel of the hex it is sold under, measured across
+every color whose finish is its surface. A coating is meant to disagree, because a layer
+that handed back the paint's own color would not be a coating; so is a glow, because a
+pigment that makes its own light is brighter than the hex it is mixed from.
+
+**The coating is a real layer, and its thickness is the whole model.** Light coming back off
+the top of the layer meets light coming back off the paint underneath, having gone twice
+through it; the wavelengths that arrive in step are the ones you see, and which those are
+depends on the thickness, the refractive index and the angle. Nothing about the color is
+stored, because nothing about it is a separate fact — three.js implements
+[Belcour and Barla's](https://belcour.github.io/blog/research/publication/2017/05/01/brdf-thin-film.html)
+thin-film model and is handed the one number the shop sells.
+
+Two things follow from taking that seriously, and both were found by rendering rather than
+by reasoning. The layer is **titanium dioxide**, index 2.4, which is what every interference
+pigment ever sold is actually built from — a layer whose index matched the paint under it
+would be no layer at all, and a first attempt at an oil-like 1.45 over a 1.5 base rendered
+as bare paint, correctly and uselessly. And a coating needs a **reflection to happen in**, so
+`product_coating_needs_a_reflection` keeps every coated surface smooth: interference over
+chalk is invisible, and a shop that sold it would be charging for nothing.
+
+Swept on one near-black slab, the color walks the series a soap film walks — 100 nm warm
+brown, 175 nm olive, 250 nm cyan, 325 nm magenta, 400 nm green — and starts again paler each
+time it passes another order, which is why the range stops at 600. Turning the slab from one
+side to the other swings the hue by 15–36°, measured across four coatings. A saturated
+pigment shows much less of any of this than a dark one does, because interference lives in
+the reflection and a bright pigment's own color is louder than it.
+
+
+The split is the same one the rest of the codebase uses.
+[`tilt.ts`](apps/web/src/features/catalog/artwork/tilt.ts) and `surfaces.ts` are arithmetic,
+pure and unit-tested and unaware that a GPU exists; `scene.ts` is the one file in the
+feature that is not referentially transparent, because a GPU context is a resource rather
+than a value. The component between them owns a canvas, turns the pointer into an angle, and
+runs the frames — none of it through React state, because re-rendering a card's subtree
+sixty times a second to move a number no React tree reads is not what React is for.
+
+A browser with no WebGL2 gets the flat swatch instead, and so does one whose "GPU" is really
+the CPU: building the rig costs about a second and a half on a software renderer and every
+stage another eighty milliseconds, which is a worse page than a grid of flat swatches that
+arrives at once.
 
 ---
 
@@ -517,39 +674,45 @@ in transaction mode fronts it; the pool size is already configuration
 facets, and a partial index `WHERE revoked_at IS NULL` for the session guard's hot path,
 which runs on every authenticated request.
 
-*Caching* is two layers. An in-process TTL cache holds the category tree, facet counts and
-product detail; `Cache-Control` and `ETag` let Caddy and the browser stop asking. A single
+*Caching* is two layers. An in-process TTL cache holds facet counts and product detail; `Cache-Control` and `ETag` let Caddy and the browser stop asking. A single
 API container makes an in-process cache strictly better than Redis — same semantics, no
 network hop, no extra service. It stops being correct at two containers, which is what the
 `Cache<A>` port is for: a Redis adapter is a new file behind the same interface.
 
-*Partitioning* is the far end, and only for tables that grow without bound —
-`product_review` and, in Project 2, `order`. Both are naturally range-partitioned by
-`created_at`.
+*Partitioning* is the far end, and only for tables that grow without bound, such as
+`product_review`, which is naturally range-partitioned by `created_at`.
 
-The catalog itself does not grow the way order history does, which is why none of this is
-built yet. Building it now would be guessing at a shape the traffic has not taken.
+The catalog itself does not grow the way order history does, which is why the above is a
+path rather than a plan: picking a partition key before the traffic has taken a shape is
+guessing.
 
 ### Testing
 
-**471 tests**, in three layers with deliberately different costs, plus 48 in a real browser.
+Three layers with deliberately different costs, plus a suite in a real browser.
 
-*Unit* (321) — pure functions and injected fakes, no I/O, ~1 second. `Option` combinators
+*Unit* — pure functions and injected fakes, no I/O, ~1 second. `Option` combinators
 and their laws; metric↔imperial conversion; WCAG luminance and contrast; every Zod schema
 across valid, invalid and boundary input; JWT generation, validation and expiration against
 a controllable clock; the TTL cache's expiry and eviction order; image type detection
 against disguised payloads; the search and facet SQL builders, asserting on generated SQL
-and bound parameters; the PNG encoder; the seeded PRNG and `hslToHex`; and the seam where
+and bound parameters; the PNG encoder; the seeded PRNG and `hslToHex`; the seam where
 the product table's nullable columns become a discriminated union, including every shape
-the variant constraint forbids.
+the variant constraint forbids; and the arithmetic and tables behind the artwork, pinned by
+their relationships rather than by their tuned constants — the pointer turns the slab away
+from the finger and gets there at the same speed whatever the framerate; a lacquer thins as
+the pigment under it coarsens and is gone by chalk; the arc a color is sold with is the arc
+its coating actually shows; the grain tile wraps, because a slab with a seam down its
+face is a slab with a mistake on it; and, the one that matters most, every parameter moves
+by a hair for a color that differs by a point, because a band anywhere in that function is a
+place where two colors a filter returned together disagree about what they are.
 
-*API integration* (122) — the real application over a real Postgres from Testcontainers,
+*API integration* — the real application over a real Postgres from Testcontainers,
 driven through `fastify.inject` so routing, schema validation, guards and serialization all
 run. Assertions read rows back rather than trusting the response: that the password was
 hashed, that the refresh token is stored only as a digest, that a replay set
 `revoked_reason = 'token_reuse'`.
 
-*Security* (28) — SQL injection through every filter, sort and auth field; XSS payloads
+*Security* — SQL injection through every filter, sort and auth field; XSS payloads
 stored and read back; JWT tampering (wrong key, `alg: none`, edited payload, wrong issuer,
 invented session); mass assignment of `role`; path traversal through the media route;
 oversized, malformed, wrongly-typed and deeply-nested bodies; rate limiting.
@@ -557,10 +720,10 @@ oversized, malformed, wrongly-typed and deeply-nested bodies; rate limiting.
 Note the asymmetry in the injection tests. Slug-shaped parameters are *rejected* — they
 have a known shape, so anything else is malformed. The free-text search term is *accepted*
 and returns zero results, because it is genuinely free text and the protection is
-parameterisation rather than a blocklist. A blocklist that rejected `O'Brien's Red` would
+parameterization rather than a blocklist. A blocklist that rejected `O'Brien's Red` would
 be a worse product and no safer.
 
-*End-to-end* (48) — Playwright against the running stack, for the things that only exist in
+*End-to-end* — Playwright against the running stack, for the things that only exist in
 a browser: that the filter rail does not reflow, that dragging the hue ring works, that the
 rail offers each category only the controls that category has, and that the auth routes send
 you where they should — including that signing in lands on the catalog rather than the
@@ -574,13 +737,13 @@ result worth having.
 **Manual tests**, run before each review because they involve a human or a third party:
 the CAPTCHA renders and gates registration; Google and GitHub OAuth complete against real
 credentials with `OAUTH_MODE=live`, including a GitHub account whose email is set to
-private; and 2FA enrolment is scanned with a real authenticator app, the QR read from a
+private; and 2FA enrollment is scanned with a real authenticator app, the QR read from a
 phone rather than a fixture.
 
-Writing these found four real bugs the type system could not: a cache key that collided
-when a search term contained `&`, a null byte in a search term producing a 500, Drizzle
-wrapping Postgres errors so every duplicate email reported a generic conflict, and
-`X-Frame-Options` defaulting to `SAMEORIGIN`.
+The suite covers what the type system cannot: a cache key that collides when a search term
+contains `&`, a null byte in a search term producing a 500, Drizzle wrapping Postgres errors
+so every duplicate email reports a generic conflict, and `X-Frame-Options` defaulting to
+`SAMEORIGIN`.
 
 ---
 
@@ -601,7 +764,7 @@ validate the requests and is browsable at `/api/docs`.
 | `GET  /auth/me` | The signed-in user |
 | `POST /auth/password/forgot` | Always 204 |
 | `POST /auth/password/reset` | Single-use token; ends every session |
-| `POST /auth/2fa/setup` · `/enable` · `/disable` | TOTP enrolment |
+| `POST /auth/2fa/setup` · `/enable` · `/disable` | TOTP enrollment |
 | `GET  /auth/oauth/providers` | Which third-party sign-ins are live |
 | `GET  /auth/oauth/:provider` + callback | Authorization-code flow (`google`, `github`) |
 
@@ -609,7 +772,6 @@ validate the requests and is browsable at `/api/docs`.
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET /categories` | Tree with per-subtree product counts |
 | `GET /products` | Search, filter, sort, page — with facet counts |
 | `GET /products/suggest` | Typeahead |
 | `GET /products/:slug` | One product, with its variant spec and both unit systems |
@@ -619,25 +781,29 @@ validate the requests and is browsable at `/api/docs`.
 ```text
 GET /api/v1/products
   ?q=screaming            full-text across product and brand, plus a substring
-                          match on the color's own name — so "red" also finds
-                          "Powdered". A category hit takes its whole subtree,
-                          so "yellows" finds the golds filed beneath it
+                          match on the product's own name — so "red" also finds
+                          "Powdered"
 
   &category=color         one of color | finisher | shifter, and the only
                           filter that decides which of the rest apply
-  &tag=crimson            a node of the taxonomy; includes everything beneath it
+  &family=gold            the color family, which is the landmark in RGB space
+                          a color is nearest to. Colors only, and derived —
+                          nothing is filed under one
   &brands=cyan-and-sons   comma-separated, multi-select
   &priceMin=1000&priceMax=5000
   &minRating=4
 
+  colors and finishers — the finish one has, or the finish the other leaves:
+  &finish=coating         which of the three amounts is being asked about, one
+                          of roughness | coating | emission
+  &roughnessMin=5&roughnessMax=40      matte at one end, gloss at the other
+  &coatingMin=100&coatingMax=600       nanometers of interference layer
+  &emissionMin=35&emissionMax=100      how hard it gives off its own light
+
   colors only:
-  &finishes=gloss,matte
   &hueMin=340&hueMax=20   an arc through 0° — where the reds live
   &saturationMin=60&saturationMax=100
   &lightnessMin=0&lightnessMax=40
-
-  finishers only:
-  &finishes=gloss         the finish it applies; the rail offers one at a time
 
   shifters only:
   &arcMin=90&arcMax=270   how far round it turns a color
@@ -646,6 +812,14 @@ GET /api/v1/products
   &sort=relevance|price_asc|price_desc|rating
   &page=1&perPage=12
 ```
+
+A product comes back with `category` and `spec.kind` holding the same value. That is
+deliberate rather than an oversight: the required data model names a `category` field, and
+`spec` is the discriminated union everything downstream matches on, so `category` is built
+from `spec.kind` and the two cannot drift. `images` is the whole gallery, ordered, and
+`primaryImage` is the first of it — a caller that needs one image takes that and never
+reasons about an empty array. A finisher and a shifter are drawn from their own spec, so
+their gallery is empty rather than absent.
 
 Facet counts are computed against every filter *except* the dimension being counted, so
 ticking a second brand widens the result rather than emptying it. The category dimension
@@ -697,14 +871,14 @@ drift.
 
 ---
 
-## What is deliberately not here
+## The storefront
 
-Cart, checkout, payments and orders are Project 2. The admin *interface* is Project 3 —
-though `role` exists from the first migration and the admin API is role-gated already, so
-Project 3 adds screens rather than schema.
+`role` is part of the schema and the admin API is role-gated, so an admin screen is a
+screen rather than a schema change.
 
-The storefront is functional rather than polished, which is the correct scope for Project 1;
-Project 3 is where the interface requirement lands. It is responsive, keyboard-navigable,
-and honours `prefers-reduced-motion` and `prefers-color-scheme`, with a light/dark toggle
-that overrides the system preference — blue accents in daylight, yellow after dark, and
-near-neutral chrome throughout so that the only vivid things on the page are the products.
+The storefront is built for the catalog rather than for a design system. It is
+responsive, keyboard-navigable, and honors `prefers-reduced-motion` and
+`prefers-color-scheme`, with a light/dark toggle that overrides the system preference —
+blue accents in daylight, yellow after dark, and near-neutral chrome throughout so that the
+only vivid things on the page are the products. Where effort has gone into the interface it
+has gone into showing a product honestly, which for a color means the artwork above.

@@ -5,6 +5,7 @@ import { match } from "ts-pattern";
 import { toApiFailure } from "../../../shared/api/client.ts";
 import { IssueList } from "../../../shared/ui/index.ts";
 
+/** A caught value as text for the reader: field issues listed, everything else one sentence. */
 export const describeFailure = (reason: unknown): ReactNode =>
   match(toApiFailure(reason))
     .with({ _tag: "Some" }, ({ value }) =>

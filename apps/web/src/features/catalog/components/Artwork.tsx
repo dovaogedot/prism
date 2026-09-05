@@ -1,68 +1,65 @@
 /**
  * What a product looks like, chosen by what it is.
  *
- * A color has a swatch, and a file behind it. The other two have neither: a
- * finisher and a shifter are drawn here from their own spec, so there is no
- * seeded image that could disagree with the numbers beside it, and no file on
- * the volume for something that is not a color.
+ * A color gets a lit stage built from the three amounts of finish it carries.
+ * The other two have no stage: a finisher and a shifter are drawn here from
+ * their own spec, so there is nothing seeded that could disagree with the
+ * numbers beside it, and nothing on the volume for something that is not a
+ * color.
  */
 
 import {
   DIRECTION_LABELS,
   DIRECTION_SYMBOLS,
   Option,
-  type Finish,
   type ProductImage,
   type ProductSpec,
   type ShiftDirection,
 } from "@prism/shared";
 import { match } from "ts-pattern";
-import { Swatch } from "./Swatch.tsx";
+import { ColorStage } from "./ColorStage.tsx";
+
+/** The gray a finisher demonstrates on, which claims nothing about hue. */
+const BARE_SLAB = "#8a8a8f";
+
+/** The pigment a glowing finisher demonstrates on. */
+const GLOWING_SLAB = "#7bd320";
 
 /**
- * Each finish drawn as the thing it does to light: matte returns none of it,
- * gloss returns a hard highlight, iridescent disagrees with itself across the
- * tile, fluorescent goes off.
+ * The pigment a finisher's surface is shown on.
+ *
+ * A tin holds no color, so its picture is the surface it leaves rather than a
+ * color it comes in, and a gray carries roughness and a coating honestly. It
+ * cannot carry a glow: fluorescence is a pigment taking light in and handing
+ * it back in its own band, and a gray has no band to hand it back in — it
+ * just goes white. So a tin that glows demonstrates on a saturated pigment.
  */
-const FINISH_GROUNDS: Record<Finish, string> = {
-  matte: "linear-gradient(150deg, #4a4a4e, #35353a 60%, #2c2c30)",
-  gloss:
-    "linear-gradient(150deg, #6f7480 0%, #d8dce6 34%, #9aa0ae 52%, #55596a 100%)",
-  iridescent:
-    "conic-gradient(from 210deg, #7de3ff, #a78bfa, #fb7185, #fbbf24, #34d399, #7de3ff)",
-  fluorescent:
-    "radial-gradient(circle at 35% 30%, #f6ff8a 0%, #c6f542 40%, #52d726 100%)",
-};
+const substrateFor = (finishing: Readonly<{ emission: number }>): string =>
+  finishing.emission > 0 ? GLOWING_SLAB : BARE_SLAB;
 
-/** Dark ink on the two pale grounds, light on the two dark ones. */
-const FINISH_INK: Record<Finish, string> = {
-  matte: "text-white/85",
-  gloss: "text-black/70",
-  iridescent: "text-black/70",
-  fluorescent: "text-black/75",
-};
-
-const FinishTile = ({
-  finish,
-  label,
-}: Readonly<{ finish: Finish; label: string }>) => (
-  <div
-    role="img"
-    aria-label={label}
-    className="relative size-full"
-    style={{ backgroundImage: FINISH_GROUNDS[finish] }}
-  >
-    {/*
-      The finish is the whole picture. The durability is on the card's badge
-      rather than here, so the two facts appear once each.
-    */}
-    <span
-      className={`absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-[13px] font-semibold uppercase tracking-[0.2em] ${FINISH_INK[finish]}`}
-    >
-      {finish}
-    </span>
-  </div>
-);
+/**
+ * A surface written out as the three amounts that make it.
+ *
+ * What a screen reader is given in place of the picture, so it hears the same
+ * three numbers the stage was built from rather than one word standing in for
+ * them.
+ */
+const describeSurface = (
+  opening: string,
+  finishing: Readonly<{
+    roughness: number;
+    coatingNanometers: number;
+    emission: number;
+  }>,
+): string =>
+  [
+    opening,
+    `${finishing.roughness}% roughness`,
+    finishing.coatingNanometers > 0
+      ? `a ${finishing.coatingNanometers} nm coating`
+      : "no coating",
+    finishing.emission > 0 ? `glowing at ${finishing.emission}%` : "no glow",
+  ].join(", ");
 
 /**
  * The wheel, with the arc the shifter turns drawn on it.
@@ -119,15 +116,17 @@ const ShiftDial = ({
   );
 };
 
+/** Which product to draw, and how much room there is to draw it in. */
 export type ArtworkProps = Readonly<{
   spec: ProductSpec;
   name: string;
   image: Option<ProductImage>;
-  /** Colors show their hex under the swatch; the other two have nothing to show. */
+  /** Colors print their hex on the slab; the other two have nothing to print. */
   captioned?: boolean;
   className?: string;
 }>;
 
+/** A product's picture: the stage for a color, and a drawn spec for the other two. */
 export const Artwork = ({
   spec,
   name,
@@ -137,21 +136,31 @@ export const Artwork = ({
 }: ArtworkProps) =>
   match(spec)
     .with({ kind: "color" }, (color) => (
-      <Swatch
+      <ColorStage
         hex={color.hex}
+        finishing={{
+          roughness: color.roughness,
+          coatingNanometers: color.coatingNanometers,
+          emission: color.emission,
+        }}
         image={image}
-        alt={`${name} — ${color.hex}`}
+        alt={describeSurface(`${name} — ${color.hex}`, color)}
         {...(captioned ? { caption: color.hex } : {})}
         className={className}
       />
     ))
     .with({ kind: "finisher" }, (finisher) => (
-      <div className={`overflow-hidden ${className}`}>
-        <FinishTile
-          finish={finisher.finish}
-          label={`${name} — puts back a ${finisher.finish} finish, ${finisher.durability} colors' worth`}
-        />
-      </div>
+      <ColorStage
+        hex={substrateFor(finisher)}
+        finishing={{
+          roughness: finisher.roughness,
+          coatingNanometers: finisher.coatingNanometers,
+          emission: finisher.emission,
+        }}
+        image={Option.none}
+        alt={describeSurface(`${name} — the surface it leaves`, finisher)}
+        className={className}
+      />
     ))
     .with({ kind: "shifter" }, (shifter) => (
       <div className={`overflow-hidden ${className}`}>

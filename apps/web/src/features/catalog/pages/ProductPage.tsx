@@ -2,10 +2,9 @@
  * One product, whichever of the three it is.
  *
  * The measurements block is where the metric/imperial requirement shows up:
- * the server sends both, derived from one set of metric values it derived in
- * turn, and the toggle just picks which vocabulary to read them in. All three
- * kinds have all three measurements — each computed from whatever that kind
- * actually carries — so the block is the same on every page.
+ * the server sends both, derived from one set of metric values, and the toggle
+ * picks which vocabulary to read them in. What a kind measures follows from
+ * what it carries, so a color has one row the other two have no answer for.
  *
  * The spec block above it is not: it is the variant part of the product, and
  * it is rendered by matching on the variant.
@@ -56,6 +55,7 @@ const MeasurementRows = ({
       <>
         <Spec label="Temperature" value={`${metric.temperatureCelsius} °C`} />
         <Spec label="Reach" value={`${metric.reachMeters} m`} />
+        <Spec label="Coating" value={`${metric.coatingNanometers} nm`} />
         <Spec label="Weight" value={`${metric.weightGrams} g`} />
       </>
     ))
@@ -63,19 +63,20 @@ const MeasurementRows = ({
       <>
         <Spec label="Temperature" value={`${imperial.temperatureFahrenheit} °F`} />
         <Spec label="Reach" value={`${imperial.reachFeet} ft`} />
+        <Spec label="Coating" value={`${imperial.coatingMicroinches} µin`} />
         <Spec label="Weight" value={`${imperial.weightOunces} oz`} />
       </>
     ))
     .with([{ of: "finisher" }, "metric"], ([{ metric }]) => (
       <>
-        <Spec label="Coverage" value={`${metric.coverageSquareMeters} m²`} />
+        <Spec label="Coating" value={`${metric.coatingNanometers} nm`} />
         <Spec label="Grain" value={`${metric.grainMicrometers} µm`} />
         <Spec label="Weight" value={`${metric.weightGrams} g`} />
       </>
     ))
     .with([{ of: "finisher" }, "imperial"], ([{ imperial }]) => (
       <>
-        <Spec label="Coverage" value={`${imperial.coverageSquareFeet} ft²`} />
+        <Spec label="Coating" value={`${imperial.coatingMicroinches} µin`} />
         <Spec label="Grain" value={`${imperial.grainMils} mil`} />
         <Spec label="Weight" value={`${imperial.weightOunces} oz`} />
       </>
@@ -98,7 +99,8 @@ const MeasurementRows = ({
 
 /** Six words each, since nobody has met any of these numbers before. */
 const MEASUREMENT_NOTES: Record<Measurements["of"], string> = {
-  color: "How warm it burns, how far it still reads, and how heavy it looks.",
+  color:
+    "How warm it burns, how far it still reads, how thick the layer over it is, and how heavy it looks.",
   finisher:
     "How much surface it will see through, how much texture it leaves, and how heavy the tin is.",
   shifter:
@@ -152,6 +154,23 @@ const Measurements = ({ product }: Readonly<{ product: ProductDetail }>) => {
 };
 
 /**
+ * The amounts a finish is made of, less the coating.
+ *
+ * Both of them, always: they are independent, so a zero is a fact about the
+ * thing rather than a row that failed to apply. The coating is absent here
+ * because it is a thickness, and a thickness is a measurement — it appears in
+ * the block below, where the unit it is read in can be chosen.
+ */
+const FinishRows = ({
+  finishing,
+}: Readonly<{ finishing: Readonly<{ roughness: number; emission: number }> }>) => (
+  <>
+    <Spec label="Roughness" value={`${finishing.roughness}%`} />
+    <Spec label="Emission" value={`${finishing.emission}%`} />
+  </>
+);
+
+/**
  * The variant half of the product. Each kind lists exactly the facts it has:
  * there is no row here that says "—" because this particular product happens
  * not to be a color.
@@ -164,26 +183,10 @@ const SpecRows = ({ spec }: Readonly<{ spec: ProductSpec }>) =>
         <Spec label="Hue" value={`${color.hue}°`} />
         <Spec label="Saturation" value={`${color.saturation}%`} />
         <Spec label="Lightness" value={`${color.lightness}%`} />
-        <Spec
-          label="Finish"
-          value={color.finish.charAt(0).toUpperCase() + color.finish.slice(1)}
-        />
+        <FinishRows finishing={color} />
       </>
     ))
-    .with({ kind: "finisher" }, (finisher) => (
-      <>
-        <Spec
-          label="Applies"
-          value={
-            finisher.finish.charAt(0).toUpperCase() + finisher.finish.slice(1)
-          }
-        />
-        <Spec
-          label="Durability"
-          value={`${finisher.durability} color${finisher.durability === 1 ? "" : "s"}`}
-        />
-      </>
-    ))
+    .with({ kind: "finisher" }, (finisher) => <FinishRows finishing={finisher} />)
     .with({ kind: "shifter" }, (shifter) => (
       <>
         <Spec label="Direction" value={DIRECTION_LABELS[shifter.direction]} />
@@ -199,6 +202,7 @@ const SPEC_TITLES: Record<ProductSpec["kind"], string> = {
   shifter: "The shifter",
 };
 
+/** One product's page, reached by its slug. */
 export const ProductPage = () => {
   const { slug = "" } = useParams();
 
@@ -296,48 +300,12 @@ export const ProductPage = () => {
                 </h2>
                 <dl className="divide-y divide-line">
                   <SpecRows spec={data.spec} />
-                  {/*
-                    The whole chain, as on the swatches in the grid — an acid is
-                    a yellow too, and showing only the leaf hid that. Each one
-                    is a filter, so each links back to it. The category is not
-                    among them; it is in the header, beside the foundry.
-                  */}
-                  {match(data.tags.length)
-                    .with(0, () => null)
-                    .otherwise(() => (
-                      <div className="flex items-baseline justify-between gap-4 py-2">
-                        <dt className="text-sm text-ink-soft">
-                          {data.tags.length === 1 ? "Tag" : "Tags"}
-                        </dt>
-                        <dd className="flex flex-wrap justify-end gap-1">
-                          {data.tags.map((tag) => (
-                            <Link
-                              key={tag.slug}
-                              to={`/?tag=${tag.slug}`}
-                              className="rounded-full bg-sunken px-2 py-0.5 text-xs font-medium text-ink-soft hover:bg-accent-wash hover:text-ink"
-                            >
-                              {tag.name}
-                            </Link>
-                          ))}
-                        </dd>
-                      </div>
-                    ))}
                 </dl>
               </Card>
 
               <Card className="p-4">
                 <Measurements product={data} />
               </Card>
-
-              {/* Project 2 turns this on. */}
-              <button
-                type="button"
-                disabled
-                title="Carts arrive in project 2"
-                className="w-full cursor-not-allowed rounded-lg border border-dashed border-line py-3 text-sm font-medium text-ink-faint"
-              >
-                Add to cart — coming in project 2
-              </button>
 
               {match(data.reviews.length)
                 .with(0, () => null)

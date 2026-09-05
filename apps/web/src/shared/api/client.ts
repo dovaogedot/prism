@@ -24,11 +24,13 @@ import { tokenStore } from "../../features/auth/token-store.ts";
 
 const BASE = "/api/v1";
 
+/** A request the API refused, and what it refused it with. */
 export type ApiFailure = Readonly<{
   error: DomainError;
   status: number;
 }>;
 
+/** The failure as something `throw` accepts, since that is what fetch callers catch. */
 export class ApiError extends Error {
   readonly failure: ApiFailure;
 
@@ -97,6 +99,12 @@ const performRefresh = async (): Promise<boolean> => {
   return true;
 };
 
+/**
+ * Trades the refresh cookie for a fresh access token.
+ *
+ * Concurrent callers share one attempt, because several refreshes at once are
+ * several replays of a single-use token.
+ */
 export const refreshSession = (): Promise<boolean> => {
   if (Option.isSome(refreshInFlight)) return refreshInFlight.value;
 
@@ -153,6 +161,7 @@ const exchange = async (
   return response;
 };
 
+/** A request whose body is decoded as JSON. Raises `ApiError` on a refusal. */
 export const request = async <A>(
   path: string,
   options: RequestOptions = {},
@@ -172,6 +181,7 @@ export const requestEmpty = async (
   await exchange(path, options);
 };
 
+/** The verbs, each saying whether a 401 is worth one silent refresh and retry. */
 export const api = {
   get: <A>(path: string, signal?: AbortSignal): Promise<A> =>
     request<A>(path, signal === undefined ? {} : { signal }),
@@ -190,6 +200,7 @@ export const api = {
     requestEmpty(path, { method: "POST", body, retryOnUnauthorized: false }),
 } as const;
 
+/** The failure inside a caught value, or `None` if it did not come from the API. */
 export const toApiFailure = (reason: unknown): Option<ApiFailure> =>
   reason instanceof ApiError ? Option.some(reason.failure) : Option.none;
 

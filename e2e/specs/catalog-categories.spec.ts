@@ -4,9 +4,9 @@
  * The shop sells three different things and they share almost nothing. What
  * these cover is that the rail offers each category only the controls that
  * category has, that switching does not leave a filter behind that nothing on
- * the new shelf could satisfy, and that the page height still does not move
- * when a filter narrows the results — which used to be the filter rail's doing,
- * back when the rail was always the taller of the two columns.
+ * the chosen shelf could satisfy, and that the page height does not move when
+ * a filter narrows the results — which the rail cannot hold steady, since its
+ * own height depends on the category.
  */
 
 import { expect, test, type Page } from "@playwright/test";
@@ -47,33 +47,64 @@ test.describe("choosing a category", () => {
     await expect(section(page, "Price")).toBeVisible();
 
     // A hue ring is meaningless across a mixed shelf, so it is not offered.
-    await expect(section(page, "Hue")).toBeHidden();
+    await expect(section(page, "HSL")).toBeHidden();
     await expect(section(page, "Finish")).toBeHidden();
     await expect(section(page, "Arc")).toBeHidden();
   });
 
-  test("gives colors the hue ring, the ramps and the finishes", async ({ page }) => {
+  test("gives colors the hue ring, the ramps and the finish", async ({ page }) => {
     await page.goto("/?category=color");
     await ready(page);
 
-    await expect(section(page, "Hue")).toBeVisible();
-    await expect(section(page, "Saturation")).toBeVisible();
-    await expect(section(page, "Lightness")).toBeVisible();
+    // One coordinate in three parts, behind one heading.
+    await expect(section(page, "HSL")).toBeVisible();
+    // And the finish behind another, as three amounts with none picked yet.
     await expect(section(page, "Finish")).toBeVisible();
+    await expect(rail(page).getByRole("radio", { name: /^Iridescence/ })).toBeVisible();
+    await expect(page.getByRole("slider", { name: /Roughness/ })).toHaveCount(0);
     await expect(section(page, "Arc")).toBeHidden();
   });
 
-  test("gives finishers one finish and nothing else", async ({ page }) => {
+  test("gives finishers the finish they leave, and no color of their own", async ({
+    page,
+  }) => {
     await page.goto("/?category=finisher");
     await ready(page);
 
+    // A tin has no hue. What it has is the finish it puts back, which is the
+    // same three amounts a color carries.
     await expect(section(page, "Finish")).toBeVisible();
-    await expect(section(page, "Hue")).toBeHidden();
+    await expect(section(page, "HSL")).toBeHidden();
+    await expect(rail(page).getByRole("radio", { name: /^Roughness/ })).toBeVisible();
+  });
 
-    // A finisher applies exactly one finish, so the control is exclusive.
-    const finishes = rail(page).getByRole("radio", { name: /Matte|Gloss/ });
-    await expect(finishes.first()).toBeVisible();
-    await expect(rail(page).getByRole("checkbox", { name: /Matte/ })).toHaveCount(0);
+  test("an amount decides which slider there is to drag", async ({ page }) => {
+    // A roughness is a percentage, a coating is a thickness in nanometers and
+    // a glow is neither. Asking about all three at once is asking three
+    // questions, so one is picked and it brings its own.
+    await page.goto("/?category=color");
+    await ready(page);
+
+    await rail(page).getByRole("radio", { name: /^Iridescence/ }).click();
+    await expect(page).toHaveURL(/finish=coating/);
+    await expect(page.getByRole("slider", { name: /Coating, minimum/ })).toHaveAttribute(
+      "aria-valuetext",
+      "100 nm",
+    );
+    await expect(page.getByRole("slider", { name: /Roughness/ })).toHaveCount(0);
+
+    await rail(page).getByRole("radio", { name: /^Roughness/ }).click();
+    await expect(page).toHaveURL(/finish=roughness/);
+    // One axis with matte at one end and gloss at the other, so it spans both.
+    await expect(page.getByRole("slider", { name: /Roughness, minimum/ })).toHaveAttribute(
+      "aria-valuetext",
+      "5%",
+    );
+    await expect(page.getByRole("slider", { name: /Roughness, maximum/ })).toHaveAttribute(
+      "aria-valuetext",
+      "95%",
+    );
+    await expect(page.getByRole("slider", { name: /Coating/ })).toHaveCount(0);
   });
 
   test("gives shifters an arc and a direction", async ({ page }) => {
@@ -112,10 +143,10 @@ test.describe("switching category", () => {
   });
 
   test("a category showing zero is still selectable", async ({ page }) => {
-    // A color tag zeroes the other two honestly, but choosing one of them
-    // clears that tag on the way — so locking it would be a dead end that is
+    // A color family zeroes the other two honestly, but choosing one of them
+    // clears the family on the way — so locking it would be a dead end that is
     // not actually dead. Everywhere else in the rail, zero does lock.
-    await page.goto("/?category=color&tag=black");
+    await page.goto("/?category=color&family=black");
     await ready(page);
 
     const finishers = categoryRadio(page, "Finishers");
@@ -123,7 +154,7 @@ test.describe("switching category", () => {
 
     await finishers.click();
     await expect(page).toHaveURL(/category=finisher/);
-    await expect(page).not.toHaveURL(/tag=/);
+    await expect(page).not.toHaveURL(/family=/);
 
     await ready(page);
     await expect(page.getByText("Nothing matches that.")).toBeHidden();
@@ -148,16 +179,16 @@ test.describe("the shifter controls", () => {
 
     const cards = await results(page).getByRole("article").count();
 
-    // The dial draws the arc, so the badge names the way round — between them a
-    // card states both facts without saying either twice.
-    await expect(results(page).getByText(/^[↻↺] (cw|ccw)$/i)).toHaveCount(cards);
+    // The dial draws the arc and prints the two facts under it: which way
+    // round, and how far.
+    await expect(results(page).getByText(/^[↻↺]$/)).toHaveCount(cards);
     await expect(results(page).getByText(/^\d+°$/)).toHaveCount(cards);
   });
 });
 
 test.describe("layout stability across categories", () => {
   for (const [label, url, narrowed] of [
-    ["finishers", "/?category=finisher", "/?category=finisher&finishes=gloss"],
+    ["finishers", "/?category=finisher", "/?category=finisher&roughnessMax=20"],
     ["shifters", "/?category=shifter", "/?category=shifter&arcMin=200&direction=ccw"],
   ] as const) {
     test(`the page is the same height however few ${label} match`, async ({ page }) => {
@@ -186,14 +217,36 @@ test.describe("measurements differ by category", () => {
     await expect(page.getByRole("heading", { name: "Measurements" })).toBeVisible();
   };
 
-  test("a color measures how it burns, reads and looks", async ({ page }) => {
+  test("a color measures how it burns, reads, is coated and looks", async ({
+    page,
+  }) => {
     await openFirst(page, "color");
-    expect(await measurementLabels(page)).toEqual(["Temperature", "Reach", "Weight"]);
+    expect(await measurementLabels(page)).toEqual([
+      "Temperature",
+      "Reach",
+      "Coating",
+      "Weight",
+    ]);
+  });
+
+  test("a coating is quoted in nanometers, and in microinches to order", async ({
+    page,
+  }) => {
+    // The one measurement in the shop small enough to need the unit below a
+    // mil, which is where the metric and imperial halves stop being the same
+    // number with a different name on it.
+    await openFirst(page, "color");
+
+    const coating = page.locator("dl").last().locator("dd").nth(2);
+    await expect(coating).toHaveText(/^\d+ nm$/);
+
+    await page.getByRole("button", { name: "imperial" }).click();
+    await expect(coating).toHaveText(/^[\d.]+ µin$/);
   });
 
   test("a finisher measures the tin instead", async ({ page }) => {
     await openFirst(page, "finisher");
-    expect(await measurementLabels(page)).toEqual(["Coverage", "Grain", "Weight"]);
+    expect(await measurementLabels(page)).toEqual(["Coating", "Grain", "Weight"]);
   });
 
   test("a shifter measures the mechanism", async ({ page }) => {

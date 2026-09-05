@@ -13,12 +13,18 @@ import {
   DIRECTION_LABELS,
   formatPrice,
   isCents,
+  EMISSION_BOUNDS,
+  FINISH_PROPERTIES,
+  FINISH_PROPERTY_LABELS,
+  FINISH_RANGES,
   LIGHTNESS_BOUNDS,
+  ROUGHNESS_BOUNDS,
   Option,
   PRODUCT_KINDS,
   SATURATION_BOUNDS,
   SHIFT_DIRECTIONS,
   type FacetBucket,
+  type FinishProperty,
   type NumericRange,
   type ProductFacets,
   type ProductKind,
@@ -29,12 +35,20 @@ import { match, P } from "ts-pattern";
 import { HueRing } from "./HueRing.tsx";
 import { RangeSlider } from "./RangeSlider.tsx";
 
+/**
+ * Every filter, as the strings the URL carries them as.
+ *
+ * Strings rather than numbers because this is the query string's own shape: an
+ * empty string is a filter nobody set, which keeps the URL free of `NaN`.
+ */
 export type FacetState = Readonly<{
   /** The category, or "" for all three at once. */
   category: string;
-  tag: string;
+  /** A color family, or "" for no claim about it. Set by search, not by the rail. */
+  family: string;
   brands: readonly string[];
-  finishes: readonly string[];
+  /** Which amount of the finish is being asked about, or "" for none of them. */
+  finish: string;
   direction: string;
   arcMin: string;
   arcMax: string;
@@ -47,8 +61,15 @@ export type FacetState = Readonly<{
   saturationMax: string;
   lightnessMin: string;
   lightnessMax: string;
+  roughnessMin: string;
+  roughnessMax: string;
+  coatingMin: string;
+  coatingMax: string;
+  emissionMin: string;
+  emissionMax: string;
 }>;
 
+/** The choices on offer, the ones taken, and where a change goes. */
 export type FacetsProps = Readonly<{
   facets: ProductFacets;
   state: FacetState;
@@ -177,8 +198,8 @@ const CheckList = ({
 );
 
 /**
- * The same list, exclusive. Clicking the chosen one clears it, so a category
- * or a finish is never a one-way door.
+ * The same list, exclusive. Clicking the chosen one clears it, so a category is
+ * never a one-way door.
  */
 const RadioList = ({
   buckets,
@@ -368,8 +389,160 @@ const StarRating = ({
 
 /* ------------------------------------------------------------------- rail */
 
+/**
+ * What a range section says when it is shut.
+ *
+ * Empty while the filter is untouched, so a closed section only ever carries a
+ * summary when there is something to summarize.
+ */
+const rangeSummary = (
+  min: string,
+  max: string,
+  range: NumericRange,
+  format: (value: number) => string,
+): string =>
+  min === "" && max === "" ? "" : `${format(range.min)}–${format(range.max)}`;
+
+/** Whether a range filter is doing anything at all. */
+const hasRange = (min: string, max: string): boolean => min !== "" || max !== "";
+
+/**
+ * What a panel of several ranges says when it is shut.
+ *
+ * A count rather than the ranges themselves: three of them spelled out would
+ * not fit on the header, and a header that can grow moves every section under
+ * it when a filter is applied.
+ */
+const settledCount = (active: readonly boolean[]): string => {
+  const count = active.filter(Boolean).length;
+
+  return count === 0 ? "" : `${count} set`;
+};
+
 const numberOr = (raw: string, fallback: number): number =>
   raw === "" ? fallback : Number(raw);
+
+/**
+ * The three ranges, cleared.
+ *
+ * A range says where on one axis to look, so it means nothing once a
+ * different axis is chosen.
+ */
+const NO_AMOUNTS = {
+  roughnessMin: "",
+  roughnessMax: "",
+  coatingMin: "",
+  coatingMax: "",
+  emissionMin: "",
+  emissionMax: "",
+} as const satisfies Partial<FacetState>;
+
+/**
+ * What a coating looks like along its range, thinnest to thickest.
+ *
+ * Interference color does not run round the hue wheel once. It walks a series
+ * — warm, then yellow, then cyan, then magenta, then green — and starts again
+ * paler each time the layer thickens past another order. The hues here were
+ * sampled off rendered slabs at the thicknesses they sit at, so the track says
+ * what the shelf actually holds; only the lightness is lifted, because the
+ * pigment they were measured on is nearly black and a track has to be legible.
+ */
+const COATING_RAMP =
+  "linear-gradient(to right, #cb7f71 0%, #c4d369 15%, #3de1ff 30%, #e05cbd 45%, #6fcea8 60%, #83b9a8 75%, #b48893 90%, #84b4b8 100%)";
+
+/** Pale, then the chalk end. Reads the way the word does at either band. */
+const ROUGHNESS_RAMP = "linear-gradient(to right, #f4f4f5, #6b6b70)";
+
+/** A glow worth selling at one end, and one you cannot look at at the other. */
+const EMISSION_RAMP = "linear-gradient(to right, #cdbb6a, #fde047, #fffbea)";
+
+/**
+ * Where on the chosen amount's axis to look.
+ *
+ * The axis runs over `FINISH_RANGES` — the same table the server floors the
+ * filter at, so the slider cannot offer a stretch the shelf has nothing in.
+ * Roughness is the one with two names on it: dragging the low end up asks for
+ * matte and dragging the high end down asks for gloss, without the shop having
+ * to pick the point where one becomes the other.
+ */
+const AmountSlider = ({
+  property,
+  state,
+  onChange,
+}: Readonly<{
+  property: FinishProperty;
+  state: FacetState;
+  onChange: (next: Partial<FacetState>) => void;
+}>) => {
+  const range = FINISH_RANGES[property];
+
+  /** Dragged back to an end of the band means "no narrowing", not "the band". */
+  const narrowed = (next: NumericRange): Readonly<{ min: string; max: string }> => ({
+    min: next.min <= range.min ? "" : String(next.min),
+    max: next.max >= range.max ? "" : String(next.max),
+  });
+
+  return match(property)
+    .with("roughness", () => (
+      <RangeSlider
+        label="Roughness"
+        min={range.min}
+        max={range.max}
+        value={{
+          min: numberOr(state.roughnessMin, range.min),
+          max: numberOr(state.roughnessMax, range.max),
+        }}
+        format={(value) => `${value}%`}
+        trackBackground={ROUGHNESS_RAMP}
+        onChange={(next) =>
+          onChange({
+            roughnessMin: narrowed(next).min,
+            roughnessMax: narrowed(next).max,
+          })
+        }
+      />
+    ))
+    .with("coating", () => (
+      <RangeSlider
+        label="Coating"
+        min={range.min}
+        max={range.max}
+        step={10}
+        value={{
+          min: numberOr(state.coatingMin, range.min),
+          max: numberOr(state.coatingMax, range.max),
+        }}
+        format={(value) => `${value} nm`}
+        trackBackground={COATING_RAMP}
+        onChange={(next) =>
+          onChange({
+            coatingMin: narrowed(next).min,
+            coatingMax: narrowed(next).max,
+          })
+        }
+      />
+    ))
+    .with("emission", () => (
+      <RangeSlider
+        label="Emission"
+        min={range.min}
+        max={range.max}
+        value={{
+          min: numberOr(state.emissionMin, range.min),
+          max: numberOr(state.emissionMax, range.max),
+        }}
+        format={(value) => `${value}%`}
+        trackBackground={EMISSION_RAMP}
+        onChange={(next) =>
+          onChange({
+            emissionMin: narrowed(next).min,
+            emissionMax: narrowed(next).max,
+          })
+        }
+      />
+    ))
+    .exhaustive();
+};
 
 /** The ring is shown in a neutral blue while no hue is selected. */
 const DEFAULT_RAMP_HUE = 220;
@@ -380,6 +553,15 @@ const isKind = (value: string): value is ProductKind =>
 const isDirection = (value: string): value is ShiftDirection =>
   SHIFT_DIRECTIONS.some((direction) => direction === value);
 
+const isFinishProperty = (value: string): value is FinishProperty =>
+  FINISH_PROPERTIES.some((property) => property === value);
+
+/**
+ * The filter rail.
+ *
+ * Offers each category only the controls that category has, so switching
+ * category changes which sections exist rather than graying them out.
+ */
 export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
   const priceBounds = facets.priceCents;
   const hueActive = state.hueMin !== "" || state.hueMax !== "";
@@ -395,6 +577,11 @@ export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
 
   const showsKind = (kind: ProductKind): boolean =>
     Option.isSome(chosenKind) && chosenKind.value === kind;
+
+  /** Which of the three amounts is being asked about, if any. */
+  const chosenFinish: Option<FinishProperty> = isFinishProperty(state.finish)
+    ? Option.some(state.finish)
+    : Option.none;
 
   const arc: NumericRange = {
     min: numberOr(state.arcMin, ARC_BOUNDS.min),
@@ -427,6 +614,7 @@ export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
     min: numberOr(state.lightnessMin, LIGHTNESS_BOUNDS.min),
     max: numberOr(state.lightnessMax, LIGHTNESS_BOUNDS.max),
   };
+
 
   const ratingCounts = new Map(
     facets.ratings.map((bucket) => [Number(bucket.value), bucket.count]),
@@ -484,8 +672,9 @@ export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
             // nothing, with no visible control to explain why.
             onChange({
               category: value,
-              tag: "",
-              finishes: [],
+              family: "",
+              finish: "",
+              ...NO_AMOUNTS,
               direction: "",
               arcMin: "",
               arcMax: "",
@@ -507,125 +696,118 @@ export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
       {match(showsKind("color"))
         .with(false, () => null)
         .with(true, () => (
-          <>
-      <Section title="Hue" summary={hueActive ? `${hue.min}°–${hue.max}°` : ""}>
-        <div className="space-y-3">
-          <HueRing
-            value={hue}
-            active={hueActive}
+          <>{/*
+        Hue, saturation and lightness are one coordinate in three parts — a
+        shopper narrowing a color moves all three or none — so they open and
+        close together rather than as three sections to scroll past.
+      */}
+      <Section title="HSL" summary={settledCount([hueActive, hasRange(state.saturationMin, state.saturationMax), hasRange(state.lightnessMin, state.lightnessMax)])}>
+        <div className="space-y-4">
+          <div className="space-y-3">
+            <HueRing
+              value={hue}
+              active={hueActive}
+              onChange={(next) =>
+                onChange({ hueMin: String(next.min), hueMax: String(next.max) })
+              }
+              onActivate={(next) =>
+                onChange({ hueMin: String(next.min), hueMax: String(next.max) })
+              }
+              onPreview={(next) => setHuePreview(Option.some(next.min))}
+            />
+
+            {match(hueActive)
+              .with(true, () => (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHuePreview(Option.none);
+                    onChange({ hueMin: "", hueMax: "" });
+                  }}
+                  className="w-full rounded-lg border border-line py-1.5 text-xs font-medium text-ink-soft hover:bg-sunken hover:text-ink"
+                >
+                  Any hue
+                </button>
+              ))
+              .with(false, () => null)
+              .exhaustive()}
+          </div>
+
+          <RangeSlider
+            label="Saturation"
+            min={SATURATION_BOUNDS.min}
+            max={SATURATION_BOUNDS.max}
+            value={saturation}
+            format={(value) => `${value}%`}
+            trackBackground={`linear-gradient(to right, hsl(${rampHue} 0% 55%), hsl(${rampHue} 100% 55%))`}
             onChange={(next) =>
-              onChange({ hueMin: String(next.min), hueMax: String(next.max) })
+              onChange({
+                saturationMin:
+                  next.min <= SATURATION_BOUNDS.min ? "" : String(next.min),
+                saturationMax:
+                  next.max >= SATURATION_BOUNDS.max ? "" : String(next.max),
+              })
             }
-            onActivate={(next) =>
-              onChange({ hueMin: String(next.min), hueMax: String(next.max) })
-            }
-            onPreview={(next) => setHuePreview(Option.some(next.min))}
           />
 
-          {match(hueActive)
-            .with(true, () => (
-              <button
-                type="button"
-                onClick={() => {
-                  setHuePreview(Option.none);
-                  onChange({ hueMin: "", hueMax: "" });
-                }}
-                className="w-full rounded-lg border border-line py-1.5 text-xs font-medium text-ink-soft hover:bg-sunken hover:text-ink"
-              >
-                Any hue
-              </button>
-            ))
-            .with(false, () => null)
-            .exhaustive()}
+          <RangeSlider
+            label="Lightness"
+            min={LIGHTNESS_BOUNDS.min}
+            max={LIGHTNESS_BOUNDS.max}
+            value={lightness}
+            format={(value) => `${value}%`}
+            trackBackground={`linear-gradient(to right, hsl(${rampHue} 55% 0%), hsl(${rampHue} 55% 50%), hsl(${rampHue} 55% 100%))`}
+            onChange={(next) =>
+              onChange({
+                lightnessMin:
+                  next.min <= LIGHTNESS_BOUNDS.min ? "" : String(next.min),
+                lightnessMax:
+                  next.max >= LIGHTNESS_BOUNDS.max ? "" : String(next.max),
+              })
+            }
+          />
         </div>
       </Section>
 
-      <Section
-        title="Saturation"
-        summary={
-          state.saturationMin === "" && state.saturationMax === ""
-            ? ""
-            : `${saturation.min}–${saturation.max}%`
-        }
-      >
-        <RangeSlider
-          label="Saturation"
-          min={SATURATION_BOUNDS.min}
-          max={SATURATION_BOUNDS.max}
-          value={saturation}
-          format={(value) => `${value}%`}
-          trackBackground={`linear-gradient(to right, hsl(${rampHue} 0% 55%), hsl(${rampHue} 100% 55%))`}
-          onChange={(next) =>
-            onChange({
-              saturationMin:
-                next.min <= SATURATION_BOUNDS.min ? "" : String(next.min),
-              saturationMax:
-                next.max >= SATURATION_BOUNDS.max ? "" : String(next.max),
-            })
-          }
-        />
-      </Section>
-
-      <Section
-        title="Lightness"
-        summary={
-          state.lightnessMin === "" && state.lightnessMax === ""
-            ? ""
-            : `${lightness.min}–${lightness.max}%`
-        }
-      >
-        <RangeSlider
-          label="Lightness"
-          min={LIGHTNESS_BOUNDS.min}
-          max={LIGHTNESS_BOUNDS.max}
-          value={lightness}
-          format={(value) => `${value}%`}
-          trackBackground={`linear-gradient(to right, hsl(${rampHue} 55% 0%), hsl(${rampHue} 55% 50%), hsl(${rampHue} 55% 100%))`}
-          onChange={(next) =>
-            onChange({
-              lightnessMin:
-                next.min <= LIGHTNESS_BOUNDS.min ? "" : String(next.min),
-              lightnessMax:
-                next.max >= LIGHTNESS_BOUNDS.max ? "" : String(next.max),
-            })
-          }
-        />
-      </Section>
-
-      <Section
-        title="Finish"
-        summary={state.finishes.length > 0 ? `${state.finishes.length} chosen` : ""}
-      >
-        <CheckList
-          name="finish"
-          buckets={facets.finishes}
-          selected={state.finishes}
-          onToggle={(value) => onChange({ finishes: toggle(state.finishes, value) })}
-        />
-      </Section>
           </>
         ))
         .exhaustive()}
 
       {/*
-        Finishers. One finish at a time, because a finisher applies exactly one
-        and asking for two would be asking for a tool that does not exist.
+        The finish, on the shelf of colors that have one and on the shelf of
+        tins that put one back. Three amounts and therefore three questions,
+        asked one at a time: a roughness is a percentage, a coating is a
+        thickness in nanometers and a glow is neither, so one slider each and
+        one of them on screen.
       */}
-      {match(showsKind("finisher"))
+      {match(showsKind("color") || showsKind("finisher"))
         .with(false, () => null)
         .with(true, () => (
           <Section
             title="Finish"
-            summary={state.finishes[0] ?? ""}
+            summary={Option.match<FinishProperty, string>({
+              onSome: (property) => FINISH_PROPERTY_LABELS[property],
+              onNone: () => "",
+            })(chosenFinish)}
           >
-            <RadioList
-              name="finisher-finish"
-              buckets={facets.finishes}
-              selected={state.finishes[0] ?? ""}
-              onSelect={(value) =>
-                onChange({ finishes: value === "" ? [] : [value] })
-              }
-            />
+            <div className="space-y-4">
+              <RadioList
+                name="finish"
+                buckets={facets.finishes}
+                selected={state.finish}
+                // A range goes with the axis it was drawn on. One left behind
+                // would narrow the results with no control on screen to
+                // explain why.
+                onSelect={(value) => onChange({ finish: value, ...NO_AMOUNTS })}
+              />
+
+              {Option.match<FinishProperty, ReactNode>({
+                onSome: (property) => (
+                  <AmountSlider property={property} state={state} onChange={onChange} />
+                ),
+                onNone: () => null,
+              })(chosenFinish)}
+            </div>
           </Section>
         ))
         .exhaustive()}

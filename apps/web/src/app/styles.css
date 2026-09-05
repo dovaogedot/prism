@@ -143,18 +143,51 @@
 
 @layer components {
   /*
-   * The checkerboard behind a swatch. Without it, a color with any
-   * transparency — or simply a very pale one — is indistinguishable from the
-   * card it sits on.
+   * The stage a color is sold on.
+   *
+   * There is almost nothing here, and that is the point: the picture is a
+   * render, not a stack of gradients. `features/catalog/artwork` builds the
+   * room, the lamp and the slab, and this only decides how much of the card
+   * the canvas gets and where the placard sits.
    */
-  .swatch-ground {
-    background-image:
-      linear-gradient(45deg, var(--color-sunken) 25%, transparent 25%),
-      linear-gradient(-45deg, var(--color-sunken) 25%, transparent 25%),
-      linear-gradient(45deg, transparent 75%, var(--color-sunken) 75%),
-      linear-gradient(-45deg, transparent 75%, var(--color-sunken) 75%);
-    background-size: 16px 16px;
-    background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  .stage {
+    position: relative;
+    overflow: hidden;
+    /* Held under the canvas for the frame before the first render lands, and
+       behind a flat swatch on a browser with no WebGL to render into. */
+    background-color: var(--color-sunken);
+  }
+
+  .stage__canvas,
+  .stage__flat {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .stage__flat {
+    object-fit: cover;
+  }
+
+  /*
+   * The hex, on the wall beside the work rather than printed on it.
+   *
+   * Frosted like the card's badge and tags, so it stays legible whichever
+   * corner of the room it happens to sit on.
+   */
+  .stage__placard {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    border-radius: 9999px;
+    padding: 0.125rem 0.375rem;
+    background-color: color-mix(in oklab, var(--color-surface) 75%, transparent);
+    backdrop-filter: blur(4px);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-ink-soft);
   }
 
   /* The QR code arrives as inline SVG with transparent paper. */

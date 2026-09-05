@@ -38,6 +38,7 @@ import { issueMockAuthorizationCode } from "../../platform/oauth.ts";
 import type { AuthService, IssuedSession, RequestContext } from "./service.ts";
 import { renderMockConsentPage } from "./mock-consent.ts";
 
+/** What the auth routes need beyond the service itself. */
 export type AuthRouteDependencies = Readonly<{
   service: AuthService;
   guards: ReturnType<typeof createGuards>;
@@ -53,6 +54,7 @@ const isIssuedSession = (
   value: IssuedSession | { status: string },
 ): value is IssuedSession => "grant" in value && "refreshToken" in value;
 
+/** Mounts every auth endpoint, each carrying the schema its OpenAPI entry is generated from. */
 export const registerAuthRoutes = (
   app: FastifyInstance,
   deps: AuthRouteDependencies,
@@ -315,7 +317,7 @@ export const registerAuthRoutes = (
       config: MODERATE_RATE_LIMIT,
       schema: {
         tags: ["auth"],
-        summary: "Start 2FA enrolment. Returns an otpauth URI and a QR code.",
+        summary: "Start 2FA enrollment. Returns an otpauth URI and a QR code.",
       },
     },
     async (request, reply) => {
@@ -368,7 +370,7 @@ export const registerAuthRoutes = (
       config: STRICT_RATE_LIMIT,
       schema: {
         tags: ["auth"],
-        summary: "Confirm enrolment by proving one live code.",
+        summary: "Confirm enrollment by proving one live code.",
         body: enableTwoFactorSchema,
       },
     },

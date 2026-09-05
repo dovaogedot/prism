@@ -3,8 +3,7 @@
  *
  * Everything this file needs arrives as an argument — clock, hasher, tokens,
  * mailer, captcha, repository. There is no import of a concrete adapter, which
- * is what lets the unit tests run the real logic against fakes, and what will
- * let project 2 reuse it unchanged.
+ * is what lets the unit tests run the real logic against fakes.
  *
  * Every operation returns `Result<T, DomainError>`. There is no `throw` here.
  */
@@ -34,6 +33,7 @@ import { passwordResetEmail } from "./emails.ts";
 import type { AuthRepository, UserRecord } from "./repository.ts";
 import { randomUUID } from "node:crypto";
 
+/** Every port the auth module works through. No adapter is reached for directly. */
 export type AuthDependencies = Readonly<{
   repository: AuthRepository;
   clock: Clock;
@@ -73,6 +73,7 @@ export const withProvider = (user: UserRecord, provider: string): UserRecord => 
   providers: [...new Set([...user.providers, provider])].sort(),
 });
 
+/** An account as the wire reports it. Neither secret leaves in it. */
 export const toSessionUser = (user: UserRecord): SessionUser => ({
   id: user.id,
   email: user.email,
@@ -82,6 +83,7 @@ export const toSessionUser = (user: UserRecord): SessionUser => ({
   providers: user.providers,
 });
 
+/** Everything an account can do, with every failure a `DomainError`. */
 export type AuthService = Readonly<{
   register: (input: {
     email: string;
@@ -147,6 +149,7 @@ export type AuthService = Readonly<{
   }) => ResultAsync<TwoFactorChallenge | IssuedSession, DomainError>;
 }>;
 
+/** The auth module over the ports it is given. */
 export const createAuthService = (deps: AuthDependencies): AuthService => {
   const {
     repository,

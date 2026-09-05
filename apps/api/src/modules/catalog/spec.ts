@@ -1,22 +1,24 @@
 /**
  * Where the database's tagged union becomes the domain's tagged union.
  *
- * `product` stores one discriminant and one nullable column per variant field,
- * with a CHECK constraint that spells out which columns each kind must and must
- * not have. TypeScript cannot see that constraint, so this is the one place
- * that has to look — after which nothing downstream sees a null again.
+ * `product_listing` is a base row LEFT JOINed to the one sub-table its kind
+ * lives in, so every column belonging to the other two arrives null. Which
+ * columns those are is decided by `kind`, and TypeScript cannot see that, so
+ * this is the one place that has to look — after which nothing downstream sees
+ * a null again.
  *
  * Pure: a row shape goes in and a `ProductSpec` comes out, which is what lets
  * it be tested without a database.
  */
 
 import type {
-  Finish,
+  ColorFamily,
   Measurements,
   ProductKind,
   ProductSpec,
   ShiftDirection,
 } from "@prism/shared";
+import { COLOR_FAMILIES } from "@prism/shared";
 import {
   measureColor,
   measureFinisher,
@@ -30,21 +32,32 @@ import { match, P } from "ts-pattern";
 export type SpecColumns = Readonly<{
   kind: ProductKind;
   hex: string | null;
-  finish: Finish | null;
+  family: string | null;
+  roughness: number | null;
+  coatingNanometers: number | null;
+  emission: number | null;
   hue: number | null;
   saturation: number | null;
   lightness: number | null;
-  durability: number | null;
   arcDegrees: number | null;
   direction: ShiftDirection | null;
 }>;
 
 /**
- * `None` is unreachable while `product_variant_shape` holds: every branch here
- * requires exactly the columns that constraint requires, and forbids nothing it
- * allows. It is an `Option` rather than a thrown error because the honest
- * response to a row that broke the constraint is to leave it out of the
- * catalog, not to take the catalog down with it.
+ * Whether the family a row carries is one this build knows.
+ *
+ * `color_family` and `COLOR_FAMILIES` hold the same list of landmarks, so a
+ * mismatch means the two have drifted, and a color whose family cannot be named
+ * is left out rather than named wrongly.
+ */
+const isColorFamily = (value: string): value is ColorFamily =>
+  COLOR_FAMILIES.some((family) => family === value);
+
+/**
+ * `None` is unreachable while each sub-table holds: every branch requires
+ * exactly the columns that table declares NOT NULL. It is an `Option` rather
+ * than a thrown error because the honest response to a row that somehow lost
+ * them is to leave it out of the catalog, not to take the catalog down with it.
  */
 export const toProductSpec = (columns: SpecColumns): Option<ProductSpec> =>
   match(columns)
@@ -52,25 +65,50 @@ export const toProductSpec = (columns: SpecColumns): Option<ProductSpec> =>
       {
         kind: "color",
         hex: P.string,
-        finish: P.not(P.nullish),
+        family: P.when(isColorFamily),
+        roughness: P.number,
+        coatingNanometers: P.number,
+        emission: P.number,
         hue: P.number,
         saturation: P.number,
         lightness: P.number,
       },
-      ({ hex, finish, hue, saturation, lightness }) =>
+      ({
+        hex,
+        family,
+        roughness,
+        coatingNanometers,
+        emission,
+        hue,
+        saturation,
+        lightness,
+      }) =>
         Option.some<ProductSpec>({
           kind: "color",
           hex,
-          finish,
+          family,
+          roughness,
+          coatingNanometers,
+          emission,
           hue,
           saturation,
           lightness,
         }),
     )
     .with(
-      { kind: "finisher", finish: P.not(P.nullish), durability: P.number },
-      ({ finish, durability }) =>
-        Option.some<ProductSpec>({ kind: "finisher", finish, durability }),
+      {
+        kind: "finisher",
+        roughness: P.number,
+        coatingNanometers: P.number,
+        emission: P.number,
+      },
+      ({ roughness, coatingNanometers, emission }) =>
+        Option.some<ProductSpec>({
+          kind: "finisher",
+          roughness,
+          coatingNanometers,
+          emission,
+        }),
     )
     .with(
       { kind: "shifter", direction: P.not(P.nullish), arcDegrees: P.number },
@@ -88,7 +126,8 @@ export type MeasurementColumns = Readonly<{
   kind: ProductKind;
   temperatureKelvin: number | null;
   reachCentimeters: number | null;
-  coverageSquareCentimeters: number | null;
+  /** Stored rather than generated: a coating's thickness is a fact, not a derivation. */
+  coatingNanometers: number | null;
   grainMicrometers: number | null;
   torqueMillinewtonMeters: number | null;
   backlashMicrometers: number | null;
@@ -99,24 +138,29 @@ export type MeasurementColumns = Readonly<{
  * Columns to measurements, scaling each to the unit a shopper reads on the way.
  *
  * The database stores the smallest whole unit so the columns stay exact
- * integers — centimetres, square centimetres, millinewton-metres, micrometres.
+ * integers — centimeters, millinewton-meters, micrometers, nanometers.
  * Dividing here rather than in SQL keeps that decision in one place, and keeps
  * the generated columns free of a rounding rule that is really presentation.
  *
- * `None` is unreachable while `product_variant_shape` holds, for the same
- * reason as `toProductSpec`.
+ * `None` is unreachable for the same reason as `toProductSpec`.
  */
 export const toMeasurements = (
   columns: MeasurementColumns,
 ): Option<Measurements> =>
   match(columns)
     .with(
-      { kind: "color", temperatureKelvin: P.number, reachCentimeters: P.number },
-      ({ temperatureKelvin, reachCentimeters, weightGrams }) =>
+      {
+        kind: "color",
+        temperatureKelvin: P.number,
+        reachCentimeters: P.number,
+        coatingNanometers: P.number,
+      },
+      ({ temperatureKelvin, reachCentimeters, coatingNanometers, weightGrams }) =>
         Option.some<Measurements>(
           measureColor({
             temperatureKelvin,
             reachMeters: roundTo(2, reachCentimeters / 100),
+            coatingNanometers,
             weightGrams,
           }),
         ),
@@ -124,16 +168,12 @@ export const toMeasurements = (
     .with(
       {
         kind: "finisher",
-        coverageSquareCentimeters: P.number,
+        coatingNanometers: P.number,
         grainMicrometers: P.number,
       },
-      ({ coverageSquareCentimeters, grainMicrometers, weightGrams }) =>
+      ({ coatingNanometers, grainMicrometers, weightGrams }) =>
         Option.some<Measurements>(
-          measureFinisher({
-            coverageSquareMeters: roundTo(1, coverageSquareCentimeters / 10_000),
-            grainMicrometers,
-            weightGrams,
-          }),
+          measureFinisher({ coatingNanometers, grainMicrometers, weightGrams }),
         ),
     )
     .with(

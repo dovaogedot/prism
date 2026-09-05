@@ -27,6 +27,7 @@ import { createMemoryMailer } from "../../src/platform/mailer.ts";
 import type { MemoryMailer } from "../../src/platform/mailer.ts";
 import type { Hasher } from "../../src/platform/hasher.ts";
 
+/** Where the harness clock starts, so every expiry in the suite is reasoned from one instant. */
 export const TEST_START = new Date("2026-08-07T12:00:00.000Z");
 
 /** Matches `PERIOD_SECONDS` in the TOTP adapter. */
@@ -44,6 +45,7 @@ const fastHasher: Hasher = {
   fakeVerify: async () => undefined,
 };
 
+/** The real application over a real Postgres, with the slow and external parts faked. */
 export type Harness = Readonly<{
   app: FastifyInstance;
   database: DatabaseHandle;
@@ -57,6 +59,7 @@ export type Harness = Readonly<{
   stop: () => Promise<void>;
 }>;
 
+/** An environment the config parser accepts, pointed at a throwaway database. */
 export const testEnvironment = (
   databaseUrl: string,
   mediaDirectory: string,
@@ -89,25 +92,17 @@ export const testEnvironment = (
   GITHUB_CLIENT_ID: "",
   GITHUB_CLIENT_SECRET: "",
   // Effectively off by default. The limiter keys on the client address and
-  // has no idea a new test started, so a realiztic budget would exhaust
+  // has no idea a new test started, so a realistic budget would exhaust
   // itself a few tests in and turn every later assertion into a 429. The
   // tests that exercise throttling build their own app with a low budget.
   AUTH_RATE_LIMIT_PER_MINUTE: authRateLimitPerMinute,
   MEDIA_DIR: mediaDirectory,
   MEDIA_MAX_BYTES: 2 * 1024 * 1024,
-  CATEGORY_CACHE_TTL_SECONDS: 300,
   FACET_CACHE_TTL_SECONDS: 60,
   PRODUCT_CACHE_TTL_SECONDS: 60,
 });
 
-/**
- * Every table the tests write to, in an order that respects the FKs.
- *
- * `category` is not among them: its three roots are created by migration 0005,
- * one per `product_kind`, and truncating them would leave a schema no product
- * could satisfy — the composite foreign key requires a product's category to
- * exist with its own kind. `reset` clears the taxonomy beneath them instead.
- */
+/** Every table the tests write to, in an order that respects the FKs. */
 const MUTABLE_TABLES = [
   "refresh_token",
   "password_reset_token",
@@ -115,11 +110,20 @@ const MUTABLE_TABLES = [
   "oauth_identity",
   "product_review",
   "product_image",
+  "color",
+  "finisher",
+  "shifter",
   "product",
   "brand",
   "app_user",
 ];
 
+/**
+ * Starts a Postgres container, migrates it, and builds the app against it.
+ *
+ * `reset` empties the tables between tests and returns the clock to
+ * `TEST_START`; `stop` takes the container down.
+ */
 export const startHarness = async (): Promise<Harness> => {
   const container: StartedPostgreSqlContainer = await new PostgreSqlContainer(
     "postgres:18-alpine",
@@ -171,10 +175,6 @@ export const startHarness = async (): Promise<Harness> => {
       await database.sql.unsafe(
         `TRUNCATE ${MUTABLE_TABLES.join(", ")} RESTART IDENTITY CASCADE`,
       );
-      // One statement, so the parent references are all gone by the time the
-      // foreign key is checked — which is what lets a whole branch go at once
-      // rather than leaf by leaf.
-      await database.sql`DELETE FROM category WHERE parent_id IS NOT NULL`;
       epoch += 60 * 60 * 1000;
       clock.set(new Date(epoch));
       mailer.clear();
@@ -215,8 +215,10 @@ export const cookieValue = (
   return "";
 };
 
+/** A password that satisfies the policy, for tests that are not about the policy. */
 export const VALID_PASSWORD = "correct horse battery staple";
 
+/** Opens an account and hands back the response along with the token it granted. */
 export const registerUser = async (
   harness: Harness,
   email: string,
@@ -237,15 +239,7 @@ export const registerUser = async (
   };
 };
 
-/**
- * Seeds a minimal catalog: one tag under the Colors category, one brand, and
- * the given colors.
- *
- * The three categories are not created here — migration 0005 creates them, one
- * per `product_kind`, because they are part of what the schema means rather
- * than sample data. `reds` hangs off the color root, which is what makes it a
- * tag rather than a category.
- */
+/** Seeds a minimal catalog: one brand, and the given colors. */
 export const seedCatalog = async (
   harness: Harness,
   colors: readonly Readonly<{
@@ -253,35 +247,116 @@ export const seedCatalog = async (
     name: string;
     hex: string;
     priceCents: number;
-    finish?: string;
+    /** Defaulted, so a test names only the amounts it cares about. */
+    roughness?: number;
+    coatingNanometers?: number;
+    emission?: number;
   }>[],
 ): Promise<void> => {
   const { sql } = harness.database;
 
-  await sql`
-    INSERT INTO category (slug, name, kind, parent_id)
-    SELECT 'reds', 'Reds', 'color', id FROM category WHERE slug = 'color'
-  `;
   await sql`INSERT INTO brand (slug, name) VALUES ('chroma-labs', 'Chroma Labs')`;
 
   for (const color of colors) {
     await sql`
       INSERT INTO product (
-        slug, name, description, price_cents, stock_quantity,
-        category_id, brand_id, kind, hex, finish
+        slug, name, description, price_cents, stock_quantity, brand_id, kind
       )
       SELECT ${color.slug}, ${color.name}, ${`${color.name} description`},
-             ${color.priceCents}, 10, c.id, b.id, 'color', ${color.hex},
-             ${color.finish ?? "matte"}::product_finish
-      FROM category c, brand b
-      WHERE c.slug = 'reds' AND b.slug = 'chroma-labs'
+             ${color.priceCents}, 10, b.id, 'color'
+      FROM brand b WHERE b.slug = 'chroma-labs'
+    `;
+    await sql`
+      INSERT INTO color (product_id, hex, roughness, coating_nanometers, emission)
+      SELECT p.id, ${color.hex},
+             ${color.roughness ?? (color.coatingNanometers ? 20 : 88)}::smallint,
+             ${color.coatingNanometers ?? 0}::smallint,
+             ${color.emission ?? 0}::smallint
+      FROM product p WHERE p.slug = ${color.slug}
     `;
   }
 };
 
+/** The variant values a product of each kind is built from. */
+export type Variant =
+  | Readonly<{
+      kind: "color";
+      hex: string;
+      roughness?: number;
+      coatingNanometers?: number;
+      emission?: number;
+    }>
+  | Readonly<{
+      kind: "finisher";
+      roughness: number;
+      coatingNanometers?: number;
+      emission?: number;
+    }>
+  | Readonly<{ kind: "shifter"; direction: "cw" | "ccw"; arcDegrees: number }>;
+
 /**
- * Adds a finisher and a shifter to a catalog already seeded by `seedCatalog`,
- * filed directly on their own categories.
+ * Inserts one product and the variant row that goes with it.
+ *
+ * The brand defaults to the one `seedCatalog` creates, so a test that only
+ * needs a product to exist names a slug, a price and what it is.
+ */
+export const insertProduct = async (
+  harness: Harness,
+  product: Readonly<{
+    slug: string;
+    name: string;
+    description?: string;
+    priceCents: number;
+    stockQuantity?: number;
+    brandSlug?: string;
+  }> &
+    Variant,
+): Promise<void> => {
+  const { sql } = harness.database;
+
+  await sql`
+    INSERT INTO product (
+      slug, name, description, price_cents, stock_quantity, brand_id, kind
+    )
+    SELECT ${product.slug}, ${product.name},
+           ${product.description ?? `${product.name} description`},
+           ${product.priceCents}, ${product.stockQuantity ?? 10}, b.id,
+           ${product.kind}::product_kind
+    FROM brand b WHERE b.slug = ${product.brandSlug ?? "chroma-labs"}
+  `;
+
+  if (product.kind === "color") {
+    await sql`
+      INSERT INTO color (product_id, hex, roughness, coating_nanometers, emission)
+      SELECT p.id, ${product.hex},
+             ${product.roughness ?? (product.coatingNanometers ? 20 : 88)}::smallint,
+             ${product.coatingNanometers ?? 0}::smallint,
+             ${product.emission ?? 0}::smallint
+      FROM product p WHERE p.slug = ${product.slug}
+    `;
+    return;
+  }
+
+  if (product.kind === "finisher") {
+    await sql`
+      INSERT INTO finisher (product_id, roughness, coating_nanometers, emission)
+      SELECT p.id, ${product.roughness}::smallint,
+             ${product.coatingNanometers ?? 0}::smallint,
+             ${product.emission ?? 0}::smallint
+      FROM product p WHERE p.slug = ${product.slug}
+    `;
+    return;
+  }
+
+  await sql`
+    INSERT INTO shifter (product_id, direction, arc_degrees)
+    SELECT p.id, ${product.direction}::shift_direction, ${product.arcDegrees}::smallint
+    FROM product p WHERE p.slug = ${product.slug}
+  `;
+};
+
+/**
+ * Adds a finisher and a shifter to a catalog already seeded by `seedCatalog`.
  *
  * Everything about them but the price is fixed: these exist so that tests which
  * care about the other two kinds have one of each to find, not so that they can
@@ -292,23 +367,27 @@ export const seedInstruments = async (harness: Harness): Promise<void> => {
 
   await sql`
     INSERT INTO product (
-      slug, name, description, price_cents, stock_quantity,
-      category_id, brand_id, kind, finish, durability
+      slug, name, description, price_cents, stock_quantity, brand_id, kind
     )
     SELECT 'test-applicator', 'Test Applicator', 'Puts gloss back on.',
-           4200, 10, c.id, b.id, 'finisher', 'gloss', 12
-    FROM category c, brand b
-    WHERE c.slug = 'finisher' AND b.slug = 'chroma-labs'
+           4200, 10, b.id, 'finisher'
+    FROM brand b WHERE b.slug = 'chroma-labs'
+  `;
+  await sql`
+    INSERT INTO finisher (product_id, roughness, coating_nanometers, emission)
+    SELECT p.id, 18, 0, 0 FROM product p WHERE p.slug = 'test-applicator'
   `;
 
   await sql`
     INSERT INTO product (
-      slug, name, description, price_cents, stock_quantity,
-      category_id, brand_id, kind, arc_degrees, direction
+      slug, name, description, price_cents, stock_quantity, brand_id, kind
     )
     SELECT 'test-swing', 'Test Swing', 'Turns a color right round.',
-           6900, 10, c.id, b.id, 'shifter', 120, 'ccw'
-    FROM category c, brand b
-    WHERE c.slug = 'shifter' AND b.slug = 'chroma-labs'
+           6900, 10, b.id, 'shifter'
+    FROM brand b WHERE b.slug = 'chroma-labs'
+  `;
+  await sql`
+    INSERT INTO shifter (product_id, direction, arc_degrees)
+    SELECT p.id, 'ccw', 120 FROM product p WHERE p.slug = 'test-swing'
   `;
 };

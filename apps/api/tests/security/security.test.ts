@@ -12,6 +12,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app.ts";
 import { toConfig } from "../../src/config.ts";
 import {
+  insertProduct,
   jsonOf,
   registerUser,
   seedCatalog,
@@ -66,7 +67,7 @@ describe("SQL injection through catalog filters", () => {
 
   it("rejects payloads in slug-shaped parameters", async () => {
     for (const payload of SQL_PAYLOADS) {
-      for (const parameter of ["category", "brands", "finishes"]) {
+      for (const parameter of ["category", "brands", "family", "direction"]) {
         const response = await get(
           `/api/v1/products?${parameter}=${encodeURIComponent(payload)}`,
         );
@@ -95,7 +96,7 @@ describe("SQL injection through catalog filters", () => {
 
   it("treats a payload in the free-text search as a search term", async () => {
     // `q` is genuinely free text, so it must be accepted and bound, not
-    // rejected — the protection is parameterisation, not a blocklist.
+    // rejected — the protection is parameterization, not a blocklist.
     for (const payload of SQL_PAYLOADS) {
       const response = await get(`/api/v1/products?q=${encodeURIComponent(payload)}`);
 
@@ -157,18 +158,17 @@ describe("cross-site scripting", () => {
   it("stores and returns markup as inert text, never as HTML", async () => {
     const { sql } = harness.database;
 
-    await sql`
-      INSERT INTO category (slug, name, kind, parent_id)
-      SELECT 'reds', 'Reds', 'color', id FROM category WHERE slug = 'color'
-    `;
     await sql`INSERT INTO brand (slug, name) VALUES ('chroma-labs', 'Chroma Labs')`;
 
     for (const [index, payload] of XSS_PAYLOADS.entries()) {
-      await sql`
-        INSERT INTO product (slug, name, description, price_cents, category_id, brand_id, kind, hex, finish)
-        SELECT ${`xss-${index}`}, ${payload}, ${payload}, 1000, c.id, b.id, 'color', '#ff0000', 'matte'
-        FROM category c, brand b WHERE c.slug = 'reds' AND b.slug = 'chroma-labs'
-      `;
+      await insertProduct(harness, {
+        kind: "color",
+        slug: `xss-${index}`,
+        name: payload,
+        description: payload,
+        priceCents: 1000,
+        hex: "#ff0000",
+      });
     }
 
     const response = await get("/api/v1/products/xss-0");

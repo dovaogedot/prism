@@ -12,16 +12,37 @@ import { z } from "zod";
 import { Option } from "../fp/option.ts";
 import type { Measurements } from "../domain/units.ts";
 
+/** Every order the grid can be asked for. */
 export const PRODUCT_SORTS = [
   "relevance",
   "price_asc",
   "price_desc",
   "rating",
 ] as const;
+/** The order a search returns its results in. */
 export type ProductSort = (typeof PRODUCT_SORTS)[number];
 
+/**
+ * The four words people use for a surface.
+ *
+ * They name regions of the space the three amounts below span, so they are how
+ * the catalog talks about itself. Nothing is stored as one of them.
+ */
 export const FINISHES = ["matte", "gloss", "iridescent", "fluorescent"] as const;
+/** One of the four words, as prose about a surface rather than a stored fact. */
 export type Finish = (typeof FINISHES)[number];
+
+/**
+ * The three amounts a finish is made of, and the three questions there are to
+ * ask about one.
+ *
+ * Matte and gloss are not two of these. They are the two ends of the first
+ * one, which is why a shopper picks the axis and then picks where on it —
+ * asking "matte or gloss?" would be asking for a threshold nobody agreed on.
+ */
+export const FINISH_PROPERTIES = ["roughness", "coating", "emission"] as const;
+/** One amount a finish is made of, which is one question a shopper can ask. */
+export type FinishProperty = (typeof FINISH_PROPERTIES)[number];
 
 /**
  * The three things the shop sells, and the discriminant of every product.
@@ -35,25 +56,106 @@ export type Finish = (typeof FINISHES)[number];
  * filter needs no lookup to become a `WHERE kind = …`.
  */
 export const PRODUCT_KINDS = ["color", "finisher", "shifter"] as const;
+/** Which of the three things a product is. */
 export type ProductKind = (typeof PRODUCT_KINDS)[number];
+
+/**
+ * The color families a shopper can search by.
+ *
+ * Each name is a landmark in RGB space, and a color belongs to whichever
+ * landmark is nearest — so the set of names partitions the color cube into one
+ * cell each, and no color is ever filed under a name by hand. The database
+ * holds the same list inside `color_family`, which is what derives the column.
+ */
+export const COLOR_FAMILIES = [
+  "red",
+  "orange",
+  "gold",
+  "yellow",
+  "lime",
+  "green",
+  "teal",
+  "blue",
+  "violet",
+  "magenta",
+  "pink",
+  "brown",
+  "maroon",
+  "navy",
+  "olive",
+  "cream",
+  "black",
+  "gray",
+  "white",
+] as const;
+
+/** The family a color falls in, which is the nearest landmark to its hex. */
+export type ColorFamily = (typeof COLOR_FAMILIES)[number];
 
 /** Which way round the wheel a shifter turns. */
 export const SHIFT_DIRECTIONS = ["cw", "ccw"] as const;
+/** Which way a shifter turns a color. */
 export type ShiftDirection = (typeof SHIFT_DIRECTIONS)[number];
 
+/** Hue in degrees, all the way round. */
 export const HUE_BOUNDS = { min: 0, max: 360 } as const;
 /** A shifter that turned 0° would not be a shifter. */
 export const ARC_BOUNDS = { min: 1, max: 360 } as const;
+/** Saturation as a percentage: 0 is gray, 100 is a pure hue. */
 export const SATURATION_BOUNDS = { min: 0, max: 100 } as const;
+/** Lightness as a percentage: 0 is black, 100 is white. */
 export const LIGHTNESS_BOUNDS = { min: 0, max: 100 } as const;
+/** The widest price filter the API accepts, in cents. */
 export const PRICE_BOUNDS = { min: 0, max: 100_000_000 } as const;
 
+/**
+ * How rough a surface is: 5 is a mirror, 95 is chalk.
+ *
+ * The direction is the word's own, so a lacquered surface is a low number. It
+ * never reaches either end — paint that returned everything or nothing would
+ * not be paint.
+ *
+ * Matte and gloss are both on this axis and differ by where on it they sit.
+ */
+export const ROUGHNESS_BOUNDS = { min: 5, max: 95 } as const;
+
+/**
+ * Nanometers of interference coating.
+ *
+ * The coating is a transparent layer over the paint, and its thickness is the
+ * whole of what decides its color: light returning off the top of it meets
+ * light returning off the paint underneath, having traveled twice through it,
+ * and the wavelengths that come back in step are the ones you see. Twice the
+ * thickness is a different color, not more of the same one.
+ *
+ * Zero is bare paint, which is most colors. Below the minimum the layer is
+ * thinner than the light it would have to bend and shows nothing at all, so
+ * nothing sensible lives between zero and it, which `product_property_ranges`
+ * enforces in the database. Past the maximum the orders pile up and the color
+ * washes out to a pearly white.
+ */
+export const COATING_BOUNDS = { min: 100, max: 600 } as const;
+
+/**
+ * The roughest a surface can be and still show a coating.
+ *
+ * Interference happens to a reflection. A surface that scatters its reflection
+ * away has none for it to happen in, so a coating over chalk is a coating
+ * nobody can see. `product_coating_needs_a_reflection` enforces the same
+ * number in the database.
+ */
+export const COATING_ROUGHNESS_CEILING = 40;
+
+/** How hard a surface gives off its own light. Zero for most of them. */
+export const EMISSION_BOUNDS = { min: 0, max: 100 } as const;
+
+/** The largest page a client may ask for, so one request cannot pull the shelf. */
 export const MAX_PER_PAGE = 60;
 
 /**
  * Three rows of four on a desktop grid. The results column — count, grid and
  * pagination controls together — then fits inside the height of the filter
- * rail beside it, so narrowing 240 colors down to 3 cannot change the height
+ * rail beside it, so narrowing the shelf to a handful cannot change the height
  * of the document or move the scroll position under the pointer.
  */
 export const DEFAULT_PER_PAGE = 12;
@@ -94,14 +196,44 @@ const searchTermSchema = z
   .max(120)
   .refine((term) => !/[\u0000-\u001f\u007f]/.test(term), "Contains invalid characters.");
 
+/** The query string of `GET /products`, where an absent filter is `undefined`. */
 export const productQueryParamsSchema = z.object({
   q: searchTermSchema.optional(),
   /** The category, which is the kind. One at a time — a product is one thing. */
   category: z.enum(PRODUCT_KINDS).optional(),
-  /** A node of the taxonomy beneath a category; matches its whole subtree. */
-  tag: slugSchema.optional(),
+  /** A color family, which only colors have. */
+  family: z.enum(COLOR_FAMILIES).optional(),
   brands: commaSeparated.pipe(z.array(slugSchema).max(20)),
-  finishes: commaSeparated.pipe(z.array(z.enum(FINISHES)).max(FINISHES.length)),
+  /** Which of the three amounts is being asked about. */
+  finish: z.enum(FINISH_PROPERTIES).optional(),
+  roughnessMin: z.coerce
+    .number()
+    .int()
+    .min(ROUGHNESS_BOUNDS.min)
+    .max(ROUGHNESS_BOUNDS.max)
+    .optional(),
+  roughnessMax: z.coerce
+    .number()
+    .int()
+    .min(ROUGHNESS_BOUNDS.min)
+    .max(ROUGHNESS_BOUNDS.max)
+    .optional(),
+  // Zero is a legitimate floor here and not a bound of the coating's own
+  // range: "no coating at all" is the commonest answer and has to be askable.
+  coatingMin: z.coerce.number().int().min(0).max(COATING_BOUNDS.max).optional(),
+  coatingMax: z.coerce.number().int().min(0).max(COATING_BOUNDS.max).optional(),
+  emissionMin: z.coerce
+    .number()
+    .int()
+    .min(EMISSION_BOUNDS.min)
+    .max(EMISSION_BOUNDS.max)
+    .optional(),
+  emissionMax: z.coerce
+    .number()
+    .int()
+    .min(EMISSION_BOUNDS.min)
+    .max(EMISSION_BOUNDS.max)
+    .optional(),
   direction: z.enum(SHIFT_DIRECTIONS).optional(),
   arcMin: z.coerce.number().int().min(ARC_BOUNDS.min).max(ARC_BOUNDS.max).optional(),
   arcMax: z.coerce.number().int().min(ARC_BOUNDS.min).max(ARC_BOUNDS.max).optional(),
@@ -139,25 +271,42 @@ export const productQueryParamsSchema = z.object({
   perPage: z.coerce.number().int().min(1).max(MAX_PER_PAGE).default(DEFAULT_PER_PAGE),
 });
 
+/** A validated `GET /products` query string. */
 export type ProductQueryParams = z.infer<typeof productQueryParamsSchema>;
 
+/** The query string of `GET /products/suggest`. */
 export const suggestQueryParamsSchema = z.object({
   q: searchTermSchema.pipe(z.string().min(1).max(60)),
   limit: z.coerce.number().int().min(1).max(20).default(8),
 });
 
+/** A validated suggestion query string. */
 export type SuggestQueryParams = z.infer<typeof suggestQueryParamsSchema>;
 
+/** A closed interval. Both ends are included. */
 export type NumericRange = Readonly<{ min: number; max: number }>;
 
+/** A search as the domain states it, with every absent filter an `Option`. */
 export type ProductQuery = Readonly<{
   text: Option<string>;
   /** The category. Absent means all three at once. */
   kind: Option<ProductKind>;
-  tagSlug: Option<string>;
+  /** The color family asked for. Only colors carry one, so this excludes the other two. */
+  family: Option<ColorFamily>;
   brandSlugs: readonly string[];
-  /** Colors have one; so does a finisher, being the finish it puts back. */
-  finishes: readonly Finish[];
+  /**
+   * Which amount of the finish is being asked about. Exclusive: a shopper
+   * narrows one at a time, and the matching range below narrows inside it.
+   */
+  finish: Option<FinishProperty>;
+  /**
+   * The three amounts a finish is made of. Independent of each other, and
+   * asked of colors and of the tins that put a finish back alike.
+   */
+  roughness: Option<NumericRange>;
+  /** Nanometers of coating. */
+  coating: Option<NumericRange>;
+  emission: Option<NumericRange>;
   price: Option<NumericRange>;
   minRating: Option<number>;
   /** `min > max` is a wrap-around arc through 0°, which is where the reds live. */
@@ -187,14 +336,34 @@ const ordered = (range: NumericRange): NumericRange => ({
   max: Math.max(range.min, range.max),
 });
 
+/**
+ * A parsed query string as a domain query.
+ *
+ * The one place `undefined` becomes `Option`, so nothing downstream of it has
+ * to ask whether a filter was given.
+ */
 export const toProductQuery = (params: ProductQueryParams): ProductQuery => ({
   text: Option.filter<string>((text) => text.length > 0)(
     Option.fromNullable(params.q),
   ),
   kind: Option.fromNullable(params.category),
-  tagSlug: Option.fromNullable(params.tag),
+  family: Option.fromNullable(params.family),
   brandSlugs: params.brands,
-  finishes: params.finishes,
+  finish: Option.fromNullable(params.finish),
+  roughness: Option.map(ordered)(
+    rangeOf(params.roughnessMin, params.roughnessMax, ROUGHNESS_BOUNDS),
+  ),
+  // Floored at zero rather than at the coating's own minimum, so that asking
+  // for "no coating" is a range the slider can express.
+  coating: Option.map(ordered)(
+    rangeOf(params.coatingMin, params.coatingMax, {
+      min: 0,
+      max: COATING_BOUNDS.max,
+    }),
+  ),
+  emission: Option.map(ordered)(
+    rangeOf(params.emissionMin, params.emissionMax, EMISSION_BOUNDS),
+  ),
   price: Option.map(ordered)(rangeOf(params.priceMin, params.priceMax, PRICE_BOUNDS)),
   minRating: Option.fromNullable(params.minRating),
   // Hue is deliberately not ordered — see the wrap-around note above.
@@ -213,35 +382,131 @@ export const toProductQuery = (params: ProductQueryParams): ProductQuery => ({
   perPage: params.perPage,
 });
 
+/** One image of a product, and where it sits in that product's gallery. */
 export type ProductImage = Readonly<{
   url: string;
   alt: string;
   position: number;
 }>;
 
+/** What reviewers said, averaged. A count of zero makes the average meaningless. */
 export type Rating = Readonly<{ average: number; count: number }>;
 
+/** A foundry, named and linkable. */
 export type BrandRef = Readonly<{ slug: string; name: string }>;
-export type CategoryRef = Readonly<{ slug: string; name: string }>;
-
 /**
- * What a color is: one stored hex and one stored finish. The three channels
- * come back from the database derived, never written.
+ * What a color is: a stored hex and three stored amounts of finish.
+ *
+ * The three are independent — a color may be lacquered and iridescent, or
+ * chalky and faintly glowing — so no one of them says what the color "is". The
+ * hue, saturation and lightness come back from the database derived from the
+ * hex, never written.
  */
 export type ColorSpec = Readonly<{
   kind: "color";
   hex: string;
-  finish: Finish;
+  /** Which family the hex falls in. Derived from it, never chosen. */
+  family: ColorFamily;
+  /** 5 is a mirror, 95 is chalk. */
+  roughness: number;
+  /** Nanometers of interference coating. Zero is bare paint. */
+  coatingNanometers: number;
+  /** How hard it gives off its own light. Zero for most colors. */
+  emission: number;
   hue: number;
   saturation: number;
   lightness: number;
 }>;
 
-/** What a finisher is: the finish it puts back, and how many colors' worth. */
+/**
+ * The least glow worth selling as one.
+ *
+ * A pigment either fluoresces visibly or is not sold as fluorescent, so the
+ * seed never rolls an emission under this.
+ */
+export const EMISSION_SPEAKS = 35;
+
+/**
+ * The least saturated a pigment can be and still fluoresce.
+ *
+ * Fluorescence happens in a band: the pigment absorbs light further up the
+ * spectrum and hands it back in its own. A pigment with no band has none to
+ * hand it back in — gray does not glow gray, it just goes white — so a
+ * fluorescent pigment is always a vivid one, and there is no fluorescent
+ * beige to sell. `product_fluorescence_needs_a_band` holds
+ * that down.
+ */
+export const FLUORESCENCE_FLOOR = 50;
+
+/** At or above this a surface has stopped returning a reflection worth naming. */
+export const MATTE_FLOOR = 80;
+
+/**
+ * The stretch of each amount that is worth asking about.
+ *
+ * Every surface has a roughness, so that one is the whole axis. A coating and
+ * a glow are things a surface either has or has not got, so those two start
+ * where having one begins — which makes picking the amount a filter in its own
+ * right: asking about a coating is asking for the things that carry one.
+ */
+export const FINISH_RANGES: Record<FinishProperty, NumericRange> = {
+  roughness: ROUGHNESS_BOUNDS,
+  coating: COATING_BOUNDS,
+  emission: { min: EMISSION_SPEAKS, max: EMISSION_BOUNDS.max },
+};
+
+/** What each amount is called on screen, which is the effect it produces. */
+export const FINISH_PROPERTY_LABELS: Record<FinishProperty, string> = {
+  roughness: "Roughness",
+  coating: "Iridescence",
+  emission: "Fluorescence",
+};
+
+/** A stretch of one property's range, and which property it is a stretch of. */
+export type FinishBand = Readonly<{
+  property: FinishProperty;
+  range: NumericRange;
+}>;
+
+/**
+ * The amounts each of the four words picks out.
+ *
+ * A finish name is a reading of the numbers rather than a value anything
+ * stores, so this is where that reading is defined as something searchable:
+ * a word becomes the stretch of one amount it names. Typing "gloss" is asking
+ * for this band.
+ */
+export const FINISH_BANDS: Record<Finish, FinishBand> = {
+  matte: {
+    property: "roughness",
+    range: { min: MATTE_FLOOR, max: ROUGHNESS_BOUNDS.max },
+  },
+  gloss: {
+    property: "roughness",
+    range: { min: ROUGHNESS_BOUNDS.min, max: MATTE_FLOOR },
+  },
+  iridescent: { property: "coating", range: FINISH_RANGES.coating },
+  fluorescent: { property: "emission", range: FINISH_RANGES.emission },
+};
+
+/**
+ * What a finisher is: the finish it puts back.
+ *
+ * The same three amounts a color carries, because that is what a finish is.
+ * There is no such thing as "the gloss finisher" — one tin leaves a surface at
+ * 20 and the next leaves it at 15, and a shopper who wants the second is not
+ * served by being sold the first.
+ *
+ * A tin never runs out, so nothing here says how long it lasts.
+ */
 export type FinisherSpec = Readonly<{
   kind: "finisher";
-  finish: Finish;
-  durability: number;
+  /** 5 is a mirror, 95 is chalk. */
+  roughness: number;
+  /** Nanometers of coating it lays down. Zero leaves the paint bare. */
+  coatingNanometers: number;
+  /** How hard what it leaves gives off its own light. */
+  emission: number;
 }>;
 
 /** What a shifter is: which way round the wheel, and how far. */
@@ -260,20 +525,30 @@ export type ShifterSpec = Readonly<{
  */
 export type ProductSpec = ColorSpec | FinisherSpec | ShifterSpec;
 
+/** A product as the grid shows it. */
 export type ProductSummary = Readonly<{
   id: string;
   slug: string;
   name: string;
   spec: ProductSpec;
+  /**
+   * Which of the three shelves this product sits on.
+   *
+   * Mirrors `spec.kind` exactly, and is built from it, so the two cannot
+   * disagree: a product's category is its kind, which makes this a second name
+   * for one fact rather than a second fact. It carries the name the catalog
+   * contract asks for a category by. Match on `spec` for anything that needs
+   * the variant's own fields, since it brings them along.
+   */
+  category: ProductKind;
   priceCents: number;
   stockQuantity: number;
   brand: BrandRef;
-  /** The node it is filed under, which may be a tag beneath its category. */
-  category: CategoryRef;
   rating: Rating;
   primaryImage: Option<ProductImage>;
 }>;
 
+/** One review. The author is an initial, since a full name is nobody's business. */
 export type ProductReview = Readonly<{
   id: string;
   rating: number;
@@ -282,24 +557,25 @@ export type ProductReview = Readonly<{
   createdAt: string;
 }>;
 
+/** A product as its own page shows it: the summary, plus everything else. */
 export type ProductDetail = ProductSummary &
   Readonly<{
     description: string;
-    /**
-     * The tag chain, outermost first: an acid is tagged yellow, then acid.
-     * The category itself is not in it — that is what `spec.kind` says.
-     *
-     * The grid works this out on the client — a search response already carries
-     * the whole taxonomy in its facets — but one product on its own has no
-     * tree to walk, so its detail carries the answer.
-     */
-    tags: readonly CategoryRef[];
     /** Metric is stored, imperial is derived — see `units.ts`. */
     measurements: Measurements;
+    /**
+     * Every image of the product, in the order they are shown.
+     *
+     * `primaryImage` is the first of these, so a caller that only needs one
+     * takes that and never has to reason about an empty array. A color has its
+     * swatch here; a finisher and a shifter are drawn from their own spec and
+     * have none, so the list is empty rather than absent.
+     */
     images: readonly ProductImage[];
     reviews: readonly ProductReview[];
   }>;
 
+/** One choice in the filter rail, and how many results choosing it would leave. */
 export type FacetBucket = Readonly<{
   value: string;
   label: string;
@@ -307,31 +583,29 @@ export type FacetBucket = Readonly<{
 }>;
 
 /**
- * Tags are a tree, so their facet carries enough shape to be rendered as one.
- * A parent is selectable in its own right — picking "Yellow" means every color
- * beneath it — and its count is its whole subtree, which is why the numbers on
- * a parent and its children do not sum to the total.
+ * Every choice the filter rail offers, counted against the current search.
+ *
+ * Each facet is counted with its own filter lifted, so a choice already made
+ * still shows what the alternatives would give.
  */
-export type TagFacetBucket = FacetBucket &
-  Readonly<{
-    parentSlug: Option<string>;
-    /** 0 for a tag directly under a category, 1 for its children, and so on. */
-    depth: number;
-    /** Which category's taxonomy this tag belongs to. */
-    kind: ProductKind;
-  }>;
-
 export type ProductFacets = Readonly<{
   /** The three categories, always all three, counted independently. */
   categories: readonly FacetBucket[];
-  tags: readonly TagFacetBucket[];
   brands: readonly FacetBucket[];
+  /**
+   * The three amounts, always all three, counted independently.
+   *
+   * They overlap on purpose: the amounts are independent, so a coated color
+   * has a roughness too and is counted under both, and the three sum to more
+   * than the total.
+   */
   finishes: readonly FacetBucket[];
   /** "4 stars & up", "3 stars & up", … */
   ratings: readonly FacetBucket[];
   priceCents: NumericRange;
 }>;
 
+/** The body of `GET /products`: a page of results, and the rail beside it. */
 export type ProductSearchResult = Readonly<{
   items: readonly ProductSummary[];
   facets: ProductFacets;
@@ -341,14 +615,6 @@ export type ProductSearchResult = Readonly<{
   totalPages: number;
 }>;
 
-export type CategoryNode = Readonly<{
-  id: string;
-  slug: string;
-  name: string;
-  productCount: number;
-  children: readonly CategoryNode[];
-}>;
-
 /** Plural, because a category names a shelf rather than a product. */
 export const KIND_LABELS: Record<ProductKind, string> = {
   color: "Colors",
@@ -356,6 +622,7 @@ export const KIND_LABELS: Record<ProductKind, string> = {
   shifter: "Shifters",
 };
 
+/** How each direction is written out in the filter rail and on a spec sheet. */
 export const DIRECTION_LABELS: Record<ShiftDirection, string> = {
   cw: "Clockwise",
   ccw: "Counter-clockwise",
@@ -367,8 +634,9 @@ export const DIRECTION_SYMBOLS: Record<ShiftDirection, string> = {
   ccw: "↺",
 };
 
+/** One row of the search box's dropdown. */
 export type Suggestion = Readonly<{
-  kind: "product" | "brand" | "category";
+  kind: "product" | "brand";
   label: string;
   slug: string;
   /** Products carry their swatch so the dropdown can show it. */

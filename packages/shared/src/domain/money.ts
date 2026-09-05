@@ -4,22 +4,18 @@
  */
 
 import type { Brand } from "../fp/brand.ts";
-import { Option } from "../fp/option.ts";
 
+/** A price as a whole number of cents. Never negative. */
 export type Cents = Brand<number, "Cents">;
 
+/** The ISO 4217 code every price in the shop is quoted in. */
 export const CURRENCY = "EUR";
 
+/** Whether a number is a safe non-negative integer, and so a valid `Cents`. */
 export const isCents = (value: number): value is Cents =>
   Number.isSafeInteger(value) && value >= 0;
 
-export const parseCents = (value: number): Option<Cents> =>
-  isCents(value) ? Option.some(value) : Option.none;
-
-/** `1999 -> "19.99"`. Presentation only; never round-trips back into storage. */
-export const formatAmount = (cents: Cents): string =>
-  (cents / 100).toFixed(2);
-
+/** A price with its currency symbol, placed as `locale` places it. */
 export const formatPrice = (cents: Cents, locale = "en-IE"): string =>
   new Intl.NumberFormat(locale, {
     style: "currency",

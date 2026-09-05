@@ -16,9 +16,12 @@ import type { DomainError } from "@prism/shared";
 import { Option } from "@prism/shared";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 
+/** Every image format the shop accepts. */
 export const IMAGE_TYPES = ["png", "jpg", "webp"] as const;
+/** The format of an image, as decided by its bytes. */
 export type ImageType = (typeof IMAGE_TYPES)[number];
 
+/** The header each format is served under. */
 export const CONTENT_TYPE_BY_IMAGE_TYPE: Record<ImageType, string> = {
   png: "image/png",
   jpg: "image/jpeg",
@@ -53,12 +56,14 @@ export const detectImageType = (bytes: Uint8Array): Option<ImageType> => {
   return Option.none;
 };
 
+/** An image that reached the disk, and what a client needs to fetch it back. */
 export type StoredImage = Readonly<{
   filename: string;
   byteLength: number;
   contentType: string;
 }>;
 
+/** Taking image bytes in, and finding them again by name. */
 export type MediaStorage = Readonly<{
   save: (bytes: Uint8Array) => ResultAsync<StoredImage, DomainError>;
   /** Absolute path for the static file handler, or None if the name is not ours. */
@@ -66,6 +71,7 @@ export type MediaStorage = Readonly<{
   directory: string;
 }>;
 
+/** Where images are kept, and the largest one that will be taken. */
 export type StorageOptions = Readonly<{
   directory: string;
   maxBytes: number;
@@ -74,6 +80,12 @@ export type StorageOptions = Readonly<{
 /** Exactly the shape `save` produces: 64 hex characters and a known extension. */
 const STORED_FILENAME_PATTERN = /^[a-f0-9]{64}\.(png|jpg|webp)$/;
 
+/**
+ * Images as files under one directory.
+ *
+ * `save` rejects anything too large or of an unrecognized format; `resolve`
+ * answers only for names this storage could have written.
+ */
 export const createFileMediaStorage = (options: StorageOptions): MediaStorage => ({
   directory: options.directory,
 

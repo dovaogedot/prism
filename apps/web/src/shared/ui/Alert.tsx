@@ -2,12 +2,14 @@ import type { ValidationIssue } from "@prism/shared";
 import type { ReactNode } from "react";
 import { match, P } from "ts-pattern";
 
+/** What an alert says, and how loudly. */
 export type AlertProps = Readonly<{
   tone?: "danger" | "accent";
   title?: string;
   children: ReactNode;
 }>;
 
+/** A message the page announces as soon as it appears. */
 export const Alert = ({ tone = "danger", title, children }: AlertProps) => (
   <div
     role="alert"

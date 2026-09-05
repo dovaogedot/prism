@@ -19,6 +19,7 @@ const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), "../../migr
 /** Arbitrary but fixed: two runners must pick the same number to contend. */
 const ADVISORY_LOCK_KEY = 8_314_159;
 
+/** Which files this run applied, and which it found already applied. */
 export type MigrationReport = Readonly<{
   applied: readonly string[];
   skipped: readonly string[];
@@ -29,6 +30,13 @@ const listMigrations = async (): Promise<readonly string[]> => {
   return entries.filter((entry) => entry.endsWith(".sql")).sort();
 };
 
+/**
+ * Applies every file not yet recorded, in filename order.
+ *
+ * Each file runs inside its own transaction, and the whole run holds an
+ * advisory lock, so two runners starting at once do not both apply the same
+ * file.
+ */
 export const runMigrations = async (sql: postgres.Sql): Promise<MigrationReport> => {
   await sql`
     CREATE TABLE IF NOT EXISTS schema_migration (

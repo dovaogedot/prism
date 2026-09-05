@@ -8,7 +8,6 @@
 
 import { sql } from "drizzle-orm";
 import {
-  type AnyPgColumn,
   customType,
   index,
   integer,
@@ -37,19 +36,15 @@ const primaryId = () => uuid("id").primaryKey().defaultRandom();
 const createdAt = () =>
   timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 
+/** What an account is allowed to reach. */
 export const userRole = pgEnum("user_role", ["customer", "admin"]);
-export const productFinish = pgEnum("product_finish", [
-  "matte",
-  "gloss",
-  "iridescent",
-  "fluorescent",
-]);
 /** The discriminant of the product union; also the slug of its category. */
 export const productKind = pgEnum("product_kind", [
   "color",
   "finisher",
   "shifter",
 ]);
+/** Which way round the wheel a shifter turns. */
 export const shiftDirection = pgEnum("shift_direction", ["cw", "ccw"]);
 
 /* ------------------------------------------------------------------ identity */
@@ -71,6 +66,7 @@ export const users = pgTable(
   (table) => [uniqueIndex("app_user_email_key").on(table.email)],
 );
 
+/** One provider account linked to one user. A user may have several. */
 export const oauthIdentities = pgTable(
   "oauth_identity",
   {
@@ -138,6 +134,7 @@ export const refreshTokens = pgTable(
   ],
 );
 
+/** Outstanding reset links, stored as digests and usable once. */
 export const passwordResetTokens = pgTable(
   "password_reset_token",
   {
@@ -158,35 +155,7 @@ export const passwordResetTokens = pgTable(
 
 /* ----------------------------------------------------------------- catalog */
 
-export const categories = pgTable(
-  "category",
-  {
-    id: primaryId(),
-    slug: text("slug").notNull(),
-    name: text("name").notNull(),
-    description: text("description").notNull().default(""),
-    parentId: uuid("parent_id").references((): AnyPgColumn => categories.id, {
-      onDelete: "restrict",
-    }),
-    /**
-     * Which of the three shelves this node belongs to. A composite foreign key
-     * in migration 0005 ties it to the parent's, so a subtree cannot mix kinds
-     * and the three roots are the only place a kind is chosen.
-     */
-    kind: productKind("kind").notNull(),
-    position: integer("position").notNull().default(0),
-    // Marked generated so Drizzle keeps it out of insert types — the DDL in
-    // migration 0003 is what actually defines the expression.
-    searchVector: tsvector("search_vector")
-      .notNull()
-      .generatedAlwaysAs(sql`to_tsvector('english', name || ' ' || description)`),
-  },
-  (table) => [
-    uniqueIndex("category_slug_key").on(table.slug),
-    index("category_parent_idx").on(table.parentId),
-  ],
-);
-
+/** The pigment foundries products are sold under. */
 export const brands = pgTable(
   "brand",
   {
@@ -201,6 +170,13 @@ export const brands = pgTable(
   (table) => [uniqueIndex("brand_slug_key").on(table.slug)],
 );
 
+/**
+ * What every product has, whichever of the three it is.
+ *
+ * `kind` is the discriminant and nothing else here varies by it, so there is no
+ * nullable column and no CHECK deciding which ones apply. What varies lives in
+ * `colors`, `finishers` and `shifters`, one row each, keyed back to this one.
+ */
 export const products = pgTable(
   "product",
   {
@@ -210,73 +186,11 @@ export const products = pgTable(
     description: text("description").notNull(),
     priceCents: integer("price_cents").notNull(),
     stockQuantity: integer("stock_quantity").notNull().default(0),
-    categoryId: uuid("category_id")
-      .notNull()
-      .references(() => categories.id, { onDelete: "restrict" }),
     brandId: uuid("brand_id")
       .notNull()
       .references(() => brands.id, { onDelete: "restrict" }),
-
-    /**
-     * The discriminant. Every nullable column below belongs to exactly one
-     * value of it, and `product_variant_shape` in migration 0005 says which.
-     */
+    /** Which of the three this is, and which sub-table therefore holds its rest. */
     kind: productKind("kind").notNull(),
-
-    /** Colors only. The two stored facts about a color. */
-    hex: text("hex"),
-    /** Colors and finishers: what the color is, or what the tin puts back. */
-    finish: productFinish("finish"),
-
-    /** Finishers only: how many colors one of them will see you through. */
-    durability: integer("durability"),
-
-    /** Shifters only. */
-    arcDegrees: smallint("arc_degrees"),
-    direction: shiftDirection("direction"),
-
-    /**
-     * Derived from `hex` by IMMUTABLE SQL functions and materialized by
-     * Postgres, so they can carry B-tree indexes for range faceting. Null for
-     * anything that is not a color, because those functions are STRICT.
-     *
-     * Marked generated here so Drizzle omits them from insert types: writing
-     * one is a compile error, and Postgres rejects it at runtime too.
-     */
-    hue: smallint("hue").generatedAlwaysAs(sql`hex_to_hue(hex)`),
-    saturation: smallint("saturation").generatedAlwaysAs(sql`hex_to_saturation(hex)`),
-    lightness: smallint("lightness").generatedAlwaysAs(sql`hex_to_lightness(hex)`),
-
-    /**
-     * Measurements, each generated from the facts of the kind it belongs to
-     * and null for the kinds it does not — see migration 0006. Weight is the
-     * one every kind has. Imperial is derived again in `@prism/shared`, and
-     * the scale to a readable unit happens there too.
-     */
-    temperatureKelvin: smallint("temperature_kelvin").generatedAlwaysAs(
-      sql`hex_to_temperature(hex)`,
-    ),
-    reachCentimeters: integer("reach_centimeters").generatedAlwaysAs(
-      sql`hex_to_reach(hex, finish)`,
-    ),
-    coverageSquareCentimeters: integer("coverage_square_centimeters").generatedAlwaysAs(
-      sql`finisher_coverage(durability)`,
-    ),
-    grainMicrometers: smallint("grain_micrometers").generatedAlwaysAs(
-      sql`finish_grain(finish)`,
-    ),
-    torqueMillinewtonMeters: integer("torque_millinewton_meters").generatedAlwaysAs(
-      sql`shift_torque(arc_degrees)`,
-    ),
-    backlashMicrometers: integer("backlash_micrometers").generatedAlwaysAs(
-      sql`shift_backlash(direction, arc_degrees)`,
-    ),
-    weightGrams: integer("weight_grams")
-      .notNull()
-      .generatedAlwaysAs(
-        sql`product_weight(kind, hex, finish, durability, arc_degrees, direction)`,
-      ),
-
     searchVector: tsvector("search_vector")
       .notNull()
       .generatedAlwaysAs(
@@ -286,15 +200,95 @@ export const products = pgTable(
   },
   (table) => [
     uniqueIndex("product_slug_key").on(table.slug),
-    index("product_category_idx").on(table.categoryId),
     index("product_brand_idx").on(table.brandId),
     index("product_price_idx").on(table.priceCents),
-    index("product_hue_idx").on(table.hue),
     index("product_kind_idx").on(table.kind),
-    index("product_arc_idx").on(table.arcDegrees),
   ],
 );
 
+/**
+ * A color: one hex, and the three amounts of finish its surface carries.
+ *
+ * Everything else about it — where it sits in HSL, which family it belongs to,
+ * how hot it burns, how far it reads, what it weighs — is generated from those
+ * four, so the application can write none of it.
+ */
+export const colors = pgTable("color", {
+  productId: uuid("product_id").primaryKey(),
+  /** Always `color`; it is half of the key back to a product of that kind. */
+  kind: productKind("kind").notNull().default("color"),
+
+  hex: text("hex").notNull(),
+  /** 5 is a mirror, 95 is chalk. */
+  roughness: smallint("roughness").notNull(),
+  /**
+   * Nanometers of interference coating. Zero is bare paint.
+   *
+   * Which colors it shows follows from the thickness and the refractive index
+   * of the material, so neither they nor the arc they walk is stored.
+   */
+  coatingNanometers: smallint("coating_nanometers").notNull(),
+  /** How hard the pigment gives off its own light. Zero for most colors. */
+  emission: smallint("emission").notNull(),
+
+  hue: smallint("hue").generatedAlwaysAs(sql`hex_to_hue(hex)`),
+  saturation: smallint("saturation").generatedAlwaysAs(sql`hex_to_saturation(hex)`),
+  lightness: smallint("lightness").generatedAlwaysAs(sql`hex_to_lightness(hex)`),
+  /** The nearest landmark in RGB space, which is what a family name is. */
+  family: text("family").generatedAlwaysAs(sql`color_family(hex)`),
+
+  temperatureKelvin: smallint("temperature_kelvin").generatedAlwaysAs(
+    sql`hex_to_temperature(hex)`,
+  ),
+  reachCentimeters: integer("reach_centimeters").generatedAlwaysAs(
+    sql`color_reach(hex, roughness, emission)`,
+  ),
+  weightGrams: integer("weight_grams").generatedAlwaysAs(sql`hex_to_weight(hex)`),
+});
+
+/**
+ * A finisher: the finish it puts back, as the same three amounts a color has.
+ *
+ * A tin never runs out, so nothing here says how long it lasts.
+ */
+export const finishers = pgTable("finisher", {
+  productId: uuid("product_id").primaryKey(),
+  /** Always `finisher`; it is half of the key back to a product of that kind. */
+  kind: productKind("kind").notNull().default("finisher"),
+
+  roughness: smallint("roughness").notNull(),
+  coatingNanometers: smallint("coating_nanometers").notNull(),
+  emission: smallint("emission").notNull(),
+
+  grainMicrometers: smallint("grain_micrometers").generatedAlwaysAs(
+    sql`finish_grain(roughness)`,
+  ),
+  weightGrams: integer("weight_grams").generatedAlwaysAs(
+    sql`finisher_weight(roughness, coating_nanometers)`,
+  ),
+});
+
+/** A shifter: which way round the wheel it turns a color, and how far. */
+export const shifters = pgTable("shifter", {
+  productId: uuid("product_id").primaryKey(),
+  /** Always `shifter`; it is half of the key back to a product of that kind. */
+  kind: productKind("kind").notNull().default("shifter"),
+
+  direction: shiftDirection("direction").notNull(),
+  arcDegrees: smallint("arc_degrees").notNull(),
+
+  torqueMillinewtonMeters: integer("torque_millinewton_meters").generatedAlwaysAs(
+    sql`shift_torque(arc_degrees)`,
+  ),
+  backlashMicrometers: integer("backlash_micrometers").generatedAlwaysAs(
+    sql`shift_backlash(direction, arc_degrees)`,
+  ),
+  weightGrams: integer("weight_grams").generatedAlwaysAs(
+    sql`shift_weight(direction, arc_degrees)`,
+  ),
+});
+
+/** The images of a product, in the order they are shown. */
 export const productImages = pgTable(
   "product_image",
   {
@@ -311,6 +305,7 @@ export const productImages = pgTable(
   (table) => [index("product_image_product_idx").on(table.productId)],
 );
 
+/** What shoppers said. One review per person per product. */
 export const productReviews = pgTable(
   "product_review",
   {
@@ -332,10 +327,14 @@ export const productReviews = pgTable(
 );
 
 /**
+ * A product with its variant, its foundry and its rating already joined, so a
+ * search reads one relation instead of four.
+ *
  * Ratings are aggregated here rather than stored on `product`, so a rating can
- * never disagree with the reviews it came from. Every catalog read goes
- * through this view. If it ever needs to be fast, `MATERIALIZED` is the only
- * word that changes — no application code moves.
+ * never disagree with the reviews it came from. The three finish amounts are
+ * COALESCEd across the two kinds that carry them, so a filter on roughness
+ * finds it wherever it lives. If this ever needs to be fast, `MATERIALIZED` is
+ * the only word that changes — no application code moves.
  */
 export const productListing = pgView("product_listing", {
   id: uuid("id").notNull(),
@@ -345,49 +344,56 @@ export const productListing = pgView("product_listing", {
   priceCents: integer("price_cents").notNull(),
   stockQuantity: integer("stock_quantity").notNull(),
   kind: productKind("kind").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  searchVector: tsvector("search_vector").notNull(),
+
   hex: text("hex"),
-  finish: productFinish("finish"),
   hue: smallint("hue"),
   saturation: smallint("saturation"),
   lightness: smallint("lightness"),
-  durability: integer("durability"),
-  arcDegrees: smallint("arc_degrees"),
-  direction: shiftDirection("direction"),
+  family: text("family"),
   temperatureKelvin: smallint("temperature_kelvin"),
   reachCentimeters: integer("reach_centimeters"),
-  coverageSquareCentimeters: integer("coverage_square_centimeters"),
+
+  roughness: smallint("roughness"),
+  coatingNanometers: smallint("coating_nanometers"),
+  emission: smallint("emission"),
   grainMicrometers: smallint("grain_micrometers"),
+
+  direction: shiftDirection("direction"),
+  arcDegrees: smallint("arc_degrees"),
   torqueMillinewtonMeters: integer("torque_millinewton_meters"),
   backlashMicrometers: integer("backlash_micrometers"),
+
   weightGrams: integer("weight_grams").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
-  searchVector: tsvector("search_vector").notNull(),
-  brandSearchVector: tsvector("brand_search_vector").notNull(),
-  categorySearchVector: tsvector("category_search_vector").notNull(),
+
   brandId: uuid("brand_id").notNull(),
   brandSlug: text("brand_slug").notNull(),
   brandName: text("brand_name").notNull(),
-  categoryId: uuid("category_id").notNull(),
-  categorySlug: text("category_slug").notNull(),
-  categoryName: text("category_name").notNull(),
+  brandSearchVector: tsvector("brand_search_vector").notNull(),
+
   ratingAverage: numericAsNumber("rating_average").notNull(),
   ratingCount: integer("rating_count").notNull(),
 }).existing();
 
+/** Which schema files have run, so a rerun applies only what is new. */
 export const schemaMigrations = pgTable("schema_migration", {
   name: text("name").primaryKey(),
   appliedAt: createdAt(),
 });
 
+/** Every table and view, as the query builder is typed against. */
 export const schema = {
   users,
   oauthIdentities,
   sessions,
   refreshTokens,
   passwordResetTokens,
-  categories,
   brands,
   products,
+  colors,
+  finishers,
+  shifters,
   productImages,
   productReviews,
   productListing,

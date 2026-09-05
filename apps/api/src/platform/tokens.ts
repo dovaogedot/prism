@@ -15,6 +15,7 @@ import type { Clock } from "./clock.ts";
 
 const ALGORITHM = "HS256";
 
+/** What an access token asserts about the request carrying it. */
 export type AccessTokenClaims = Readonly<{
   /** The user. */
   subject: string;
@@ -25,8 +26,10 @@ export type AccessTokenClaims = Readonly<{
   tokenId: string;
 }>;
 
+/** Who a two-factor challenge belongs to. It asserts nothing else. */
 export type ChallengeClaims = Readonly<{ subject: string }>;
 
+/** Minting the two signed tokens, and reading them back. */
 export type TokenService = Readonly<{
   issueAccessToken: (claims: AccessTokenClaims) => ResultAsync<string, DomainError>;
   verifyAccessToken: (
@@ -41,6 +44,7 @@ export type TokenService = Readonly<{
   ) => ResultAsync<ChallengeClaims, DomainError>;
 }>;
 
+/** What the tokens are signed with, who signs them, and how long they last. */
 export type TokenOptions = Readonly<{
   secret: Uint8Array;
   issuer: string;
@@ -59,6 +63,13 @@ const isNonEmptyString = (value: unknown): value is string =>
 const isUserRole = (value: unknown): value is UserRole =>
   value === "customer" || value === "admin";
 
+/**
+ * Tokens signed and checked against the injected clock.
+ *
+ * Verification is total: a token with a wrong signature, a wrong issuer, a
+ * wrong audience, an expiry gone by, or claims of the wrong shape all come
+ * back as a domain error rather than a raise.
+ */
 export const createTokenService = (options: TokenOptions): TokenService => {
   const { secret, issuer, clock } = options;
 
@@ -163,6 +174,7 @@ export const createOpaqueToken = (): OpaqueToken => {
   return { plaintext, digest: digestToken(plaintext) };
 };
 
+/** The hex SHA-256 of a token, which is the only form of it stored. */
 export const digestToken = (plaintext: string): string =>
   createHash("sha256").update(plaintext).digest("hex");
 

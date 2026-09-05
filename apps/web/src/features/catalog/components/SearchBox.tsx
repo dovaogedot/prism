@@ -15,11 +15,13 @@ import { api, toQueryString } from "../../../shared/api/client.ts";
 const DEBOUNCE_MS = 160;
 const MIN_TERM_LENGTH = 2;
 
+/** The term in the box, and where a submitted one goes. */
 export type SearchBoxProps = Readonly<{
   value: string;
   onSubmit: (term: string) => void;
 }>;
 
+/** The search field and the suggestions under it, which arrive as the term is typed. */
 export const SearchBox = ({ value, onSubmit }: SearchBoxProps) => {
   const [term, setTerm] = useState(value);
   const [suggestions, setSuggestions] = useState<readonly Suggestion[]>([]);
@@ -80,7 +82,6 @@ export const SearchBox = ({ value, onSubmit }: SearchBoxProps) => {
 
     match(suggestion.kind)
       .with("product", () => void navigate(`/item/${suggestion.slug}`))
-      .with("category", () => void navigate(`/?tag=${suggestion.slug}`))
       .with("brand", () => void navigate(`/?brands=${suggestion.slug}`))
       .exhaustive();
   };
@@ -121,7 +122,7 @@ export const SearchBox = ({ value, onSubmit }: SearchBoxProps) => {
             aria-controls="search-suggestions"
             aria-autocomplete="list"
             autoComplete="off"
-            placeholder="Search colors, tools, foundries, tags…"
+            placeholder="Search colors, tools, foundries…"
             onChange={(event) => {
               setTerm(event.target.value);
               setOpen(true);

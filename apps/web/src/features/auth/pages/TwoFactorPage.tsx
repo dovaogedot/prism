@@ -22,6 +22,7 @@ const readChallengeToken = (): string =>
     ? history.state.usr.challengeToken
     : "";
 
+/** The second step of sign-in, reached only with a live challenge. */
 export const TwoFactorPage = () => {
   const navigate = useNavigate();
   const [failure, setFailure] = useState<Option<ReactNode>>(Option.none);

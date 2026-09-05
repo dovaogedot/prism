@@ -9,6 +9,7 @@
 import { Option } from "@prism/shared";
 import { useCallback, useEffect, useState } from "react";
 
+/** Which of the two rooms the shop is lit as. */
 export type Theme = "light" | "dark";
 
 const STORAGE_KEY = "hue-theme";
@@ -28,6 +29,7 @@ const apply = (theme: Theme): void => {
   document.documentElement.classList.toggle("dark", theme === "dark");
 };
 
+/** The current theme, and the toggle that stores a choice over the system preference. */
 export const useTheme = (): Readonly<{ theme: Theme; toggle: () => void }> => {
   const [theme, setTheme] = useState<Theme>(() =>
     Option.getOrElse(systemPrefers)(stored()),

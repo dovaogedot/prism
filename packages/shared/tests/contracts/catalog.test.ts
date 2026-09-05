@@ -15,7 +15,6 @@ describe("productQueryParamsSchema", () => {
   it("supplies defaults for an empty query string", () => {
     expect(parse({})).toEqual({
       brands: [],
-      finishes: [],
       sort: "relevance",
       page: 1,
       perPage: DEFAULT_PER_PAGE,
@@ -75,12 +74,6 @@ describe("productQueryParamsSchema", () => {
     );
   });
 
-  it("rejects an unknown finish", () => {
-    expect(productQueryParamsSchema.safeParse({ finishes: "matte,holographic" }).success).toBe(
-      false,
-    );
-  });
-
   it("holds numeric filters inside their domain bounds", () => {
     expect(productQueryParamsSchema.safeParse({ hueMin: "-1" }).success).toBe(false);
     expect(productQueryParamsSchema.safeParse({ hueMax: "361" }).success).toBe(false);
@@ -101,7 +94,7 @@ describe("toProductQuery", () => {
     const result = query({});
 
     expect(result.text).toEqual(Option.none);
-    expect(result.tagSlug).toEqual(Option.none);
+    expect(result.family).toEqual(Option.none);
     expect(result.price).toEqual(Option.none);
     expect(result.minRating).toEqual(Option.none);
     expect(result.hue).toEqual(Option.none);
@@ -111,7 +104,6 @@ describe("toProductQuery", () => {
   it("keeps empty multi-value filters as empty arrays, not absence", () => {
     const result = query({});
     expect(result.brandSlugs).toEqual([]);
-    expect(result.finishes).toEqual([]);
   });
 
   it("treats a blank search term as no search term", () => {
@@ -169,7 +161,7 @@ describe("suggestQueryParamsSchema", () => {
     expect(suggestQueryParamsSchema.safeParse({ q: "red", limit: "100" }).success).toBe(false);
   });
 
-  it("accepts free text, since the term is parameterised at the database", () => {
+  it("accepts free text, since the term is parameterized at the database", () => {
     expect(suggestQueryParamsSchema.parse({ q: "o'brien's red" }).q).toBe("o'brien's red");
   });
 });

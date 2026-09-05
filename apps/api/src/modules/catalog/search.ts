@@ -10,8 +10,13 @@
  * injection tests boring.
  */
 
-import type { Finish, NumericRange, ProductQuery, ProductSort } from "@prism/shared";
-import { Option } from "@prism/shared";
+import type {
+  FinishProperty,
+  NumericRange,
+  ProductQuery,
+  ProductSort,
+} from "@prism/shared";
+import { FINISH_RANGES, Option } from "@prism/shared";
 import { and, asc, desc, eq, gte, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 import { productListing } from "../../db/schema.ts";
 
@@ -30,6 +35,7 @@ export const toTsQuery = (text: string): SQL =>
 export const toLikePattern = (text: string): string =>
   `%${text.replace(/([\\%_])/g, "\\$1")}%`;
 
+/** The same escaping, anchored at the start, for a term the shopper is still typing. */
 export const toPrefixPattern = (text: string): string =>
   `${text.replace(/([\\%_])/g, "\\$1")}%`;
 
@@ -46,44 +52,6 @@ export const nameContains = (text: string): SQL =>
   sql`${productListing.name} ILIKE ${toLikePattern(text)}`;
 
 /**
- * A tag filter includes everything beneath it — asking for "Red" must return
- * the colors filed under "Red → Crimson". The recursive CTE walks down from
- * the named slug.
- */
-export const descendantCategoryIds = (slug: string): SQL =>
-  sql`(
-    WITH RECURSIVE subtree AS (
-      SELECT id FROM category WHERE slug = ${slug}
-      UNION ALL
-      SELECT child.id FROM category child JOIN subtree ON child.parent_id = subtree.id
-    )
-    SELECT id FROM subtree
-  )`;
-
-/**
- * Searching for a category name means the same thing as filtering by it: the
- * whole subtree.
- *
- * Only leaf categories hold products, so matching a product against its own
- * category alone makes a parent name unfindable — typing "yellows" would return
- * nothing at all, even though "Yellows → Golds" is full of colors and the
- * typeahead happily offers the parent. Matching first, then walking down, puts
- * the two paths back in agreement.
- *
- * This subsumes the leaf case: a category that matches is in the result set
- * before the recursive term ever runs.
- */
-export const categorySubtreeMatching = (text: string): SQL =>
-  sql`(
-    WITH RECURSIVE matched AS (
-      SELECT id FROM category WHERE search_vector @@ ${toTsQuery(text)}
-      UNION ALL
-      SELECT child.id FROM category child JOIN matched ON child.parent_id = matched.id
-    )
-    SELECT id FROM matched
-  )`;
-
-/**
  * Hue is a circle, so a range whose start exceeds its end is the arc that
  * crosses 0° — which is exactly where the reds are. Any other range is a
  * plain interval.
@@ -96,17 +64,27 @@ export const hueCondition = (range: NumericRange): SQL => {
     : sql`(${productListing.hue} BETWEEN ${range.min} AND ${range.max})`;
 };
 
+/** A filter that has its own facet, and can therefore be lifted to count it. */
+export type FacetDimension = "kind" | "brand" | "finish" | "rating" | "price";
+
+/** The column each of the three amounts lives in. */
+const FINISH_COLUMNS = {
+  roughness: productListing.roughness,
+  coating: productListing.coatingNanometers,
+  emission: productListing.emission,
+} as const satisfies Record<FinishProperty, unknown>;
+
 /**
- * `kind` is the category dimension; `tag` is the taxonomy beneath it. They are
- * separate filters and separate facets, so they are separate dimensions.
+ * What asking about one amount of the finish asks of the database.
+ *
+ * The floor of the amount's own range, which is where having it begins: a
+ * coating under a hundred nanometers is not a coating and a glow under the
+ * least worth selling is not a glow. Roughness has no such floor — every
+ * surface has one — so asking about it narrows nothing by itself, and the
+ * range that follows does all the narrowing.
  */
-export type FacetDimension =
-  | "kind"
-  | "tag"
-  | "brand"
-  | "finish"
-  | "rating"
-  | "price";
+export const finishCondition = (property: FinishProperty): SQL =>
+  gte(FINISH_COLUMNS[property], FINISH_RANGES[property].min);
 
 /**
  * Conditions for a query, optionally omitting one dimension.
@@ -132,6 +110,10 @@ export const buildConditions = (
   })(exclude);
 
   const acrossKinds = omitted === "kind";
+  // Counting the finishes drops the ranges as well as the name. A range
+  // narrows inside whichever band is selected, so leaving one applied would
+  // show every other finish holding nothing.
+  const acrossFinishes = acrossKinds || omitted === "finish";
   const conditions: SQL[] = [];
 
   if (Option.isSome(query.text)) {
@@ -139,7 +121,6 @@ export const buildConditions = (
     const matches = or(
       sql`${productListing.searchVector} @@ ${tsQuery}`,
       sql`${productListing.brandSearchVector} @@ ${tsQuery}`,
-      sql`${productListing.categoryId} IN ${categorySubtreeMatching(query.text.value)}`,
       nameContains(query.text.value),
     );
     if (matches !== undefined) conditions.push(matches);
@@ -149,18 +130,18 @@ export const buildConditions = (
     conditions.push(eq(productListing.kind, query.kind.value));
   }
 
-  if (omitted !== "tag" && Option.isSome(query.tagSlug)) {
-    conditions.push(
-      sql`${productListing.categoryId} IN ${descendantCategoryIds(query.tagSlug.value)}`,
-    );
+  // No facet, so nothing lifts it: a family is what a typed word resolves to
+  // rather than something offered in the rail.
+  if (Option.isSome(query.family)) {
+    conditions.push(eq(productListing.family, query.family.value));
   }
 
   if (omitted !== "brand" && query.brandSlugs.length > 0) {
     conditions.push(inArray(productListing.brandSlug, [...query.brandSlugs]));
   }
 
-  if (!acrossKinds && omitted !== "finish" && query.finishes.length > 0) {
-    conditions.push(inArray(productListing.finish, [...query.finishes]));
+  if (!acrossFinishes && Option.isSome(query.finish)) {
+    conditions.push(finishCondition(query.finish.value));
   }
 
   if (omitted !== "price" && Option.isSome(query.price)) {
@@ -186,6 +167,25 @@ export const buildConditions = (
     conditions.push(lte(productListing.lightness, query.lightness.value.max));
   }
 
+  // The three amounts a finish is made of, which a color has and a tin puts
+  // back. Independent of each other, so narrowing one says nothing about the
+  // other two.
+  if (!acrossFinishes && Option.isSome(query.roughness)) {
+    conditions.push(gte(productListing.roughness, query.roughness.value.min));
+    conditions.push(lte(productListing.roughness, query.roughness.value.max));
+  }
+
+  if (!acrossFinishes && Option.isSome(query.coating)) {
+    conditions.push(gte(productListing.coatingNanometers, query.coating.value.min));
+    conditions.push(lte(productListing.coatingNanometers, query.coating.value.max));
+  }
+
+  if (!acrossFinishes && Option.isSome(query.emission)) {
+    conditions.push(gte(productListing.emission, query.emission.value.min));
+    conditions.push(lte(productListing.emission, query.emission.value.max));
+  }
+
+
   if (!acrossKinds && Option.isSome(query.direction)) {
     conditions.push(eq(productListing.direction, query.direction.value));
   }
@@ -198,26 +198,26 @@ export const buildConditions = (
   return conditions;
 };
 
+/** Every condition ANDed together, or `None` when there is nothing to filter by. */
 export const combineConditions = (conditions: readonly SQL[]): Option<SQL> =>
   conditions.length === 0 ? Option.none : Option.fromNullable(and(...conditions));
 
 /**
- * Weighted relevance across the three vectors: a hit on the color's own name
- * outranks a hit on its foundry, which outranks a hit on its category.
+ * Weighted relevance across the two vectors: a hit on the product's own name
+ * outranks a hit on its foundry.
  */
 export const relevanceExpression = (text: string): SQL => {
   const tsQuery = toTsQuery(text);
 
   // A literal hit in the color's own name is the strongest signal there is,
   // and one at the start of the name is stronger still — somebody typing
-  // "red" wants "Red Ochre" before "Powdered Rosé". Those two terms sit well
+  // "red" wants "Red Ocher" before "Powdered Rosé". Those two terms sit well
   // above the ts_rank_cd scores, which land in the 0.0–0.2 range.
   return sql`(
     CASE WHEN ${productListing.name} ILIKE ${toPrefixPattern(text)} THEN 2 ELSE 0 END
     + CASE WHEN ${productListing.name} ILIKE ${toLikePattern(text)} THEN 1 ELSE 0 END
     + ts_rank_cd(${productListing.searchVector}, ${tsQuery}) * 4
     + ts_rank_cd(${productListing.brandSearchVector}, ${tsQuery}) * 2
-    + ts_rank_cd(${productListing.categorySearchVector}, ${tsQuery})
   )`;
 };
 
@@ -258,18 +258,17 @@ export const buildOrderBy = (
  */
 export const RATING_THRESHOLDS = [5, 4, 3, 2, 1] as const;
 
+/** How a rating bucket is written out in the filter rail. */
 export const ratingFacetLabel = (threshold: number): string =>
   // "5 stars & up" would be a lie about a scale that stops at five.
   threshold === 5
     ? "5 stars"
     : `${threshold} star${threshold === 1 ? "" : "s"} & up`;
 
-export const finishLabel = (finish: Finish): string =>
-  finish.charAt(0).toUpperCase() + finish.slice(1);
-
 /** Page numbers are 1-based at the edge and 0-based in SQL. */
 export const toOffset = (page: number, perPage: number): number =>
   (page - 1) * perPage;
 
+/** How many pages a result set fills. Nothing found is no pages, not one empty one. */
 export const toTotalPages = (total: number, perPage: number): number =>
   total === 0 ? 0 : Math.ceil(total / perPage);

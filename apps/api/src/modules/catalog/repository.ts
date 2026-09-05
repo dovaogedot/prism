@@ -7,9 +7,7 @@
  */
 
 import type {
-  CategoryNode,
-  CategoryRef,
-  Finish,
+  FinishProperty,
   ProductDetail,
   ProductFacets,
   ProductImage,
@@ -21,12 +19,17 @@ import type {
   ShiftDirection,
   Suggestion,
 } from "@prism/shared";
-import { FINISHES, KIND_LABELS, Option, PRODUCT_KINDS } from "@prism/shared";
+import {
+  FINISH_PROPERTIES,
+  FINISH_PROPERTY_LABELS,
+  KIND_LABELS,
+  Option,
+  PRODUCT_KINDS,
+} from "@prism/shared";
 import { asc, count, desc, eq, inArray, min, max, sql, type SQL } from "drizzle-orm";
 import type { Database } from "../../db/client.ts";
 import {
   brands,
-  categories,
   productImages,
   productListing,
   productReviews,
@@ -38,7 +41,7 @@ import {
   buildOrderBy,
   combineConditions,
   type FacetDimension,
-  finishLabel,
+  finishCondition,
   RATING_THRESHOLDS,
   ratingFacetLabel,
   toOffset,
@@ -54,24 +57,23 @@ type ListingRow = Readonly<{
   stockQuantity: number;
   kind: ProductKind;
   hex: string | null;
-  finish: Finish | null;
+  roughness: number | null;
+  coatingNanometers: number | null;
+  emission: number | null;
   hue: number | null;
   saturation: number | null;
   lightness: number | null;
-  durability: number | null;
+  family: string | null;
   arcDegrees: number | null;
   direction: ShiftDirection | null;
   temperatureKelvin: number | null;
   reachCentimeters: number | null;
-  coverageSquareCentimeters: number | null;
   grainMicrometers: number | null;
   torqueMillinewtonMeters: number | null;
   backlashMicrometers: number | null;
   weightGrams: number;
   brandSlug: string;
   brandName: string;
-  categorySlug: string;
-  categoryName: string;
   ratingAverage: number;
   ratingCount: number;
 }>;
@@ -85,24 +87,23 @@ const LISTING_COLUMNS = {
   stockQuantity: productListing.stockQuantity,
   kind: productListing.kind,
   hex: productListing.hex,
-  finish: productListing.finish,
+  roughness: productListing.roughness,
+  coatingNanometers: productListing.coatingNanometers,
+  emission: productListing.emission,
   hue: productListing.hue,
   saturation: productListing.saturation,
   lightness: productListing.lightness,
-  durability: productListing.durability,
+  family: productListing.family,
   arcDegrees: productListing.arcDegrees,
   direction: productListing.direction,
   temperatureKelvin: productListing.temperatureKelvin,
   reachCentimeters: productListing.reachCentimeters,
-  coverageSquareCentimeters: productListing.coverageSquareCentimeters,
   grainMicrometers: productListing.grainMicrometers,
   torqueMillinewtonMeters: productListing.torqueMillinewtonMeters,
   backlashMicrometers: productListing.backlashMicrometers,
   weightGrams: productListing.weightGrams,
   brandSlug: productListing.brandSlug,
   brandName: productListing.brandName,
-  categorySlug: productListing.categorySlug,
-  categoryName: productListing.categoryName,
   ratingAverage: productListing.ratingAverage,
   ratingCount: productListing.ratingCount,
 } as const;
@@ -118,24 +119,27 @@ const toSummary = (
   slug: row.slug,
   name: row.name,
   spec,
+  // Read off the spec rather than the row, so it is the same value by
+  // construction and not merely by both being right.
+  category: spec.kind,
   priceCents: row.priceCents,
   stockQuantity: row.stockQuantity,
   brand: { slug: row.brandSlug, name: row.brandName },
-  category: { slug: row.categorySlug, name: row.categoryName },
   rating: { average: Number(row.ratingAverage), count: row.ratingCount },
   primaryImage,
 });
 
+/** One page of results, and how many there are in total behind it. */
 export type SearchPage = Readonly<{
   items: readonly ProductSummary[];
   total: number;
 }>;
 
+/** Every read and write the catalog module makes against the database. */
 export type CatalogRepository = Readonly<{
   search: (query: ProductQuery) => Promise<SearchPage>;
   facets: (query: ProductQuery) => Promise<ProductFacets>;
   findBySlug: (slug: string) => Promise<Option<ProductDetail>>;
-  categoryTree: () => Promise<readonly CategoryNode[]>;
   suggest: (term: string, limit: number) => Promise<readonly Suggestion[]>;
   findProductIdBySlug: (slug: string) => Promise<Option<string>>;
   addImage: (input: {
@@ -145,6 +149,12 @@ export type CatalogRepository = Readonly<{
   }) => Promise<ProductImage>;
 }>;
 
+/**
+ * The repository over a real database.
+ *
+ * Reads go through the `product_listing` view, so a product arrives with its
+ * rating and its measurements already computed.
+ */
 export const createCatalogRepository = (db: Database): CatalogRepository => {
   /** One extra query for all images on the page, rather than one per product. */
   const primaryImagesFor = async (
@@ -246,12 +256,17 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
         onNone: () => sql`TRUE`,
       })(whereExcept("rating"));
 
-      const tagScope: SQL = Option.match<SQL, SQL>({
-        onSome: (condition) => condition,
-        onNone: () => sql`TRUE`,
-      })(whereExcept("tag"));
+      /**
+       * One amount counted over the scope that ignores every finish filter.
+       *
+       * `FILTER` rather than three statements: the three are three predicates
+       * over the same rows, so one pass answers all of them, and they overlap
+       * — a coated color has a roughness too and is counted under both.
+       */
+      const countWithin = (property: FinishProperty) =>
+        sql<number>`count(*) FILTER (WHERE ${finishCondition(property)})`.mapWith(Number);
 
-      const [kindRows, tagRows, brandRows, finishRows, summaryRows] = await Promise.all([
+      const [kindRows, brandRows, finishRow, summaryRows] = await Promise.all([
         scoped(
           db
             .select({ value: productListing.kind, total: count() })
@@ -259,65 +274,6 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
             .$dynamic(),
           whereExcept("kind"),
         ).groupBy(productListing.kind),
-
-        /**
-         * Every tag, parents included, each counted over its whole subtree.
-         *
-         * `closure` pairs each category with itself and all its descendants,
-         * so joining through it attributes a color filed under "Gold" to
-         * "Yellow" as well. `ranked` starts one level below the roots — a root
-         * is a category, not a tag — and carries the root's position down the
-         * tree, which is what keeps branches together in the output instead of
-         * interleaving them by their within-parent index.
-         *
-         * The parent join skips roots too, so the outermost tag reports no
-         * parent and a chain walked from a leaf stops at the category boundary
-         * rather than ending on a bucket that is not in this list.
-         */
-        db.execute<{
-          value: string;
-          label: string;
-          parent_slug: string | null;
-          depth: number;
-          kind: ProductKind;
-          total: number;
-        }>(sql`
-          WITH RECURSIVE closure AS (
-            SELECT id AS ancestor, id AS descendant FROM category
-            UNION ALL
-            SELECT c.ancestor, child.id
-            FROM closure c
-            JOIN category child ON child.parent_id = c.descendant
-          ),
-          ranked AS (
-            SELECT c.id, c.slug, c.name, c.parent_id, c.kind, 0 AS depth,
-                   root.position AS root_position, c.position AS own_position
-            FROM category c
-            JOIN category root ON root.id = c.parent_id AND root.parent_id IS NULL
-            UNION ALL
-            SELECT child.id, child.slug, child.name, child.parent_id, child.kind,
-                   r.depth + 1, r.root_position, child.position
-            FROM ranked r
-            JOIN category child ON child.parent_id = r.id
-          )
-          SELECT r.slug AS value,
-                 r.name AS label,
-                 parent.slug AS parent_slug,
-                 r.depth::int AS depth,
-                 r.kind AS kind,
-                 count(${productListing.id})::int AS total
-          FROM ranked r
-          JOIN closure cl ON cl.ancestor = r.id
-          LEFT JOIN category parent
-            ON parent.id = r.parent_id AND parent.parent_id IS NOT NULL
-          -- Deliberately not aliased: the scope condition below is built by the
-          -- same condition builder the main query uses, so it names the view in
-          -- full. An alias here would leave those references dangling.
-          LEFT JOIN ${productListing}
-            ON ${productListing.categoryId} = cl.descendant AND ${tagScope}
-          GROUP BY r.id, r.slug, r.name, r.depth, r.kind, r.root_position, r.own_position, parent.slug
-          ORDER BY r.root_position, r.depth, r.own_position, r.name
-        `),
 
         db
           .select({
@@ -338,13 +294,15 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
 
         scoped(
           db
-            .select({ value: productListing.finish, total: count() })
+            .select({
+              roughness: countWithin("roughness"),
+              coating: countWithin("coating"),
+              emission: countWithin("emission"),
+            })
             .from(productListing)
             .$dynamic(),
           whereExcept("finish"),
-        )
-          .groupBy(productListing.finish)
-          .orderBy(desc(count())),
+        ),
 
         // Price extents and the cumulative rating tiers in one pass.
         //
@@ -388,12 +346,8 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
         count: cumulativeByThreshold[threshold],
       }));
 
-      // Same for finishes and categories: the universe is the enum, not
-      // whatever matched.
-      const finishCounts = new Map(
-        finishRows.map((row) => [row.value, Number(row.total)]),
-      );
-
+      // Same for the categories: the universe is the enum, not whatever
+      // matched.
       const kindCounts = new Map(
         kindRows.map((row) => [row.value, Number(row.total)]),
       );
@@ -404,23 +358,15 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
           label: KIND_LABELS[kind],
           count: kindCounts.get(kind) ?? 0,
         })),
-        tags: [...tagRows].map((row) => ({
-          value: row.value,
-          label: row.label,
-          parentSlug: Option.fromNullable(row.parent_slug),
-          depth: Number(row.depth),
-          kind: row.kind,
-          count: Number(row.total),
-        })),
         brands: brandRows.map((row) => ({
           value: row.value,
           label: row.label,
           count: Number(row.total),
         })),
-        finishes: FINISHES.map((finish) => ({
-          value: finish,
-          label: finishLabel(finish),
-          count: finishCounts.get(finish) ?? 0,
+        finishes: FINISH_PROPERTIES.map((property) => ({
+          value: property,
+          label: FINISH_PROPERTY_LABELS[property],
+          count: finishRow[0]?.[property] ?? 0,
         })),
         ratings,
         priceCents: {
@@ -444,7 +390,7 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
       const measurements = toMeasurements(row);
       if (Option.isNone(spec) || Option.isNone(measurements)) return Option.none;
 
-      const [imageRows, reviewRows, tagRows] = await Promise.all([
+      const [imageRows, reviewRows] = await Promise.all([
         db
           .select({
             filename: productImages.filename,
@@ -467,30 +413,6 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
           .where(eq(productReviews.productId, row.id))
           .orderBy(desc(productReviews.createdAt))
           .limit(20),
-        /*
-         * The tag chain, outermost first — an acid is tagged yellow, then acid.
-         *
-         * The grid derives this on the client because a search response already
-         * carries the whole taxonomy in its facets. One product on its own
-         * carries no tree, so the walk happens here instead.
-         *
-         * `parent_id IS NOT NULL` drops the root, which is the product's
-         * category rather than one of its tags — `spec.kind` already says which
-         * shelf this came off, and repeating it as a tag would make every
-         * color's first chip say "Colors".
-         */
-        db.execute<{ slug: string; name: string }>(sql`
-          WITH RECURSIVE ancestors AS (
-            SELECT id, parent_id, slug, name, 0 AS depth
-            FROM category WHERE slug = ${row.categorySlug}
-            UNION ALL
-            SELECT parent.id, parent.parent_id, parent.slug, parent.name, ancestors.depth + 1
-            FROM category parent JOIN ancestors ON parent.id = ancestors.parent_id
-          )
-          SELECT slug, name FROM ancestors
-          WHERE parent_id IS NOT NULL
-          ORDER BY depth DESC
-        `),
       ]);
 
       const images: readonly ProductImage[] = imageRows.map((image) => ({
@@ -508,72 +430,15 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
         createdAt: review.createdAt.toISOString(),
       }));
 
-      const tags: readonly CategoryRef[] = tagRows.map((tag) => ({
-        slug: tag.slug,
-        name: tag.name,
-      }));
-
       const detail: ProductDetail = {
         ...toSummary(row, spec.value, Option.fromNullable(images[0])),
         description: row.description,
-        tags,
         measurements: measurements.value,
         images,
         reviews,
       };
 
       return Option.some(detail);
-    },
-
-    categoryTree: async () => {
-      const rows = await db
-        .select({
-          id: categories.id,
-          slug: categories.slug,
-          name: categories.name,
-          parentId: categories.parentId,
-          position: categories.position,
-        })
-        .from(categories)
-        .orderBy(asc(categories.position), asc(categories.name));
-
-      // Counts are per subtree, so a parent shows everything filed beneath it.
-      const counts = await db
-        .select({
-          categorySlug: productListing.categorySlug,
-          total: count(),
-        })
-        .from(productListing)
-        .groupBy(productListing.categorySlug);
-
-      const directCounts = new Map(
-        counts.map((row) => [row.categorySlug, Number(row.total)]),
-      );
-
-      const childrenOf = new Map<string | null, typeof rows>();
-      for (const row of rows) {
-        const siblings = childrenOf.get(row.parentId) ?? [];
-        siblings.push(row);
-        childrenOf.set(row.parentId, siblings);
-      }
-
-      const build = (parentId: string | null): readonly CategoryNode[] =>
-        (childrenOf.get(parentId) ?? []).map((row) => {
-          const children = build(row.id);
-          const subtreeTotal =
-            (directCounts.get(row.slug) ?? 0) +
-            children.reduce((sum, child) => sum + child.productCount, 0);
-
-          return {
-            id: row.id,
-            slug: row.slug,
-            name: row.name,
-            productCount: subtreeTotal,
-            children,
-          };
-        });
-
-      return build(null);
     },
 
     /**
@@ -584,7 +449,7 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
     suggest: async (term, limit) => {
       const pattern = `%${term}%`;
 
-      const [productRows, brandRows, categoryRows] = await Promise.all([
+      const [productRows, brandRows] = await Promise.all([
         db
           .select({
             slug: productListing.slug,
@@ -606,11 +471,6 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
           .from(productListing)
           .where(sql`${productListing.brandName} ILIKE ${pattern}`)
           .limit(3),
-        db
-          .select({ slug: categories.slug, label: categories.name })
-          .from(categories)
-          .where(sql`${categories.name} ILIKE ${pattern}`)
-          .limit(3),
       ]);
 
       const suggestions: Suggestion[] = [
@@ -626,14 +486,6 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
         ...brandRows.map(
           (row): Suggestion => ({
             kind: "brand",
-            label: row.label,
-            slug: row.slug,
-            hex: Option.none,
-          }),
-        ),
-        ...categoryRows.map(
-          (row): Suggestion => ({
-            kind: "category",
             label: row.label,
             slug: row.slug,
             hex: Option.none,

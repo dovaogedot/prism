@@ -10,5 +10,8 @@ coverage/
 media/
 !media/.gitkeep
 
+# Playwright writes here when it is run from the repository root.
+test-results/
+
 .DS_Store
 *.log

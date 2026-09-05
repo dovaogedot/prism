@@ -10,6 +10,7 @@ import { AuthShell } from "../components/AuthShell.tsx";
 import { describeFailure } from "../components/error-message.tsx";
 import { tokenStore } from "../token-store.ts";
 
+/** Choosing a new password against a token from an email. */
 export const ResetPasswordPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();

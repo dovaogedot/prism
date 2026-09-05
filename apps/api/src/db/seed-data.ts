@@ -9,6 +9,7 @@
 
 import type { Finish } from "@prism/shared";
 
+/** A top-level category, and the branches of its taxonomy. */
 export type CategorySeed = Readonly<{
   slug: string;
   name: string;
@@ -25,6 +26,7 @@ export type InstrumentSeed = Readonly<{
   nouns: readonly string[];
 }>;
 
+/** A branch of the color taxonomy: the patch of HSL space it holds, and how its colors are named. */
 export type LeafCategorySeed = Readonly<{
   slug: string;
   name: string;
@@ -37,6 +39,7 @@ export type LeafCategorySeed = Readonly<{
   nouns: readonly string[];
 }>;
 
+/** The foundries the catalog is sold under. */
 export const BRANDS = [
   {
     slug: "chroma-labs",
@@ -48,7 +51,7 @@ export const BRANDS = [
     slug: "vantablack-industries",
     name: "Vantablack Industries",
     description:
-      "Specializts in the darker end of the catalog. Their showroom has never been successfully photographed.",
+      "Specialists in the darker end of the catalog. Their showroom has never been successfully photographed.",
   },
   {
     slug: "cyan-and-sons",
@@ -84,24 +87,17 @@ export const BRANDS = [
     slug: "perceptual-uniform",
     name: "Perceptual Uniform Ltd",
     description:
-      "Every color is exactly as far from its neighbour as it looks. This took eleven years.",
+      "Every color is exactly as far from its neighbor as it looks. This took eleven years.",
   },
 ] as const;
 
+/** The four words, in the order the seed walks them. */
 export const FINISHES: readonly Finish[] = [
   "matte",
   "gloss",
   "iridescent",
   "fluorescent",
 ];
-
-/** How the color behaves once you have it. */
-export const FINISH_NOTES: Record<Finish, string> = {
-  matte: "Absorbs light politely and returns none of it.",
-  gloss: "Reflective enough to check your parting in.",
-  iridescent: "Changes its mind depending on where you stand.",
-  fluorescent: "Legal in most jurisdictions. Check locally.",
-};
 
 const CEREMONIAL = [
   "Screaming",
@@ -118,6 +114,7 @@ const CEREMONIAL = [
   "Notarized",
 ];
 
+/** The whole taxonomy, and the color space each branch of it draws from. */
 export const CATEGORIES: readonly CategorySeed[] = [
   {
     slug: "red",
@@ -154,12 +151,12 @@ export const CATEGORIES: readonly CategorySeed[] = [
       {
         slug: "rust",
         name: "Rust",
-        description: "Oxidised, weathered, faintly agricultural.",
+        description: "Oxidized, weathered, faintly agricultural.",
         hue: { from: 12, to: 32 },
         saturation: { from: 48, to: 88 },
         lightness: { from: 34, to: 56 },
         adjectives: [...CEREMONIAL, "Corrugated", "Abandoned"],
-        nouns: ["Rust", "Terracotta", "Ochre", "Paprika", "Tangerine", "Ember"],
+        nouns: ["Rust", "Terracotta", "Ocher", "Paprika", "Tangerine", "Ember"],
       },
       {
         slug: "earth",
@@ -168,7 +165,7 @@ export const CATEGORIES: readonly CategorySeed[] = [
         hue: { from: 20, to: 40 },
         saturation: { from: 18, to: 52 },
         lightness: { from: 20, to: 46 },
-        adjectives: ["Ploughed", "Peat", "Reclaimed", "Honest", "Weekday", "Cellar"],
+        adjectives: ["Plowed", "Peat", "Reclaimed", "Honest", "Weekday", "Cellar"],
         nouns: ["Umber", "Sienna", "Loam", "Chestnut", "Bark", "Tobacco"],
       },
     ],
@@ -196,7 +193,7 @@ export const CATEGORIES: readonly CategorySeed[] = [
         saturation: { from: 76, to: 100 },
         lightness: { from: 48, to: 68 },
         adjectives: ["Hazard", "Unlicensed", "Screaming", "Highlighter", "Feral", "Warning"],
-        nouns: ["Acid", "Citron", "Sulphur", "Chartreuse", "Neon", "Voltage"],
+        nouns: ["Acid", "Citron", "Sulfur", "Chartreuse", "Neon", "Voltage"],
       },
     ],
   },
@@ -276,7 +273,7 @@ export const CATEGORIES: readonly CategorySeed[] = [
         hue: { from: 290, to: 322 },
         saturation: { from: 20, to: 60 },
         lightness: { from: 54, to: 82 },
-        adjectives: ["Faded", "Parlour", "Victorian", "Convalescent", "Dusty", "Provincial"],
+        adjectives: ["Faded", "Parlor", "Victorian", "Convalescent", "Dusty", "Provincial"],
         nouns: ["Mauve", "Lilac", "Heather", "Thistle", "Wisteria", "Lavender"],
       },
     ],
@@ -323,9 +320,9 @@ export const CATEGORIES: readonly CategorySeed[] = [
 /* ------------------------------------------------------------- finishers */
 
 /**
- * Tools that put a finish back on a color you already own. They have a finish
- * of their own — the one they apply — and a durability, being how many colors
- * one will see through before it stops meaning it.
+ * Tools that put a finish back on a color you already own. They carry the same
+ * three amounts a color does — the finish they apply — and a durability, being
+ * how many colors one will see through before it stops meaning it.
  */
 export const FINISHER_BRANCHES: readonly InstrumentSeed[] = [
   {
@@ -362,7 +359,7 @@ export const FINISHER_BRANCHES: readonly InstrumentSeed[] = [
   },
 ];
 
-/** What a finisher's own finish says about it. */
+/** What the finish a tin leaves says about it. */
 export const FINISHER_NOTES: Record<Finish, string> = {
   matte:
     "Leaves a surface that absorbs light and any follow-up questions. The most-returned finisher we stock, and the one we stand behind.",
@@ -448,6 +445,7 @@ export const DESCRIPTION_NOTES = [
   "Comes with a card explaining what it is not.",
 ];
 
+/** What reviewers say, drawn from at random. */
 export const REVIEW_BODIES = [
   "Exactly the color on the listing. No notes.",
   "Arrived slightly more orange than advertised. Kept it anyway.",

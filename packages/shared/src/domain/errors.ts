@@ -43,8 +43,10 @@ export type DomainError =
   | Readonly<{ _tag: "RateLimited" }>
   | Readonly<{ _tag: "Conflict" }>;
 
+/** One rejected field: where it was in the body, and what was wrong with it. */
 export type ValidationIssue = Readonly<{ path: string; message: string }>;
 
+/** The name of a domain error, which is also the `code` clients match on. */
 export type DomainErrorTag = DomainError["_tag"];
 
 /**
@@ -179,9 +181,11 @@ export const TAGLESS_ERRORS = {
   Conflict: { _tag: "Conflict" },
 } as const satisfies Record<TaglessDomainErrorTag, DomainError>;
 
+/** The status code an error is served with. */
 export const httpStatusOf = (error: DomainError): number =>
   httpStatusByTag[error._tag];
 
+/** The sentence a shopper is shown for an error. */
 export const messageOf = (error: DomainError): string => messageByTag[error._tag];
 
 /** The wire shape for every non-2xx response. */
@@ -193,6 +197,7 @@ export type ErrorResponse = Readonly<{
   }>;
 }>;
 
+/** An error as the body it is served as. Issues are empty unless it carries some. */
 export const toErrorResponse = (error: DomainError): ErrorResponse => ({
   error: {
     code: error._tag,

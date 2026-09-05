@@ -8,13 +8,10 @@
 
 export type Clock = Readonly<{ now: () => Date }>;
 
+/** The wall clock, which is what the application runs on. */
 export const systemClock: Clock = { now: () => new Date() };
 
-/** A clock frozen at one instant. */
-export const fixedClock = (instant: Date): Clock => ({
-  now: () => new Date(instant.getTime()),
-});
-
+/** A clock whose reading can be moved, for tests that need time to pass. */
 export type MutableClock = Clock &
   Readonly<{
     advanceSeconds: (seconds: number) => void;
@@ -36,8 +33,7 @@ export const mutableClock = (start: Date): MutableClock => {
   };
 };
 
+/** The instant `seconds` after this clock's current reading. */
 export const secondsFromNow = (clock: Clock, seconds: number): Date =>
   new Date(clock.now().getTime() + seconds * 1000);
 
-export const isExpired = (clock: Clock, expiresAt: Date): boolean =>
-  expiresAt.getTime() <= clock.now().getTime();

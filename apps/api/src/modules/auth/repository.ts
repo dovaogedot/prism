@@ -19,6 +19,7 @@ import {
   users,
 } from "../../db/schema.ts";
 
+/** An account as the rest of the module sees it, with every nullable column an `Option`. */
 export type UserRecord = Readonly<{
   id: string;
   email: string;
@@ -31,6 +32,7 @@ export type UserRecord = Readonly<{
   createdAt: Date;
 }>;
 
+/** One sign-in, which is both the revocation unit and the refresh family. */
 export type SessionRecord = Readonly<{
   id: string;
   userId: string;
@@ -124,6 +126,7 @@ export type RotationOutcome =
   | Readonly<{ _tag: "Unknown" }>
   | Readonly<{ _tag: "SessionEnded" }>;
 
+/** Every read and write the auth module makes against the database. */
 export type AuthRepository = Readonly<{
   findUserByEmail: (email: string) => Promise<Option<UserRecord>>;
   findUserById: (id: string) => Promise<Option<UserRecord>>;
@@ -185,6 +188,12 @@ export type AuthRepository = Readonly<{
   ) => Promise<Option<string>>;
 }>;
 
+/**
+ * The repository over a real database.
+ *
+ * The only layer that sees a nullable column: every record it returns has its
+ * absences as `Option`.
+ */
 export const createAuthRepository = (db: Database): AuthRepository => ({
   findUserByEmail: async (email) =>
     Option.map(toUserRecord)(

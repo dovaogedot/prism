@@ -43,6 +43,12 @@ services:
       DATABASE_URL: postgres://prism:${POSTGRES_PASSWORD:-prism}@postgres:5432/prism
       MEDIA_DIR: /srv/media
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      # Per address per minute, on /auth/* — and /auth/refresh is one of them,
+      # which every page load calls to restore the session. Ten is the right
+      # number for one person signing in and the wrong one for a browser
+      # opening pages as fast as it can, so the local stack raises it and a
+      # deployment sets its own.
+      AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-60}
     volumes:
       - media:/srv/media
     depends_on:
@@ -61,6 +67,12 @@ services:
       DATABASE_URL: postgres://prism:${POSTGRES_PASSWORD:-prism}@postgres:5432/prism
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      # Per address per minute, on /auth/* — and /auth/refresh is one of them,
+      # which every page load calls to restore the session. Ten is the right
+      # number for one person signing in and the wrong one for a browser
+      # opening pages as fast as it can, so the local stack raises it and a
+      # deployment sets its own.
+      AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-60}
       SMTP_HOST: ${SMTP_HOST:-mailpit}
       SMTP_PORT: ${SMTP_PORT:-1025}
       SMTP_USER: ${SMTP_USER:-}

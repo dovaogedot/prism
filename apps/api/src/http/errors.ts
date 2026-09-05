@@ -11,6 +11,7 @@ import { httpStatusOf, toErrorResponse } from "@prism/shared";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { hasZodFastifySchemaValidationErrors } from "fastify-type-provider-zod";
 
+/** Answers a request with the status and body an error is defined to carry. */
 export const sendDomainError = (
   reply: FastifyReply,
   error: DomainError,
@@ -25,12 +26,6 @@ const toValidationIssues = (
     message: issue.message ?? "Invalid value.",
   }));
 
-/**
- * Anything that escapes a route handler lands here. Schema failures become a
- * structured 422 the client can attach to individual fields; everything else
- * is logged in full and reported as an opaque 500, because an internal message
- * is a gift to whoever provoked it.
- */
 /** Fastify hands the handler an `unknown`; these read it without casting. */
 const statusCodeOf = (error: unknown): number | undefined =>
   typeof error === "object" &&
@@ -48,6 +43,13 @@ const messageOf = (error: unknown): string =>
     ? error.message
     : "Invalid request.";
 
+/**
+ * Installs the handler everything escaping a route lands in.
+ *
+ * Schema failures become a structured 422 the client can attach to individual
+ * fields; everything else is logged in full and reported as an opaque 500,
+ * because an internal message is a gift to whoever provoked it.
+ */
 export const registerErrorHandler = (app: FastifyInstance): void => {
   app.setErrorHandler((error, request, reply) => {
     if (hasZodFastifySchemaValidationErrors(error)) {

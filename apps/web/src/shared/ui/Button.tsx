@@ -2,6 +2,7 @@ import type { ButtonHTMLAttributes } from "react";
 import { match } from "ts-pattern";
 import { Spinner } from "./Spinner.tsx";
 
+/** How much attention a button asks for. */
 export type ButtonTone = "accent" | "quiet" | "ghost" | "danger";
 
 const TONES: Record<ButtonTone, string> = {
@@ -13,9 +14,11 @@ const TONES: Record<ButtonTone, string> = {
   danger: "bg-danger text-white hover:opacity-90 active:scale-[.98]",
 };
 
+/** Everything a `<button>` takes, plus its tone and whether it is working. */
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
   Readonly<{ tone?: ButtonTone; busy?: boolean }>;
 
+/** A button that keeps its label while it works, and refuses clicks meanwhile. */
 export const Button = ({
   tone = "accent",
   busy = false,

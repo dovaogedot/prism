@@ -13,6 +13,7 @@ import { Option } from "@prism/shared";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+/** Who a provider says the person completing a sign-in is. */
 export type OAuthProfile = Readonly<{
   provider: OAuthProviderName;
   /** The provider's stable identifier for this user — never their email. */
@@ -20,6 +21,7 @@ export type OAuthProfile = Readonly<{
   email: string;
 }>;
 
+/** One identity provider: where to send a browser, and what to do with the code. */
 export type OAuthProvider = Readonly<{
   name: OAuthProviderName;
   authorizationUrl: (state: string, redirectUri: string) => string;
@@ -39,6 +41,7 @@ export type OAuthRegistry = Readonly<{
   isMock: boolean;
 }>;
 
+/** The providers this instance can sign in with. `find` answers `None` for the rest. */
 export const createOAuthRegistry = (
   providers: readonly OAuthProvider[],
   isMock: boolean,
@@ -72,6 +75,12 @@ const exchangeFailed: DomainError = { _tag: "OAuthExchangeFailed" };
 const mockPayload = (provider: OAuthProviderName, email: string): string =>
   `${provider}:${email}`;
 
+/**
+ * An authorization code for the built-in consent screen.
+ *
+ * Signed with the API's own secret, so a code minted for one provider cannot
+ * be redeemed at another.
+ */
 export const issueMockAuthorizationCode = (
   provider: OAuthProviderName,
   email: string,
@@ -108,6 +117,7 @@ const verifyMockCode = (
   return timingSafeEqual(provided, computed) ? Option.some(email) : Option.none;
 };
 
+/** A provider whose consent screen this API serves itself. */
 export const createMockOAuthProvider = (
   provider: OAuthProviderName,
   secret: Uint8Array,
@@ -162,6 +172,7 @@ const isAccessTokenPayload = (
   "access_token" in payload &&
   typeof payload.access_token === "string";
 
+/** Google, asking for the profile and email scopes. */
 export const createGoogleOAuthProvider = (
   clientId: string,
   clientSecret: string,
@@ -279,6 +290,12 @@ export const selectGitHubEmail = (payload: unknown): Option<string> => {
   );
 };
 
+/**
+ * GitHub, asking for the user's email scope.
+ *
+ * An account whose address is private has none on the profile, so the address
+ * is read from the emails endpoint, preferring the primary verified one.
+ */
 export const createGitHubOAuthProvider = (
   clientId: string,
   clientSecret: string,

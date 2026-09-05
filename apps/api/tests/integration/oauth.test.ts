@@ -150,8 +150,8 @@ describe.each(OAUTH_PROVIDERS)("signing in with %s", (provider) => {
   });
 
   it("reports the provider it was actually signed in with", async () => {
-    // The account page reads this. It used to name Google whatever you had
-    // signed in with, because the provider was never on the wire at all.
+    // The account page reads this, so the provider has to travel on the
+    // wire rather than be guessed at the far end.
     const { refreshToken } = await signInWith(
       provider,
       `${provider}-named@example.com`,
@@ -356,7 +356,7 @@ describe("adding a password to a provider account", () => {
 });
 
 describe("a provider sign-in into an account with two-factor", () => {
-  /** Enrols the signed-in account in TOTP and returns nothing but the effect. */
+  /** Enrolls the signed-in account in TOTP and returns nothing but the effect. */
   const enableTwoFactor = async (accessToken: string): Promise<void> => {
     const setup = await harness.app.inject({
       method: "POST",

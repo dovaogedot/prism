@@ -52,6 +52,7 @@ const Wordmark = () => (
   </Link>
 );
 
+/** The header and footer every page sits between. */
 export const Layout = () => {
   const session = useSession();
   const signOut = useSignOut();

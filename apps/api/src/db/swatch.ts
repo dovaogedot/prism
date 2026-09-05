@@ -2,7 +2,7 @@
  * A minimal PNG encoder, used to generate one swatch image per color at seed
  * time.
  *
- * Writing the bytes here rather than committing 250 binaries keeps the
+ * Writing the bytes here rather than committing the binaries keeps the
  * repository text-only, and it means the seed exercises the same storage port
  * an admin upload goes through — the mandatory image handling is real rather
  * than staged.
@@ -31,6 +31,7 @@ const buildCrcTable = (): Uint32Array => {
 
 const CRC_TABLE = buildCrcTable();
 
+/** The CRC-32 a PNG chunk is checked by. */
 export const crc32 = (bytes: Uint8Array): number => {
   let crc = 0xffffffff;
 
@@ -54,6 +55,7 @@ const chunk = (type: string, payload: Buffer): Buffer => {
   return Buffer.concat([length, typeAndPayload, checksum]);
 };
 
+/** One color as three sRGB channels, each 0 to 255. */
 export type Rgb = Readonly<{ red: number; green: number; blue: number }>;
 
 const clampChannel = (value: number): number =>
@@ -102,6 +104,7 @@ export const encodePng = (
   ]);
 };
 
+/** The three channels of a `#rrggbb` string. */
 export const hexToRgb = (hex: string): Rgb => ({
   red: Number.parseInt(hex.slice(1, 3), 16),
   green: Number.parseInt(hex.slice(3, 5), 16),

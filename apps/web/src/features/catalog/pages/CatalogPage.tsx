@@ -8,9 +8,11 @@
  */
 
 import {
+  FINISH_BANDS,
+  FINISH_RANGES,
   PRODUCT_SORTS,
   resolveSearchTerm,
-  tagChain,
+  type Finish,
   type ProductSearchResult,
   type ProductSort,
 } from "@prism/shared";
@@ -36,6 +38,40 @@ const isSort = (value: string): value is ProductSort =>
 const splitList = (value: string): readonly string[] =>
   value.split(",").filter((entry) => entry.length > 0);
 
+/**
+ * The rail state a finish name stands for.
+ *
+ * A name is a stretch of one amount, so it is the amount to ask about plus
+ * wherever on that amount the name sits. Only a bound that actually narrows is
+ * set: "iridescent" is the whole coating axis and needs no range at all, while
+ * "gloss" is the smooth half of the roughness axis and needs the top of it.
+ */
+const bandFilter = (finish: Finish): Partial<FacetState> => {
+  const { property, range } = FINISH_BANDS[finish];
+  const axis = FINISH_RANGES[property];
+  const low = range.min <= axis.min ? "" : String(range.min);
+  const high = range.max >= axis.max ? "" : String(range.max);
+
+  return match(property)
+    .with("roughness", () => ({
+      finish: property,
+      roughnessMin: low,
+      roughnessMax: high,
+    }))
+    .with("coating", () => ({
+      finish: property,
+      coatingMin: low,
+      coatingMax: high,
+    }))
+    .with("emission", () => ({
+      finish: property,
+      emissionMin: low,
+      emissionMax: high,
+    }))
+    .exhaustive();
+};
+
+/** The catalog: the search box, the filter rail, and the grid they narrow. */
 export const CatalogPage = () => {
   const [params, setParams] = useSearchParams();
 
@@ -46,9 +82,9 @@ export const CatalogPage = () => {
 
   const facetState: FacetState = {
     category: params.get("category") ?? "",
-    tag: params.get("tag") ?? "",
+    family: params.get("family") ?? "",
     brands: splitList(params.get("brands") ?? ""),
-    finishes: splitList(params.get("finishes") ?? ""),
+    finish: params.get("finish") ?? "",
     direction: params.get("direction") ?? "",
     arcMin: params.get("arcMin") ?? "",
     arcMax: params.get("arcMax") ?? "",
@@ -61,6 +97,12 @@ export const CatalogPage = () => {
     saturationMax: params.get("saturationMax") ?? "",
     lightnessMin: params.get("lightnessMin") ?? "",
     lightnessMax: params.get("lightnessMax") ?? "",
+    roughnessMin: params.get("roughnessMin") ?? "",
+    roughnessMax: params.get("roughnessMax") ?? "",
+    coatingMin: params.get("coatingMin") ?? "",
+    coatingMax: params.get("coatingMax") ?? "",
+    emissionMin: params.get("emissionMin") ?? "",
+    emissionMax: params.get("emissionMax") ?? "",
   };
 
   const query = toQueryString({
@@ -103,37 +145,32 @@ export const CatalogPage = () => {
   };
 
   /**
-   * A term that names a facet becomes that filter rather than a text query.
-   * Typing "gloss" means gloss colors, not colors whose prose mentions gloss;
-   * typing "golds" means the gold tag, which is stored singular.
+   * A term that names something the catalog can filter by becomes that filter
+   * rather than a text query.
    *
-   * The vocabulary comes from the facets already on screen, so it needs no
-   * request of its own.
+   * Nothing is looked up: every word here resolves against what a product
+   * physically is, so the answer needs no facets on screen and no request of
+   * its own.
    */
   const submitSearch = (raw: string): void => {
-    const tags = (results.data?.facets.tags ?? []).map((bucket) => bucket.value);
-
-    match(resolveSearchTerm(raw, tags))
+    match(resolveSearchTerm(raw))
       .with({ kind: "category" }, ({ category }) =>
-        update({ q: "", category, tag: "" }),
+        update({ q: "", category, family: "" }),
       )
+      // A finish is a thing a shopper buys, so the name of one is the shelf of
+      // tins that apply it rather than a search through the prose — and the
+      // name itself is a place on one of the three amounts.
       .with({ kind: "finish" }, ({ finish }) =>
-        update({
-          q: "",
-          finishes: facetState.finishes.includes(finish)
-            ? facetState.finishes
-            : [...facetState.finishes, finish],
-        }),
+        update({ q: "", category: "finisher", family: "", ...bandFilter(finish) }),
       )
-      .with({ kind: "tag" }, ({ slug }) => {
-        // A tag belongs to one category, so selecting it selects that too —
-        // otherwise the rail would show no sign of the filter that is running.
-        const owner = results.data?.facets.tags.find(
-          (bucket) => bucket.value === slug,
-        );
-
-        update({ q: "", tag: slug, category: owner?.kind ?? facetState.category });
-      })
+      // Only a shifter turns, so the word picks the shelf as well as the way.
+      .with({ kind: "direction" }, ({ direction }) =>
+        update({ q: "", category: "shifter", family: "", direction }),
+      )
+      // Only a color has a family, so the same is true the other way.
+      .with({ kind: "family" }, ({ family }) =>
+        update({ q: "", category: "color", family }),
+      )
       .with({ kind: "text" }, ({ text }) => update({ q: text }))
       .exhaustive();
   };
@@ -224,24 +261,7 @@ export const CatalogPage = () => {
                 ))}
               </div>
             ))
-            .otherwise(({ data }) =>
-              match(data.items.length)
-                .with(0, () => (
-                  <div className="rounded-[--radius-card] border border-dashed border-line px-6 py-16 text-center">
-                    <p className="font-medium text-ink">Nothing matches that.</p>
-                    <p className="mt-1 text-sm text-ink-soft">
-                      Try widening the hue range or clearing a filter.
-                    </p>
-                    <Button
-                      tone="quiet"
-                      className="mt-4"
-                      onClick={() => setParams(new URLSearchParams())}
-                    >
-                      Clear all filters
-                    </Button>
-                  </div>
-                ))
-                .otherwise(() => (
+            .otherwise(({ data }) => (
                   <>
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <p className="text-sm text-ink-faint">
@@ -252,44 +272,67 @@ export const CatalogPage = () => {
                       </p>
 
                       {/*
-                        The tag is the one active filter the rail cannot show,
-                        so it is shown here — and removable, or a tag arrived at
-                        from a card would be a one-way door.
+                        The family is the one active filter the rail does not
+                        offer, so it is shown here — and removable, or a search
+                        for "gold" would be a one-way door.
                       */}
-                      {match(tagChain(data.facets.tags, facetState.tag))
-                        .with([], () => null)
-                        .otherwise((chain) => (
+                      {match(facetState.family)
+                        .with("", () => null)
+                        .otherwise((family) => (
                           <button
                             type="button"
-                            onClick={() => update({ tag: "" })}
-                            className="flex items-center gap-1 rounded-full bg-accent-wash px-2.5 py-0.5 text-xs font-medium text-ink hover:bg-sunken"
+                            onClick={() => update({ family: "" })}
+                            className="flex items-center gap-1 rounded-full bg-accent-wash px-2.5 py-0.5 text-xs font-medium capitalize text-ink hover:bg-sunken"
                           >
-                            {chain.map((tag) => tag.label).join(" › ")}
+                            {family}
                             <span aria-hidden="true">✕</span>
-                            <span className="sr-only">Clear this tag</span>
+                            <span className="sr-only">Clear this color family</span>
                           </button>
                         ))}
                     </div>
 
-                    <div
-                      className={`grid grid-cols-2 gap-4 transition-opacity sm:grid-cols-3 xl:grid-cols-4 ${
-                        results.isFetching ? "opacity-60" : "opacity-100"
-                      }`}
-                    >
-                      {data.items.map((product) => (
-                        <ProductCard
-                          key={product.id}
-                          product={product}
-                          tags={tagChain(data.facets.tags, product.category.slug)}
-                          onSelectTag={(slug) => update({ tag: slug })}
-                        />
-                      ))}
+                    <div className="relative">
+                      <div
+                        className={`grid grid-cols-2 gap-4 transition-opacity sm:grid-cols-3 xl:grid-cols-4 ${
+                          results.isFetching ? "opacity-60" : "opacity-100"
+                        }`}
+                      >
+                        {data.items.map((product) => (
+                          <ProductCard key={product.id} product={product} />
+                        ))}
 
-                      {/* A full page of slots, however few results there are. */}
-                      {Array.from(
-                        { length: Math.max(0, data.perPage - data.items.length) },
-                        (_, index) => <ProductCardSlot key={`slot-${index}`} />,
-                      )}
+                        {/* A full page of slots, however few results there are. */}
+                        {Array.from(
+                          { length: Math.max(0, data.perPage - data.items.length) },
+                          (_, index) => <ProductCardSlot key={`slot-${index}`} />,
+                        )}
+                      </div>
+
+                      {/*
+                        Laid over the slots rather than put in their place. The
+                        slots are what hold the column's height, so a page with
+                        nothing on it is exactly as tall as a full one and the
+                        document does not move under the pointer.
+                      */}
+                      {match(data.items.length)
+                        .with(0, () => (
+                          <div className="absolute inset-0 grid place-items-center">
+                            <div className="rounded-[--radius-card] border border-dashed border-line bg-surface px-6 py-16 text-center">
+                              <p className="font-medium text-ink">Nothing matches that.</p>
+                              <p className="mt-1 text-sm text-ink-soft">
+                                Try widening the hue range or clearing a filter.
+                              </p>
+                              <Button
+                                tone="quiet"
+                                className="mt-4"
+                                onClick={() => setParams(new URLSearchParams())}
+                              >
+                                Clear all filters
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                        .otherwise(() => null)}
                     </div>
 
                     {/*
@@ -326,8 +369,7 @@ export const CatalogPage = () => {
                         .exhaustive()}
                     </nav>
                   </>
-                )),
-            )}
+            ))}
         </section>
       </div>
     </div>

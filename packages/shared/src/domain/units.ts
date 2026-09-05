@@ -7,9 +7,9 @@
  *
  * The measurements belong to the thing itself rather than to a container,
  * because there is no container — and what there is to measure depends on what
- * the thing is. A color has a temperature, a reach and a weight. A tin of
- * finisher has none of those; it has a coverage, a grain and a weight. A
- * shifter is a mechanism, so it has a torque, a backlash and a weight.
+ * the thing is. A color has a temperature, a reach, a coating and a weight. A
+ * tin of finisher has none of those; it has a coating, a grain and a weight.
+ * A shifter is a mechanism, so it has a torque, a backlash and a weight.
  *
  * Weight is the one they share, because the requirement names it and because
  * everything in the shop has some.
@@ -23,14 +23,19 @@ const METERS_PER_FOOT = 0.3048;
 const MILLIMETERS_PER_INCH = 25.4;
 /** A mil is a thousandth of an inch, which is where surface grain is measured. */
 const MICROMETERS_PER_MIL = 25.4;
-const SQUARE_FEET_PER_SQUARE_METER = 10.763910416709722;
+/**
+ * A microinch is a millionth of one, which is where coating thickness is
+ * measured by anyone who buys their instruments in inches. Same 25.4 as the
+ * mil, three decimal places further down.
+ */
+const NANOMETERS_PER_MICROINCH = 25.4;
 const NEWTON_METERS_PER_POUND_FOOT = 1.3558179483314004;
 
 /** Absolute zero, in degrees Celsius. */
 const CELSIUS_OFFSET = 273.15;
 
 /**
- * Half-away-from-zero to `decimals` places, avoiding float display artefacts.
+ * Half-away-from-zero to `decimals` places, avoiding float display artifacts.
  *
  * Rounds the magnitude and puts the sign back, because `Math.round` is
  * half-*up*: it sends -273.15 to -273.1 while sending 273.15 to 273.2. Nothing
@@ -44,12 +49,15 @@ export const roundTo = (decimals: number, value: number): number => {
   return value < 0 ? -magnitude : magnitude;
 };
 
+/** Grams as ounces, to two decimals. */
 export const gramsToOunces = (grams: number): number =>
   roundTo(2, grams / GRAMS_PER_OUNCE);
 
+/** Meters as feet, to one decimal. */
 export const metersToFeet = (meters: number): number =>
   roundTo(1, meters / METERS_PER_FOOT);
 
+/** Kelvin as degrees Celsius, to one decimal. */
 export const kelvinToCelsius = (kelvin: number): number =>
   roundTo(1, kelvin - CELSIUS_OFFSET);
 
@@ -60,15 +68,19 @@ export const kelvinToCelsius = (kelvin: number): number =>
 export const kelvinToFahrenheit = (kelvin: number): number =>
   roundTo(1, (kelvin - CELSIUS_OFFSET) * (9 / 5) + 32);
 
-export const squareMetersToSquareFeet = (squareMeters: number): number =>
-  roundTo(1, squareMeters * SQUARE_FEET_PER_SQUARE_METER);
-
+/** Micrometers as mils, to two decimals. */
 export const micrometersToMils = (micrometers: number): number =>
   roundTo(2, micrometers / MICROMETERS_PER_MIL);
 
+/** Nanometers as microinches, to two decimals. */
+export const nanometersToMicroinches = (nanometers: number): number =>
+  roundTo(2, nanometers / NANOMETERS_PER_MICROINCH);
+
+/** Newton-meters as pound-feet, to two decimals. */
 export const newtonMetersToPoundFeet = (newtonMeters: number): number =>
   roundTo(2, newtonMeters / NEWTON_METERS_PER_POUND_FOOT);
 
+/** Millimeters as inches, to three decimals. */
 export const millimetersToInches = (millimeters: number): number =>
   roundTo(3, millimeters / MILLIMETERS_PER_INCH);
 
@@ -82,35 +94,42 @@ export const millimetersToInches = (millimeters: number): number =>
 export type ColorMetric = Readonly<{
   temperatureKelvin: number;
   reachMeters: number;
+  /** Thickness of the interference coating. Zero for bare paint. */
+  coatingNanometers: number;
   weightGrams: number;
 }>;
 
+/** A color's measurements in both systems, ready to display. */
 export type ColorMeasurements = Readonly<{
   of: "color";
   metric: Readonly<{
     temperatureCelsius: number;
     reachMeters: number;
+    coatingNanometers: number;
     weightGrams: number;
   }>;
   imperial: Readonly<{
     temperatureFahrenheit: number;
     reachFeet: number;
+    coatingMicroinches: number;
     weightOunces: number;
   }>;
 }>;
 
 /** What a tin of finisher measures. */
 export type FinisherMetric = Readonly<{
-  coverageSquareMeters: number;
+  /** Thickness of the interference coating it lays down. Zero leaves paint bare. */
+  coatingNanometers: number;
   grainMicrometers: number;
   weightGrams: number;
 }>;
 
+/** A finisher's measurements in both systems, ready to display. */
 export type FinisherMeasurements = Readonly<{
   of: "finisher";
   metric: FinisherMetric;
   imperial: Readonly<{
-    coverageSquareFeet: number;
+    coatingMicroinches: number;
     grainMils: number;
     weightOunces: number;
   }>;
@@ -123,6 +142,7 @@ export type ShifterMetric = Readonly<{
   weightGrams: number;
 }>;
 
+/** A shifter's measurements in both systems, ready to display. */
 export type ShifterMeasurements = Readonly<{
   of: "shifter";
   metric: ShifterMetric;
@@ -143,30 +163,35 @@ export type Measurements =
   | FinisherMeasurements
   | ShifterMeasurements;
 
+/** Both systems for a color, from the metric values Postgres generated. */
 export const measureColor = (metric: ColorMetric): ColorMeasurements => ({
   of: "color",
   metric: {
     temperatureCelsius: kelvinToCelsius(metric.temperatureKelvin),
     reachMeters: metric.reachMeters,
+    coatingNanometers: metric.coatingNanometers,
     weightGrams: metric.weightGrams,
   },
   imperial: {
     temperatureFahrenheit: kelvinToFahrenheit(metric.temperatureKelvin),
     reachFeet: metersToFeet(metric.reachMeters),
+    coatingMicroinches: nanometersToMicroinches(metric.coatingNanometers),
     weightOunces: gramsToOunces(metric.weightGrams),
   },
 });
 
+/** Both systems for a finisher, from the metric values Postgres generated. */
 export const measureFinisher = (metric: FinisherMetric): FinisherMeasurements => ({
   of: "finisher",
   metric,
   imperial: {
-    coverageSquareFeet: squareMetersToSquareFeet(metric.coverageSquareMeters),
+    coatingMicroinches: nanometersToMicroinches(metric.coatingNanometers),
     grainMils: micrometersToMils(metric.grainMicrometers),
     weightOunces: gramsToOunces(metric.weightGrams),
   },
 });
 
+/** Both systems for a shifter, from the metric values Postgres generated. */
 export const measureShifter = (metric: ShifterMetric): ShifterMeasurements => ({
   of: "shifter",
   metric,

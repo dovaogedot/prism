@@ -16,6 +16,7 @@ const escapeHtml = (value: string): string =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
+/** The consent page, with every value it is given escaped into the markup. */
 export const renderMockConsentPage = (input: {
   provider: OAuthProviderName;
   state: string;

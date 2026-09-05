@@ -19,11 +19,13 @@ import {
 const empty: SpecColumns = {
   kind: "color",
   hex: null,
-  finish: null,
+  roughness: null,
+  coatingNanometers: null,
+  emission: null,
   hue: null,
   saturation: null,
   lightness: null,
-  durability: null,
+  family: null,
   arcDegrees: null,
   direction: null,
 };
@@ -32,17 +34,21 @@ const color: SpecColumns = {
   ...empty,
   kind: "color",
   hex: "#ff8800",
-  finish: "gloss",
+  roughness: 18,
+  coatingNanometers: 300,
+  emission: 0,
   hue: 32,
   saturation: 100,
   lightness: 50,
+  family: "orange",
 };
 
 const finisher: SpecColumns = {
   ...empty,
   kind: "finisher",
-  finish: "matte",
-  durability: 12,
+  roughness: 88,
+  coatingNanometers: 0,
+  emission: 0,
 };
 
 const shifter: SpecColumns = {
@@ -53,12 +59,15 @@ const shifter: SpecColumns = {
 };
 
 describe("toProductSpec", () => {
-  it("builds a color from its hex, finish and three channels", () => {
+  it("builds a color from its hex, its three amounts and three channels", () => {
     expect(toProductSpec(color)).toEqual(
       Option.some({
         kind: "color",
         hex: "#ff8800",
-        finish: "gloss",
+        family: "orange",
+        roughness: 18,
+        coatingNanometers: 300,
+        emission: 0,
         hue: 32,
         saturation: 100,
         lightness: 50,
@@ -66,9 +75,14 @@ describe("toProductSpec", () => {
     );
   });
 
-  it("builds a finisher from its finish and durability", () => {
+  it("builds a finisher from the finish it leaves", () => {
     expect(toProductSpec(finisher)).toEqual(
-      Option.some({ kind: "finisher", finish: "matte", durability: 12 }),
+      Option.some({
+        kind: "finisher",
+        roughness: 88,
+        coatingNanometers: 0,
+        emission: 0,
+      }),
     );
   });
 
@@ -85,7 +99,10 @@ describe("toProductSpec", () => {
       Option.some({
         kind: "color",
         hex: "#ff8800",
-        finish: "gloss",
+        family: "orange",
+        roughness: 18,
+        coatingNanometers: 300,
+        emission: 0,
         hue: 32,
         saturation: 100,
         lightness: 50,
@@ -94,11 +111,18 @@ describe("toProductSpec", () => {
   });
 
   it("keeps a zero arc and a zero channel, which are values and not absence", () => {
-    expect(toProductSpec({ ...color, hue: 0, lightness: 0 })).toEqual(
+    // Iridescence and emission are the same story: nought is what most colors
+    // have, and a branch that treated it as a missing column would drop them.
+    expect(
+      toProductSpec({ ...color, hue: 0, lightness: 0, coatingNanometers: 0 }),
+    ).toEqual(
       Option.some({
         kind: "color",
         hex: "#ff8800",
-        finish: "gloss",
+        family: "orange",
+        roughness: 18,
+        coatingNanometers: 0,
+        emission: 0,
         hue: 0,
         saturation: 100,
         lightness: 0,
@@ -114,8 +138,8 @@ describe("toProductSpec", () => {
     expect(toProductSpec({ ...color, saturation: null })).toEqual(Option.none);
   });
 
-  it("refuses a finisher with no durability", () => {
-    expect(toProductSpec({ ...finisher, durability: null })).toEqual(Option.none);
+  it("refuses a finisher with no roughness", () => {
+    expect(toProductSpec({ ...finisher, roughness: null })).toEqual(Option.none);
   });
 
   it("refuses a shifter with no direction", () => {
@@ -135,7 +159,7 @@ const noMeasurements: MeasurementColumns = {
   kind: "color",
   temperatureKelvin: null,
   reachCentimeters: null,
-  coverageSquareCentimeters: null,
+  coatingNanometers: null,
   grainMicrometers: null,
   torqueMillinewtonMeters: null,
   backlashMicrometers: null,
@@ -147,8 +171,9 @@ const colorColumns: MeasurementColumns = {
   kind: "color",
   temperatureKelvin: 2596,
   reachCentimeters: 29_350,
-  // A color has a grain too, because grain comes from the finish and a color
-  // has one. It is simply never part of a color's measurements.
+  coatingNanometers: 320,
+  // A color has a grain too, because grain comes from the roughness and a
+  // color has one. It is simply never part of a color's measurements.
   grainMicrometers: 3,
   weightGrams: 99,
 };
@@ -156,7 +181,7 @@ const colorColumns: MeasurementColumns = {
 const finisherColumns: MeasurementColumns = {
   ...noMeasurements,
   kind: "finisher",
-  coverageSquareCentimeters: 252_000,
+  coatingNanometers: 320,
   grainMicrometers: 34,
   weightGrams: 235,
 };
@@ -171,38 +196,39 @@ const shifterColumns: MeasurementColumns = {
 
 describe("toMeasurements", () => {
   it("scales a color's columns to the units a shopper reads", () => {
-    // Centimetres in the column so it stays an exact integer; metres on screen.
+    // Centimeters in the column so it stays an exact integer; meters on screen.
     expect(toMeasurements(colorColumns)).toEqual(
       Option.some({
         of: "color",
         metric: {
           temperatureCelsius: 2322.9,
           reachMeters: 293.5,
+          coatingNanometers: 320,
           weightGrams: 99,
         },
         imperial: {
           temperatureFahrenheit: 4213.1,
           reachFeet: 962.9,
+          coatingMicroinches: 12.6,
           weightOunces: 3.49,
         },
       }),
     );
   });
 
-  it("scales a finisher's coverage from square centimetres", () => {
-    // The area trap: 252 000 cm² is 25.2 m², not 2520.
+  it("gives a finisher the coating it lays down, in both systems", () => {
     const measurements = toMeasurements(finisherColumns);
 
     expect(measurements).toEqual(
       Option.some({
         of: "finisher",
         metric: {
-          coverageSquareMeters: 25.2,
+          coatingNanometers: 320,
           grainMicrometers: 34,
           weightGrams: 235,
         },
         imperial: {
-          coverageSquareFeet: 271.3,
+          coatingMicroinches: 12.6,
           grainMils: 1.34,
           weightOunces: 8.29,
         },
@@ -245,7 +271,7 @@ describe("toMeasurements", () => {
       Option.none,
     );
     expect(
-      toMeasurements({ ...finisherColumns, coverageSquareCentimeters: null }),
+      toMeasurements({ ...finisherColumns, grainMicrometers: null }),
     ).toEqual(Option.none);
     expect(toMeasurements({ ...shifterColumns, backlashMicrometers: null })).toEqual(
       Option.none,

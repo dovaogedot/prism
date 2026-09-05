@@ -14,18 +14,19 @@
 import type { DomainError } from "@prism/shared";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 
+/** Deciding whether a widget response came from a person. */
 export type CaptchaVerifier = Readonly<{
   verify: (response: string, remoteIp: string) => ResultAsync<true, DomainError>;
 }>;
 
-/** Google's documented always-pass test key pair. */
-export const RECAPTCHA_TEST_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
+/** Google's documented always-pass test secret, which accepts every response. */
 export const RECAPTCHA_TEST_SECRET_KEY = "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe";
 
 const SITEVERIFY_URL = "https://www.google.com/recaptcha/api/siteverify";
 
 const rejected: DomainError = { _tag: "CaptchaRejected" };
 
+/** Accepts any non-empty response without a network call. */
 export const createTestCaptchaVerifier = (): CaptchaVerifier => ({
   verify: (response) =>
     response.trim().length > 0 ? okAsync(true) : errAsync(rejected),
@@ -37,6 +38,7 @@ const isSuccessfulVerification = (payload: unknown): boolean =>
   "success" in payload &&
   payload.success === true;
 
+/** Asks Google about the response. A verification that cannot be made is a rejection. */
 export const createGoogleCaptchaVerifier = (
   secretKey: string,
 ): CaptchaVerifier => ({

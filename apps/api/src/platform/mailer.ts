@@ -10,6 +10,7 @@
 import { Option } from "@prism/shared";
 import { createTransport, type Transporter } from "nodemailer";
 
+/** One message, carrying both bodies so a client can take either. */
 export type Email = Readonly<{
   to: string;
   subject: string;
@@ -17,12 +18,15 @@ export type Email = Readonly<{
   html: string;
 }>;
 
+/** Sending a message. Answers whether it went, and never raises. */
 export type Mailer = Readonly<{
   send: (email: Email) => Promise<boolean>;
 }>;
 
+/** What an SMTP server asks for before it will relay. */
 export type SmtpCredentials = Readonly<{ user: string; password: string }>;
 
+/** Which server to hand messages to, and who they come from. */
 export type MailerOptions = Readonly<{
   host: string;
   port: number;
@@ -34,6 +38,7 @@ export type MailerOptions = Readonly<{
   onFailure: (reason: unknown) => void;
 }>;
 
+/** Hands messages to an SMTP server. A failure is reported and swallowed. */
 export const createSmtpMailer = (options: MailerOptions): Mailer => {
   const transport: Transporter = createTransport({
     host: options.host,
@@ -66,6 +71,7 @@ export const createSmtpMailer = (options: MailerOptions): Mailer => {
   };
 };
 
+/** A mailer that keeps what it was given, in the order it was given. */
 export type MemoryMailer = Mailer &
   Readonly<{ sent: readonly Email[]; clear: () => void }>;
 

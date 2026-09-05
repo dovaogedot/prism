@@ -1,3 +1,4 @@
+/** A turning ring, hidden from screen readers because the label already says it. */
 export const Spinner = () => (
   <span
     aria-hidden="true"

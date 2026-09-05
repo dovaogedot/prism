@@ -71,11 +71,13 @@ const loadScript = (): Promise<void> =>
     document.head.appendChild(script);
   });
 
+/** Where a solved challenge goes, and which of reCAPTCHA's two themes to render. */
 export type CaptchaProps = Readonly<{
   onToken: (token: string) => void;
   dark: boolean;
 }>;
 
+/** The reCAPTCHA widget. Says so plainly when the script cannot be reached. */
 export const Captcha = ({ onToken, dark }: CaptchaProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<"loading" | "ready" | "unavailable">("loading");

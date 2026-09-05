@@ -12,6 +12,7 @@
 import { Option } from "@prism/shared";
 import type { Clock } from "./clock.ts";
 
+/** Values held under string keys, each forgotten once its time is up. */
 export type Cache<A> = Readonly<{
   get: (key: string) => Option<A>;
   set: (key: string, value: A) => void;
@@ -20,6 +21,7 @@ export type Cache<A> = Readonly<{
   size: () => number;
 }>;
 
+/** How long a cache holds a value, and how many it may hold at once. */
 export type CacheOptions = Readonly<{
   clock: Clock;
   ttlSeconds: number;
@@ -31,6 +33,12 @@ type Entry<A> = Readonly<{ value: A; expiresAtMs: number }>;
 
 const DEFAULT_MAX_ENTRIES = 500;
 
+/**
+ * A cache in this process's memory.
+ *
+ * Entries expire against the injected clock, and the oldest insertion is
+ * evicted once the cache is full.
+ */
 export const createTtlCache = <A>(options: CacheOptions): Cache<A> => {
   const { clock, ttlSeconds } = options;
   const maxEntries = options.maxEntries ?? DEFAULT_MAX_ENTRIES;

@@ -14,6 +14,7 @@ export type FieldProps = InputHTMLAttributes<HTMLInputElement> &
     error?: string | undefined;
   }>;
 
+/** A labelled input, with its hint and error tied to it for a screen reader. */
 export const Field = forwardRef<HTMLInputElement, FieldProps>(
   ({ label, hint, error, id, className = "", ...rest }, ref) => {
     const fieldId = id ?? rest.name ?? label.toLowerCase().replace(/\s+/g, "-");

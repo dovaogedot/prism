@@ -9,9 +9,9 @@ import {
   metersToFeet,
   micrometersToMils,
   millimetersToInches,
+  nanometersToMicroinches,
   newtonMetersToPoundFeet,
   roundTo,
-  squareMetersToSquareFeet,
   type ColorMetric,
   type FinisherMetric,
   type ShifterMetric,
@@ -21,12 +21,13 @@ import {
 const gold: ColorMetric = {
   temperatureKelvin: 2596,
   reachMeters: 293.5,
+  coatingNanometers: 320,
   weightGrams: 99,
 };
 
-/** A matte bath good for twelve colors. */
+/** A matte bath that leaves a 320 nm coating. */
 const bath: FinisherMetric = {
-  coverageSquareMeters: 25.2,
+  coatingNanometers: 320,
   grainMicrometers: 34,
   weightGrams: 235,
 };
@@ -107,19 +108,8 @@ describe("kelvinToFahrenheit", () => {
   });
 });
 
-describe("squareMetersToSquareFeet", () => {
-  it("converts a square metre", () => {
-    expect(squareMetersToSquareFeet(1)).toBe(10.8);
-  });
-
-  it("scales as an area rather than as a length", () => {
-    // The trap: 3 m is 9.8 ft, but 3 m² is 32.3 ft², not 9.8.
-    expect(squareMetersToSquareFeet(3)).toBe(32.3);
-  });
-});
-
 describe("micrometersToMils", () => {
-  it("puts a mil at 25.4 micrometres, being a thousandth of an inch", () => {
+  it("puts a mil at 25.4 micrometers, being a thousandth of an inch", () => {
     expect(micrometersToMils(25.4)).toBe(1);
   });
 
@@ -139,12 +129,12 @@ describe("newtonMetersToPoundFeet", () => {
 });
 
 describe("millimetersToInches", () => {
-  it("puts an inch at 25.4 millimetres", () => {
+  it("puts an inch at 25.4 millimeters", () => {
     expect(millimetersToInches(25.4)).toBe(1);
   });
 
-  it("keeps enough places for a number that never leaves the sub-millimetre", () => {
-    // Backlash is fractions of a millimetre, so two decimal places of inches
+  it("keeps enough places for a number that never leaves the sub-millimeter", () => {
+    // Backlash is fractions of a millimeter, so two decimal places of inches
     // would round every shifter in the catalog to the same 0.03 in.
     expect(millimetersToInches(0.64)).toBe(0.025);
     expect(millimetersToInches(0.9)).toBe(0.035);
@@ -158,6 +148,7 @@ describe("measureColor", () => {
     expect(measureColor(gold).metric).toEqual({
       temperatureCelsius: kelvinToCelsius(2596),
       reachMeters: 293.5,
+      coatingNanometers: 320,
       weightGrams: 99,
     });
     expect(measureColor(gold).metric).not.toHaveProperty("temperatureKelvin");
@@ -167,6 +158,7 @@ describe("measureColor", () => {
     expect(measureColor(gold).imperial).toEqual({
       temperatureFahrenheit: kelvinToFahrenheit(2596),
       reachFeet: metersToFeet(293.5),
+      coatingMicroinches: nanometersToMicroinches(320),
       weightOunces: gramsToOunces(99),
     });
   });
@@ -186,18 +178,25 @@ describe("measureFinisher", () => {
       of: "finisher",
       metric: bath,
       imperial: {
-        coverageSquareFeet: squareMetersToSquareFeet(25.2),
+        coatingMicroinches: nanometersToMicroinches(320),
         grainMils: micrometersToMils(34),
         weightOunces: gramsToOunces(235),
       },
     });
   });
 
-  it("shares only weight with a color", () => {
+  it("shares with a color exactly what a tin and a surface both have", () => {
+    // A coating, because a tin lays down the layer a color wears, and a
+    // weight, because everything in the shop has one. Not a temperature and
+    // not a reach: those are things a color does with light, and a tin is not
+    // a color.
     const finisher = Object.keys(measureFinisher(bath).metric);
     const color = Object.keys(measureColor(gold).metric);
 
-    expect(finisher.filter((key) => color.includes(key))).toEqual(["weightGrams"]);
+    expect(finisher.filter((key) => color.includes(key))).toEqual([
+      "coatingNanometers",
+      "weightGrams",
+    ]);
   });
 });
 
@@ -227,5 +226,18 @@ describe("every kind tags its measurements", () => {
     expect(measureColor(gold).of).toBe("color");
     expect(measureFinisher(bath).of).toBe("finisher");
     expect(measureShifter(swing).of).toBe("shifter");
+  });
+});
+
+describe("nanometersToMicroinches", () => {
+  it("converts a coating to the unit an inch-shop measures it in", () => {
+    // A microinch is 25.4 nm exactly, the same ratio as the mil three decimal
+    // places up. A 320 nm coating is a shade over twelve and a half of them.
+    expect(nanometersToMicroinches(25.4)).toBe(1);
+    expect(nanometersToMicroinches(320)).toBe(12.6);
+  });
+
+  it("gives bare paint no thickness", () => {
+    expect(nanometersToMicroinches(0)).toBe(0);
   });
 });

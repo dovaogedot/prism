@@ -13,9 +13,6 @@ import {
   buildConditions,
   buildOrderBy,
   combineConditions,
-  categorySubtreeMatching,
-  descendantCategoryIds,
-  finishLabel,
   hueCondition,
   nameContains,
   ratingFacetLabel,
@@ -36,9 +33,12 @@ const render = (fragment: Parameters<typeof dialect.sqlToQuery>[0]) =>
 const baseQuery: ProductQuery = {
   text: Option.none,
   kind: Option.none,
-  tagSlug: Option.none,
+  family: Option.none,
   brandSlugs: [],
-  finishes: [],
+  finish: Option.none,
+  roughness: Option.none,
+  coating: Option.none,
+  emission: Option.none,
   price: Option.none,
   minRating: Option.none,
   hue: Option.none,
@@ -77,35 +77,6 @@ describe("toTsQuery", () => {
   });
 });
 
-describe("descendantCategoryIds", () => {
-  it("walks the tree downwards with a recursive CTE", () => {
-    const { sql, params } = render(descendantCategoryIds("reds"));
-
-    expect(sql).toContain("WITH RECURSIVE");
-    expect(sql).toContain("child.parent_id = subtree.id");
-    expect(params).toEqual(["reds"]);
-  });
-});
-
-describe("categorySubtreeMatching", () => {
-  it("matches a category by name and then walks down from it", () => {
-    const { sql, params } = render(categorySubtreeMatching("yellows"));
-
-    expect(sql).toContain("WITH RECURSIVE");
-    expect(sql).toContain("search_vector @@");
-    expect(sql).toContain("child.parent_id = matched.id");
-    expect(params).toEqual(["yellows"]);
-  });
-
-  it("binds the term rather than concatenating it", () => {
-    const payload = "'; DROP TABLE category; --";
-    const { sql, params } = render(categorySubtreeMatching(payload));
-
-    expect(sql).not.toContain("DROP");
-    expect(params).toEqual([payload]);
-  });
-});
-
 describe("hueCondition", () => {
   it("uses a plain interval for an ordinary range", () => {
     const { sql, params } = render(hueCondition({ min: 90, max: 150 }));
@@ -137,13 +108,12 @@ describe("buildConditions", () => {
   it("adds one condition per active filter", () => {
     const conditions = buildConditions({
       ...baseQuery,
-      tagSlug: Option.some("red"),
+      family: Option.some("red"),
       brandSlugs: ["chroma-labs"],
-      finishes: ["matte"],
       minRating: Option.some(4),
     });
 
-    expect(conditions).toHaveLength(4);
+    expect(conditions).toHaveLength(3);
   });
 
   it("expands a price range into two bounds", () => {
@@ -155,7 +125,7 @@ describe("buildConditions", () => {
     expect(conditions).toHaveLength(2);
   });
 
-  it("searches the color, its foundry and its category tree alike", () => {
+  it("searches the product and its foundry alike", () => {
     const conditions = buildConditions({
       ...baseQuery,
       text: Option.some("cyan"),
@@ -165,18 +135,14 @@ describe("buildConditions", () => {
 
     expect(sql).toContain("search_vector");
     expect(sql).toContain("brand_search_vector");
-    // The category half goes through the subtree walk rather than the view's
-    // own vector, so that a parent category name finds its children.
-    expect(sql).toContain("child.parent_id = matched.id");
     expect(sql).toContain("ILIKE");
   });
 
   describe("facet exclusion", () => {
     const filtered: ProductQuery = {
       ...baseQuery,
-      tagSlug: Option.some("red"),
+      family: Option.some("red"),
       brandSlugs: ["chroma-labs"],
-      finishes: ["matte"],
       minRating: Option.some(4),
     };
 
@@ -189,15 +155,18 @@ describe("buildConditions", () => {
       expect(withoutBrand).toHaveLength(withAll.length - 1);
     });
 
-    it("omits the tag filter when counting tags", () => {
-      expect(buildConditions(filtered, Option.some("tag"))).toHaveLength(3);
+    it("keeps the family filter in every count, having no facet of its own", () => {
+      // A family is what a typed word resolves to, not a choice in the rail,
+      // so there is no count it could distort by staying applied.
+      expect(buildConditions(filtered, Option.some("brand"))).toHaveLength(2);
+      expect(buildConditions(filtered, Option.some("rating"))).toHaveLength(2);
     });
 
     it("omits both price bounds when computing price extents", () => {
       const priced = { ...filtered, price: Option.some({ min: 1, max: 2 }) };
 
-      expect(buildConditions(priced)).toHaveLength(6);
-      expect(buildConditions(priced, Option.some("price"))).toHaveLength(4);
+      expect(buildConditions(priced)).toHaveLength(5);
+      expect(buildConditions(priced, Option.some("price"))).toHaveLength(3);
     });
 
     it("drops every kind-specific filter when counting categories", () => {
@@ -222,7 +191,7 @@ describe("buildConditions", () => {
       const colors: ProductQuery = {
         ...baseQuery,
         kind: Option.some("color"),
-        finishes: ["matte"],
+        roughness: Option.some({ min: 5, max: 40 }),
         hue: Option.some({ min: 0, max: 60 }),
         saturation: Option.some({ min: 10, max: 90 }),
         lightness: Option.some({ min: 10, max: 90 }),
@@ -233,19 +202,19 @@ describe("buildConditions", () => {
       expect(buildConditions(colors, Option.some("kind"))).toHaveLength(1);
     });
 
-    it("keeps the tag filter when counting categories", () => {
-      // A tag belongs to exactly one category, so it does not distort the
-      // others' counts — it zeroes them honestly.
-      const tagged = { ...baseQuery, tagSlug: Option.some("acid") };
+    it("keeps the family filter when counting categories", () => {
+      // Only colors have a family, so it does not distort the other two
+      // categories' counts — it zeroes them honestly.
+      const inFamily = { ...baseQuery, family: Option.some("gold" as const) };
 
-      expect(buildConditions(tagged, Option.some("kind"))).toHaveLength(1);
+      expect(buildConditions(inFamily, Option.some("kind"))).toHaveLength(1);
     });
 
     it("keeps the search term in every facet count", () => {
       // The term narrows the result set itself; it is not a facet dimension.
       const searched = { ...filtered, text: Option.some("red") };
 
-      for (const dimension of ["brand", "tag", "finish", "rating"] as const) {
+      for (const dimension of ["brand", "finish", "rating"] as const) {
         const conditions = buildConditions(searched, Option.some(dimension));
         const rendered = conditions.map((condition) => render(condition).sql);
 
@@ -320,13 +289,7 @@ describe("relevanceExpression", () => {
     const { sql, params } = render(relevanceExpression("crimson"));
 
     expect(sql).not.toContain("crimson");
-    expect(params).toEqual([
-      "crimson%",
-      "%crimson%",
-      "crimson",
-      "crimson",
-      "crimson",
-    ]);
+    expect(params).toEqual(["crimson%", "%crimson%", "crimson", "crimson"]);
   });
 });
 
@@ -384,10 +347,5 @@ describe("facet labels", () => {
   it("says 1 star and 4 stars correctly", () => {
     expect(ratingFacetLabel(1)).toBe("1 star & up");
     expect(ratingFacetLabel(4)).toBe("4 stars & up");
-  });
-
-  it("capitalizes finishes for display", () => {
-    expect(finishLabel("matte")).toBe("Matte");
-    expect(finishLabel("fluorescent")).toBe("Fluorescent");
   });
 });
