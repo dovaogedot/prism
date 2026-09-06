@@ -89,7 +89,15 @@ export const buildApp = async (input: AppInput): Promise<FastifyInstance> => {
     // Caddy terminates the connection, so the client's address arrives in a
     // header. Without this every request appears to come from the proxy and
     // rate limiting becomes global rather than per-client.
-    trustProxy: true,
+    //
+    // Trusted by address rather than by `true` or a hop count. `true` trusts
+    // the whole X-Forwarded-For chain, which lets a caller name any address it
+    // likes and spend a fresh rate-limit budget on each one; a hop count is
+    // right for exactly one topology and wrong the moment a proxy is added or
+    // removed. Trusting the private ranges instead means the address taken is
+    // the first one no proxy on this network vouched for, which is the caller,
+    // whatever they put in the header and however many proxies are in front.
+    trustProxy: "loopback, linklocal, uniquelocal",
     bodyLimit: 256 * 1024,
   });
 

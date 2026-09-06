@@ -881,6 +881,14 @@ teach people to write `Password1!`.
 filename or the declared `Content-Type`, and the stored filename is the SHA-256 of the
 bytes — so nothing an uploader controls ever reaches the filesystem.
 
+**The client's address is the one no proxy vouched for.** Rate limiting is only
+protection if its budget cannot be reset at will, and the budget is keyed on the caller's
+address. Trusting the whole `X-Forwarded-For` chain would let a caller name a fresh address
+on every request and never spend the same budget twice, so Fastify is given the private
+ranges to trust instead: the address taken is the first one no proxy on this network
+vouched for, whatever the header says and however many proxies stand in front. A security
+test spends the budget through a rotating forged header and expects the refusal anyway.
+
 **Validation runs on both sides from one definition.** The Zod schemas in
 `packages/shared` are simultaneously the server validator, the OpenAPI spec, and the
 client-side form rules. There is one place to change a rule and no way for the two sides to

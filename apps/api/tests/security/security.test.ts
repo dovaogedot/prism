@@ -438,6 +438,30 @@ describe("rate limiting", () => {
     expect(jsonOf(refused)["error"]).toMatchObject({ code: "RateLimited" });
   });
 
+  it("ignores a forwarded address the caller made up", async () => {
+    // The whole point of the budget is that it cannot be reset at will. With
+    // the entire X-Forwarded-For chain trusted, a caller could name a new
+    // address on every request and never spend the same budget twice; the
+    // address that counts is the one no proxy on this network vouched for.
+    const spoofed = (claimed: string) =>
+      throttled.inject({
+        method: "POST",
+        url: "/api/v1/auth/login",
+        payload: { email: "target@example.com", password: "guess number one here" },
+        // A public address, so nothing about this request is trusted.
+        remoteAddress: "198.51.100.7",
+        headers: { "x-forwarded-for": claimed },
+      });
+
+    const statuses: number[] = [];
+
+    for (let index = 0; index < LIMIT + 3; index += 1) {
+      statuses.push((await spoofed(`203.0.113.${120 + index}`)).statusCode);
+    }
+
+    expect(statuses).toContain(429);
+  });
+
   it("budgets each client address separately", async () => {
     for (let index = 0; index < LIMIT + 3; index += 1) {
       await attempt("203.0.113.11");
