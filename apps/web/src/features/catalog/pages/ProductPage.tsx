@@ -3,21 +3,27 @@
  *
  * The measurements block is where the metric/imperial requirement shows up:
  * the server sends both, derived from one set of metric values, and the toggle
- * picks which vocabulary to read them in. What a kind measures follows from
- * what it carries, so a color has one row the other two have no answer for.
+ * picks which vocabulary to read them in. Which rows those are follows from
+ * what the product is, and that reading lives in `@prism/shared` — this page
+ * prints the rows it is handed.
  *
- * The spec block above it is not: it is the variant part of the product, and
- * it is rendered by matching on the variant.
+ * The spec block above it is the variant part of the product, and it is
+ * rendered by matching on the variant.
  */
 
 import {
+  describeApplication,
   DIRECTION_LABELS,
+  finishAmount,
+  FINISH_AXIS_LABELS,
   formatPrice,
   isCents,
   KIND_LABELS,
   type Measurements,
+  measurementRows,
   type ProductDetail,
   type ProductSpec,
+  type UnitSystem,
 } from "@prism/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -25,9 +31,8 @@ import { Link, useParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { api } from "../../../shared/api/client.ts";
 import { Artwork } from "../components/Artwork.tsx";
+import { Gallery } from "../components/Gallery.tsx";
 import { Alert, Card, Skeleton, Stars } from "../../../shared/ui/index.ts";
-
-type UnitSystem = "metric" | "imperial";
 
 const Spec = ({ label, value }: Readonly<{ label: string; value: string }>) => (
   <div className="flex items-baseline justify-between gap-4 py-2">
@@ -36,78 +41,17 @@ const Spec = ({ label, value }: Readonly<{ label: string; value: string }>) => (
   </div>
 );
 
-/**
- * The measurement rows, which differ by kind because what there is to measure
- * differs by kind. A tin of finisher has no temperature and no reach; it has a
- * coverage and a grain. A shifter is a mechanism, so it has a torque and the
- * play in its gear. Weight is the one all three share.
- *
- * Kelvin is deliberately absent. It is what the column stores, being the unit
- * the derivation is defined in, but "6208 K" describes a light source rather
- * than this color — °C and °F are the two a shopper can act on.
- */
-const MeasurementRows = ({
-  measurements,
-  system,
-}: Readonly<{ measurements: Measurements; system: UnitSystem }>) =>
-  match([measurements, system] as const)
-    .with([{ of: "color" }, "metric"], ([{ metric }]) => (
-      <>
-        <Spec label="Temperature" value={`${metric.temperatureCelsius} °C`} />
-        <Spec label="Reach" value={`${metric.reachMeters} m`} />
-        <Spec label="Coating" value={`${metric.coatingNanometers} nm`} />
-        <Spec label="Weight" value={`${metric.weightGrams} g`} />
-      </>
-    ))
-    .with([{ of: "color" }, "imperial"], ([{ imperial }]) => (
-      <>
-        <Spec label="Temperature" value={`${imperial.temperatureFahrenheit} °F`} />
-        <Spec label="Reach" value={`${imperial.reachFeet} ft`} />
-        <Spec label="Coating" value={`${imperial.coatingMicroinches} µin`} />
-        <Spec label="Weight" value={`${imperial.weightOunces} oz`} />
-      </>
-    ))
-    .with([{ of: "finisher" }, "metric"], ([{ metric }]) => (
-      <>
-        <Spec label="Coating" value={`${metric.coatingNanometers} nm`} />
-        <Spec label="Grain" value={`${metric.grainMicrometers} µm`} />
-        <Spec label="Weight" value={`${metric.weightGrams} g`} />
-      </>
-    ))
-    .with([{ of: "finisher" }, "imperial"], ([{ imperial }]) => (
-      <>
-        <Spec label="Coating" value={`${imperial.coatingMicroinches} µin`} />
-        <Spec label="Grain" value={`${imperial.grainMils} mil`} />
-        <Spec label="Weight" value={`${imperial.weightOunces} oz`} />
-      </>
-    ))
-    .with([{ of: "shifter" }, "metric"], ([{ metric }]) => (
-      <>
-        <Spec label="Torque" value={`${metric.torqueNewtonMeters} N·m`} />
-        <Spec label="Backlash" value={`${metric.backlashMillimeters} mm`} />
-        <Spec label="Weight" value={`${metric.weightGrams} g`} />
-      </>
-    ))
-    .with([{ of: "shifter" }, "imperial"], ([{ imperial }]) => (
-      <>
-        <Spec label="Torque" value={`${imperial.torquePoundFeet} lbf·ft`} />
-        <Spec label="Backlash" value={`${imperial.backlashInches} in`} />
-        <Spec label="Weight" value={`${imperial.weightOunces} oz`} />
-      </>
-    ))
-    .exhaustive();
-
 /** Six words each, since nobody has met any of these numbers before. */
 const MEASUREMENT_NOTES: Record<Measurements["of"], string> = {
   color:
     "How warm it burns, how far it still reads, how thick the layer over it is, and how heavy it looks.",
   finisher:
-    "How much surface it will see through, how much texture it leaves, and how heavy the tin is.",
+    "The one dimension the effect it sells has, and how heavy the tin is.",
   shifter:
     "How hard it has to turn, how much play there is before the color moves, and how heavy the gear is.",
 };
 
-const Measurements = ({ product }: Readonly<{ product: ProductDetail }>) => {
+const MeasurementBlock = ({ product }: Readonly<{ product: ProductDetail }>) => {
   const [system, setSystem] = useState<UnitSystem>("metric");
 
   return (
@@ -139,7 +83,9 @@ const Measurements = ({ product }: Readonly<{ product: ProductDetail }>) => {
       </div>
 
       <dl className="divide-y divide-line">
-        <MeasurementRows measurements={product.measurements} system={system} />
+        {measurementRows(product.measurements, system).map((row) => (
+          <Spec key={row.label} label={row.label} value={row.value} />
+        ))}
       </dl>
 
       {/*
@@ -186,7 +132,15 @@ const SpecRows = ({ spec }: Readonly<{ spec: ProductSpec }>) =>
         <FinishRows finishing={color} />
       </>
     ))
-    .with({ kind: "finisher" }, (finisher) => <FinishRows finishing={finisher} />)
+    // One row, because a tin carries one amount. Which amount it is names the
+    // row, so there is never a row here reading zero for something the tin
+    // does not do.
+    .with({ kind: "finisher" }, (finisher) => (
+      <Spec
+        label={FINISH_AXIS_LABELS[finisher.applies]}
+        value={finishAmount(finisher)}
+      />
+    ))
     .with({ kind: "shifter" }, (shifter) => (
       <>
         <Spec label="Direction" value={DIRECTION_LABELS[shifter.direction]} />
@@ -239,12 +193,31 @@ export const ProductPage = () => {
         ))
         .otherwise(({ data }) => (
           <article className="grid gap-10 lg:grid-cols-2">
-            <Artwork
-              spec={data.spec}
-              name={data.name}
-              image={data.primaryImage}
-              className="aspect-square w-full rounded-[--radius-card] border border-line"
-            />
+            {/*
+              A tin is photographed, not drawn. It holds no color of its own,
+              so what it has to show is what it does to four that do, and that
+              is a set of pictures rather than one. The other two kinds carry
+              at most one picture and are drawn from their own numbers.
+            */}
+            {match(data)
+              .with(
+                { spec: { kind: "finisher" }, images: [P.any, ...P.array()] },
+                ({ spec, images, name }) => (
+                  <Gallery
+                    key={data.slug}
+                    images={images}
+                    alt={`${name} — ${describeApplication(spec)}`}
+                  />
+                ),
+              )
+              .otherwise(() => (
+                <Artwork
+                  spec={data.spec}
+                  name={data.name}
+                  image={data.primaryImage}
+                  className="aspect-square w-full rounded-[--radius-card] border border-line"
+                />
+              ))}
 
             <div className="space-y-6">
               <header className="space-y-2">
@@ -304,7 +277,7 @@ export const ProductPage = () => {
               </Card>
 
               <Card className="p-4">
-                <Measurements product={data} />
+                <MeasurementBlock product={data} />
               </Card>
 
               {match(data.reviews.length)

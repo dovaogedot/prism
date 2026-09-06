@@ -95,20 +95,20 @@ export const toProductSpec = (columns: SpecColumns): Option<ProductSpec> =>
           lightness,
         }),
     )
-    .with(
-      {
+    // A tin does one thing, so exactly one of the three arrives and the branch
+    // that matches it is the branch that says what the tin is.
+    .with({ kind: "finisher", roughness: P.number }, ({ roughness }) =>
+      Option.some<ProductSpec>({ kind: "finisher", applies: "roughness", roughness }),
+    )
+    .with({ kind: "finisher", coatingNanometers: P.number }, ({ coatingNanometers }) =>
+      Option.some<ProductSpec>({
         kind: "finisher",
-        roughness: P.number,
-        coatingNanometers: P.number,
-        emission: P.number,
-      },
-      ({ roughness, coatingNanometers, emission }) =>
-        Option.some<ProductSpec>({
-          kind: "finisher",
-          roughness,
-          coatingNanometers,
-          emission,
-        }),
+        applies: "coating",
+        coatingNanometers,
+      }),
+    )
+    .with({ kind: "finisher", emission: P.number }, ({ emission }) =>
+      Option.some<ProductSpec>({ kind: "finisher", applies: "emission", emission }),
     )
     .with(
       { kind: "shifter", direction: P.not(P.nullish), arcDegrees: P.number },
@@ -129,6 +129,8 @@ export type MeasurementColumns = Readonly<{
   /** Stored rather than generated: a coating's thickness is a fact, not a derivation. */
   coatingNanometers: number | null;
   grainMicrometers: number | null;
+  /** How far a tin's glow carries. A color's own reach is `reachCentimeters`. */
+  finisherReachCentimeters: number | null;
   torqueMillinewtonMeters: number | null;
   backlashMicrometers: number | null;
   weightGrams: number;
@@ -165,15 +167,30 @@ export const toMeasurements = (
           }),
         ),
     )
+    // One dimension per tin, and it is the one its own effect has.
     .with(
-      {
-        kind: "finisher",
-        coatingNanometers: P.number,
-        grainMicrometers: P.number,
-      },
-      ({ coatingNanometers, grainMicrometers, weightGrams }) =>
+      { kind: "finisher", grainMicrometers: P.number },
+      ({ grainMicrometers, weightGrams }) =>
         Option.some<Measurements>(
-          measureFinisher({ coatingNanometers, grainMicrometers, weightGrams }),
+          measureFinisher({ applies: "roughness", grainMicrometers, weightGrams }),
+        ),
+    )
+    .with(
+      { kind: "finisher", coatingNanometers: P.number },
+      ({ coatingNanometers, weightGrams }) =>
+        Option.some<Measurements>(
+          measureFinisher({ applies: "coating", coatingNanometers, weightGrams }),
+        ),
+    )
+    .with(
+      { kind: "finisher", finisherReachCentimeters: P.number },
+      ({ finisherReachCentimeters, weightGrams }) =>
+        Option.some<Measurements>(
+          measureFinisher({
+            applies: "emission",
+            reachMeters: roundTo(2, finisherReachCentimeters / 100),
+            weightGrams,
+          }),
         ),
     )
     .with(

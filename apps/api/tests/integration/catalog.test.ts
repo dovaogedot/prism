@@ -364,6 +364,46 @@ describe("facets", () => {
     await seedCatalog(harness, COLORS);
   });
 
+  /**
+   * One tin per finish word, which is every word there is. Seeded inside the
+   * tests that need them so the counts in the rest of this block stay about
+   * the colors.
+   */
+  const seedTins = async (): Promise<void> => {
+    await insertProduct(harness, {
+      kind: "finisher",
+      applies: "roughness",
+      roughness: 88,
+      slug: "test-chalk",
+      name: "Test Chalk",
+      priceCents: 1000,
+    });
+    await insertProduct(harness, {
+      kind: "finisher",
+      applies: "roughness",
+      roughness: 18,
+      slug: "test-lacquer",
+      name: "Test Lacquer",
+      priceCents: 1100,
+    });
+    await insertProduct(harness, {
+      kind: "finisher",
+      applies: "coating",
+      coatingNanometers: 300,
+      slug: "test-film",
+      name: "Test Film",
+      priceCents: 1200,
+    });
+    await insertProduct(harness, {
+      kind: "finisher",
+      applies: "emission",
+      emission: 80,
+      slug: "test-lamp",
+      name: "Test Lamp",
+      priceCents: 1300,
+    });
+  };
+
   it("returns every dimension", async () => {
     const facets = jsonOf(await get("/api/v1/products"))["facets"];
 
@@ -408,33 +448,59 @@ describe("facets", () => {
     );
   };
 
-  it("counts each finish over the surfaces it names", async () => {
-    // Matte and gloss partition the roughness axis, so between them they name
-    // the whole shelf and neither claims a surface the other does. A coating
-    // and a glow name only the surfaces that carry one.
-    const counts = await finishCounts("?category=color");
+  it("counts each finish over the tins it names", async () => {
+    // The four words name tins, not colors: a tin is bought for the one effect
+    // it produces, so it has one answer to which finish it is. Matte and gloss
+    // are two ends of the same amount and partition it between them.
+    await seedTins();
+    const counts = await finishCounts("?category=finisher");
 
-    expect(counts.get("matte")).toBe(2);
-    expect(counts.get("gloss")).toBe(2);
+    expect(counts.get("matte")).toBe(1);
+    expect(counts.get("gloss")).toBe(1);
     expect(counts.get("iridescent")).toBe(1);
-    expect(counts.get("fluorescent")).toBe(0);
+    expect(counts.get("fluorescent")).toBe(1);
   });
 
   it("keeps every finish counted while one of them is selected", async () => {
     // Otherwise picking one would show the other three holding nothing, and
     // there would be no way to see what switching to one of them costs.
-    const counts = await finishCounts("?category=color&finish=iridescent");
+    await seedTins();
+    const counts = await finishCounts("?category=finisher&finish=iridescent");
 
-    expect(counts.get("matte")).toBe(2);
-    expect(counts.get("gloss")).toBe(2);
+    expect(counts.get("matte")).toBe(1);
+    expect(counts.get("gloss")).toBe(1);
+    expect(counts.get("fluorescent")).toBe(1);
   });
 
-  it("narrows to the surfaces the finish names", async () => {
-    const iridescent = jsonOf(await get("/api/v1/products?category=color&finish=iridescent"));
-    const matte = jsonOf(await get("/api/v1/products?category=color&finish=matte"));
+  it("narrows to the tins the finish names, and to no others", async () => {
+    await seedTins();
 
-    expect(iridescent["total"]).toBe(1);
-    expect(matte["total"]).toBe(2);
+    const slugsOf = async (finish: string) =>
+      (
+        jsonOf(await get(`/api/v1/products?category=finisher&finish=${finish}`))[
+          "items"
+        ] as readonly Record<string, unknown>[]
+      )
+        .map((item) => item["slug"])
+        .sort();
+
+    // Each word picks out its own tin and only its own. A tin that lays a
+    // coating carries no roughness at all, so it is neither matte nor gloss —
+    // and asking for gloss cannot answer with the whole shelf.
+    expect(await slugsOf("gloss")).toEqual(["test-lacquer"]);
+    expect(await slugsOf("matte")).toEqual(["test-chalk"]);
+    expect(await slugsOf("iridescent")).toEqual(["test-film"]);
+    expect(await slugsOf("fluorescent")).toEqual(["test-lamp"]);
+  });
+
+  it("leaves the four words out of the color shelf, which has no answer to them", async () => {
+    // A color carries all three amounts at once, so "which finish is it" has
+    // no single answer for one. Colors are narrowed by the amounts instead,
+    // each on its own axis, which is the test below.
+    await seedTins();
+
+    expect(jsonOf(await get("/api/v1/products?category=color&finish=gloss"))["total"])
+      .toBe(0);
   });
 
   it("narrows by each amount independently, and by several at once", async () => {
@@ -590,9 +656,8 @@ describe("the three categories", () => {
 
     expect(finisher["spec"]).toEqual({
       kind: "finisher",
+      applies: "roughness",
       roughness: 18,
-      coatingNanometers: 0,
-      emission: 0,
     });
     expect(shifter["spec"]).toEqual({
       kind: "shifter",
@@ -605,6 +670,9 @@ describe("the three categories", () => {
     // A tin of finisher has no temperature and no reach; a shifter has neither
     // and no grain either. What they share is a weight, because the
     // requirement names one and because everything in the shop has some.
+    //
+    // `applies` is dropped: it says which dimension a tin quotes rather than
+    // being a dimension of its own.
     const metricOf = async (slug: string) =>
       Object.keys(
         (
@@ -613,7 +681,9 @@ describe("the three categories", () => {
             Record<string, number>
           >
         )["metric"] ?? {},
-      ).sort();
+      )
+        .filter((key) => key !== "applies")
+        .sort();
 
     expect(await metricOf("void-black")).toEqual([
       "coatingNanometers",
@@ -621,8 +691,9 @@ describe("the three categories", () => {
       "temperatureCelsius",
       "weightGrams",
     ]);
+    // One dimension, and it is the one this tin's own effect has: it is sold
+    // for the surface it leaves, so it quotes that surface's grain.
     expect(await metricOf("test-applicator")).toEqual([
-      "coatingNanometers",
       "grainMicrometers",
       "weightGrams",
     ]);

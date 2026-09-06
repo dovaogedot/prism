@@ -18,6 +18,8 @@
  * nothing here is ever the second copy of anything.
  */
 
+import { match } from "ts-pattern";
+
 const GRAMS_PER_OUNCE = 28.349523125;
 const METERS_PER_FOOT = 0.3048;
 const MILLIMETERS_PER_INCH = 25.4;
@@ -116,23 +118,33 @@ export type ColorMeasurements = Readonly<{
   }>;
 }>;
 
-/** What a tin of finisher measures. */
-export type FinisherMetric = Readonly<{
-  /** Thickness of the interference coating it lays down. Zero leaves paint bare. */
-  coatingNanometers: number;
-  grainMicrometers: number;
-  weightGrams: number;
-}>;
+/**
+ * The one thing a tin of finisher has to measure.
+ *
+ * A tin does one thing, so it has one dimension and it is the one belonging to
+ * that thing: a tin sold for the surface it leaves quotes a grain, one sold
+ * for a coating quotes a thickness, one sold for a glow quotes how far that
+ * glow carries.
+ */
+export type FinisherDimension =
+  | Readonly<{ applies: "roughness"; grainMicrometers: number }>
+  | Readonly<{ applies: "coating"; coatingNanometers: number }>
+  | Readonly<{ applies: "emission"; reachMeters: number }>;
+
+/** What a tin measures: its one dimension, and the weight every tin has. */
+export type FinisherMetric = Readonly<{ weightGrams: number }> & FinisherDimension;
+
+/** The same one dimension, in the vocabulary that buys its instruments in inches. */
+export type FinisherImperialDimension =
+  | Readonly<{ applies: "roughness"; grainMils: number }>
+  | Readonly<{ applies: "coating"; coatingMicroinches: number }>
+  | Readonly<{ applies: "emission"; reachFeet: number }>;
 
 /** A finisher's measurements in both systems, ready to display. */
 export type FinisherMeasurements = Readonly<{
   of: "finisher";
   metric: FinisherMetric;
-  imperial: Readonly<{
-    coatingMicroinches: number;
-    grainMils: number;
-    weightOunces: number;
-  }>;
+  imperial: Readonly<{ weightOunces: number }> & FinisherImperialDimension;
 }>;
 
 /** What a shifter measures. */
@@ -180,13 +192,32 @@ export const measureColor = (metric: ColorMetric): ColorMeasurements => ({
   },
 });
 
+/**
+ * A tin's one dimension, converted. Weight is added by the caller, being the
+ * half every tin shares.
+ */
+const finisherImperial = (metric: FinisherMetric): FinisherImperialDimension =>
+  match(metric)
+    .with({ applies: "roughness" }, ({ grainMicrometers }) => ({
+      applies: "roughness" as const,
+      grainMils: micrometersToMils(grainMicrometers),
+    }))
+    .with({ applies: "coating" }, ({ coatingNanometers }) => ({
+      applies: "coating" as const,
+      coatingMicroinches: nanometersToMicroinches(coatingNanometers),
+    }))
+    .with({ applies: "emission" }, ({ reachMeters }) => ({
+      applies: "emission" as const,
+      reachFeet: metersToFeet(reachMeters),
+    }))
+    .exhaustive();
+
 /** Both systems for a finisher, from the metric values Postgres generated. */
 export const measureFinisher = (metric: FinisherMetric): FinisherMeasurements => ({
   of: "finisher",
   metric,
   imperial: {
-    coatingMicroinches: nanometersToMicroinches(metric.coatingNanometers),
-    grainMils: micrometersToMils(metric.grainMicrometers),
+    ...finisherImperial(metric),
     weightOunces: gramsToOunces(metric.weightGrams),
   },
 });
@@ -201,3 +232,100 @@ export const measureShifter = (metric: ShifterMetric): ShifterMeasurements => ({
     weightOunces: gramsToOunces(metric.weightGrams),
   },
 });
+
+/* ------------------------------------------------------------- as written */
+
+/** Which vocabulary a reader has asked for the numbers in. */
+export type UnitSystem = "metric" | "imperial";
+
+/** One measurement, named and written in the unit it is read in. */
+export type MeasurementRow = Readonly<{ label: string; value: string }>;
+
+/**
+ * The one dimension a tin quotes, in metric.
+ *
+ * Which dimension follows from what the tin does, because a dimension nothing
+ * about the tin produces is not a fact about it. A tin sold for the surface it
+ * leaves quotes the grain of that surface; one sold for a coating quotes the
+ * film's thickness; one sold for a glow quotes how far the glow carries.
+ */
+const finisherMetricRow = (metric: FinisherMetric): MeasurementRow =>
+  match(metric)
+    .with({ applies: "roughness" }, ({ grainMicrometers }) => ({
+      label: "Grain",
+      value: `${grainMicrometers} µm`,
+    }))
+    .with({ applies: "coating" }, ({ coatingNanometers }) => ({
+      label: "Coating",
+      value: `${coatingNanometers} nm`,
+    }))
+    .with({ applies: "emission" }, ({ reachMeters }) => ({
+      label: "Reach",
+      value: `${reachMeters} m`,
+    }))
+    .exhaustive();
+
+/** The same dimension, in the other vocabulary. */
+const finisherImperialRow = (imperial: FinisherImperialDimension): MeasurementRow =>
+  match(imperial)
+    .with({ applies: "roughness" }, ({ grainMils }) => ({
+      label: "Grain",
+      value: `${grainMils} mil`,
+    }))
+    .with({ applies: "coating" }, ({ coatingMicroinches }) => ({
+      label: "Coating",
+      value: `${coatingMicroinches} µin`,
+    }))
+    .with({ applies: "emission" }, ({ reachFeet }) => ({
+      label: "Reach",
+      value: `${reachFeet} ft`,
+    }))
+    .exhaustive();
+
+/**
+ * A product's measurements as the rows a page prints, in the system asked for.
+ *
+ * The rows differ by kind because what there is to measure differs by kind, so
+ * no row here ever reads "—": a kind that has no answer for something has no
+ * row for it either. Weight is last everywhere, being the one they share.
+ *
+ * Kelvin is deliberately absent. It is what the column stores, being the unit
+ * the derivation is defined in, but "6208 K" describes a light source rather
+ * than a color — °C and °F are the two a shopper can act on.
+ */
+export const measurementRows = (
+  measurements: Measurements,
+  system: UnitSystem,
+): readonly MeasurementRow[] =>
+  match([measurements, system] as const)
+    .with([{ of: "color" }, "metric"], ([{ metric }]) => [
+      { label: "Temperature", value: `${metric.temperatureCelsius} °C` },
+      { label: "Reach", value: `${metric.reachMeters} m` },
+      { label: "Coating", value: `${metric.coatingNanometers} nm` },
+      { label: "Weight", value: `${metric.weightGrams} g` },
+    ])
+    .with([{ of: "color" }, "imperial"], ([{ imperial }]) => [
+      { label: "Temperature", value: `${imperial.temperatureFahrenheit} °F` },
+      { label: "Reach", value: `${imperial.reachFeet} ft` },
+      { label: "Coating", value: `${imperial.coatingMicroinches} µin` },
+      { label: "Weight", value: `${imperial.weightOunces} oz` },
+    ])
+    .with([{ of: "finisher" }, "metric"], ([{ metric }]) => [
+      finisherMetricRow(metric),
+      { label: "Weight", value: `${metric.weightGrams} g` },
+    ])
+    .with([{ of: "finisher" }, "imperial"], ([{ imperial }]) => [
+      finisherImperialRow(imperial),
+      { label: "Weight", value: `${imperial.weightOunces} oz` },
+    ])
+    .with([{ of: "shifter" }, "metric"], ([{ metric }]) => [
+      { label: "Torque", value: `${metric.torqueNewtonMeters} N·m` },
+      { label: "Backlash", value: `${metric.backlashMillimeters} mm` },
+      { label: "Weight", value: `${metric.weightGrams} g` },
+    ])
+    .with([{ of: "shifter" }, "imperial"], ([{ imperial }]) => [
+      { label: "Torque", value: `${imperial.torquePoundFeet} lbf·ft` },
+      { label: "Backlash", value: `${imperial.backlashInches} in` },
+      { label: "Weight", value: `${imperial.weightOunces} oz` },
+    ])
+    .exhaustive();

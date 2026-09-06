@@ -16,6 +16,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import postgres from "postgres";
+import { match } from "ts-pattern";
+import type { FinishApplication, FinisherSpec } from "@prism/shared";
 import { generateSync } from "otplib";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../src/app.ts";
@@ -284,13 +286,40 @@ export type Variant =
       coatingNanometers?: number;
       emission?: number;
     }>
-  | Readonly<{
-      kind: "finisher";
-      roughness: number;
-      coatingNanometers?: number;
-      emission?: number;
-    }>
+  | FinisherSpec
   | Readonly<{ kind: "shifter"; direction: "cw" | "ccw"; arcDegrees: number }>;
+
+/** A tin's row: the one amount it carries, and the two columns it leaves empty. */
+type FinisherColumns = Readonly<{
+  roughness: number | null;
+  coatingNanometers: number | null;
+  emission: number | null;
+}>;
+
+/**
+ * Which column a tin writes, from what the tin does.
+ *
+ * The table refuses a row with more or fewer than one of the three, so the
+ * two a tin does not use are absent rather than zero.
+ */
+const finisherColumns = (application: FinishApplication): FinisherColumns =>
+  match(application)
+    .with({ applies: "roughness" }, ({ roughness }) => ({
+      roughness,
+      coatingNanometers: null,
+      emission: null,
+    }))
+    .with({ applies: "coating" }, ({ coatingNanometers }) => ({
+      roughness: null,
+      coatingNanometers,
+      emission: null,
+    }))
+    .with({ applies: "emission" }, ({ emission }) => ({
+      roughness: null,
+      coatingNanometers: null,
+      emission,
+    }))
+    .exhaustive();
 
 /**
  * Inserts one product and the variant row that goes with it.
@@ -336,11 +365,13 @@ export const insertProduct = async (
   }
 
   if (product.kind === "finisher") {
+    const columns = finisherColumns(product);
+
     await sql`
       INSERT INTO finisher (product_id, roughness, coating_nanometers, emission)
-      SELECT p.id, ${product.roughness}::smallint,
-             ${product.coatingNanometers ?? 0}::smallint,
-             ${product.emission ?? 0}::smallint
+      SELECT p.id, ${columns.roughness}::smallint,
+             ${columns.coatingNanometers}::smallint,
+             ${columns.emission}::smallint
       FROM product p WHERE p.slug = ${product.slug}
     `;
     return;
@@ -372,8 +403,8 @@ export const seedInstruments = async (harness: Harness): Promise<void> => {
     FROM brand b WHERE b.slug = 'chroma-labs'
   `;
   await sql`
-    INSERT INTO finisher (product_id, roughness, coating_nanometers, emission)
-    SELECT p.id, 18, 0, 0 FROM product p WHERE p.slug = 'test-applicator'
+    INSERT INTO finisher (product_id, roughness)
+    SELECT p.id, 18 FROM product p WHERE p.slug = 'test-applicator'
   `;
 
   await sql`

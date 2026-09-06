@@ -36,6 +36,7 @@ import {
 } from "./schema.ts";
 import { createRandom, hslToHex, shuffle, slugify, type Random } from "./palette.ts";
 import { renderSwatch } from "./swatch.ts";
+import { finisherImages } from "./finish-art.ts";
 import {
   BRANDS,
   CATEGORIES,
@@ -50,7 +51,12 @@ import {
   type InstrumentSeed,
   type LeafCategorySeed,
 } from "./seed-data.ts";
-import type { Finish, ProductKind, ShiftDirection } from "@prism/shared";
+import type {
+  Finish,
+  FinishApplication,
+  ProductKind,
+  ShiftDirection,
+} from "@prism/shared";
 import {
   EMISSION_BOUNDS,
   EMISSION_SPEAKS,
@@ -125,7 +131,7 @@ type PlannedProduct = PlannedCommon &
         coatingNanometers: number;
         emission: number;
       }
-    | ({ kind: "finisher" } & Finishing)
+    | ({ kind: "finisher" } & FinishApplication)
     | { kind: "shifter"; direction: ShiftDirection; arcDegrees: number }
   >;
 
@@ -240,30 +246,21 @@ const planColorsFor = (
  * genuinely different products — one leaves a surface at 20 and the next at 15,
  * and a shopper who wants the second is not served by being sold the first.
  *
- * A coating and a glow both need a surface that returns light, so a tin that
- * leaves either also leaves a surface smooth enough for it.
+ * One amount and no others, because a tin does one thing: the two it is not
+ * sold for are absent rather than zero, which is what makes "which finish is
+ * this" a column rather than a threshold.
  */
-const planFinisherFinish = (finish: Finish, random: Random): Finishing => {
+const planFinisherFinish = (
+  finish: Finish,
+  random: Random,
+): FinishApplication => {
   const band = FINISH_BANDS[finish];
   const amount = random.between(band.range.min, band.range.max);
-  const smooth = random.between(ROUGHNESS_BOUNDS.min, COATING_ROUGHNESS_CEILING);
 
   return match(band.property)
-    .with("roughness", () => ({
-      roughness: amount,
-      coatingNanometers: 0,
-      emission: 0,
-    }))
-    .with("coating", () => ({
-      roughness: smooth,
-      coatingNanometers: amount,
-      emission: 0,
-    }))
-    .with("emission", () => ({
-      roughness: smooth,
-      coatingNanometers: 0,
-      emission: amount,
-    }))
+    .with("roughness", () => ({ applies: "roughness" as const, roughness: amount }))
+    .with("coating", () => ({ applies: "coating" as const, coatingNanometers: amount }))
+    .with("emission", () => ({ applies: "emission" as const, emission: amount }))
     .exhaustive();
 };
 
@@ -362,8 +359,15 @@ const insertVariant = (
     .with({ kind: "color" }, ({ hex, roughness, coatingNanometers, emission }) =>
       db.insert(colors).values({ productId, hex, roughness, coatingNanometers, emission }),
     )
-    .with({ kind: "finisher" }, ({ roughness, coatingNanometers, emission }) =>
-      db.insert(finishers).values({ productId, roughness, coatingNanometers, emission }),
+    // Exactly the one column the tin is sold for; the other two stay absent.
+    .with({ kind: "finisher", applies: "roughness" }, ({ roughness }) =>
+      db.insert(finishers).values({ productId, roughness }),
+    )
+    .with({ kind: "finisher", applies: "coating" }, ({ coatingNanometers }) =>
+      db.insert(finishers).values({ productId, coatingNanometers }),
+    )
+    .with({ kind: "finisher", applies: "emission" }, ({ emission }) =>
+      db.insert(finishers).values({ productId, emission }),
     )
     .with({ kind: "shifter" }, ({ direction, arcDegrees }) =>
       db.insert(shifters).values({ productId, direction, arcDegrees }),
@@ -436,23 +440,31 @@ const seedCatalog = async (
 
     await insertVariant(db, inserted.id, planned);
 
-    // Only a color has a swatch to render. A finisher and a shifter draw
-    // themselves in the browser from what they are, which is one fewer file on
-    // the volume and one fewer thing that can disagree with the data.
-    if (planned.kind !== "color") continue;
+    // A color is one swatch of itself. A finisher has no color, so what there
+    // is to show is the effect — one picture of it and four of it over
+    // ordinary pigments. A shifter changes no surface, so it has neither and
+    // is drawn in the browser from its own two numbers.
+    const gallery = match(planned)
+      .with({ kind: "color" }, ({ name, hex }) => [
+        { png: renderSwatch(hex), alt: `${name}, a swatch of ${hex}` },
+      ])
+      .with({ kind: "finisher" }, finisherImages)
+      .with({ kind: "shifter" }, () => [])
+      .exhaustive();
 
-    // Content-addressed, exactly as the upload endpoint would store it.
-    const png = renderSwatch(planned.hex);
-    const filename = `${createHash("sha256").update(png).digest("hex")}.png`;
+    for (const [position, image] of gallery.entries()) {
+      // Content-addressed, exactly as the upload endpoint would store it.
+      const filename = `${createHash("sha256").update(image.png).digest("hex")}.png`;
 
-    await writeFile(join(mediaDirectory, filename), png);
+      await writeFile(join(mediaDirectory, filename), image.png);
 
-    await db.insert(productImages).values({
-      productId: inserted.id,
-      filename,
-      alt: `${planned.name}, a swatch of ${planned.hex}`,
-      position: 0,
-    });
+      await db.insert(productImages).values({
+        productId: inserted.id,
+        filename,
+        alt: image.alt,
+        position,
+      });
+    }
   }
 };
 

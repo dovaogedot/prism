@@ -128,33 +128,51 @@ CREATE INDEX color_emission_idx ON color (emission);
 -- A tin puts a finish back onto a color, so it carries the same three amounts a
 -- color does, being the finish it applies. It never runs out, so there is
 -- nothing here about how long it lasts.
+-- A tin does one thing, and the column that is set is which one.
+--
+-- Exactly one of the three is present and the other two are absent, so what a
+-- tin is needs no threshold to recover and no fourth column to declare: asking
+-- for the iridescent ones is asking which rows have a coating. A tin carrying
+-- two of them would be a tin with no answer to what it does, which is why the
+-- constraint counts them rather than checking each.
 CREATE TABLE finisher (
   product_id uuid         PRIMARY KEY,
   kind       product_kind NOT NULL DEFAULT 'finisher',
 
-  roughness          smallint NOT NULL,
-  coating_nanometers smallint NOT NULL,
-  emission           smallint NOT NULL,
+  -- 5 is a mirror and 95 is chalk. Set on a tin sold for the surface it
+  -- leaves, absent on one sold for a coating or a glow.
+  roughness          smallint,
+  -- Nanometers of interference coating it lays down.
+  coating_nanometers smallint,
+  -- How hard it makes a pigment give off its own light.
+  emission           smallint,
 
+  -- Each is generated from the one column that is set, so a tin has exactly
+  -- one dimension and it is the one belonging to what the tin does.
   grain_micrometers smallint GENERATED ALWAYS AS (finish_grain(roughness)) STORED,
+  reach_centimeters integer  GENERATED ALWAYS AS (emission_reach(emission)) STORED,
   weight_grams      integer
-    GENERATED ALWAYS AS (finisher_weight(roughness, coating_nanometers)) STORED,
+    GENERATED ALWAYS AS (finisher_weight(roughness, coating_nanometers, emission)) STORED,
 
   CONSTRAINT finisher_is_a_finisher CHECK (kind = 'finisher'),
   CONSTRAINT finisher_belongs_to_a_finisher
     FOREIGN KEY (product_id, kind) REFERENCES product (id, kind) ON DELETE CASCADE,
 
+  CONSTRAINT finisher_does_one_thing CHECK (
+    num_nonnulls(roughness, coating_nanometers, emission) = 1
+  ),
+
   CONSTRAINT finisher_roughness_range CHECK (roughness BETWEEN 5 AND 95),
-  CONSTRAINT finisher_coating_range
-    CHECK (coating_nanometers = 0 OR coating_nanometers BETWEEN 100 AND 600),
-  CONSTRAINT finisher_emission_range CHECK (emission BETWEEN 0 AND 100),
-  CONSTRAINT finisher_coating_needs_a_reflection
-    CHECK (coating_nanometers = 0 OR roughness <= 40)
+  CONSTRAINT finisher_coating_range CHECK (coating_nanometers BETWEEN 100 AND 600),
+  CONSTRAINT finisher_emission_range CHECK (emission BETWEEN 25 AND 100)
 );
 
-CREATE INDEX finisher_roughness_idx ON finisher (roughness);
-CREATE INDEX finisher_coating_idx ON finisher (coating_nanometers);
-CREATE INDEX finisher_emission_idx ON finisher (emission);
+-- Partial, because a row with the column absent is not a row this index has
+-- anything to say about — and absence is exactly what the filter asks.
+CREATE INDEX finisher_roughness_idx ON finisher (roughness) WHERE roughness IS NOT NULL;
+CREATE INDEX finisher_coating_idx
+  ON finisher (coating_nanometers) WHERE coating_nanometers IS NOT NULL;
+CREATE INDEX finisher_emission_idx ON finisher (emission) WHERE emission IS NOT NULL;
 
 /* ---------------------------------------------------------------- a shifter */
 
@@ -248,6 +266,7 @@ SELECT
   COALESCE(c.coating_nanometers, f.coating_nanometers) AS coating_nanometers,
   COALESCE(c.emission, f.emission)                     AS emission,
   f.grain_micrometers,
+  f.reach_centimeters AS finisher_reach_centimeters,
 
   s.direction,
   s.arc_degrees,

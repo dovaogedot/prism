@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { Option } from "../../src/fp/option.ts";
 import {
   DEFAULT_PER_PAGE,
+  describeApplication,
+  finishAmount,
+  FINISH_AXIS_LABELS,
+  type FinishApplication,
   MAX_PER_PAGE,
   productQueryParamsSchema,
   suggestQueryParamsSchema,
@@ -163,5 +167,50 @@ describe("suggestQueryParamsSchema", () => {
 
   it("accepts free text, since the term is parameterized at the database", () => {
     expect(suggestQueryParamsSchema.parse({ q: "o'brien's red" }).q).toBe("o'brien's red");
+  });
+});
+
+/** One tin per amount, which is every tin there can be. */
+const tins: readonly FinishApplication[] = [
+  { applies: "roughness", roughness: 88 },
+  { applies: "coating", coatingNanometers: 300 },
+  { applies: "emission", emission: 80 },
+];
+
+describe("finishAmount", () => {
+  it("writes each amount in the unit that amount is read in", () => {
+    expect(tins.map(finishAmount)).toEqual(["88%", "300 nm", "80%"]);
+  });
+
+  it("keeps the amount at either end of its range", () => {
+    expect(finishAmount({ applies: "roughness", roughness: 5 })).toBe("5%");
+    expect(finishAmount({ applies: "coating", coatingNanometers: 600 })).toBe("600 nm");
+  });
+});
+
+describe("describeApplication", () => {
+  it("says what the tin does, in words, for a reader without the pictures", () => {
+    expect(tins.map(describeApplication)).toEqual([
+      "leaves a surface at 88% roughness",
+      "lays a 300 nm coating",
+      "glows at 80%",
+    ]);
+  });
+
+  it("names one effect per tin and never another tin's", () => {
+    // A tin carries one amount, so its description carries one number.
+    for (const tin of tins) {
+      expect(describeApplication(tin).match(/\d+/g)).toHaveLength(1);
+    }
+  });
+});
+
+describe("FINISH_AXIS_LABELS", () => {
+  it("names the row every tin's amount goes under", () => {
+    expect(tins.map((tin) => FINISH_AXIS_LABELS[tin.applies])).toEqual([
+      "Roughness",
+      "Coating",
+      "Glow",
+    ]);
   });
 });

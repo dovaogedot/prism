@@ -9,21 +9,25 @@ There are three categories, and they have almost nothing in common:
 | Category | What it is | What it carries |
 | --- | --- | --- |
 | **Colors** | A color, sold whole | A hex, and three amounts of finish |
-| **Finishers** | Puts a finish back on a color you own | The same three amounts, being the finish it applies |
+| **Finishers** | Puts a finish back on a color you own | One of those amounts, being the one thing the tin does |
 | **Shifters** | Turns a color you own into a different one | A direction round the wheel, and an arc in degrees |
 
 The unusual product turns out to be a good fit for the requirements. A color has real
 numeric attributes — hue angle, saturation, lightness — which makes faceted search
-genuinely interesting rather than a brand checkbox, and it means the swatch images can be
-generated at seed time instead of committed as binaries. A finisher and a shifter have no
-image at all: the grid draws them from their own spec, so there is nothing on disk that
-could disagree with the numbers beside it.
+genuinely interesting rather than a brand checkbox, and it means every image in the shop can
+be generated at seed time instead of committed as binaries. A color gets one swatch of
+itself. A tin holds no color, so what there is to show is the effect: the thing it does,
+then the same thing done to four ordinary pigments — five pictures rendered from the one
+number the tin carries. A shifter changes no surface, so it has no picture and the grid
+draws it from its own two numbers.
 
 Three categories with disjoint attributes is the interesting modeling problem here, and it
 is solved the normalized way: a `product` table for what all three share, and a `color`,
-`finisher` and `shifter` table for what they do not. Every column in those three is NOT
-NULL, because a column only exists where it applies — there is no `hex` on a shifter to be
-null. Each keys back to `product (id, kind)` rather than to `product (id)`, so a color row
+`finisher` and `shifter` table for what they do not. A column only exists where it applies,
+so there is no `hex` on a shifter to be null. `finisher` is the one table with a choice
+inside it — a tin does one thing, so exactly one of its three amounts is present and a CHECK
+refuses any row where that is not true. Each keys back to `product (id, kind)` rather than
+to `product (id)`, so a color row
 attached to a shifter is rejected by the database rather than by a code path somebody has to
 remember to write. [`spec.ts`](apps/api/src/modules/catalog/spec.ts) is the one place that
 turns the joined row back into a discriminated union, after which nothing downstream sees a
@@ -34,15 +38,17 @@ because there is no container — and what there is to measure follows from what
 
 | | Colors | Finishers | Shifters |
 | --- | --- | --- | --- |
-| | **Temperature** how warm it burns · °C / °F | **Coating** the layer it lays down · nm / µin | **Torque** how hard it has to turn · N·m / lbf·ft |
-| | **Reach** how far away it still reads · m / ft | **Grain** how much texture it leaves · µm / mil | **Backlash** the play before the color moves · mm / in |
-| | **Coating** the interference layer over it · nm / µin | | |
+| | **Temperature** how warm it burns · °C / °F | one of **Grain** how much texture it leaves · µm / mil | **Torque** how hard it has to turn · N·m / lbf·ft |
+| | **Reach** how far away it still reads · m / ft | **Coating** the layer it lays down · nm / µin | **Backlash** the play before the color moves · mm / in |
+| | **Coating** the interference layer over it · nm / µin | **Reach** how far the glow it leaves carries · m / ft | |
 | | **Weight** how heavy it looks · g / oz | **Weight** the tin and its contents · g / oz | **Weight** the gear itself · g / oz |
 
 Weight is the one all three share, because the requirement names it and because everything
-in the shop has some. The coating is shared by two, because the layer a tin lays down is the
-layer a color wears. Otherwise a kind measures exactly what it carries — a tin never runs
-out, so there is nothing to measure about how long it lasts.
+in the shop has some. A tin quotes one dimension and it is the one its own effect has: a tin
+sold for the surface it leaves quotes that surface's grain, one sold for a coating quotes
+the film's thickness, one sold for a glow quotes how far the glow carries. Otherwise a kind
+measures exactly what it carries — a tin never runs out, so there is nothing to measure
+about how long it lasts.
 
 The coating is where the two systems stop being the same number under a different name. It
 is a layer a few hundred nanometers thick, which is below the mil every other surface in the
@@ -75,8 +81,8 @@ This is **Project 1 (Foundation)**: accounts, the database, and the catalog.
 ```
 
 That builds the images, starts the stack, sets up the database, seeds the catalog —
-every color with its swatch image, and the finishers and shifters beside them — and
-waits until the storefront answers.
+every color with its swatch, every tin with the five pictures of what it does, and the
+shifters beside them — and waits until the storefront answers.
 
 | Service | URL |
 | --- | --- |
@@ -286,10 +292,11 @@ erDiagram
 
     FINISHER {
         uuid     product_id         PK "FK with kind, so it can only be a finisher"
-        smallint roughness          "the surface it leaves"
-        smallint coating_nanometers "the layer it lays down, or 0"
-        smallint emission           "the glow it leaves, or 0"
+        smallint roughness          "the surface it leaves, or absent"
+        smallint coating_nanometers "the layer it lays down, or absent"
+        smallint emission           "the glow it leaves, or absent"
         smallint grain_micrometers  "GENERATED from roughness"
+        integer  reach_centimeters  "GENERATED from emission"
         integer  weight_grams       "GENERATED"
     }
 
@@ -326,11 +333,20 @@ erDiagram
 `password_hash` (OAuth-only) or a `totp_secret` (2FA off). Each of those is mapped to an
 `Option` at the repository boundary, so nothing above that layer sees a `null`.
 
-Nothing in `color`, `finisher` or `shifter` is nullable, because a column only exists in the
-table it applies to. There is no `hex` on a shifter to be null and no CHECK constraint
-standing in for a shape the tables already have. What the database does have to say is that
-a variant row belongs to a product of its own kind, and a plain foreign key on `product_id`
-cannot say it — so the key is composite:
+A column only exists in the table it applies to, so there is no `hex` on a shifter to be
+null. `finisher` is where absence is the point rather than an accident: a tin does one
+thing, so it carries one of the three amounts and leaves the other two absent, and which
+one is present is what the tin *is*. A CHECK says exactly that, and it is the reason a query
+for the iridescent tins is a query for the rows that have a coating at all:
+
+```sql
+CONSTRAINT finisher_does_one_thing CHECK (
+  num_nonnulls(roughness, coating_nanometers, emission) = 1
+)
+```
+
+What the database also has to say is that a variant row belongs to a product of its own
+kind, and a plain foreign key on `product_id` cannot say it — so the key is composite:
 
 ```sql
 CREATE TABLE color (
@@ -418,7 +434,7 @@ apps/api/src/
   modules/
     auth/        routes | service | repository | emails | mock-consent
     catalog/     routes | service | repository | search
-  db/            schema · migrate · seed · palette · swatch
+  db/            schema · migrate · seed · palette · swatch · finish-art
 
 packages/shared/ Option · Result · units · color · errors · Zod contracts
 apps/web/        React SPA
@@ -481,32 +497,28 @@ is three **amounts**, rolled independently, because a real surface is several th
 
 None of the three says what the color *is*. A color can be lacquered and iridescent at once,
 which real paint routinely is. The four words are still how the shop talks about itself, but
-they are **readings** of the numbers rather than values anything stores: `dominantFinish`
-picks whichever shows most strongly, each measured as a fraction of its own range, for the
-one word a screen reader is given, and `FINISH_BANDS` runs the other way so that typing
-"gloss" into the search box lands somewhere sensible.
+they are **readings** of the numbers rather than values anything stores: `FINISH_BANDS` maps
+each word to the stretch of one amount it names, so typing "gloss" into the search box lands
+somewhere sensible.
 
-The rail asks about the amounts instead, one at a time, because they are three different
-questions: a roughness is a percentage, a coating is a thickness in nanometers and a glow is
-neither. Picking one brings its own slider and nothing else. Matte and gloss are *not* two
-of the three — they are the two ends of the first one, so the roughness slider spans the
-whole axis and a shopper drags toward whichever end they mean, rather than the shop picking
-the point where one word becomes the other.
+So a color is narrowed by the amounts rather than by the words, and by all three at once:
+three sliders, live together, because narrowing one says nothing about the other two. A
+shopper can ask for a lacquered surface that is also coated and also glowing, which is a
+thing real paint is. Matte and gloss are *not* two of the three — they are the two ends of
+the first one, so the roughness slider spans the whole axis and a shopper drags toward
+whichever end they mean, rather than the shop picking the point where one word becomes the
+other. The sliders carry no counts, because a range has no buckets to distort.
 
-Picking an amount is itself a filter for two of the three, and this falls out of what the
-amounts are rather than being a rule on top of them. A coating and a glow are things a
-surface either has or has not got, so their ranges start where having one begins and asking
-about a coating is asking for the things that carry one. Every surface has a roughness, so
-asking about that narrows nothing and the slider does all the work.
+The four words belong to the tins, and that is the whole of a tin's filter. A tin does one
+thing, so it has one answer to which finish it is, and the word is a question about which
+column its row has: asking for the iridescent tins is asking which rows carry a coating at
+all. No threshold recovers it and nothing has to agree about where one finish becomes
+another. Matte and gloss are the exception, and only because they are one thing — two ends
+of the roughness a tin leaves, split where a reflection stops being worth naming.
 
-The three counts overlap, and are meant to: a coated color has a roughness as well and is
-counted under both, so the three sum to more than the shelf holds. Each is counted with
-every finish filter dropped, the range included, or picking one would show the other two
-holding nothing.
-
-A finisher carries the same three, being the finish it puts back. There is no such thing as
-*the* gloss finisher: one tin leaves a surface at 20 and the next at 15, and a shopper who
-wants the second is not served by being sold the first.
+There is still no such thing as *the* gloss finisher: one tin leaves a surface at 20 and the
+next at 15, and a shopper who wants the second is not served by being sold the first. What
+the word does is narrow the shelf to the tins that answer to it.
 
 [`surfaces.ts`](apps/web/src/features/catalog/artwork/surfaces.ts) is where those amounts
 become rendering parameters, and every one of its outputs is a **continuous** function of
@@ -604,6 +616,30 @@ A browser with no WebGL2 gets the flat swatch instead, and so does one whose "GP
 the CPU: building the rig costs about a second and a half on a software renderer and every
 stage another eighty milliseconds, which is a worse page than a grid of flat swatches that
 arrives at once.
+
+### Drawing a tin
+
+A tin is the one product that is photographed rather than lit, and it has to be: it holds no
+color, so a slab of it would be a slab of nothing. What it sells is what it does to a color,
+so that is what its pictures show — the effect itself, then the same effect over red, green,
+blue and yellow, five in all.
+
+[`finish-art.ts`](apps/api/src/db/finish-art.ts) renders them at seed time from the one
+number the tin carries, straight to PNG, so nothing on disk can disagree with the number
+beside it and nothing is committed as a binary. Which five follows from what the tin does,
+and no branch can borrow another's picture because no branch carries another's number:
+
+| The tin does | Leads with | Then |
+| --- | --- | --- |
+| a coating | every color a film returns as it thickens, with this tin's thickness marked | the same film over four pigments, thin to full |
+| a glow | how far the glow it leaves carries | that glow on four pigments |
+| a surface | the reflection left in the surface it leaves | that same surface over four pigments |
+
+The coating strip is the same physics the slab uses — `sin²(2π·n·d/λ)` sampled at three
+wavelengths — evaluated across the whole 100–600 nm range rather than at one thickness, so
+the picture and the product page cannot drift. The glow is a bloom, the reflection is a
+strip blurred by the roughness the tin leaves, and both are plain raster work: a tin is a
+still life, not a scene.
 
 ---
 
@@ -793,7 +829,7 @@ validate the requests and is browsable at `/api/docs`.
 | `GET /products/suggest` | Typeahead |
 | `GET /products/:slug` | One product, with its variant spec and both unit systems |
 | `POST /admin/products/:slug/images` | Upload, admin only |
-| `GET /media/:filename` | Serve a swatch |
+| `GET /media/:filename` | Serve a rendered image |
 
 ```text
 GET /api/v1/products
@@ -836,8 +872,8 @@ deliberate rather than an oversight: the required data model names a `category` 
 `spec` is the discriminated union everything downstream matches on, so `category` is built
 from `spec.kind` and the two cannot drift. `images` is the whole gallery, ordered, and
 `primaryImage` is the first of it — a caller that needs one image takes that and never
-reasons about an empty array. A finisher and a shifter are drawn from their own spec, so
-their gallery is empty rather than absent.
+reasons about an empty array. A shifter is drawn in the browser from its own two numbers,
+so its gallery is empty rather than absent.
 
 Facet counts are computed against every filter *except* the dimension being counted, so
 ticking a second brand widens the result rather than emptying it. The category dimension

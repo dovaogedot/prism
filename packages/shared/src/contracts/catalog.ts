@@ -8,6 +8,7 @@
  * layer applies to nullable columns.
  */
 
+import { match } from "ts-pattern";
 import { z } from "zod";
 import { Option } from "../fp/option.ts";
 import type { Measurements } from "../domain/units.ts";
@@ -503,24 +504,56 @@ export const FINISH_BANDS: Record<Finish, FinishBand> = {
 };
 
 /**
- * What a finisher is: the finish it puts back.
+ * What a finisher is: the one thing it does, and how much of it.
  *
- * The same three amounts a color carries, because that is what a finish is.
- * There is no such thing as "the gloss finisher" — one tin leaves a surface at
+ * A sum rather than three numbers, because a tin does one thing — the database
+ * stores the other two amounts as absent and refuses a row with two of them.
+ * `applies` is the discriminant, so a caller that handles all three handles
+ * every tin there can be, and one that forgets a case does not compile.
+ *
+ * There is no such thing as "the gloss finisher": one tin leaves a surface at
  * 20 and the next leaves it at 15, and a shopper who wants the second is not
  * served by being sold the first.
- *
- * A tin never runs out, so nothing here says how long it lasts.
  */
-export type FinisherSpec = Readonly<{
-  kind: "finisher";
-  /** 5 is a mirror, 95 is chalk. */
-  roughness: number;
-  /** Nanometers of coating it lays down. Zero leaves the paint bare. */
-  coatingNanometers: number;
-  /** How hard what it leaves gives off its own light. */
-  emission: number;
-}>;
+export type FinishApplication =
+  | Readonly<{ applies: "roughness"; roughness: number }>
+  | Readonly<{ applies: "coating"; coatingNanometers: number }>
+  | Readonly<{ applies: "emission"; emission: number }>;
+
+/** A tin, as the catalog reports it. */
+export type FinisherSpec = Readonly<{ kind: "finisher" }> & FinishApplication;
+
+/**
+ * The one amount a tin carries, in the unit that amount is read in.
+ *
+ * Which unit follows from which amount it is, so there is no call site that
+ * has to remember that a coating is nanometers and a glow is a percentage.
+ */
+export const finishAmount = (application: FinishApplication): string =>
+  match(application)
+    .with({ applies: "roughness" }, ({ roughness }) => `${roughness}%`)
+    .with({ applies: "coating" }, ({ coatingNanometers }) => `${coatingNanometers} nm`)
+    .with({ applies: "emission" }, ({ emission }) => `${emission}%`)
+    .exhaustive();
+
+/**
+ * What a tin does, as a phrase that follows its name.
+ *
+ * Read by anyone who cannot see the pictures, which is where the whole of a
+ * tin's answer otherwise lives.
+ */
+export const describeApplication = (application: FinishApplication): string =>
+  match(application)
+    .with(
+      { applies: "roughness" },
+      ({ roughness }) => `leaves a surface at ${roughness}% roughness`,
+    )
+    .with(
+      { applies: "coating" },
+      ({ coatingNanometers }) => `lays a ${coatingNanometers} nm coating`,
+    )
+    .with({ applies: "emission" }, ({ emission }) => `glows at ${emission}%`)
+    .exhaustive();
 
 /** What a shifter is: which way round the wheel, and how far. */
 export type ShifterSpec = Readonly<{
@@ -580,9 +613,11 @@ export type ProductDetail = ProductSummary &
      * Every image of the product, in the order they are shown.
      *
      * `primaryImage` is the first of these, so a caller that only needs one
-     * takes that and never has to reason about an empty array. A color has its
-     * swatch here; a finisher and a shifter are drawn from their own spec and
-     * have none, so the list is empty rather than absent.
+     * takes that and never has to reason about an empty array. A color has one
+     * swatch; a tin of finisher has a set, because what a tin does can only be
+     * shown by showing it done to something. A shifter is drawn in the browser
+     * from its own two numbers and has none, so the list is empty rather than
+     * absent.
      */
     images: readonly ProductImage[];
     reviews: readonly ProductReview[];

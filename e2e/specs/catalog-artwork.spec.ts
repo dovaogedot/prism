@@ -148,38 +148,33 @@ const drawn = async (page: Page): Promise<void> => {
 };
 
 /**
- * Everything in the shop that makes its own light, a page at a time.
+ * Every color in the shop that makes its own light, a page at a time.
  *
- * A finisher is here as well as a color: a tin that puts a glow back on a
- * surface is drawn wearing the glow it applies, so it spills like one.
+ * Only colors: a tin is photographed rather than lit, so there is no stage of
+ * one to flood.
  */
-const glowing = (category: string, page: number): string =>
-  `/?category=${category}&emissionMin=1&perPage=12&page=${page}`;
+const glowing = (page: number): string =>
+  `/?category=color&emissionMin=1&perPage=12&page=${page}`;
 
 test.describe("a glowing product on its card", () => {
   test.beforeEach(async ({ page }) => {
     await pretendGpu(page);
   });
 
-  for (const [category, pages] of [
-    ["color", [1, 2]],
-    ["finisher", [1]],
-  ] as const) {
-    for (const page of pages) {
-      test(`leaves the background dark: ${category}, page ${page}`, async ({
-        page: browserPage,
-      }) => {
-        await browserPage.goto(glowing(category, page));
-        await drawn(browserPage);
+  for (const page of [1, 2] as const) {
+    test(`leaves the background dark: page ${page}`, async ({
+      page: browserPage,
+    }) => {
+      await browserPage.goto(glowing(page));
+      await drawn(browserPage);
 
-        const stages = await backgrounds(browserPage);
+      const stages = await backgrounds(browserPage);
 
-        expect(stages.length).toBeGreaterThan(0);
-        for (const stage of stages) {
-          expect(stage.peakLightness).toBeLessThanOrEqual(BACKGROUND_CEILING);
-        }
-      });
-    }
+      expect(stages.length).toBeGreaterThan(0);
+      for (const stage of stages) {
+        expect(stage.peakLightness).toBeLessThanOrEqual(BACKGROUND_CEILING);
+      }
+    });
   }
 });
 
@@ -188,7 +183,7 @@ test.describe("a glowing color in a lit room", () => {
 
   test("leaves the background the gray it was", async ({ page }) => {
     await pretendGpu(page);
-    await page.goto(glowing("color", 1));
+    await page.goto(glowing(1));
     await drawn(page);
 
     // A lit room is gray rather than black, so the ceiling that applies here is

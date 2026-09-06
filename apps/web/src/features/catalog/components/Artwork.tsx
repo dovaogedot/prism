@@ -2,15 +2,21 @@
  * What a product looks like, chosen by what it is.
  *
  * A color gets a lit stage built from the three amounts of finish it carries.
- * The other two have no stage: a finisher and a shifter are drawn here from
- * their own spec, so there is nothing seeded that could disagree with the
- * numbers beside it, and nothing on the volume for something that is not a
- * color.
+ * A shifter has no stage either: it is drawn here from its own two numbers, so
+ * there is nothing seeded that could disagree with the numbers beside it.
+ *
+ * A tin of finisher is the one kind that is photographed. It holds no color,
+ * so a slab of it would be a slab of nothing; what it sells is what it does to
+ * a color, and that can only be shown by showing it done. Those pictures are
+ * rendered once at seed time from the tin's one amount, so they cannot drift
+ * from it either.
  */
 
 import {
+  describeApplication,
   DIRECTION_LABELS,
   DIRECTION_SYMBOLS,
+  type FinisherSpec,
   Option,
   type ProductImage,
   type ProductSpec,
@@ -18,24 +24,7 @@ import {
 } from "@prism/shared";
 import { match } from "ts-pattern";
 import { ColorStage } from "./ColorStage.tsx";
-
-/** The gray a finisher demonstrates on, which claims nothing about hue. */
-const BARE_SLAB = "#8a8a8f";
-
-/** The pigment a glowing finisher demonstrates on. */
-const GLOWING_SLAB = "#7bd320";
-
-/**
- * The pigment a finisher's surface is shown on.
- *
- * A tin holds no color, so its picture is the surface it leaves rather than a
- * color it comes in, and a gray carries roughness and a coating honestly. It
- * cannot carry a glow: fluorescence is a pigment taking light in and handing
- * it back in its own band, and a gray has no band to hand it back in — it
- * just goes white. So a tin that glows demonstrates on a saturated pigment.
- */
-const substrateFor = (finishing: Readonly<{ emission: number }>): string =>
-  finishing.emission > 0 ? GLOWING_SLAB : BARE_SLAB;
+import { Photograph } from "./Photograph.tsx";
 
 /**
  * A surface written out as the three amounts that make it.
@@ -60,6 +49,10 @@ const describeSurface = (
       : "no coating",
     finishing.emission > 0 ? `glowing at ${finishing.emission}%` : "no glow",
   ].join(", ");
+
+/** A tin written out, for a reader who has the words but not the pictures. */
+const finisherAlt = (name: string, finisher: FinisherSpec): string =>
+  `${name} — ${describeApplication(finisher)}`;
 
 /**
  * The wheel, with the arc the shifter turns drawn on it.
@@ -150,15 +143,9 @@ export const Artwork = ({
       />
     ))
     .with({ kind: "finisher" }, (finisher) => (
-      <ColorStage
-        hex={substrateFor(finisher)}
-        finishing={{
-          roughness: finisher.roughness,
-          coatingNanometers: finisher.coatingNanometers,
-          emission: finisher.emission,
-        }}
-        image={Option.none}
-        alt={describeSurface(`${name} — the surface it leaves`, finisher)}
+      <Photograph
+        image={image}
+        alt={finisherAlt(name, finisher)}
         className={className}
       />
     ))

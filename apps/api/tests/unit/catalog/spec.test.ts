@@ -43,13 +43,13 @@ const color: SpecColumns = {
   family: "orange",
 };
 
-const finisher: SpecColumns = {
-  ...empty,
-  kind: "finisher",
-  roughness: 88,
-  coatingNanometers: 0,
-  emission: 0,
-};
+/**
+ * One tin per amount. A tin does one thing, so the row carries one number and
+ * the other two arrive absent — the table refuses any other shape.
+ */
+const roughnessTin: SpecColumns = { ...empty, kind: "finisher", roughness: 88 };
+const coatingTin: SpecColumns = { ...empty, kind: "finisher", coatingNanometers: 300 };
+const emissionTin: SpecColumns = { ...empty, kind: "finisher", emission: 80 };
 
 const shifter: SpecColumns = {
   ...empty,
@@ -75,14 +75,15 @@ describe("toProductSpec", () => {
     );
   });
 
-  it("builds a finisher from the finish it leaves", () => {
-    expect(toProductSpec(finisher)).toEqual(
-      Option.some({
-        kind: "finisher",
-        roughness: 88,
-        coatingNanometers: 0,
-        emission: 0,
-      }),
+  it("reads a tin as the one amount it carries", () => {
+    expect(toProductSpec(roughnessTin)).toEqual(
+      Option.some({ kind: "finisher", applies: "roughness", roughness: 88 }),
+    );
+    expect(toProductSpec(coatingTin)).toEqual(
+      Option.some({ kind: "finisher", applies: "coating", coatingNanometers: 300 }),
+    );
+    expect(toProductSpec(emissionTin)).toEqual(
+      Option.some({ kind: "finisher", applies: "emission", emission: 80 }),
     );
   });
 
@@ -138,8 +139,12 @@ describe("toProductSpec", () => {
     expect(toProductSpec({ ...color, saturation: null })).toEqual(Option.none);
   });
 
-  it("refuses a finisher with no roughness", () => {
-    expect(toProductSpec({ ...finisher, roughness: null })).toEqual(Option.none);
+  it("refuses a tin that lost the one amount it had", () => {
+    expect(toProductSpec({ ...roughnessTin, roughness: null })).toEqual(Option.none);
+    expect(toProductSpec({ ...coatingTin, coatingNanometers: null })).toEqual(
+      Option.none,
+    );
+    expect(toProductSpec({ ...emissionTin, emission: null })).toEqual(Option.none);
   });
 
   it("refuses a shifter with no direction", () => {
@@ -161,6 +166,7 @@ const noMeasurements: MeasurementColumns = {
   reachCentimeters: null,
   coatingNanometers: null,
   grainMicrometers: null,
+  finisherReachCentimeters: null,
   torqueMillinewtonMeters: null,
   backlashMicrometers: null,
   weightGrams: 120,
@@ -178,11 +184,28 @@ const colorColumns: MeasurementColumns = {
   weightGrams: 99,
 };
 
-const finisherColumns: MeasurementColumns = {
+/**
+ * One dimension per tin, generated from the one amount it carries, so the
+ * columns belonging to the other two amounts are absent here too.
+ */
+const roughnessTinColumns: MeasurementColumns = {
+  ...noMeasurements,
+  kind: "finisher",
+  grainMicrometers: 34,
+  weightGrams: 235,
+};
+
+const coatingTinColumns: MeasurementColumns = {
   ...noMeasurements,
   kind: "finisher",
   coatingNanometers: 320,
-  grainMicrometers: 34,
+  weightGrams: 235,
+};
+
+const emissionTinColumns: MeasurementColumns = {
+  ...noMeasurements,
+  kind: "finisher",
+  finisherReachCentimeters: 430,
   weightGrams: 235,
 };
 
@@ -216,22 +239,29 @@ describe("toMeasurements", () => {
     );
   });
 
-  it("gives a finisher the coating it lays down, in both systems", () => {
-    const measurements = toMeasurements(finisherColumns);
-
-    expect(measurements).toEqual(
+  it("gives a tin the one dimension its own effect has, in both systems", () => {
+    expect(toMeasurements(roughnessTinColumns)).toEqual(
       Option.some({
         of: "finisher",
-        metric: {
-          coatingNanometers: 320,
-          grainMicrometers: 34,
-          weightGrams: 235,
-        },
-        imperial: {
-          coatingMicroinches: 12.6,
-          grainMils: 1.34,
-          weightOunces: 8.29,
-        },
+        metric: { applies: "roughness", grainMicrometers: 34, weightGrams: 235 },
+        imperial: { applies: "roughness", grainMils: 1.34, weightOunces: 8.29 },
+      }),
+    );
+
+    expect(toMeasurements(coatingTinColumns)).toEqual(
+      Option.some({
+        of: "finisher",
+        metric: { applies: "coating", coatingNanometers: 320, weightGrams: 235 },
+        imperial: { applies: "coating", coatingMicroinches: 12.6, weightOunces: 8.29 },
+      }),
+    );
+
+    // Centimeters in the column, meters on screen, exactly as a color's reach.
+    expect(toMeasurements(emissionTinColumns)).toEqual(
+      Option.some({
+        of: "finisher",
+        metric: { applies: "emission", reachMeters: 4.3, weightGrams: 235 },
+        imperial: { applies: "emission", reachFeet: 14.1, weightOunces: 8.29 },
       }),
     );
   });
@@ -255,15 +285,23 @@ describe("toMeasurements", () => {
   });
 
   it("leaves out the columns that belong to another kind", () => {
-    const finisher = toMeasurements(finisherColumns);
-
-    // A color's grain is present in the row and absent from the answer.
-    expect(Option.isSome(finisher) && "grainMicrometers" in finisher.value.metric).toBe(
-      true,
-    );
-
+    // A color's grain is present in the row and absent from the answer: grain
+    // comes from roughness and every color has one, but it is not a fact a
+    // color is sold on.
     const color = toMeasurements(colorColumns);
     expect(Option.isSome(color) && "grainMicrometers" in color.value.metric).toBe(false);
+
+    // A tin sold for its coating quotes no grain, and one sold for its glow
+    // quotes neither.
+    const coating = toMeasurements(coatingTinColumns);
+    expect(Option.isSome(coating) && "grainMicrometers" in coating.value.metric).toBe(
+      false,
+    );
+
+    const emission = toMeasurements(emissionTinColumns);
+    expect(
+      Option.isSome(emission) && "coatingNanometers" in emission.value.metric,
+    ).toBe(false);
   });
 
   it("refuses a row missing the measurement its kind requires", () => {
@@ -271,7 +309,7 @@ describe("toMeasurements", () => {
       Option.none,
     );
     expect(
-      toMeasurements({ ...finisherColumns, grainMicrometers: null }),
+      toMeasurements({ ...roughnessTinColumns, grainMicrometers: null }),
     ).toEqual(Option.none);
     expect(toMeasurements({ ...shifterColumns, backlashMicrometers: null })).toEqual(
       Option.none,

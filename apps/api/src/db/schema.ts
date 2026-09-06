@@ -247,24 +247,33 @@ export const colors = pgTable("color", {
 });
 
 /**
- * A finisher: the finish it puts back, as the same three amounts a color has.
+ * A finisher: the one thing a tin does, in the column that says which.
  *
- * A tin never runs out, so nothing here says how long it lasts.
+ * Exactly one of the three amounts is present and the other two are absent, so
+ * what a tin is needs no threshold to recover and no extra column to declare —
+ * `finisher_does_one_thing` in the database counts them. Its dimension follows
+ * the same column, since a tin that changes no texture has no grain to quote.
  */
 export const finishers = pgTable("finisher", {
   productId: uuid("product_id").primaryKey(),
   /** Always `finisher`; it is half of the key back to a product of that kind. */
   kind: productKind("kind").notNull().default("finisher"),
 
-  roughness: smallint("roughness").notNull(),
-  coatingNanometers: smallint("coating_nanometers").notNull(),
-  emission: smallint("emission").notNull(),
+  /** 5 is a mirror, 95 is chalk. Present on a tin sold for the surface it leaves. */
+  roughness: smallint("roughness"),
+  /** Nanometers of interference coating it lays down. */
+  coatingNanometers: smallint("coating_nanometers"),
+  /** How hard it makes a pigment give off its own light. */
+  emission: smallint("emission"),
 
   grainMicrometers: smallint("grain_micrometers").generatedAlwaysAs(
     sql`finish_grain(roughness)`,
   ),
+  reachCentimeters: integer("reach_centimeters").generatedAlwaysAs(
+    sql`emission_reach(emission)`,
+  ),
   weightGrams: integer("weight_grams").generatedAlwaysAs(
-    sql`finisher_weight(roughness, coating_nanometers)`,
+    sql`finisher_weight(roughness, coating_nanometers, emission)`,
   ),
 });
 
@@ -359,6 +368,7 @@ export const productListing = pgView("product_listing", {
   coatingNanometers: smallint("coating_nanometers"),
   emission: smallint("emission"),
   grainMicrometers: smallint("grain_micrometers"),
+  finisherReachCentimeters: integer("finisher_reach_centimeters"),
 
   direction: shiftDirection("direction"),
   arcDegrees: smallint("arc_degrees"),

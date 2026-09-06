@@ -69,6 +69,7 @@ type ListingRow = Readonly<{
   temperatureKelvin: number | null;
   reachCentimeters: number | null;
   grainMicrometers: number | null;
+  finisherReachCentimeters: number | null;
   torqueMillinewtonMeters: number | null;
   backlashMicrometers: number | null;
   weightGrams: number;
@@ -99,6 +100,7 @@ const LISTING_COLUMNS = {
   temperatureKelvin: productListing.temperatureKelvin,
   reachCentimeters: productListing.reachCentimeters,
   grainMicrometers: productListing.grainMicrometers,
+  finisherReachCentimeters: productListing.finisherReachCentimeters,
   torqueMillinewtonMeters: productListing.torqueMillinewtonMeters,
   backlashMicrometers: productListing.backlashMicrometers,
   weightGrams: productListing.weightGrams,

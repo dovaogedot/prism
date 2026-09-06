@@ -16,15 +16,20 @@ export {
   measureColor,
   measureFinisher,
   measureShifter,
+  measurementRows,
 } from "./domain/units.ts";
 export type {
   ColorMetric,
+  FinisherDimension,
+  FinisherImperialDimension,
   FinisherMetric,
   ShifterMetric,
   ColorMeasurements,
   FinisherMeasurements,
   ShifterMeasurements,
   Measurements,
+  MeasurementRow,
+  UnitSystem,
 } from "./domain/units.ts";
 
 export {

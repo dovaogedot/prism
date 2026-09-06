@@ -203,14 +203,34 @@ AS $$
   SELECT round(roughness * 0.37)::smallint;
 $$;
 
--- What a tin weighs, in grams: the tin, plus the solids it has to carry to
--- leave that much texture and that thick a coating.
-CREATE FUNCTION finisher_weight(roughness smallint, coating_nanometers smallint)
+-- How far the glow a tin leaves still carries, in centimeters. A tin sold for
+-- emission changes no texture and lays down no film, so this is the one
+-- dimension it has.
+CREATE FUNCTION emission_reach(emission smallint)
 RETURNS integer
 LANGUAGE sql
 IMMUTABLE STRICT PARALLEL SAFE
 AS $$
-  SELECT round(180 + finish_grain(roughness) * 3.0 + coating_nanometers * 0.25)::integer;
+  SELECT round(120 + emission * 34.0)::integer;
+$$;
+
+-- What a tin weighs, in grams: the tin, plus the solids it carries to do the
+-- one thing it does. Not STRICT, because two of the three arguments are absent
+-- on every tin — that is what says which one it is.
+CREATE FUNCTION finisher_weight(
+  roughness smallint,
+  coating_nanometers smallint,
+  emission smallint
+)
+RETURNS integer
+LANGUAGE sql
+IMMUTABLE PARALLEL SAFE
+AS $$
+  SELECT round(
+    180 + COALESCE(finish_grain(roughness) * 3.0, 0)
+        + COALESCE(coating_nanometers * 0.25, 0)
+        + COALESCE(emission * 1.4, 0)
+  )::integer;
 $$;
 
 -- How hard a shifter has to turn, in millinewton-meters.

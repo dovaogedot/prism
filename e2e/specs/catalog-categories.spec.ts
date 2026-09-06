@@ -156,7 +156,7 @@ test.describe("the shifter controls", () => {
 
 test.describe("layout stability across categories", () => {
   for (const [label, url, narrowed] of [
-    ["finishers", "/?category=finisher", "/?category=finisher&roughnessMax=20"],
+    ["finishers", "/?category=finisher", "/?category=finisher&finish=fluorescent"],
     ["shifters", "/?category=shifter", "/?category=shifter&arcMin=200&direction=ccw"],
   ] as const) {
     test(`the page is the same height however few ${label} match`, async ({ page }) => {
@@ -212,9 +212,17 @@ test.describe("measurements differ by category", () => {
     await expect(coating).toHaveText(/^[\d.]+ µin$/);
   });
 
-  test("a finisher measures the tin instead", async ({ page }) => {
+  test("a tin measures the one dimension its own effect has", async ({ page }) => {
+    // Which dimension that is depends on what the tin does — a grain, a
+    // thickness or a reach — so what is pinned here is the shape: one
+    // dimension, then the weight every tin has.
     await openFirst(page, "finisher");
-    expect(await measurementLabels(page)).toEqual(["Coating", "Grain", "Weight"]);
+
+    const labels = await measurementLabels(page);
+
+    expect(labels).toHaveLength(2);
+    expect(["Grain", "Coating", "Reach"]).toContain(labels[0]);
+    expect(labels[1]).toBe("Weight");
   });
 
   test("a shifter measures the mechanism", async ({ page }) => {
@@ -253,5 +261,43 @@ test.describe("measurements differ by category", () => {
       expect.stringContaining("in"),
       expect.stringContaining("oz"),
     ]);
+  });
+});
+
+test.describe("a tin is photographed", () => {
+  /** The pictures of one tin, which is the strip under the large one. */
+  const pictures = (page: Page) => page.getByRole("list", { name: "Pictures" });
+
+  test("shows what it does on its card, rather than a slab of color", async ({
+    page,
+  }) => {
+    await page.goto("/?category=finisher");
+    await ready(page);
+
+    const card = results(page).getByRole("article").first();
+
+    // A tin holds no color, so there is nothing to light: its card carries the
+    // rendered picture of its effect instead of a stage.
+    await expect(card.locator("img")).toHaveCount(1);
+    await expect(card.locator("canvas")).toHaveCount(0);
+  });
+
+  test("opens on the effect and the same effect over four pigments", async ({
+    page,
+  }) => {
+    await page.goto("/?category=finisher");
+    await ready(page);
+    await results(page).getByRole("article").first().getByRole("link").click();
+    await expect(page.getByRole("heading", { name: "Measurements" })).toBeVisible();
+
+    const thumbnails = pictures(page).getByRole("button");
+    await expect(thumbnails).toHaveCount(5);
+
+    const large = page.getByRole("article").locator("img").first();
+    const before = await large.getAttribute("src");
+
+    await thumbnails.last().click();
+
+    await expect(large).not.toHaveAttribute("src", String(before));
   });
 });

@@ -5,6 +5,7 @@ import {
   kelvinToFahrenheit,
   measureColor,
   measureFinisher,
+  measurementRows,
   measureShifter,
   metersToFeet,
   micrometersToMils,
@@ -25,9 +26,9 @@ const gold: ColorMetric = {
   weightGrams: 99,
 };
 
-/** A matte bath that leaves a 320 nm coating. */
+/** A matte bath, sold for the surface it leaves. */
 const bath: FinisherMetric = {
-  coatingNanometers: 320,
+  applies: "roughness",
   grainMicrometers: 34,
   weightGrams: 235,
 };
@@ -178,25 +179,26 @@ describe("measureFinisher", () => {
       of: "finisher",
       metric: bath,
       imperial: {
-        coatingMicroinches: nanometersToMicroinches(320),
+        applies: "roughness",
         grainMils: micrometersToMils(34),
         weightOunces: gramsToOunces(235),
       },
     });
   });
 
-  it("shares with a color exactly what a tin and a surface both have", () => {
-    // A coating, because a tin lays down the layer a color wears, and a
-    // weight, because everything in the shop has one. Not a temperature and
-    // not a reach: those are things a color does with light, and a tin is not
-    // a color.
-    const finisher = Object.keys(measureFinisher(bath).metric);
-    const color = Object.keys(measureColor(gold).metric);
+  it("gives each kind of tin the one dimension its own effect has", () => {
+    // A tin does one thing, so it quotes one dimension and it is the one
+    // belonging to that thing. Weight is the only row all three share.
+    const dimensions = (metric: FinisherMetric) =>
+      Object.keys(measureFinisher(metric).metric)
+        .filter((key) => key !== "applies")
+        .sort();
 
-    expect(finisher.filter((key) => color.includes(key))).toEqual([
-      "coatingNanometers",
-      "weightGrams",
-    ]);
+    expect(dimensions(bath)).toEqual(["grainMicrometers", "weightGrams"]);
+    expect(dimensions({ applies: "coating", coatingNanometers: 320, weightGrams: 255 }))
+      .toEqual(["coatingNanometers", "weightGrams"]);
+    expect(dimensions({ applies: "emission", reachMeters: 24.6, weightGrams: 281 }))
+      .toEqual(["reachMeters", "weightGrams"]);
   });
 });
 
@@ -239,5 +241,94 @@ describe("nanometersToMicroinches", () => {
 
   it("gives bare paint no thickness", () => {
     expect(nanometersToMicroinches(0)).toBe(0);
+  });
+});
+
+describe("measurementRows", () => {
+  it("writes a color's four rows in the system asked for", () => {
+    expect(measurementRows(measureColor(gold), "metric")).toEqual([
+      { label: "Temperature", value: "2322.9 °C" },
+      { label: "Reach", value: "293.5 m" },
+      { label: "Coating", value: "320 nm" },
+      { label: "Weight", value: "99 g" },
+    ]);
+
+    expect(measurementRows(measureColor(gold), "imperial")).toEqual([
+      { label: "Temperature", value: "4213.1 °F" },
+      { label: "Reach", value: "962.9 ft" },
+      { label: "Coating", value: "12.6 µin" },
+      { label: "Weight", value: "3.49 oz" },
+    ]);
+  });
+
+  it("gives each tin two rows: its own dimension, then its weight", () => {
+    expect(measurementRows(measureFinisher(bath), "metric")).toEqual([
+      { label: "Grain", value: "34 µm" },
+      { label: "Weight", value: "235 g" },
+    ]);
+
+    expect(
+      measurementRows(
+        measureFinisher({ applies: "coating", coatingNanometers: 320, weightGrams: 255 }),
+        "metric",
+      ),
+    ).toEqual([
+      { label: "Coating", value: "320 nm" },
+      { label: "Weight", value: "255 g" },
+    ]);
+
+    expect(
+      measurementRows(
+        measureFinisher({ applies: "emission", reachMeters: 24.6, weightGrams: 281 }),
+        "imperial",
+      ),
+    ).toEqual([
+      { label: "Reach", value: "80.7 ft" },
+      { label: "Weight", value: "9.91 oz" },
+    ]);
+  });
+
+  it("writes a shifter's rows as a mechanism's", () => {
+    expect(measurementRows(measureShifter(swing), "metric")).toEqual([
+      { label: "Torque", value: "5.4 N·m" },
+      { label: "Backlash", value: "0.64 mm" },
+      { label: "Weight", value: "249 g" },
+    ]);
+
+    expect(measurementRows(measureShifter(swing), "imperial")).toEqual([
+      { label: "Torque", value: "3.98 lbf·ft" },
+      { label: "Backlash", value: "0.025 in" },
+      { label: "Weight", value: "8.78 oz" },
+    ]);
+  });
+
+  it("ends every reading with the weight, which is the row all three share", () => {
+    const measured = [
+      measureColor(gold),
+      measureFinisher(bath),
+      measureShifter(swing),
+    ] as const;
+
+    for (const measurements of measured) {
+      for (const system of ["metric", "imperial"] as const) {
+        const rows = measurementRows(measurements, system);
+
+        expect(rows.at(-1)).toEqual({
+          label: "Weight",
+          value: system === "metric" ? expect.stringMatching(/ g$/) : expect.stringMatching(/ oz$/),
+        });
+      }
+    }
+  });
+
+  it("labels no row it has no number for", () => {
+    // The point of the whole shape: a tin has no temperature row reading zero,
+    // because a tin has no temperature.
+    const labels = measurementRows(measureFinisher(bath), "metric").map(
+      (row) => row.label,
+    );
+
+    expect(labels).not.toContain("Temperature");
+    expect(labels).not.toContain("Torque");
   });
 });

@@ -18,7 +18,19 @@ import type {
   ProductSort,
 } from "@prism/shared";
 import { FINISH_BANDS, Option } from "@prism/shared";
-import { and, asc, desc, eq, gte, inArray, lte, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  lte,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { productListing } from "../../db/schema.ts";
 
 /**
@@ -76,18 +88,28 @@ const FINISH_COLUMNS = {
 } as const satisfies Record<FinishProperty, unknown>;
 
 /**
- * The products a finish name picks out.
+ * The tins a finish name picks out.
  *
- * A name is a stretch of one amount rather than a value anything stores, so
- * the filter is that stretch. The four stretches do not overlap: matte and
- * gloss partition the roughness axis, and a coating and a glow each begin
- * above the point where they would be invisible.
+ * A tin does one thing, and the column that is present is which one — so
+ * asking for the iridescent ones is asking which rows have a coating at all.
+ * No threshold recovers it and nothing has to agree about where one finish
+ * becomes another.
+ *
+ * Matte and gloss are the exception, and only because they are one thing: two
+ * ends of the roughness a tin leaves, split where a reflection stops being
+ * worth naming. Both still require the column to be present, so a coating tin
+ * is neither.
+ *
+ * Scoped to finishers, because a color carries all three amounts at once and
+ * has no single answer to which finish it is.
  */
 export const finishCondition = (finish: Finish): SQL => {
   const band = FINISH_BANDS[finish];
   const column = FINISH_COLUMNS[band.property];
 
   return and(
+    eq(productListing.kind, "finisher"),
+    isNotNull(column),
     gte(column, band.range.min),
     lte(column, band.range.max),
   ) as SQL;
@@ -191,7 +213,6 @@ export const buildConditions = (
     conditions.push(gte(productListing.emission, query.emission.value.min));
     conditions.push(lte(productListing.emission, query.emission.value.max));
   }
-
 
   if (!acrossKinds && Option.isSome(query.direction)) {
     conditions.push(eq(productListing.direction, query.direction.value));
