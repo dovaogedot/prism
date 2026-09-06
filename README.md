@@ -164,6 +164,51 @@ The end-to-end specs drive a real browser and expect `./start.sh` to have been r
 
 ---
 
+## Deployment
+
+Pushing to `main` builds the commit and restarts it on whichever server the
+repository's settings point at. Nothing in this repository names a host: the
+address, the paths, the ports and every credential arrive as GitHub variables
+and secrets, so moving the deployment is a settings change rather than a
+commit.
+
+A server small enough to be cheap runs this stack comfortably and cannot build
+it, so nothing is compiled there. The workflow typechecks and unit-tests,
+builds both images, pushes them to GHCR tagged with the commit SHA, and the
+server pulls and restarts. What is running is therefore always traceable to
+one commit, and a rollback needs no rebuild:
+
+```bash
+# on the server, in the deploy directory
+sed -i 's/:[0-9a-f]\{40\}$/:<older-sha>/' .env
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+[`docker-compose.prod.yml`](docker-compose.prod.yml) layers over the same
+compose file a laptop uses, so there is one description of how the services
+are wired. It changes three things: images are pulled rather than built,
+nothing binds a public address, and everything restarts on its own. Both
+services listen on loopback for a reverse proxy to forward to — the proxy is
+the host's business, not this repository's.
+
+Password-reset mail goes to Mailpit as it does locally. Publish it behind a
+password if a reviewer needs to open the inbox, or read the link from
+`docker compose logs mailpit`.
+
+**Repository secrets.** `DEPLOY_HOST`, `DEPLOY_USER` and `DEPLOY_SSH_KEY`
+reach the server; `JWT_SECRET` and `POSTGRES_PASSWORD` are required. The rest
+are optional and decide which mode a path runs in — supply
+`RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET_KEY` and the real CAPTCHA answers,
+supply `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` and real OAuth answers,
+leave them out and the offline stand-ins do, exactly as they do locally.
+
+**Repository variables.** `PUBLIC_WEB_URL` is required, because password-reset
+links and OAuth redirects are built from it and there is no safe default.
+`DEPLOY_PATH`, `WEB_PORT`, `MAILPIT_PORT`, `MAIL_FROM` and
+`AUTH_RATE_LIMIT_PER_MINUTE` all have one.
+
+---
+
 ## Entity relationship diagram
 
 Cardinality is on the connector; modality is in the notes beneath.

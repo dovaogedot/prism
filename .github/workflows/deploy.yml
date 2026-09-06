@@ -1,0 +1,233 @@
+# Build the two images, then tell a server to run them.
+#
+# Nothing here knows where it deploys. The host, the paths, the ports and the
+# public URL all arrive as repository variables and secrets, so pointing this
+# at a different machine is a settings change rather than a commit.
+#
+# Nothing is compiled on the server either. A box small enough to be cheap
+# runs this stack comfortably and cannot build it, so the runner builds both
+# images, pushes them to the registry tagged with the commit, and the deploy
+# step is a pull and an `up`. The tag is the commit SHA rather than `latest`,
+# so what is running is always traceable to one commit and a rollback is one
+# variable in the server's `.env`.
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  # A second push while a deploy is in flight waits for it rather than racing
+  # it onto the same server.
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Images are named after the repository, so a fork publishes its own without
+  # editing anything.
+  API_IMAGE: ghcr.io/${{ github.repository }}-api
+  WEB_IMAGE: ghcr.io/${{ github.repository }}-web
+
+jobs:
+  verify:
+    name: Typecheck and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # The shared package is consumed as built output, so it has to exist
+      # before anything that imports it can be typechecked.
+      - run: npm run build
+
+      - run: npm run typecheck
+
+      # Unit tests only. The integration suite needs Testcontainers and the
+      # end-to-end suite needs the whole stack; neither belongs in the gate
+      # that decides whether a deploy proceeds.
+      - run: npm run test:unit
+
+  build:
+    name: Build and push images
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push the API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: ${{ env.API_IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The site key and the CAPTCHA mode are read by Vite at build time, so
+      # they are baked into this image rather than set on the server. Supply a
+      # site key and the real widget ships; leave it out and the build uses
+      # Google's public always-pass test key, as the local stack does.
+      - name: Build and push the web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          tags: ${{ env.WEB_IMAGE }}:${{ github.sha }}
+          build-args: |
+            VITE_CAPTCHA_MODE=${{ secrets.RECAPTCHA_SITE_KEY != '' && 'google' || 'test' }}
+            VITE_RECAPTCHA_SITE_KEY=${{ secrets.RECAPTCHA_SITE_KEY }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Pull and restart on the server
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    env:
+      SSH_TARGET: ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
+      # Where the compose files and the generated .env live on the server.
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '~/prism' }}
+      WEB_PORT: ${{ vars.WEB_PORT || '8090' }}
+      MAILPIT_PORT: ${{ vars.MAILPIT_PORT || '8026' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Open an SSH connection to the server
+        env:
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Send the compose files
+        run: |
+          ssh -i ~/.ssh/id_deploy "$SSH_TARGET" "mkdir -p $DEPLOY_PATH"
+          scp -i ~/.ssh/id_deploy docker-compose.yml docker-compose.prod.yml \
+            "$SSH_TARGET:$DEPLOY_PATH/"
+
+      # Written fresh every deploy, so the repository's settings are the only
+      # place these values are edited. Each mode follows its credential:
+      # supply a CAPTCHA or OAuth secret and that path goes live, leave it out
+      # and the built-in offline stand-in answers instead, exactly as it does
+      # on a laptop.
+      #
+      # Values are written by printf from the environment rather than
+      # interpolated into the heredoc, so a secret containing a quote, a
+      # newline or a `$` cannot break the file or the shell.
+      - name: Write the environment
+        env:
+          PUBLIC_WEB_URL: ${{ vars.PUBLIC_WEB_URL }}
+          MAIL_FROM: ${{ vars.MAIL_FROM || 'Prism <noreply@localhost>' }}
+          AUTH_RATE_LIMIT_PER_MINUTE: ${{ vars.AUTH_RATE_LIMIT_PER_MINUTE || '60' }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          RECAPTCHA_SECRET_KEY: ${{ secrets.RECAPTCHA_SECRET_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          OAUTH_GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
+          OAUTH_GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          if [ -z "$PUBLIC_WEB_URL" ]; then
+            echo "PUBLIC_WEB_URL is not set. Password-reset links and OAuth" >&2
+            echo "redirects are built from it, so it has no safe default." >&2
+            exit 1
+          fi
+
+          {
+            printf 'API_IMAGE=%s\n' "${{ env.API_IMAGE }}:${{ github.sha }}"
+            printf 'WEB_IMAGE=%s\n' "${{ env.WEB_IMAGE }}:${{ github.sha }}"
+            printf 'WEB_PORT=%s\n' "$WEB_PORT"
+            printf 'MAILPIT_PORT=%s\n' "$MAILPIT_PORT"
+            printf 'PUBLIC_WEB_URL=%s\n' "$PUBLIC_WEB_URL"
+            printf 'MAIL_FROM=%s\n' "$MAIL_FROM"
+            printf 'AUTH_RATE_LIMIT_PER_MINUTE=%s\n' "$AUTH_RATE_LIMIT_PER_MINUTE"
+            printf 'LOG_LEVEL=%s\n' 'info'
+            printf 'JWT_SECRET=%s\n' "$JWT_SECRET"
+            printf 'POSTGRES_PASSWORD=%s\n' "$POSTGRES_PASSWORD"
+            printf 'CAPTCHA_MODE=%s\n' "$([ -n "$RECAPTCHA_SECRET_KEY" ] && echo google || echo test)"
+            printf 'RECAPTCHA_SECRET_KEY=%s\n' "$RECAPTCHA_SECRET_KEY"
+            printf 'OAUTH_MODE=%s\n' "$([ -n "$GOOGLE_CLIENT_ID$OAUTH_GITHUB_CLIENT_ID" ] && echo live || echo mock)"
+            printf 'GOOGLE_CLIENT_ID=%s\n' "$GOOGLE_CLIENT_ID"
+            printf 'GOOGLE_CLIENT_SECRET=%s\n' "$GOOGLE_CLIENT_SECRET"
+            printf 'GITHUB_CLIENT_ID=%s\n' "$OAUTH_GITHUB_CLIENT_ID"
+            printf 'GITHUB_CLIENT_SECRET=%s\n' "$OAUTH_GITHUB_CLIENT_SECRET"
+          } > deploy.env
+
+          scp -i ~/.ssh/id_deploy deploy.env "$SSH_TARGET:$DEPLOY_PATH/.env"
+          ssh -i ~/.ssh/id_deploy "$SSH_TARGET" "chmod 600 $DEPLOY_PATH/.env"
+          rm -f deploy.env
+
+      # The job's own token is enough to pull and it expires with the job, so
+      # no long-lived registry credential has to live on the server. It travels
+      # on stdin rather than in the command, which would put it in that host's
+      # process list.
+      - name: Sign in to the registry from the server
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          printf '%s' "$TOKEN" | ssh -i ~/.ssh/id_deploy "$SSH_TARGET" \
+            "docker login ghcr.io -u '$ACTOR' --password-stdin"
+
+      - name: Pull and start
+        run: |
+          ssh -i ~/.ssh/id_deploy "$SSH_TARGET" "
+            set -eu
+            cd $DEPLOY_PATH
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull --quiet
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+            docker logout ghcr.io"
+
+      - name: Wait for the storefront to answer
+        run: |
+          ssh -i ~/.ssh/id_deploy "$SSH_TARGET" "
+            set -eu
+            for attempt in \$(seq 1 60); do
+              if curl -fsS -o /dev/null http://127.0.0.1:$WEB_PORT/api/v1/health; then
+                echo \"healthy after \${attempt}s\"
+                exit 0
+              fi
+              sleep 1
+            done
+            echo 'the stack did not become healthy' >&2
+            cd $DEPLOY_PATH
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail 60 api web
+            exit 1"
+
+      # One image per commit accumulates quickly on a small disk.
+      - name: Drop images no container is using
+        if: success()
+        run: |
+          ssh -i ~/.ssh/id_deploy "$SSH_TARGET" \
+            'docker image prune -af --filter "until=168h" >/dev/null && echo pruned'

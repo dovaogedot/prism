@@ -1,0 +1,52 @@
+# What changes when the stack runs on a server instead of a laptop.
+#
+# Layered over `docker-compose.yml`, which stays the source of truth for how
+# the services are wired to each other:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Three things differ. The images are pulled rather than built, because a
+# server small enough to be cheap is not big enough to run a Vite build.
+# Nothing binds a public address, because a reverse proxy in front of this
+# owns 80 and 443 and forwards to these loopback ports. And every service
+# restarts by itself, because a reboot should bring the shop back up without
+# anyone logging in.
+#
+# Nothing here knows where it is deployed. The image references, the ports and
+# every credential arrive as environment variables, so the same two files run
+# on any host that can run Docker.
+#
+# `!override` on each port list matters: Compose merges list values by
+# appending, so without it the laptop's public bindings survive alongside these
+# and the inbox ends up open on 0.0.0.0.
+#
+# The ports are required rather than defaulted. Interpolation runs per file
+# before the merge, so a default here loses to the one in the base file and a
+# forgotten value would quietly land on the laptop's port instead of this one.
+
+services:
+  postgres:
+    restart: unless-stopped
+
+  mailpit:
+    restart: unless-stopped
+    # Loopback only. Whatever publishes this should ask for a password: it is
+    # the inbox a reviewer opens to finish a password reset.
+    ports: !override
+      - "127.0.0.1:${MAILPIT_PORT:?set MAILPIT_PORT}:8025"
+
+  migrate:
+    image: ${API_IMAGE:?set API_IMAGE}
+    pull_policy: always
+
+  api:
+    image: ${API_IMAGE:?set API_IMAGE}
+    pull_policy: always
+    restart: unless-stopped
+
+  web:
+    image: ${WEB_IMAGE:?set WEB_IMAGE}
+    pull_policy: always
+    restart: unless-stopped
+    ports: !override
+      - "127.0.0.1:${WEB_PORT:?set WEB_PORT}:3000"
