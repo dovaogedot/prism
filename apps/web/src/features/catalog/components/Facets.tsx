@@ -15,8 +15,8 @@ import {
   isCents,
   EMISSION_BOUNDS,
   FINISH_PROPERTIES,
-  FINISH_PROPERTY_LABELS,
-  FINISH_RANGES,
+  FINISH_AXES,
+  FINISH_LABELS,
   LIGHTNESS_BOUNDS,
   ROUGHNESS_BOUNDS,
   Option,
@@ -24,6 +24,7 @@ import {
   SATURATION_BOUNDS,
   SHIFT_DIRECTIONS,
   type FacetBucket,
+  type Finish,
   type FinishProperty,
   type NumericRange,
   type ProductFacets,
@@ -457,11 +458,11 @@ const ROUGHNESS_RAMP = "linear-gradient(to right, #f4f4f5, #6b6b70)";
 const EMISSION_RAMP = "linear-gradient(to right, #cdbb6a, #fde047, #fffbea)";
 
 /**
- * Where on the chosen amount's axis to look.
+ * Where on one amount's axis to look.
  *
- * The axis runs over `FINISH_RANGES` — the same table the server floors the
- * filter at, so the slider cannot offer a stretch the shelf has nothing in.
- * Roughness is the one with two names on it: dragging the low end up asks for
+ * All three are on screen at once and narrow independently, because a colour
+ * carries all three: a shopper can ask for a coated surface that also glows.
+ * Roughness is the one with two names on it — dragging the low end up asks for
  * matte and dragging the high end down asks for gloss, without the shop having
  * to pick the point where one becomes the other.
  */
@@ -474,7 +475,7 @@ const AmountSlider = ({
   state: FacetState;
   onChange: (next: Partial<FacetState>) => void;
 }>) => {
-  const range = FINISH_RANGES[property];
+  const range = FINISH_AXES[property];
 
   /** Dragged back to an end of the band means "no narrowing", not "the band". */
   const narrowed = (next: NumericRange): Readonly<{ min: string; max: string }> => ({
@@ -578,10 +579,12 @@ export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
   const showsKind = (kind: ProductKind): boolean =>
     Option.isSome(chosenKind) && chosenKind.value === kind;
 
-  /** Which of the three amounts is being asked about, if any. */
-  const chosenFinish: Option<FinishProperty> = isFinishProperty(state.finish)
-    ? Option.some(state.finish)
-    : Option.none;
+  /** Which of the three axes a shopper has narrowed, for the section summary. */
+  const amountsNarrowed: readonly boolean[] = [
+    hasRange(state.roughnessMin, state.roughnessMax),
+    hasRange(state.coatingMin, state.coatingMax),
+    hasRange(state.emissionMin, state.emissionMax),
+  ];
 
   const arc: NumericRange = {
     min: numberOr(state.arcMin, ARC_BOUNDS.min),
@@ -776,38 +779,52 @@ export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
       {/*
         The finish, on the shelf of colors that have one and on the shelf of
         tins that put one back. Three amounts and therefore three questions,
-        asked one at a time: a roughness is a percentage, a coating is a
-        thickness in nanometers and a glow is neither, so one slider each and
-        one of them on screen.
+        asked on their own axis: a roughness is a percentage, a coating is a
+        thickness in nanometers and a glow is neither, so one slider each.
       */}
-      {match(showsKind("color") || showsKind("finisher"))
+      {match(showsKind("color"))
+        .with(false, () => null)
+        .with(true, () => (
+          <Section title="Finish" summary={settledCount(amountsNarrowed)}>
+            {/*
+              Three axes, all of them live at once. A colour carries all three,
+              so narrowing one has nothing to do with narrowing another — a
+              shopper can ask for a lacquered surface that is also iridescent
+              and also glowing, which is a thing real paint is.
+            */}
+            <div className="space-y-4">
+              {FINISH_PROPERTIES.map((property) => (
+                <AmountSlider
+                  key={property}
+                  property={property}
+                  state={state}
+                  onChange={onChange}
+                />
+              ))}
+            </div>
+          </Section>
+        ))
+        .exhaustive()}
+
+      {/*
+        A tin is not a surface with three amounts on it; it is bought for the
+        one effect it produces. So its filter is the word, not the axes — and
+        the four words partition the space rather than overlapping, because
+        each names a stretch no other one reaches into.
+      */}
+      {match(showsKind("finisher"))
         .with(false, () => null)
         .with(true, () => (
           <Section
             title="Finish"
-            summary={Option.match<FinishProperty, string>({
-              onSome: (property) => FINISH_PROPERTY_LABELS[property],
-              onNone: () => "",
-            })(chosenFinish)}
+            summary={state.finish === "" ? "" : FINISH_LABELS[state.finish as Finish]}
           >
-            <div className="space-y-4">
-              <RadioList
-                name="finish"
-                buckets={facets.finishes}
-                selected={state.finish}
-                // A range goes with the axis it was drawn on. One left behind
-                // would narrow the results with no control on screen to
-                // explain why.
-                onSelect={(value) => onChange({ finish: value, ...NO_AMOUNTS })}
-              />
-
-              {Option.match<FinishProperty, ReactNode>({
-                onSome: (property) => (
-                  <AmountSlider property={property} state={state} onChange={onChange} />
-                ),
-                onNone: () => null,
-              })(chosenFinish)}
-            </div>
+            <RadioList
+              name="finish"
+              buckets={facets.finishes}
+              selected={state.finish}
+              onSelect={(value) => onChange({ finish: value })}
+            />
           </Section>
         ))
         .exhaustive()}

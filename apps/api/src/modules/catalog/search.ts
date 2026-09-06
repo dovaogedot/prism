@@ -11,12 +11,13 @@
  */
 
 import type {
+  Finish,
   FinishProperty,
   NumericRange,
   ProductQuery,
   ProductSort,
 } from "@prism/shared";
-import { FINISH_RANGES, Option } from "@prism/shared";
+import { FINISH_BANDS, Option } from "@prism/shared";
 import { and, asc, desc, eq, gte, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 import { productListing } from "../../db/schema.ts";
 
@@ -75,16 +76,22 @@ const FINISH_COLUMNS = {
 } as const satisfies Record<FinishProperty, unknown>;
 
 /**
- * What asking about one amount of the finish asks of the database.
+ * The products a finish name picks out.
  *
- * The floor of the amount's own range, which is where having it begins: a
- * coating under a hundred nanometers is not a coating and a glow under the
- * least worth selling is not a glow. Roughness has no such floor — every
- * surface has one — so asking about it narrows nothing by itself, and the
- * range that follows does all the narrowing.
+ * A name is a stretch of one amount rather than a value anything stores, so
+ * the filter is that stretch. The four stretches do not overlap: matte and
+ * gloss partition the roughness axis, and a coating and a glow each begin
+ * above the point where they would be invisible.
  */
-export const finishCondition = (property: FinishProperty): SQL =>
-  gte(FINISH_COLUMNS[property], FINISH_RANGES[property].min);
+export const finishCondition = (finish: Finish): SQL => {
+  const band = FINISH_BANDS[finish];
+  const column = FINISH_COLUMNS[band.property];
+
+  return and(
+    gte(column, band.range.min),
+    lte(column, band.range.max),
+  ) as SQL;
+};
 
 /**
  * Conditions for a query, optionally omitting one dimension.
@@ -110,9 +117,9 @@ export const buildConditions = (
   })(exclude);
 
   const acrossKinds = omitted === "kind";
-  // Counting the finishes drops the ranges as well as the name. A range
-  // narrows inside whichever band is selected, so leaving one applied would
-  // show every other finish holding nothing.
+  // Only the name has a facet to count, so only the name is lifted for it.
+  // The three amounts are sliders a shopper sets independently, with no counts
+  // of their own to distort.
   const acrossFinishes = acrossKinds || omitted === "finish";
   const conditions: SQL[] = [];
 
@@ -170,17 +177,17 @@ export const buildConditions = (
   // The three amounts a finish is made of, which a color has and a tin puts
   // back. Independent of each other, so narrowing one says nothing about the
   // other two.
-  if (!acrossFinishes && Option.isSome(query.roughness)) {
+  if (!acrossKinds && Option.isSome(query.roughness)) {
     conditions.push(gte(productListing.roughness, query.roughness.value.min));
     conditions.push(lte(productListing.roughness, query.roughness.value.max));
   }
 
-  if (!acrossFinishes && Option.isSome(query.coating)) {
+  if (!acrossKinds && Option.isSome(query.coating)) {
     conditions.push(gte(productListing.coatingNanometers, query.coating.value.min));
     conditions.push(lte(productListing.coatingNanometers, query.coating.value.max));
   }
 
-  if (!acrossFinishes && Option.isSome(query.emission)) {
+  if (!acrossKinds && Option.isSome(query.emission)) {
     conditions.push(gte(productListing.emission, query.emission.value.min));
     conditions.push(lte(productListing.emission, query.emission.value.max));
   }

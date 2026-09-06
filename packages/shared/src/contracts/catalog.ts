@@ -33,15 +33,15 @@ export const FINISHES = ["matte", "gloss", "iridescent", "fluorescent"] as const
 export type Finish = (typeof FINISHES)[number];
 
 /**
- * The three amounts a finish is made of, and the three questions there are to
- * ask about one.
+ * The three amounts a finish is made of.
  *
- * Matte and gloss are not two of these. They are the two ends of the first
- * one, which is why a shopper picks the axis and then picks where on it —
- * asking "matte or gloss?" would be asking for a threshold nobody agreed on.
+ * A color carries all three at once and is filtered on each independently — a
+ * shopper can ask for a coated surface that also glows. A finisher is bought
+ * for the one effect it produces, which is why its own filter is the four
+ * words rather than these three axes.
  */
 export const FINISH_PROPERTIES = ["roughness", "coating", "emission"] as const;
-/** One amount a finish is made of, which is one question a shopper can ask. */
+/** One amount a finish is made of. */
 export type FinishProperty = (typeof FINISH_PROPERTIES)[number];
 
 /**
@@ -204,8 +204,8 @@ export const productQueryParamsSchema = z.object({
   /** A color family, which only colors have. */
   family: z.enum(COLOR_FAMILIES).optional(),
   brands: commaSeparated.pipe(z.array(slugSchema).max(20)),
-  /** Which of the three amounts is being asked about. */
-  finish: z.enum(FINISH_PROPERTIES).optional(),
+  /** Which finish a tin applies. Finishers only — a color carries all three amounts. */
+  finish: z.enum(FINISHES).optional(),
   roughnessMin: z.coerce
     .number()
     .int()
@@ -295,13 +295,14 @@ export type ProductQuery = Readonly<{
   family: Option<ColorFamily>;
   brandSlugs: readonly string[];
   /**
-   * Which amount of the finish is being asked about. Exclusive: a shopper
-   * narrows one at a time, and the matching range below narrows inside it.
+   * Which finish a tin applies, which is what a finisher is bought for.
+   * A color has no single answer, so this narrows the other two categories
+   * to nothing.
    */
-  finish: Option<FinishProperty>;
+  finish: Option<Finish>;
   /**
-   * The three amounts a finish is made of. Independent of each other, and
-   * asked of colors and of the tins that put a finish back alike.
+   * The three amounts a finish is made of. Independent of each other and of
+   * the filter above: a color can be asked to be both coated and glowing.
    */
   roughness: Option<NumericRange>;
   /** Nanometers of coating. */
@@ -442,24 +443,31 @@ export const FLUORESCENCE_FLOOR = 50;
 export const MATTE_FLOOR = 80;
 
 /**
- * The stretch of each amount that is worth asking about.
+ * The axis each amount is filtered on.
  *
- * Every surface has a roughness, so that one is the whole axis. A coating and
- * a glow are things a surface either has or has not got, so those two start
- * where having one begins — which makes picking the amount a filter in its own
- * right: asking about a coating is asking for the things that carry one.
+ * The coating and the glow start at zero rather than at the point they become
+ * visible, because "none of it" is the commonest answer and has to be a place
+ * the slider can reach.
  */
-export const FINISH_RANGES: Record<FinishProperty, NumericRange> = {
+export const FINISH_AXES: Record<FinishProperty, NumericRange> = {
   roughness: ROUGHNESS_BOUNDS,
-  coating: COATING_BOUNDS,
-  emission: { min: EMISSION_SPEAKS, max: EMISSION_BOUNDS.max },
+  coating: { min: 0, max: COATING_BOUNDS.max },
+  emission: EMISSION_BOUNDS,
 };
 
-/** What each amount is called on screen, which is the effect it produces. */
-export const FINISH_PROPERTY_LABELS: Record<FinishProperty, string> = {
+/** How each finish is written out in the filter rail. */
+export const FINISH_LABELS: Record<Finish, string> = {
+  matte: "Matte",
+  gloss: "Gloss",
+  iridescent: "Iridescent",
+  fluorescent: "Fluorescent",
+};
+
+/** What each amount is called on screen. */
+export const FINISH_AXIS_LABELS: Record<FinishProperty, string> = {
   roughness: "Roughness",
-  coating: "Iridescence",
-  emission: "Fluorescence",
+  coating: "Coating",
+  emission: "Glow",
 };
 
 /** A stretch of one property's range, and which property it is a stretch of. */
@@ -481,12 +489,17 @@ export const FINISH_BANDS: Record<Finish, FinishBand> = {
     property: "roughness",
     range: { min: MATTE_FLOOR, max: ROUGHNESS_BOUNDS.max },
   },
+  // Stops one short of the floor, so the two halves of the roughness axis
+  // partition it instead of both claiming the surface exactly on the line.
   gloss: {
     property: "roughness",
-    range: { min: ROUGHNESS_BOUNDS.min, max: MATTE_FLOOR },
+    range: { min: ROUGHNESS_BOUNDS.min, max: MATTE_FLOOR - 1 },
   },
-  iridescent: { property: "coating", range: FINISH_RANGES.coating },
-  fluorescent: { property: "emission", range: FINISH_RANGES.emission },
+  iridescent: { property: "coating", range: COATING_BOUNDS },
+  fluorescent: {
+    property: "emission",
+    range: { min: EMISSION_SPEAKS, max: EMISSION_BOUNDS.max },
+  },
 };
 
 /**

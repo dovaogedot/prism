@@ -408,34 +408,48 @@ describe("facets", () => {
     );
   };
 
-  it("counts each amount over the surfaces that have any of it", async () => {
-    // Every surface has a roughness, so that one is the whole shelf. The other
-    // two are things a surface either has or has not got — and they overlap
-    // with the first, because the coated color has a roughness as well.
+  it("counts each finish over the surfaces it names", async () => {
+    // Matte and gloss partition the roughness axis, so between them they name
+    // the whole shelf and neither claims a surface the other does. A coating
+    // and a glow name only the surfaces that carry one.
     const counts = await finishCounts("?category=color");
 
-    expect(counts.get("roughness")).toBe(4);
-    expect(counts.get("coating")).toBe(1);
-    expect(counts.get("emission")).toBe(0);
+    expect(counts.get("matte")).toBe(2);
+    expect(counts.get("gloss")).toBe(2);
+    expect(counts.get("iridescent")).toBe(1);
+    expect(counts.get("fluorescent")).toBe(0);
   });
 
-  it("keeps every amount counted while one of them is selected", async () => {
-    // Otherwise picking one would show the other two holding nothing, and
+  it("keeps every finish counted while one of them is selected", async () => {
+    // Otherwise picking one would show the other three holding nothing, and
     // there would be no way to see what switching to one of them costs.
-    const counts = await finishCounts("?category=color&finish=coating");
+    const counts = await finishCounts("?category=color&finish=iridescent");
 
-    expect(counts.get("roughness")).toBe(4);
-    expect(counts.get("emission")).toBe(0);
+    expect(counts.get("matte")).toBe(2);
+    expect(counts.get("gloss")).toBe(2);
   });
 
-  it("narrows to the surfaces that carry the amount being asked about", async () => {
-    // Asking about a coating is asking for the things that have one; asking
-    // about roughness is not, because everything has some.
-    const coated = jsonOf(await get("/api/v1/products?category=color&finish=coating"));
-    const all = jsonOf(await get("/api/v1/products?category=color&finish=roughness"));
+  it("narrows to the surfaces the finish names", async () => {
+    const iridescent = jsonOf(await get("/api/v1/products?category=color&finish=iridescent"));
+    const matte = jsonOf(await get("/api/v1/products?category=color&finish=matte"));
 
-    expect(coated["total"]).toBe(1);
-    expect(all["total"]).toBe(4);
+    expect(iridescent["total"]).toBe(1);
+    expect(matte["total"]).toBe(2);
+  });
+
+  it("narrows by each amount independently, and by several at once", async () => {
+    // A surface carries all three, so asking about one says nothing about the
+    // others: a shopper can ask for something lacquered that is also coated.
+    const total = async (query: string) =>
+      jsonOf(await get(`/api/v1/products?category=color&${query}`))["total"];
+
+    expect(await total("roughnessMax=40")).toBe(2);
+    expect(await total("coatingMin=100")).toBe(1);
+    expect(await total("emissionMin=35")).toBe(0);
+
+    // Both at once, rather than one replacing the other.
+    expect(await total("roughnessMax=40&coatingMin=100")).toBe(1);
+    expect(await total("roughnessMin=80&coatingMin=100")).toBe(0);
   });
 
   it("returns every rating tier even when empty", async () => {

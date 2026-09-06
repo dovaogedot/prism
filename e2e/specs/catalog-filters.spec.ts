@@ -102,7 +102,7 @@ test.describe("layout stability", () => {
   test("an empty bucket is struck through rather than removed", async ({ page }) => {
     // Narrow hard enough that some foundry stocks nothing matching. A glow
     // needs a vivid pigment, and the blacks are the least vivid shelf there is.
-    await page.goto("/?category=color&tag=black&finish=emission");
+    await page.goto("/?category=color&family=black&emissionMin=35");
     await page.waitForLoadState("networkidle");
 
     const struck = rail(page).locator("label.line-through");
@@ -349,11 +349,10 @@ test.describe("search", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page).toHaveURL(/category=finisher/);
-    // Gloss is the smooth half of the roughness axis, so it is that axis with
-    // its top end brought down.
-    await expect(page).toHaveURL(/finish=roughness/);
-    await expect(page).toHaveURL(/roughnessMax=80/);
-    await expect(rail(page).getByRole("radio", { name: /^Roughness/ })).toBeChecked();
+    // The name is the filter now, rather than a stretch of an axis it has to
+    // be translated into.
+    await expect(page).toHaveURL(/finish=gloss/);
+    await expect(rail(page).getByRole("radio", { name: /^Gloss/ })).toBeChecked();
   });
 
   test("the family a search landed on can be cleared again", async ({ page }) => {

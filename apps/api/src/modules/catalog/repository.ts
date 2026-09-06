@@ -7,7 +7,7 @@
  */
 
 import type {
-  FinishProperty,
+  Finish,
   ProductDetail,
   ProductFacets,
   ProductImage,
@@ -20,8 +20,8 @@ import type {
   Suggestion,
 } from "@prism/shared";
 import {
-  FINISH_PROPERTIES,
-  FINISH_PROPERTY_LABELS,
+  FINISHES,
+  FINISH_LABELS,
   KIND_LABELS,
   Option,
   PRODUCT_KINDS,
@@ -257,14 +257,13 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
       })(whereExcept("rating"));
 
       /**
-       * One amount counted over the scope that ignores every finish filter.
+       * One finish counted over the scope that ignores the finish filter.
        *
-       * `FILTER` rather than three statements: the three are three predicates
-       * over the same rows, so one pass answers all of them, and they overlap
-       * — a coated color has a roughness too and is counted under both.
+       * `FILTER` rather than four statements: the four are four predicates
+       * over the same rows, so one pass answers all of them.
        */
-      const countWithin = (property: FinishProperty) =>
-        sql<number>`count(*) FILTER (WHERE ${finishCondition(property)})`.mapWith(Number);
+      const countWithin = (finish: Finish) =>
+        sql<number>`count(*) FILTER (WHERE ${finishCondition(finish)})`.mapWith(Number);
 
       const [kindRows, brandRows, finishRow, summaryRows] = await Promise.all([
         scoped(
@@ -295,9 +294,10 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
         scoped(
           db
             .select({
-              roughness: countWithin("roughness"),
-              coating: countWithin("coating"),
-              emission: countWithin("emission"),
+              matte: countWithin("matte"),
+              gloss: countWithin("gloss"),
+              iridescent: countWithin("iridescent"),
+              fluorescent: countWithin("fluorescent"),
             })
             .from(productListing)
             .$dynamic(),
@@ -363,10 +363,10 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
           label: row.label,
           count: Number(row.total),
         })),
-        finishes: FINISH_PROPERTIES.map((property) => ({
-          value: property,
-          label: FINISH_PROPERTY_LABELS[property],
-          count: finishRow[0]?.[property] ?? 0,
+        finishes: FINISHES.map((finish) => ({
+          value: finish,
+          label: FINISH_LABELS[finish],
+          count: finishRow[0]?.[finish] ?? 0,
         })),
         ratings,
         priceCents: {

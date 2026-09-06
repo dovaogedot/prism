@@ -810,9 +810,10 @@ GET /api/v1/products
   &priceMin=1000&priceMax=5000
   &minRating=4
 
-  colors and finishers — the finish one has, or the finish the other leaves:
-  &finish=coating         which of the three amounts is being asked about, one
-                          of roughness | coating | emission
+  finishers — the one effect a tin is bought for:
+  &finish=gloss           one of matte | gloss | iridescent | fluorescent
+
+  colors — the three amounts a surface carries, narrowed independently:
   &roughnessMin=5&roughnessMax=40      matte at one end, gloss at the other
   &coatingMin=100&coatingMax=600       nanometers of interference layer
   &emissionMin=35&emissionMax=100      how hard it gives off its own light

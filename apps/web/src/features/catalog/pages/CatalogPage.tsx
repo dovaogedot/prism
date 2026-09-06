@@ -8,8 +8,6 @@
  */
 
 import {
-  FINISH_BANDS,
-  FINISH_RANGES,
   PRODUCT_SORTS,
   resolveSearchTerm,
   type Finish,
@@ -37,39 +35,6 @@ const isSort = (value: string): value is ProductSort =>
 
 const splitList = (value: string): readonly string[] =>
   value.split(",").filter((entry) => entry.length > 0);
-
-/**
- * The rail state a finish name stands for.
- *
- * A name is a stretch of one amount, so it is the amount to ask about plus
- * wherever on that amount the name sits. Only a bound that actually narrows is
- * set: "iridescent" is the whole coating axis and needs no range at all, while
- * "gloss" is the smooth half of the roughness axis and needs the top of it.
- */
-const bandFilter = (finish: Finish): Partial<FacetState> => {
-  const { property, range } = FINISH_BANDS[finish];
-  const axis = FINISH_RANGES[property];
-  const low = range.min <= axis.min ? "" : String(range.min);
-  const high = range.max >= axis.max ? "" : String(range.max);
-
-  return match(property)
-    .with("roughness", () => ({
-      finish: property,
-      roughnessMin: low,
-      roughnessMax: high,
-    }))
-    .with("coating", () => ({
-      finish: property,
-      coatingMin: low,
-      coatingMax: high,
-    }))
-    .with("emission", () => ({
-      finish: property,
-      emissionMin: low,
-      emissionMax: high,
-    }))
-    .exhaustive();
-};
 
 /** The catalog: the search box, the filter rail, and the grid they narrow. */
 export const CatalogPage = () => {
@@ -161,7 +126,7 @@ export const CatalogPage = () => {
       // tins that apply it rather than a search through the prose — and the
       // name itself is a place on one of the three amounts.
       .with({ kind: "finish" }, ({ finish }) =>
-        update({ q: "", category: "finisher", family: "", ...bandFilter(finish) }),
+        update({ q: "", category: "finisher", family: "", finish }),
       )
       // Only a shifter turns, so the word picks the shelf as well as the way.
       .with({ kind: "direction" }, ({ direction }) =>
