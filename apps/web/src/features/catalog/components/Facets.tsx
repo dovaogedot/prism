@@ -17,6 +17,7 @@ import {
   FINISH_PROPERTIES,
   FINISH_AXES,
   FINISH_LABELS,
+  FINISHES,
   LIGHTNESS_BOUNDS,
   ROUGHNESS_BOUNDS,
   Option,
@@ -24,7 +25,6 @@ import {
   SATURATION_BOUNDS,
   SHIFT_DIRECTIONS,
   type FacetBucket,
-  type Finish,
   type FinishProperty,
   type NumericRange,
   type ProductFacets,
@@ -460,7 +460,7 @@ const EMISSION_RAMP = "linear-gradient(to right, #cdbb6a, #fde047, #fffbea)";
 /**
  * Where on one amount's axis to look.
  *
- * All three are on screen at once and narrow independently, because a colour
+ * All three are on screen at once and narrow independently, because a color
  * carries all three: a shopper can ask for a coated surface that also glows.
  * Roughness is the one with two names on it — dragging the low end up asks for
  * matte and dragging the high end down asks for gloss, without the shop having
@@ -556,6 +556,13 @@ const isDirection = (value: string): value is ShiftDirection =>
 
 const isFinishProperty = (value: string): value is FinishProperty =>
   FINISH_PROPERTIES.some((property) => property === value);
+
+/** The word a chosen finish is written out as, or nothing while none is chosen. */
+const finishSummary = (chosen: string): string => {
+  const finish = FINISHES.find((candidate) => candidate === chosen);
+
+  return finish === undefined ? "" : FINISH_LABELS[finish];
+};
 
 /**
  * The filter rail.
@@ -699,95 +706,102 @@ export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
       {match(showsKind("color"))
         .with(false, () => null)
         .with(true, () => (
-          <>{/*
-        Hue, saturation and lightness are one coordinate in three parts — a
-        shopper narrowing a color moves all three or none — so they open and
-        close together rather than as three sections to scroll past.
-      */}
-      <Section title="HSL" summary={settledCount([hueActive, hasRange(state.saturationMin, state.saturationMax), hasRange(state.lightnessMin, state.lightnessMax)])}>
-        <div className="space-y-4">
-          <div className="space-y-3">
-            <HueRing
-              value={hue}
-              active={hueActive}
-              onChange={(next) =>
-                onChange({ hueMin: String(next.min), hueMax: String(next.max) })
-              }
-              onActivate={(next) =>
-                onChange({ hueMin: String(next.min), hueMax: String(next.max) })
-              }
-              onPreview={(next) => setHuePreview(Option.some(next.min))}
-            />
+          <>
+            {/*
+              Hue, saturation and lightness are one coordinate in three parts — a
+              shopper narrowing a color moves all three or none — so they open and
+              close together rather than as three sections to scroll past.
+            */}
+            <Section
+              title="HSL"
+              summary={settledCount([
+                hueActive,
+                hasRange(state.saturationMin, state.saturationMax),
+                hasRange(state.lightnessMin, state.lightnessMax),
+              ])}
+            >
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <HueRing
+                    value={hue}
+                    active={hueActive}
+                    onChange={(next) =>
+                      onChange({ hueMin: String(next.min), hueMax: String(next.max) })
+                    }
+                    onActivate={(next) =>
+                      onChange({ hueMin: String(next.min), hueMax: String(next.max) })
+                    }
+                    onPreview={(next) => setHuePreview(Option.some(next.min))}
+                  />
 
-            {match(hueActive)
-              .with(true, () => (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setHuePreview(Option.none);
-                    onChange({ hueMin: "", hueMax: "" });
-                  }}
-                  className="w-full rounded-lg border border-line py-1.5 text-xs font-medium text-ink-soft hover:bg-sunken hover:text-ink"
-                >
-                  Any hue
-                </button>
-              ))
-              .with(false, () => null)
-              .exhaustive()}
-          </div>
+                  {match(hueActive)
+                    .with(true, () => (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setHuePreview(Option.none);
+                          onChange({ hueMin: "", hueMax: "" });
+                        }}
+                        className="w-full rounded-lg border border-line py-1.5 text-xs font-medium text-ink-soft hover:bg-sunken hover:text-ink"
+                      >
+                        Any hue
+                      </button>
+                    ))
+                    .with(false, () => null)
+                    .exhaustive()}
+                </div>
 
-          <RangeSlider
-            label="Saturation"
-            min={SATURATION_BOUNDS.min}
-            max={SATURATION_BOUNDS.max}
-            value={saturation}
-            format={(value) => `${value}%`}
-            trackBackground={`linear-gradient(to right, hsl(${rampHue} 0% 55%), hsl(${rampHue} 100% 55%))`}
-            onChange={(next) =>
-              onChange({
-                saturationMin:
-                  next.min <= SATURATION_BOUNDS.min ? "" : String(next.min),
-                saturationMax:
-                  next.max >= SATURATION_BOUNDS.max ? "" : String(next.max),
-              })
-            }
-          />
+                <RangeSlider
+                  label="Saturation"
+                  min={SATURATION_BOUNDS.min}
+                  max={SATURATION_BOUNDS.max}
+                  value={saturation}
+                  format={(value) => `${value}%`}
+                  trackBackground={`linear-gradient(to right, hsl(${rampHue} 0% 55%), hsl(${rampHue} 100% 55%))`}
+                  onChange={(next) =>
+                    onChange({
+                      saturationMin:
+                        next.min <= SATURATION_BOUNDS.min ? "" : String(next.min),
+                      saturationMax:
+                        next.max >= SATURATION_BOUNDS.max ? "" : String(next.max),
+                    })
+                  }
+                />
 
-          <RangeSlider
-            label="Lightness"
-            min={LIGHTNESS_BOUNDS.min}
-            max={LIGHTNESS_BOUNDS.max}
-            value={lightness}
-            format={(value) => `${value}%`}
-            trackBackground={`linear-gradient(to right, hsl(${rampHue} 55% 0%), hsl(${rampHue} 55% 50%), hsl(${rampHue} 55% 100%))`}
-            onChange={(next) =>
-              onChange({
-                lightnessMin:
-                  next.min <= LIGHTNESS_BOUNDS.min ? "" : String(next.min),
-                lightnessMax:
-                  next.max >= LIGHTNESS_BOUNDS.max ? "" : String(next.max),
-              })
-            }
-          />
-        </div>
-      </Section>
-
+                <RangeSlider
+                  label="Lightness"
+                  min={LIGHTNESS_BOUNDS.min}
+                  max={LIGHTNESS_BOUNDS.max}
+                  value={lightness}
+                  format={(value) => `${value}%`}
+                  trackBackground={`linear-gradient(to right, hsl(${rampHue} 55% 0%), hsl(${rampHue} 55% 50%), hsl(${rampHue} 55% 100%))`}
+                  onChange={(next) =>
+                    onChange({
+                      lightnessMin:
+                        next.min <= LIGHTNESS_BOUNDS.min ? "" : String(next.min),
+                      lightnessMax:
+                        next.max >= LIGHTNESS_BOUNDS.max ? "" : String(next.max),
+                    })
+                  }
+                />
+              </div>
+            </Section>
           </>
         ))
         .exhaustive()}
 
       {/*
-        The finish, on the shelf of colors that have one and on the shelf of
-        tins that put one back. Three amounts and therefore three questions,
-        asked on their own axis: a roughness is a percentage, a coating is a
-        thickness in nanometers and a glow is neither, so one slider each.
+        A color's finish, which is three amounts and therefore three questions.
+        Each is asked on its own axis, because they are measured in different
+        things: a roughness is a percentage, a coating is a thickness in
+        nanometers, and a glow is how hard the pigment gives light back.
       */}
       {match(showsKind("color"))
         .with(false, () => null)
         .with(true, () => (
           <Section title="Finish" summary={settledCount(amountsNarrowed)}>
             {/*
-              Three axes, all of them live at once. A colour carries all three,
+              Three axes, all of them live at once. A color carries all three,
               so narrowing one has nothing to do with narrowing another — a
               shopper can ask for a lacquered surface that is also iridescent
               and also glowing, which is a thing real paint is.
@@ -817,7 +831,7 @@ export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
         .with(true, () => (
           <Section
             title="Finish"
-            summary={state.finish === "" ? "" : FINISH_LABELS[state.finish as Finish]}
+            summary={finishSummary(state.finish)}
           >
             <RadioList
               name="finish"
