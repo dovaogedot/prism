@@ -80,9 +80,9 @@ services:
       SMTP_SECURE: ${SMTP_SECURE:-false}
       MAIL_FROM: ${MAIL_FROM:-Prism <noreply@prism.test>}
       MEDIA_DIR: /srv/media
-      CAPTCHA_MODE: ${CAPTCHA_MODE:-test}
+      # Supplying a key is what turns each of these on; there is no mode to
+      # set alongside it and therefore no way for the two to disagree.
       RECAPTCHA_SECRET_KEY: ${RECAPTCHA_SECRET_KEY:-}
-      OAUTH_MODE: ${OAUTH_MODE:-mock}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
@@ -112,7 +112,6 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        VITE_CAPTCHA_MODE: ${CAPTCHA_MODE:-test}
         VITE_RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-}
     ports:
       - "${WEB_PORT:-3000}:3000"

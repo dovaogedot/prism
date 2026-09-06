@@ -1,5 +1,6 @@
 /**
- * The stand-in identity provider's consent screen, used when OAUTH_MODE=mock.
+ * The stand-in identity provider's consent screen, used when no provider's
+ * credentials are configured.
  *
  * This exists so the OAuth requirement can be demonstrated on a machine with
  * no Google account and no internet. Everything around it is real — the

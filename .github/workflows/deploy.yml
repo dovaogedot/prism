@@ -83,10 +83,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # The site key and the CAPTCHA mode are read by Vite at build time, so
-      # they are baked into this image rather than set on the server. Supply a
-      # site key and the real widget ships; leave it out and the build uses
-      # Google's public always-pass test key, as the local stack does.
+      # The site key is read by Vite at build time, so it is baked into this
+      # image rather than set on the server. Supply one and the real widget
+      # ships; leave it out and the build falls back to Google's public
+      # always-pass test key, as the local stack does.
       - name: Build and push the web image
         uses: docker/build-push-action@v6
         with:
@@ -95,7 +95,6 @@ jobs:
           push: true
           tags: ${{ env.WEB_IMAGE }}:${{ github.sha }}
           build-args: |
-            VITE_CAPTCHA_MODE=${{ secrets.RECAPTCHA_SITE_KEY != '' && 'google' || 'test' }}
             VITE_RECAPTCHA_SITE_KEY=${{ secrets.RECAPTCHA_SITE_KEY }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -133,9 +132,9 @@ jobs:
             "$SSH_TARGET:$DEPLOY_PATH/"
 
       # Written fresh every deploy, so the repository's settings are the only
-      # place these values are edited. Each mode follows its credential:
-      # supply a CAPTCHA or OAuth secret and that path goes live, leave it out
-      # and the built-in offline stand-in answers instead, exactly as it does
+      # place these values are edited. There is no mode to set: supplying a
+      # CAPTCHA or OAuth credential is what turns that path on, and leaving it
+      # out is what leaves the built-in offline stand-in answering, exactly as
       # on a laptop.
       #
       # Values are written by printf from the environment rather than
@@ -174,9 +173,7 @@ jobs:
             printf 'LOG_LEVEL=%s\n' 'info'
             printf 'JWT_SECRET=%s\n' "$JWT_SECRET"
             printf 'POSTGRES_PASSWORD=%s\n' "$POSTGRES_PASSWORD"
-            printf 'CAPTCHA_MODE=%s\n' "$([ -n "$RECAPTCHA_SECRET_KEY" ] && echo google || echo test)"
             printf 'RECAPTCHA_SECRET_KEY=%s\n' "$RECAPTCHA_SECRET_KEY"
-            printf 'OAUTH_MODE=%s\n' "$([ -n "$GOOGLE_CLIENT_ID$OAUTH_GITHUB_CLIENT_ID" ] && echo live || echo mock)"
             printf 'GOOGLE_CLIENT_ID=%s\n' "$GOOGLE_CLIENT_ID"
             printf 'GOOGLE_CLIENT_SECRET=%s\n' "$GOOGLE_CLIENT_SECRET"
             printf 'GITHUB_CLIENT_ID=%s\n' "$OAUTH_GITHUB_CLIENT_ID"

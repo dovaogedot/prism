@@ -542,7 +542,7 @@ export const registerAuthRoutes = (
         schema: {
           tags: ["auth"],
           summary:
-            "Stand-in consent screen used when OAUTH_MODE=mock, so the flow works with no third-party account.",
+            "Stand-in consent screen used when no provider credentials are configured, so the flow works with no third-party account.",
           params: providerParamsSchema,
           querystring: z.object({
             state: z.string().min(1).max(512),

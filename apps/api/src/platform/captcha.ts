@@ -7,8 +7,8 @@
  * account to exist. `test` mode short-circuits the network call and accepts any
  * non-empty response, which is what Google's test secret does anyway.
  *
- * Set CAPTCHA_MODE=google with your own keys and the same code path verifies
- * for real.
+ * Supply RECAPTCHA_SECRET_KEY and the same code path verifies for real. There
+ * is no mode to set beside it: the key's presence is the mode.
  */
 
 import type { DomainError } from "@prism/shared";

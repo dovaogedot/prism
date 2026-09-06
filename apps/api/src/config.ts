@@ -46,19 +46,14 @@ const environmentSchema = z.object({
   SMTP_SECURE: z.stringbool().default(false),
   MAIL_FROM: z.string().min(1).default("Prism <noreply@prism.test>"),
 
-  /**
-   * `test` accepts Google's official always-pass test token without a network
-   * call. `google` verifies against siteverify for real.
-   */
-  CAPTCHA_MODE: z.enum(["test", "google"]).default("test"),
+  /** Present means the real CAPTCHA is verified; absent means the stand-in is. */
   RECAPTCHA_SECRET_KEY: z.string().default(""),
 
   /**
-   * `mock` completes the OAuth dance locally for every provider; `live` talks
-   * to the real ones. In `live` mode a provider is offered only if its
-   * credentials are present, so configuring GitHub alone is a valid setup.
+   * A provider is live only when both halves of its pair are present, so
+   * configuring GitHub alone is a valid setup and configuring half of one is
+   * the same as configuring none of it.
    */
-  OAUTH_MODE: z.enum(["mock", "live"]).default("mock"),
   GOOGLE_CLIENT_ID: z.string().default(""),
   GOOGLE_CLIENT_SECRET: z.string().default(""),
   GITHUB_CLIENT_ID: z.string().default(""),
@@ -118,11 +113,18 @@ export type Config = Readonly<{
 }>;
 
 /**
- * Modes become tagged unions here, so `config.oauth.clientId` simply does not
- * exist unless the mode is `google`. No optional secrets floating around.
+ * Which CAPTCHA answers, read off whether there is a key to answer with.
+ *
+ * The mode is derived rather than declared because the two ways of stating it
+ * separately are both wrong: a mode naming a credential that is absent cannot
+ * work, and a credential the mode ignores is a key somebody supplied expecting
+ * it to be used. There is one fact here, so there is one place it comes from.
+ *
+ * The result is a tagged union, so `config.captcha.secretKey` does not exist
+ * unless there is one. No optional secrets floating around.
  */
 const toCaptchaConfig = (environment: Environment): Config["captcha"] =>
-  environment.CAPTCHA_MODE === "google"
+  environment.RECAPTCHA_SECRET_KEY.length > 0
     ? { mode: "google", secretKey: environment.RECAPTCHA_SECRET_KEY }
     : { mode: "test" };
 
@@ -155,10 +157,18 @@ const configuredCredentials = (
       credential.clientId.length > 0 && credential.clientSecret.length > 0,
   );
 
-const toOAuthConfig = (environment: Environment): Config["oauth"] =>
-  environment.OAUTH_MODE === "live"
-    ? { mode: "live", credentials: configuredCredentials(environment) }
-    : { mode: "mock" };
+/**
+ * Which providers answer, read off which credentials are present.
+ *
+ * Derived for the same reason the CAPTCHA's mode is: one configured provider
+ * means the real ones are wanted, and none means the built-in stand-in is the
+ * only thing that could answer anyway.
+ */
+const toOAuthConfig = (environment: Environment): Config["oauth"] => {
+  const credentials = configuredCredentials(environment);
+
+  return credentials.length > 0 ? { mode: "live", credentials } : { mode: "mock" };
+};
 
 /** A parsed environment as the shape the application asks questions of. */
 export const toConfig = (environment: Environment): Config => ({
@@ -227,20 +237,7 @@ export const loadConfig = (source: NodeJS.ProcessEnv = process.env): Config => {
     process.exit(1);
   }
 
-  const config = toConfig(parsed.data);
-
-  if (config.captcha.mode === "google" && config.captcha.secretKey.length === 0) {
-    process.stderr.write("CAPTCHA_MODE=google requires RECAPTCHA_SECRET_KEY.\n");
-    process.exit(1);
-  }
-
-  if (config.oauth.mode === "live" && config.oauth.credentials.length === 0) {
-    process.stderr.write(
-      "OAUTH_MODE=live requires at least one provider's credentials: " +
-        "GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET or GITHUB_CLIENT_ID/GITHUB_CLIENT_SECRET.\n",
-    );
-    process.exit(1);
-  }
-
-  return config;
+  // Neither mode can disagree with its credentials, because neither is stated
+  // separately from them, so there is nothing left to check here.
+  return toConfig(parsed.data);
 };
