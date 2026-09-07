@@ -95,8 +95,8 @@ export const toProductSpec = (columns: SpecColumns): Option<ProductSpec> =>
           lightness,
         }),
     )
-    // A tin does one thing, so exactly one of the three arrives and the branch
-    // that matches it is the branch that says what the tin is.
+    // A finisher does one thing, so exactly one of the three arrives and the branch
+    // that matches it is the branch that says what the finisher is.
     .with({ kind: "finisher", roughness: P.number }, ({ roughness }) =>
       Option.some<ProductSpec>({ kind: "finisher", applies: "roughness", roughness }),
     )
@@ -129,7 +129,7 @@ export type MeasurementColumns = Readonly<{
   /** Stored rather than generated: a coating's thickness is a fact, not a derivation. */
   coatingNanometers: number | null;
   grainMicrometers: number | null;
-  /** How far a tin's glow carries. A color's own reach is `reachCentimeters`. */
+  /** How far a finisher's glow carries. A color's own reach is `reachCentimeters`. */
   finisherReachCentimeters: number | null;
   torqueMillinewtonMeters: number | null;
   backlashMicrometers: number | null;
@@ -167,7 +167,7 @@ export const toMeasurements = (
           }),
         ),
     )
-    // One dimension per tin, and it is the one its own effect has.
+    // One dimension per finisher, and it is the one its own effect has.
     .with(
       { kind: "finisher", grainMicrometers: P.number },
       ({ grainMicrometers, weightGrams }) =>

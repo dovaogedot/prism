@@ -9,23 +9,23 @@ There are three categories, and they have almost nothing in common:
 | Category | What it is | What it carries |
 | --- | --- | --- |
 | **Colors** | A color, sold whole | A hex, and three amounts of finish |
-| **Finishers** | Puts a finish back on a color you own | One of those amounts, being the one thing the tin does |
+| **Finishers** | Puts a finish back on a color you own | One of those amounts, being the one thing the finisher does |
 | **Shifters** | Turns a color you own into a different one | A direction round the wheel, and an arc in degrees |
 
 The unusual product turns out to be a good fit for the requirements. A color has real
 numeric attributes — hue angle, saturation, lightness — which makes faceted search
 genuinely interesting rather than a brand checkbox, and it means every image in the shop can
 be generated at seed time instead of committed as binaries. A color gets one swatch of
-itself. A tin holds no color, so what there is to show is the effect: the thing it does,
+itself. A finisher holds no color, so what there is to show is the effect: the thing it does,
 then the same thing done to four ordinary pigments — five pictures rendered from the one
-number the tin carries. A shifter changes no surface, so it has no picture and the grid
+number the finisher carries. A shifter changes no surface, so it has no picture and the grid
 draws it from its own two numbers.
 
 Three categories with disjoint attributes is the interesting modeling problem here, and it
 is solved the normalized way: a `product` table for what all three share, and a `color`,
 `finisher` and `shifter` table for what they do not. A column only exists where it applies,
 so there is no `hex` on a shifter to be null. `finisher` is the one table with a choice
-inside it — a tin does one thing, so exactly one of its three amounts is present and a CHECK
+inside it — a finisher does one thing, so exactly one of its three amounts is present and a CHECK
 refuses any row where that is not true. Each keys back to `product (id, kind)` rather than
 to `product (id)`, so a color row
 attached to a shifter is rejected by the database rather than by a code path somebody has to
@@ -41,13 +41,13 @@ because there is no container — and what there is to measure follows from what
 | | **Temperature** how warm it burns · °C / °F | one of **Grain** how much texture it leaves · µm / mil | **Torque** how hard it has to turn · N·m / lbf·ft |
 | | **Reach** how far away it still reads · m / ft | **Coating** the layer it lays down · nm / µin | **Backlash** the play before the color moves · mm / in |
 | | **Coating** the interference layer over it · nm / µin | **Reach** how far the glow it leaves carries · m / ft | |
-| | **Weight** how heavy it looks · g / oz | **Weight** the tin and its contents · g / oz | **Weight** the gear itself · g / oz |
+| | **Weight** how heavy it looks · g / oz | **Weight** the solids it carries · g / oz | **Weight** the gear itself · g / oz |
 
 Weight is the one all three share, because the requirement names it and because everything
-in the shop has some. A tin quotes one dimension and it is the one its own effect has: a tin
-sold for the surface it leaves quotes that surface's grain, one sold for a coating quotes
+in the shop has some. A finisher quotes one dimension and it is the one its own effect has: one sold
+for the surface it leaves quotes that surface's grain, one sold for a coating quotes
 the film's thickness, one sold for a glow quotes how far the glow carries. Otherwise a kind
-measures exactly what it carries — a tin never runs out, so there is nothing to measure
+measures exactly what it carries — a finisher never runs out, so there is nothing to measure
 about how long it lasts.
 
 The coating is where the two systems stop being the same number under a different name. It
@@ -81,7 +81,7 @@ This is **Project 1 (Foundation)**: accounts, the database, and the catalog.
 ```
 
 That builds the images, starts the stack, sets up the database, seeds the catalog —
-every color with its swatch, every tin with the five pictures of what it does, and the
+every color with its swatch, every finisher with the five pictures of what it does, and the
 shifters beside them — and waits until the storefront answers.
 
 | Service | URL |
@@ -334,10 +334,10 @@ erDiagram
 `Option` at the repository boundary, so nothing above that layer sees a `null`.
 
 A column only exists in the table it applies to, so there is no `hex` on a shifter to be
-null. `finisher` is where absence is the point rather than an accident: a tin does one
+null. `finisher` is where absence is the point rather than an accident: a finisher does one
 thing, so it carries one of the three amounts and leaves the other two absent, and which
-one is present is what the tin *is*. A CHECK says exactly that, and it is the reason a query
-for the iridescent tins is a query for the rows that have a coating at all:
+one is present is what the finisher *is*. A CHECK says exactly that, and it is the reason a query
+for the iridescent finishers is a query for the rows that have a coating at all:
 
 ```sql
 CONSTRAINT finisher_does_one_thing CHECK (
@@ -408,7 +408,7 @@ The same principle appears three times with three mechanisms:
 
 Every measurement lives in the table of the kind that has it, generated from that kind's own
 columns. Weight is the one all three carry, and each derives its own: a color's from its
-lightness, a tin's from the solids it must hold, a gear's from its arc. Nothing dispatches on
+lightness, a finisher's from the solids it must hold, a gear's from its arc. Nothing dispatches on
 `kind` any more, because nothing has to.
 
 Each is stored in the smallest whole unit — centimeters, millinewton-meters, micrometers,
@@ -509,16 +509,16 @@ the first one, so the roughness slider spans the whole axis and a shopper drags 
 whichever end they mean, rather than the shop picking the point where one word becomes the
 other. The sliders carry no counts, because a range has no buckets to distort.
 
-The four words belong to the tins, and that is the whole of a tin's filter. A tin does one
+The four words belong to the finishers, and that is the whole of a finisher's filter. A finisher does one
 thing, so it has one answer to which finish it is, and the word is a question about which
-column its row has: asking for the iridescent tins is asking which rows carry a coating at
+column its row has: asking for the iridescent finishers is asking which rows carry a coating at
 all. No threshold recovers it and nothing has to agree about where one finish becomes
 another. Matte and gloss are the exception, and only because they are one thing — two ends
-of the roughness a tin leaves, split where a reflection stops being worth naming.
+of the roughness a finisher leaves, split where a reflection stops being worth naming.
 
-There is still no such thing as *the* gloss finisher: one tin leaves a surface at 20 and the
+There is still no such thing as *the* gloss finisher: one finisher leaves a surface at 20 and the
 next at 15, and a shopper who wants the second is not served by being sold the first. What
-the word does is narrow the shelf to the tins that answer to it.
+the word does is narrow the shelf to the finishers that answer to it.
 
 [`surfaces.ts`](apps/web/src/features/catalog/artwork/surfaces.ts) is where those amounts
 become rendering parameters, and every one of its outputs is a **continuous** function of
@@ -617,28 +617,28 @@ the CPU: building the rig costs about a second and a half on a software renderer
 stage another eighty milliseconds, which is a worse page than a grid of flat swatches that
 arrives at once.
 
-### Drawing a tin
+### Drawing a finisher
 
-A tin is the one product that is photographed rather than lit, and it has to be: it holds no
+A finisher is the one product that is photographed rather than lit, and it has to be: it holds no
 color, so a slab of it would be a slab of nothing. What it sells is what it does to a color,
 so that is what its pictures show — the effect itself, then the same effect over red, green,
 blue and yellow, five in all.
 
 [`finish-art.ts`](apps/api/src/db/finish-art.ts) renders them at seed time from the one
-number the tin carries, straight to PNG, so nothing on disk can disagree with the number
-beside it and nothing is committed as a binary. Which five follows from what the tin does,
+number the finisher carries, straight to PNG, so nothing on disk can disagree with the number
+beside it and nothing is committed as a binary. Which five follows from what the finisher does,
 and no branch can borrow another's picture because no branch carries another's number:
 
-| The tin does | Leads with | Then |
+| The finisher does | Leads with | Then |
 | --- | --- | --- |
-| a coating | every color a film returns as it thickens, with this tin's thickness marked | the same film over four pigments, thin to full |
+| a coating | every color a film returns as it thickens, with this finisher's thickness marked | the same film over four pigments, thin to full |
 | a glow | how far the glow it leaves carries | that glow on four pigments |
 | a surface | the reflection left in the surface it leaves | that same surface over four pigments |
 
 The coating strip is the same physics the slab uses — `sin²(2π·n·d/λ)` sampled at three
 wavelengths — evaluated across the whole 100–600 nm range rather than at one thickness, so
 the picture and the product page cannot drift. The glow is a bloom, the reflection is a
-strip blurred by the roughness the tin leaves, and both are plain raster work: a tin is a
+strip blurred by the roughness the finisher leaves, and both are plain raster work: a finisher is a
 still life, not a scene.
 
 ---
@@ -846,7 +846,7 @@ GET /api/v1/products
   &priceMin=1000&priceMax=5000
   &minRating=4
 
-  finishers — the one effect a tin is bought for:
+  finishers — the one effect a finisher is bought for:
   &finish=gloss           one of matte | gloss | iridescent | fluorescent
 
   colors — the three amounts a surface carries, narrowed independently:

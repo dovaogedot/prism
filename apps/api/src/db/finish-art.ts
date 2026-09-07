@@ -1,10 +1,10 @@
 /**
- * What a tin of finisher does, drawn.
+ * What a finisher does, drawn.
  *
  * A finisher has no color of its own, so there is nothing to photograph. What
  * there is to show is the effect: the colors a coating walks through as it
  * thickens, how far a glow carries, how sharp a reflection stays as the
- * surface roughens. Each tin gets one picture of the effect it is bought for
+ * surface roughens. Each finisher gets one picture of the effect it is bought for
  * and four of that effect over ordinary pigments, because "what does it do to
  * a red" is the question a shopper actually has.
  *
@@ -161,10 +161,10 @@ const diagonal = (x: number, y: number): number => (x + y) / (2 * (SIZE - 1));
 /* --------------------------------------------------------------- coating */
 
 /**
- * Every color the coating can be, with this tin's own thickness marked.
+ * Every color the coating can be, with this finisher's own thickness marked.
  *
  * Thickness runs left to right across the whole range a coating is sold in, so
- * the picture is the same for every iridescent tin except for where the mark
+ * the picture is the same for every iridescent finisher except for where the mark
  * falls — which is the point: it says what this one does against what the
  * range does.
  */
@@ -200,7 +200,7 @@ export const renderCoatingSpectrum = (nanometers: number): Buffer => {
  * What the coating does to one pigment, across the thickness it is sold at.
  *
  * The diagonal runs from bare paint to the film at its full thickness, so the
- * range of colors this tin can make of that pigment is the whole image.
+ * range of colors this finisher can make of that pigment is the whole image.
  */
 export const renderCoatingOver = (baseHex: string, nanometers: number): Buffer => {
   const base = hexToRgb(baseHex);
@@ -224,7 +224,7 @@ export const renderCoatingOver = (baseHex: string, nanometers: number): Buffer =
 /* ------------------------------------------------------------- roughness */
 
 /**
- * A light source reflected in the surface this tin leaves.
+ * A light source reflected in the surface this finisher leaves.
  *
  * The strip is the reflection, and roughness is what happens to it: a
  * lacquered surface returns the source almost intact, and a chalky one
@@ -257,7 +257,7 @@ export const renderSurfaceStrip = (baseHex: string, roughness: number): Buffer =
 /* ------------------------------------------------------------- emission */
 
 /**
- * A pigment this tin has made fluoresce, seen in the dark.
+ * A pigment this finisher has made fluoresce, seen in the dark.
  *
  * The circle is the pigment and the wash around it is the light it is giving
  * off, which is the part a photograph of a bright object gets wrong and the
@@ -297,16 +297,16 @@ export const renderGlow = (baseHex: string, emission: number): Buffer => {
   return encode(blurred(lit, Math.round(SIZE * 0.02 + strength * SIZE * 0.03)));
 };
 
-/* ---------------------------------------------------------- one tin's set */
+/* ---------------------------------------------------------- one finisher's set */
 
 /** One rendered image, and what it shows. */
 export type FinishImage = Readonly<{ png: Buffer; alt: string }>;
 
 /**
- * The five pictures a tin is sold with: the effect, then that effect over each
+ * The five pictures a finisher is sold with: the effect, then that effect over each
  * of four ordinary pigments.
  *
- * Which five follows from the one column the tin has. A tin sold for a coating
+ * Which five follows from the one column the finisher has. A finisher sold for a coating
  * leads with the colors its film walks through; one sold for a glow leads with
  * how far that glow carries; one sold for the surface it leaves leads with the
  * reflection left in it. None of them can lead with another's picture, because
@@ -319,7 +319,7 @@ export const finisherImages = (
     .with({ applies: "coating" }, ({ name, coatingNanometers }) => [
       {
         png: renderCoatingSpectrum(coatingNanometers),
-        alt: `${name}: every color a coating returns as it thickens, with this tin's ${coatingNanometers} nm marked`,
+        alt: `${name}: every color a coating returns as it thickens, with this finisher's ${coatingNanometers} nm marked`,
       },
       ...DEMONSTRATION_COLORS.map(({ name: pigment, hex }) => ({
         png: renderCoatingOver(hex, coatingNanometers),

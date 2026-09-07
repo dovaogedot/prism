@@ -31,7 +31,7 @@ const documentY = async (page: Page, title: string): Promise<number> => {
 
 test.beforeEach(async ({ page }) => {
   // Inside the Colors category: the hue ring and the two ramps only exist
-  // there, since neither means anything on a shelf of tins.
+  // there, since neither means anything on a shelf of finishers.
   // `catalog-categories.spec.ts` covers the switch itself.
   await page.goto("/?category=color");
   await expect(page.getByRole("heading", { name: "Every color, on its own terms" })).toBeVisible();
@@ -341,7 +341,7 @@ test.describe("search", () => {
     await expect(results(page).getByRole("article").first()).toBeVisible();
   });
 
-  test("a finish name goes to the tins that apply it", async ({ page }) => {
+  test("a finish name goes to the finishers that apply it", async ({ page }) => {
     // A finish is a thing a shopper buys, so the name of one is a shelf rather
     // than a search through the prose.
     await searchBox(page).fill("gloss");

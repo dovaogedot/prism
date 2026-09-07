@@ -8,7 +8,7 @@
  * The measurements belong to the thing itself rather than to a container,
  * because there is no container — and what there is to measure depends on what
  * the thing is. A color has a temperature, a reach, a coating and a weight. A
- * tin of finisher has none of those; it has a coating, a grain and a weight.
+ * finisher has none of those; it has a coating, a grain and a weight.
  * A shifter is a mechanism, so it has a torque, a backlash and a weight.
  *
  * Weight is the one they share, because the requirement names it and because
@@ -119,10 +119,10 @@ export type ColorMeasurements = Readonly<{
 }>;
 
 /**
- * The one thing a tin of finisher has to measure.
+ * The one thing a finisher has to measure.
  *
- * A tin does one thing, so it has one dimension and it is the one belonging to
- * that thing: a tin sold for the surface it leaves quotes a grain, one sold
+ * A finisher does one thing, so it has one dimension and it is the one belonging to
+ * that thing: a finisher sold for the surface it leaves quotes a grain, one sold
  * for a coating quotes a thickness, one sold for a glow quotes how far that
  * glow carries.
  */
@@ -131,7 +131,7 @@ export type FinisherDimension =
   | Readonly<{ applies: "coating"; coatingNanometers: number }>
   | Readonly<{ applies: "emission"; reachMeters: number }>;
 
-/** What a tin measures: its one dimension, and the weight every tin has. */
+/** What a finisher measures: its one dimension, and the weight they all have. */
 export type FinisherMetric = Readonly<{ weightGrams: number }> & FinisherDimension;
 
 /** The same one dimension, in the vocabulary that buys its instruments in inches. */
@@ -193,8 +193,8 @@ export const measureColor = (metric: ColorMetric): ColorMeasurements => ({
 });
 
 /**
- * A tin's one dimension, converted. Weight is added by the caller, being the
- * half every tin shares.
+ * A finisher's one dimension, converted. Weight is added by the caller, being the
+ * half every finisher shares.
  */
 const finisherImperial = (metric: FinisherMetric): FinisherImperialDimension =>
   match(metric)
@@ -242,10 +242,10 @@ export type UnitSystem = "metric" | "imperial";
 export type MeasurementRow = Readonly<{ label: string; value: string }>;
 
 /**
- * The one dimension a tin quotes, in metric.
+ * The one dimension a finisher quotes, in metric.
  *
- * Which dimension follows from what the tin does, because a dimension nothing
- * about the tin produces is not a fact about it. A tin sold for the surface it
+ * Which dimension follows from what the finisher does, because a dimension nothing
+ * about the finisher produces is not a fact about it. A finisher sold for the surface it
  * leaves quotes the grain of that surface; one sold for a coating quotes the
  * film's thickness; one sold for a glow quotes how far the glow carries.
  */

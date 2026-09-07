@@ -289,7 +289,7 @@ export type Variant =
   | FinisherSpec
   | Readonly<{ kind: "shifter"; direction: "cw" | "ccw"; arcDegrees: number }>;
 
-/** A tin's row: the one amount it carries, and the two columns it leaves empty. */
+/** A finisher's row: the one amount it carries, and the two columns it leaves empty. */
 type FinisherColumns = Readonly<{
   roughness: number | null;
   coatingNanometers: number | null;
@@ -297,10 +297,10 @@ type FinisherColumns = Readonly<{
 }>;
 
 /**
- * Which column a tin writes, from what the tin does.
+ * Which column a finisher writes, from what it does.
  *
  * The table refuses a row with more or fewer than one of the three, so the
- * two a tin does not use are absent rather than zero.
+ * two a finisher does not use are absent rather than zero.
  */
 const finisherColumns = (application: FinishApplication): FinisherColumns =>
   match(application)

@@ -365,11 +365,11 @@ describe("facets", () => {
   });
 
   /**
-   * One tin per finish word, which is every word there is. Seeded inside the
+   * One finisher per finish word, which is every word there is. Seeded inside the
    * tests that need them so the counts in the rest of this block stay about
    * the colors.
    */
-  const seedTins = async (): Promise<void> => {
+  const seedFinishers = async (): Promise<void> => {
     await insertProduct(harness, {
       kind: "finisher",
       applies: "roughness",
@@ -448,11 +448,11 @@ describe("facets", () => {
     );
   };
 
-  it("counts each finish over the tins it names", async () => {
-    // The four words name tins, not colors: a tin is bought for the one effect
+  it("counts each finish over the finishers it names", async () => {
+    // The four words name finishers, not colors: a finisher is bought for the one effect
     // it produces, so it has one answer to which finish it is. Matte and gloss
     // are two ends of the same amount and partition it between them.
-    await seedTins();
+    await seedFinishers();
     const counts = await finishCounts("?category=finisher");
 
     expect(counts.get("matte")).toBe(1);
@@ -464,7 +464,7 @@ describe("facets", () => {
   it("keeps every finish counted while one of them is selected", async () => {
     // Otherwise picking one would show the other three holding nothing, and
     // there would be no way to see what switching to one of them costs.
-    await seedTins();
+    await seedFinishers();
     const counts = await finishCounts("?category=finisher&finish=iridescent");
 
     expect(counts.get("matte")).toBe(1);
@@ -472,8 +472,8 @@ describe("facets", () => {
     expect(counts.get("fluorescent")).toBe(1);
   });
 
-  it("narrows to the tins the finish names, and to no others", async () => {
-    await seedTins();
+  it("narrows to the finishers the finish names, and to no others", async () => {
+    await seedFinishers();
 
     const slugsOf = async (finish: string) =>
       (
@@ -484,7 +484,7 @@ describe("facets", () => {
         .map((item) => item["slug"])
         .sort();
 
-    // Each word picks out its own tin and only its own. A tin that lays a
+    // Each word picks out its own finisher and only its own. A finisher that lays a
     // coating carries no roughness at all, so it is neither matte nor gloss —
     // and asking for gloss cannot answer with the whole shelf.
     expect(await slugsOf("gloss")).toEqual(["test-lacquer"]);
@@ -497,7 +497,7 @@ describe("facets", () => {
     // A color carries all three amounts at once, so "which finish is it" has
     // no single answer for one. Colors are narrowed by the amounts instead,
     // each on its own axis, which is the test below.
-    await seedTins();
+    await seedFinishers();
 
     expect(jsonOf(await get("/api/v1/products?category=color&finish=gloss"))["total"])
       .toBe(0);
@@ -667,11 +667,11 @@ describe("the three categories", () => {
   });
 
   it("measures each kind by what that kind actually has", async () => {
-    // A tin of finisher has no temperature and no reach; a shifter has neither
+    // A finisher has no temperature and no reach; a shifter has neither
     // and no grain either. What they share is a weight, because the
     // requirement names one and because everything in the shop has some.
     //
-    // `applies` is dropped: it says which dimension a tin quotes rather than
+    // `applies` is dropped: it says which dimension a finisher quotes rather than
     // being a dimension of its own.
     const metricOf = async (slug: string) =>
       Object.keys(
@@ -691,7 +691,7 @@ describe("the three categories", () => {
       "temperatureCelsius",
       "weightGrams",
     ]);
-    // One dimension, and it is the one this tin's own effect has: it is sold
+    // One dimension, and it is the one this finisher's own effect has: it is sold
     // for the surface it leaves, so it quotes that surface's grain.
     expect(await metricOf("test-applicator")).toEqual([
       "grainMicrometers",

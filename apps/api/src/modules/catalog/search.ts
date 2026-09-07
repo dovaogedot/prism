@@ -88,16 +88,16 @@ const FINISH_COLUMNS = {
 } as const satisfies Record<FinishProperty, unknown>;
 
 /**
- * The tins a finish name picks out.
+ * The finishers a finish name picks out.
  *
- * A tin does one thing, and the column that is present is which one — so
+ * A finisher does one thing, and the column that is present is which one — so
  * asking for the iridescent ones is asking which rows have a coating at all.
  * No threshold recovers it and nothing has to agree about where one finish
  * becomes another.
  *
  * Matte and gloss are the exception, and only because they are one thing: two
- * ends of the roughness a tin leaves, split where a reflection stops being
- * worth naming. Both still require the column to be present, so a coating tin
+ * ends of the roughness a finisher leaves, split where a reflection stops being
+ * worth naming. Both still require the column to be present, so a coating finisher
  * is neither.
  *
  * Scoped to finishers, because a color carries all three amounts at once and
@@ -196,7 +196,7 @@ export const buildConditions = (
     conditions.push(lte(productListing.lightness, query.lightness.value.max));
   }
 
-  // The three amounts a finish is made of, which a color has and a tin puts
+  // The three amounts a finish is made of, which a color has and a finisher puts
   // back. Independent of each other, so narrowing one says nothing about the
   // other two.
   if (!acrossKinds && Option.isSome(query.roughness)) {

@@ -46,7 +46,7 @@ const MEASUREMENT_NOTES: Record<Measurements["of"], string> = {
   color:
     "How warm it burns, how far it still reads, how thick the layer over it is, and how heavy it looks.",
   finisher:
-    "The one dimension the effect it sells has, and how heavy the tin is.",
+    "The one dimension the effect it sells has, and how heavy it is.",
   shifter:
     "How hard it has to turn, how much play there is before the color moves, and how heavy the gear is.",
 };
@@ -132,8 +132,8 @@ const SpecRows = ({ spec }: Readonly<{ spec: ProductSpec }>) =>
         <FinishRows finishing={color} />
       </>
     ))
-    // One row, because a tin carries one amount. Which amount it is names the
-    // row, so there is never a row here reading zero for something the tin
+    // One row, because a finisher carries one amount. Which amount it is names the
+    // row, so there is never a row here reading zero for something the finisher
     // does not do.
     .with({ kind: "finisher" }, (finisher) => (
       <Spec
@@ -194,7 +194,7 @@ export const ProductPage = () => {
         .otherwise(({ data }) => (
           <article className="grid gap-10 lg:grid-cols-2">
             {/*
-              A tin is photographed, not drawn. It holds no color of its own,
+              A finisher is photographed, not drawn. It holds no color of its own,
               so what it has to show is what it does to four that do, and that
               is a set of pictures rather than one. The other two kinds carry
               at most one picture and are drawn from their own numbers.

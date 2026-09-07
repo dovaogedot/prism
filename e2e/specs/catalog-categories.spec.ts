@@ -75,7 +75,7 @@ test.describe("choosing a category", () => {
     await page.goto("/?category=finisher");
     await ready(page);
 
-    // A tin has no hue, and it is not a surface with three amounts on it — it
+    // A finisher has no hue, and it is not a surface with three amounts on it — it
     // is bought for the one effect it produces, so its filter is the word.
     await expect(section(page, "Finish")).toBeVisible();
     await expect(section(page, "HSL")).toBeHidden();
@@ -96,7 +96,7 @@ test.describe("choosing a category", () => {
     await expect(page.getByText("Nothing matches that.")).toBeHidden();
   });
 
-  test("a finish name narrows the tins to the ones that apply it", async ({ page }) => {
+  test("a finish name narrows the finishers to the ones that apply it", async ({ page }) => {
     await page.goto("/?category=finisher");
     await ready(page);
 
@@ -212,10 +212,10 @@ test.describe("measurements differ by category", () => {
     await expect(coating).toHaveText(/^[\d.]+ µin$/);
   });
 
-  test("a tin measures the one dimension its own effect has", async ({ page }) => {
-    // Which dimension that is depends on what the tin does — a grain, a
+  test("a finisher measures the one dimension its own effect has", async ({ page }) => {
+    // Which dimension that is depends on what the finisher does — a grain, a
     // thickness or a reach — so what is pinned here is the shape: one
-    // dimension, then the weight every tin has.
+    // dimension, then the weight every finisher has.
     await openFirst(page, "finisher");
 
     const labels = await measurementLabels(page);
@@ -264,8 +264,8 @@ test.describe("measurements differ by category", () => {
   });
 });
 
-test.describe("a tin is photographed", () => {
-  /** The pictures of one tin, which is the strip under the large one. */
+test.describe("a finisher is photographed", () => {
+  /** The pictures of one finisher, which is the strip under the large one. */
   const pictures = (page: Page) => page.getByRole("list", { name: "Pictures" });
 
   test("shows what it does on its card, rather than a slab of color", async ({
@@ -276,7 +276,7 @@ test.describe("a tin is photographed", () => {
 
     const card = results(page).getByRole("article").first();
 
-    // A tin holds no color, so there is nothing to light: its card carries the
+    // A finisher holds no color, so there is nothing to light: its card carries the
     // rendered picture of its effect instead of a stage.
     await expect(card.locator("img")).toHaveCount(1);
     await expect(card.locator("canvas")).toHaveCount(0);

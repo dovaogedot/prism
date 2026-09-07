@@ -203,7 +203,7 @@ AS $$
   SELECT round(roughness * 0.37)::smallint;
 $$;
 
--- How far the glow a tin leaves still carries, in centimeters. A tin sold for
+-- How far the glow a finisher leaves still carries, in centimeters. A finisher sold for
 -- emission changes no texture and lays down no film, so this is the one
 -- dimension it has.
 CREATE FUNCTION emission_reach(emission smallint)
@@ -214,9 +214,9 @@ AS $$
   SELECT round(120 + emission * 34.0)::integer;
 $$;
 
--- What a tin weighs, in grams: the tin, plus the solids it carries to do the
--- one thing it does. Not STRICT, because two of the three arguments are absent
--- on every tin — that is what says which one it is.
+-- What a finisher weighs, in grams: a fixed base, plus the solids it carries to
+-- do the one thing it does. Not STRICT, because two of the three arguments are absent
+-- on every finisher — that is what says which one it is.
 CREATE FUNCTION finisher_weight(
   roughness smallint,
   coating_nanometers smallint,

@@ -5,10 +5,10 @@
  * A shifter has no stage either: it is drawn here from its own two numbers, so
  * there is nothing seeded that could disagree with the numbers beside it.
  *
- * A tin of finisher is the one kind that is photographed. It holds no color,
+ * A finisher is the one kind that is photographed. It holds no color,
  * so a slab of it would be a slab of nothing; what it sells is what it does to
  * a color, and that can only be shown by showing it done. Those pictures are
- * rendered once at seed time from the tin's one amount, so they cannot drift
+ * rendered once at seed time from the finisher's one amount, so they cannot drift
  * from it either.
  */
 
@@ -50,7 +50,7 @@ const describeSurface = (
     finishing.emission > 0 ? `glowing at ${finishing.emission}%` : "no glow",
   ].join(", ");
 
-/** A tin written out, for a reader who has the words but not the pictures. */
+/** A finisher written out, for a reader who has the words but not the pictures. */
 const finisherAlt = (name: string, finisher: FinisherSpec): string =>
   `${name} — ${describeApplication(finisher)}`;
 

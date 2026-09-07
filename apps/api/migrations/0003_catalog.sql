@@ -125,21 +125,21 @@ CREATE INDEX color_emission_idx ON color (emission);
 
 /* --------------------------------------------------------------- a finisher */
 
--- A tin puts a finish back onto a color, so it carries the same three amounts a
+-- A finisher puts a finish back onto a color, so it carries the same three amounts a
 -- color does, being the finish it applies. It never runs out, so there is
 -- nothing here about how long it lasts.
--- A tin does one thing, and the column that is set is which one.
+-- A finisher does one thing, and the column that is set is which one.
 --
 -- Exactly one of the three is present and the other two are absent, so what a
--- tin is needs no threshold to recover and no fourth column to declare: asking
--- for the iridescent ones is asking which rows have a coating. A tin carrying
--- two of them would be a tin with no answer to what it does, which is why the
+-- finisher is needs no threshold to recover and no fourth column to declare: asking
+-- for the iridescent ones is asking which rows have a coating. A finisher carrying
+-- two of them would be a finisher with no answer to what it does, which is why the
 -- constraint counts them rather than checking each.
 CREATE TABLE finisher (
   product_id uuid         PRIMARY KEY,
   kind       product_kind NOT NULL DEFAULT 'finisher',
 
-  -- 5 is a mirror and 95 is chalk. Set on a tin sold for the surface it
+  -- 5 is a mirror and 95 is chalk. Set on a finisher sold for the surface it
   -- leaves, absent on one sold for a coating or a glow.
   roughness          smallint,
   -- Nanometers of interference coating it lays down.
@@ -147,8 +147,8 @@ CREATE TABLE finisher (
   -- How hard it makes a pigment give off its own light.
   emission           smallint,
 
-  -- Each is generated from the one column that is set, so a tin has exactly
-  -- one dimension and it is the one belonging to what the tin does.
+  -- Each is generated from the one column that is set, so a finisher has exactly
+  -- one dimension and it is the one belonging to what the finisher does.
   grain_micrometers smallint GENERATED ALWAYS AS (finish_grain(roughness)) STORED,
   reach_centimeters integer  GENERATED ALWAYS AS (emission_reach(emission)) STORED,
   weight_grams      integer

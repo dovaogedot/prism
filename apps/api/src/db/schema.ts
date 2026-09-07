@@ -247,19 +247,19 @@ export const colors = pgTable("color", {
 });
 
 /**
- * A finisher: the one thing a tin does, in the column that says which.
+ * A finisher: the one thing it does, in the column that says which.
  *
  * Exactly one of the three amounts is present and the other two are absent, so
- * what a tin is needs no threshold to recover and no extra column to declare —
+ * what a finisher is needs no threshold to recover and no extra column to declare —
  * `finisher_does_one_thing` in the database counts them. Its dimension follows
- * the same column, since a tin that changes no texture has no grain to quote.
+ * the same column, since a finisher that changes no texture has no grain to quote.
  */
 export const finishers = pgTable("finisher", {
   productId: uuid("product_id").primaryKey(),
   /** Always `finisher`; it is half of the key back to a product of that kind. */
   kind: productKind("kind").notNull().default("finisher"),
 
-  /** 5 is a mirror, 95 is chalk. Present on a tin sold for the surface it leaves. */
+  /** 5 is a mirror, 95 is chalk. Present on a finisher sold for the surface it leaves. */
   roughness: smallint("roughness"),
   /** Nanometers of interference coating it lays down. */
   coatingNanometers: smallint("coating_nanometers"),

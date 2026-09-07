@@ -205,7 +205,7 @@ export const productQueryParamsSchema = z.object({
   /** A color family, which only colors have. */
   family: z.enum(COLOR_FAMILIES).optional(),
   brands: commaSeparated.pipe(z.array(slugSchema).max(20)),
-  /** Which finish a tin applies. Finishers only — a color carries all three amounts. */
+  /** Which finish a finisher applies. Finishers only — a color carries all three amounts. */
   finish: z.enum(FINISHES).optional(),
   roughnessMin: z.coerce
     .number()
@@ -296,7 +296,7 @@ export type ProductQuery = Readonly<{
   family: Option<ColorFamily>;
   brandSlugs: readonly string[];
   /**
-   * Which finish a tin applies, which is what a finisher is bought for.
+   * Which finish a finisher applies, which is what it is bought for.
    * A color has no single answer, so this narrows the other two categories
    * to nothing.
    */
@@ -506,12 +506,12 @@ export const FINISH_BANDS: Record<Finish, FinishBand> = {
 /**
  * What a finisher is: the one thing it does, and how much of it.
  *
- * A sum rather than three numbers, because a tin does one thing — the database
+ * A sum rather than three numbers, because a finisher does one thing — the database
  * stores the other two amounts as absent and refuses a row with two of them.
  * `applies` is the discriminant, so a caller that handles all three handles
- * every tin there can be, and one that forgets a case does not compile.
+ * every finisher there can be, and one that forgets a case does not compile.
  *
- * There is no such thing as "the gloss finisher": one tin leaves a surface at
+ * There is no such thing as "the gloss finisher": one finisher leaves a surface at
  * 20 and the next leaves it at 15, and a shopper who wants the second is not
  * served by being sold the first.
  */
@@ -520,11 +520,11 @@ export type FinishApplication =
   | Readonly<{ applies: "coating"; coatingNanometers: number }>
   | Readonly<{ applies: "emission"; emission: number }>;
 
-/** A tin, as the catalog reports it. */
+/** A finisher, as the catalog reports it. */
 export type FinisherSpec = Readonly<{ kind: "finisher" }> & FinishApplication;
 
 /**
- * The one amount a tin carries, in the unit that amount is read in.
+ * The one amount a finisher carries, in the unit that amount is read in.
  *
  * Which unit follows from which amount it is, so there is no call site that
  * has to remember that a coating is nanometers and a glow is a percentage.
@@ -537,10 +537,10 @@ export const finishAmount = (application: FinishApplication): string =>
     .exhaustive();
 
 /**
- * What a tin does, as a phrase that follows its name.
+ * What a finisher does, as a phrase that follows its name.
  *
  * Read by anyone who cannot see the pictures, which is where the whole of a
- * tin's answer otherwise lives.
+ * finisher's answer otherwise lives.
  */
 export const describeApplication = (application: FinishApplication): string =>
   match(application)
@@ -614,7 +614,7 @@ export type ProductDetail = ProductSummary &
      *
      * `primaryImage` is the first of these, so a caller that only needs one
      * takes that and never has to reason about an empty array. A color has one
-     * swatch; a tin of finisher has a set, because what a tin does can only be
+     * swatch; a finisher has a set, because what it does can only be
      * shown by showing it done to something. A shifter is drawn in the browser
      * from its own two numbers and has none, so the list is empty rather than
      * absent.

@@ -576,7 +576,7 @@ export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
 
   /**
    * Which category's controls to show. A hue ring means nothing on a shelf of
-   * tins, so the kind-specific sections appear only once a category is chosen —
+   * finishers, so the kind-specific sections appear only once a category is chosen —
    * and with none chosen the rail is just the four filters all three share.
    */
   const chosenKind: Option<ProductKind> = isKind(state.category)
@@ -821,7 +821,7 @@ export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
         .exhaustive()}
 
       {/*
-        A tin is not a surface with three amounts on it; it is bought for the
+        A finisher is not a surface with three amounts on it; it is bought for the
         one effect it produces. So its filter is the word, not the axes — and
         the four words partition the space rather than overlapping, because
         each names a stretch no other one reaches into.

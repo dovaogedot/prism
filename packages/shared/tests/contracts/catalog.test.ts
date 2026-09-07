@@ -170,8 +170,8 @@ describe("suggestQueryParamsSchema", () => {
   });
 });
 
-/** One tin per amount, which is every tin there can be. */
-const tins: readonly FinishApplication[] = [
+/** One finisher per amount, which is every finisher there can be. */
+const finishers: readonly FinishApplication[] = [
   { applies: "roughness", roughness: 88 },
   { applies: "coating", coatingNanometers: 300 },
   { applies: "emission", emission: 80 },
@@ -179,7 +179,7 @@ const tins: readonly FinishApplication[] = [
 
 describe("finishAmount", () => {
   it("writes each amount in the unit that amount is read in", () => {
-    expect(tins.map(finishAmount)).toEqual(["88%", "300 nm", "80%"]);
+    expect(finishers.map(finishAmount)).toEqual(["88%", "300 nm", "80%"]);
   });
 
   it("keeps the amount at either end of its range", () => {
@@ -189,25 +189,25 @@ describe("finishAmount", () => {
 });
 
 describe("describeApplication", () => {
-  it("says what the tin does, in words, for a reader without the pictures", () => {
-    expect(tins.map(describeApplication)).toEqual([
+  it("says what the finisher does, in words, for a reader without the pictures", () => {
+    expect(finishers.map(describeApplication)).toEqual([
       "leaves a surface at 88% roughness",
       "lays a 300 nm coating",
       "glows at 80%",
     ]);
   });
 
-  it("names one effect per tin and never another tin's", () => {
-    // A tin carries one amount, so its description carries one number.
-    for (const tin of tins) {
-      expect(describeApplication(tin).match(/\d+/g)).toHaveLength(1);
+  it("names one effect per finisher and never another finisher's", () => {
+    // A finisher carries one amount, so its description carries one number.
+    for (const finisher of finishers) {
+      expect(describeApplication(finisher).match(/\d+/g)).toHaveLength(1);
     }
   });
 });
 
 describe("FINISH_AXIS_LABELS", () => {
-  it("names the row every tin's amount goes under", () => {
-    expect(tins.map((tin) => FINISH_AXIS_LABELS[tin.applies])).toEqual([
+  it("names the row every finisher's amount goes under", () => {
+    expect(finishers.map((finisher) => FINISH_AXIS_LABELS[finisher.applies])).toEqual([
       "Roughness",
       "Coating",
       "Glow",

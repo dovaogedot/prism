@@ -359,7 +359,7 @@ export const FINISHER_BRANCHES: readonly InstrumentSeed[] = [
   },
 ];
 
-/** What the finish a tin leaves says about it. */
+/** What the finish a finisher leaves says about it. */
 export const FINISHER_NOTES: Record<Finish, string> = {
   matte:
     "Leaves a surface that absorbs light and any follow-up questions. The most-returned finisher we stock, and the one we stand behind.",

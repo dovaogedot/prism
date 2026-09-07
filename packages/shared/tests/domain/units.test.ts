@@ -173,8 +173,8 @@ describe("measureColor", () => {
 });
 
 describe("measureFinisher", () => {
-  it("measures a tin by what a tin has", () => {
-    // No temperature and no reach: a tin of finisher has neither.
+  it("measures a finisher by what a finisher has", () => {
+    // No temperature and no reach: a finisher has neither.
     expect(measureFinisher(bath)).toEqual({
       of: "finisher",
       metric: bath,
@@ -186,8 +186,8 @@ describe("measureFinisher", () => {
     });
   });
 
-  it("gives each kind of tin the one dimension its own effect has", () => {
-    // A tin does one thing, so it quotes one dimension and it is the one
+  it("gives each kind of finisher the one dimension its own effect has", () => {
+    // A finisher does one thing, so it quotes one dimension and it is the one
     // belonging to that thing. Weight is the only row all three share.
     const dimensions = (metric: FinisherMetric) =>
       Object.keys(measureFinisher(metric).metric)
@@ -261,7 +261,7 @@ describe("measurementRows", () => {
     ]);
   });
 
-  it("gives each tin two rows: its own dimension, then its weight", () => {
+  it("gives each finisher two rows: its own dimension, then its weight", () => {
     expect(measurementRows(measureFinisher(bath), "metric")).toEqual([
       { label: "Grain", value: "34 µm" },
       { label: "Weight", value: "235 g" },
@@ -322,8 +322,8 @@ describe("measurementRows", () => {
   });
 
   it("labels no row it has no number for", () => {
-    // The point of the whole shape: a tin has no temperature row reading zero,
-    // because a tin has no temperature.
+    // The point of the whole shape: a finisher has no temperature row reading zero,
+    // because a finisher has no temperature.
     const labels = measurementRows(measureFinisher(bath), "metric").map(
       (row) => row.label,
     );

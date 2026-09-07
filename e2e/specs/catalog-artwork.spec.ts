@@ -150,7 +150,7 @@ const drawn = async (page: Page): Promise<void> => {
 /**
  * Every color in the shop that makes its own light, a page at a time.
  *
- * Only colors: a tin is photographed rather than lit, so there is no stage of
+ * Only colors: a finisher is photographed rather than lit, so there is no stage of
  * one to flood.
  */
 const glowing = (page: number): string =>

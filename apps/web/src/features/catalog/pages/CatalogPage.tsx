@@ -123,7 +123,7 @@ export const CatalogPage = () => {
         update({ q: "", category, family: "" }),
       )
       // A finish is a thing a shopper buys, so the name of one is the shelf of
-      // tins that apply it rather than a search through the prose — and the
+      // finishers that apply it rather than a search through the prose — and the
       // name itself is a place on one of the three amounts.
       .with({ kind: "finish" }, ({ finish }) =>
         update({ q: "", category: "finisher", family: "", finish }),

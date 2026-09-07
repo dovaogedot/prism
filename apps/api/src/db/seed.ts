@@ -1,6 +1,6 @@
 /**
  * Builds a catalog worth browsing: two demo accounts, a shelf of foundries, a
- * few hundred colors with a generated swatch image each, the tins and gears
+ * few hundred colors with a generated swatch image each, the finishers and gears
  * that work on them, and enough reviews that sorting by rating means something.
  *
  * The palettes below are how a plausible color gets invented — a patch of HSL
@@ -105,7 +105,7 @@ const hueWithin = (
   return (arc.from + random.between(0, span)) % 360;
 };
 
-/** The three amounts a finish is made of, which a color has and a tin leaves. */
+/** The three amounts a finish is made of, which a color has and a finisher leaves. */
 type Finishing = Readonly<{
   roughness: number;
   coatingNanometers: number;
@@ -240,13 +240,13 @@ const planColorsFor = (
   });
 
 /**
- * The amounts one tin leaves behind.
+ * The amounts one finisher leaves behind.
  *
- * Rolled inside the band the finish names, so a run of gloss tins is a run of
+ * Rolled inside the band the finish names, so a run of gloss finishers is a run of
  * genuinely different products — one leaves a surface at 20 and the next at 15,
  * and a shopper who wants the second is not served by being sold the first.
  *
- * One amount and no others, because a tin does one thing: the two it is not
+ * One amount and no others, because a finisher does one thing: the two it is not
  * sold for are absent rather than zero, which is what makes "which finish is
  * this" a column rather than a threshold.
  */
@@ -266,7 +266,7 @@ const planFinisherFinish = (
 
 /**
  * One run of finishers per finish, so every part of the space a finish name
- * covers has tins in it.
+ * covers has finishers in it.
  */
 const planFinishersFor = (
   branch: InstrumentSeed,
@@ -359,7 +359,7 @@ const insertVariant = (
     .with({ kind: "color" }, ({ hex, roughness, coatingNanometers, emission }) =>
       db.insert(colors).values({ productId, hex, roughness, coatingNanometers, emission }),
     )
-    // Exactly the one column the tin is sold for; the other two stay absent.
+    // Exactly the one column the finisher is sold for; the other two stay absent.
     .with({ kind: "finisher", applies: "roughness" }, ({ roughness }) =>
       db.insert(finishers).values({ productId, roughness }),
     )
@@ -417,7 +417,7 @@ const seedCatalog = async (
   // Planned per branch, inserted in one shuffled pass. Insertion order is the
   // only thing `created_at` records, and `created_at` is what the default sort
   // falls back to with no search term — so seeding branch by branch would open
-  // the shop on sixteen consecutive blacks, then a shelf of tins.
+  // the shop on sixteen consecutive blacks, then a shelf of finishers.
   for (const planned of shuffle(pending, random)) {
     const brandId = brandIds[random.between(0, brandIds.length - 1)];
     if (brandId === undefined) throw new Error("no brands seeded");
