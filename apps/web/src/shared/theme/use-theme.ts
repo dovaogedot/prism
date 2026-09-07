@@ -1,12 +1,13 @@
 /**
  * Light and dark, remembered.
  *
- * The stored value is only ever "light" or "dark" — the absence of a value
- * means "follow the system", which is the default and is handled by the
- * inline script in index.html so there is no flash on load.
+ * There are two themes and one of them is always in force. A stored value picks
+ * one; with nothing stored the theme is whichever the operating system is set
+ * to, and it keeps following the system until the visitor picks for themselves.
+ * The inline script in index.html reads the same key by the same rule, so the
+ * first paint is already the right one.
  */
 
-import { Option } from "@prism/shared";
 import { useCallback, useEffect, useState } from "react";
 
 /** Which of the two rooms the shop is lit as. */
@@ -14,16 +15,20 @@ export type Theme = "light" | "dark";
 
 const STORAGE_KEY = "hue-theme";
 
-const isTheme = (value: string): value is Theme =>
+const isTheme = (value: string | null): value is Theme =>
   value === "light" || value === "dark";
 
-const stored = (): Option<Theme> => {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  return raw !== null && isTheme(raw) ? Option.some(raw) : Option.none;
-};
+/** Whether the visitor has picked a theme, rather than being shown the system's. */
+const chosen = (): boolean => isTheme(localStorage.getItem(STORAGE_KEY));
 
 const systemPrefers = (): Theme =>
   window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+
+/** The theme in force: the stored choice, or the system's where there is none. */
+const current = (): Theme => {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  return isTheme(raw) ? raw : systemPrefers();
+};
 
 const apply = (theme: Theme): void => {
   document.documentElement.classList.toggle("dark", theme === "dark");
@@ -31,32 +36,30 @@ const apply = (theme: Theme): void => {
 
 /** The current theme, and the toggle that stores a choice over the system preference. */
 export const useTheme = (): Readonly<{ theme: Theme; toggle: () => void }> => {
-  const [theme, setTheme] = useState<Theme>(() =>
-    Option.getOrElse(systemPrefers)(stored()),
-  );
+  const [theme, setTheme] = useState<Theme>(current);
+  const [following, setFollowing] = useState<boolean>(() => !chosen());
 
   useEffect(() => {
     apply(theme);
   }, [theme]);
 
-  // Follow the OS until the visitor expresses a preference of their own.
   useEffect(() => {
-    if (Option.isSome(stored())) return undefined;
+    if (!following) return undefined;
 
     const query = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = (): void => setTheme(systemPrefers());
 
     query.addEventListener("change", onChange);
     return () => query.removeEventListener("change", onChange);
-  }, []);
+  }, [following]);
 
   const toggle = useCallback(() => {
-    setTheme((current) => {
-      const next: Theme = current === "dark" ? "light" : "dark";
-      localStorage.setItem(STORAGE_KEY, next);
-      return next;
-    });
-  }, []);
+    const next: Theme = theme === "dark" ? "light" : "dark";
+
+    localStorage.setItem(STORAGE_KEY, next);
+    setFollowing(false);
+    setTheme(next);
+  }, [theme]);
 
   return { theme, toggle };
 };
