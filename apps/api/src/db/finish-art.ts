@@ -160,38 +160,90 @@ const diagonal = (x: number, y: number): number => (x + y) / (2 * (SIZE - 1));
 
 /* --------------------------------------------------------------- coating */
 
+/** The ground every effect is drawn on, dark enough for a film to read against. */
+const GROUND: Rgb = { red: 26, green: 26, blue: 30 };
+
+/** Where the thinnest film sits, measured from the disc's center in pixels. */
+const SPECTRUM_INNER = SIZE * 0.06;
+
+/** Where the thickest sits. The colors run between this and `SPECTRUM_INNER`. */
+const SPECTRUM_OUTER = SIZE * 0.42;
+
 /**
- * Every color the coating can be, with this finisher's own thickness marked.
+ * Where the disc ends.
  *
- * Thickness runs left to right across the whole range a coating is sold in, so
- * the picture is the same for every iridescent finisher except for where the mark
- * falls — which is the point: it says what this one does against what the
- * range does.
+ * It runs past its last color rather than stopping on it, so a finisher sold at the
+ * top of the range gets a whole ring to stand on instead of half of one cut
+ * off by the edge. The band between shades off into the ground, so it reads as
+ * the edge of the film rather than as one more order.
+ */
+const SPECTRUM_RIM = SPECTRUM_OUTER + SIZE * 0.025;
+
+/** How far the rim fades into the ground, in pixels. */
+const SPECTRUM_EDGE = SIZE * 0.008;
+
+/** Half the width of the ring that marks a finisher's own thickness, in pixels. */
+const MARK_HALF_WIDTH = 2.5;
+
+/** The mark, which is not a color the film can return. */
+const MARK: Rgb = { red: 245, green: 245, blue: 245 };
+
+/**
+ * Where a thickness sits on the disc, in pixels from its center.
+ *
+ * The thinnest film is a ring rather than a point, so a finisher at the bottom of
+ * the range is marked by something a reader can see.
+ */
+export const spectrumRadiusOf = (nanometers: number): number =>
+  SPECTRUM_INNER +
+  ((nanometers - COATING_BOUNDS.min) / (COATING_BOUNDS.max - COATING_BOUNDS.min)) *
+    (SPECTRUM_OUTER - SPECTRUM_INNER);
+
+/**
+ * The thickness the disc shows at a distance from its center, in nanometers.
+ *
+ * The inverse of `spectrumRadiusOf` between the two radii, and clamped outside
+ * them: the core is the thinnest film the range holds and the rim is the
+ * thickest.
+ */
+export const spectrumThicknessAt = (radius: number): number =>
+  COATING_BOUNDS.min +
+  clamp01((radius - SPECTRUM_INNER) / (SPECTRUM_OUTER - SPECTRUM_INNER)) *
+    (COATING_BOUNDS.max - COATING_BOUNDS.min);
+
+/**
+ * Every color the coating can be, with this finisher's own thickness ringed.
+ *
+ * Thickness runs outward from the center across the whole range a coating is
+ * sold in, which is the shape the effect actually takes: a film thickening
+ * away from a point returns its orders as rings, and each order is a wider
+ * ring than the last. The picture is the same for every iridescent finisher except
+ * for where the ring falls — which is the point: it says what this one does
+ * against what the range does.
  */
 export const renderCoatingSpectrum = (nanometers: number): Buffer => {
-  const markAt = Math.round(
-    ((nanometers - COATING_BOUNDS.min) / (COATING_BOUNDS.max - COATING_BOUNDS.min)) *
-      (SIZE - 1),
-  );
+  const center = (SIZE - 1) / 2;
+  const markAt = spectrumRadiusOf(nanometers);
 
   return encode(
     draw(SIZE, SIZE, (x, y) => {
-      const thickness =
-        COATING_BOUNDS.min +
-        (x / (SIZE - 1)) * (COATING_BOUNDS.max - COATING_BOUNDS.min);
-      const band = coatingColor(thickness);
+      const radius = Math.hypot(x - center, y - center);
+      const film = coatingColor(spectrumThicknessAt(radius));
 
-      // A margin of bare ground top and bottom, so the spectrum reads as a
-      // sample of the film rather than as the whole image being the product.
-      const inset = y < SIZE * 0.22 || y > SIZE * 0.78;
-      const ground: Rgb = { red: 26, green: 26, blue: 30 };
-      const marked = Math.abs(x - markAt) <= 2;
+      const shoulder = clamp01(
+        (radius - SPECTRUM_OUTER) / (SPECTRUM_RIM - SPECTRUM_OUTER),
+      );
+      const shaded = mix(film, GROUND, shoulder * 0.8);
 
-      if (marked) return { red: 245, green: 245, blue: 245 };
-      if (inset) return ground;
+      // Drawn at the radius its own thickness sits at, so the ring and the
+      // color under it are one fact rather than two that could disagree.
+      const marked = clamp01((MARK_HALF_WIDTH - Math.abs(radius - markAt)) / 1.5);
 
-      // Lit from above inside the band, so it reads as a strip of material.
-      return mix(band, ground, clamp01(Math.abs(y / SIZE - 0.5) * 0.9));
+      // The rim fades over a few pixels, which seats the disc on the ground
+      // and is the only antialiasing a circle drawn a pixel at a time gets.
+      const inside = clamp01((SPECTRUM_RIM - radius) / SPECTRUM_EDGE);
+
+      return mix(GROUND, mix(shaded, MARK, marked), inside);
     }),
   );
 };
@@ -319,7 +371,7 @@ export const finisherImages = (
     .with({ applies: "coating" }, ({ name, coatingNanometers }) => [
       {
         png: renderCoatingSpectrum(coatingNanometers),
-        alt: `${name}: every color a coating returns as it thickens, with this finisher's ${coatingNanometers} nm marked`,
+        alt: `${name}: every color a coating returns as it thickens outward from the center, ringed at this finisher's ${coatingNanometers} nm`,
       },
       ...DEMONSTRATION_COLORS.map(({ name: pigment, hex }) => ({
         png: renderCoatingOver(hex, coatingNanometers),

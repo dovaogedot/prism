@@ -631,15 +631,19 @@ and no branch can borrow another's picture because no branch carries another's n
 
 | The finisher does | Leads with | Then |
 | --- | --- | --- |
-| a coating | every color a film returns as it thickens, with this finisher's thickness marked | the same film over four pigments, thin to full |
+| a coating | every color a film returns as it thickens outward from a point, ringed at this finisher's thickness | the same film over four pigments, thin to full |
 | a glow | how far the glow it leaves carries | that glow on four pigments |
 | a surface | the reflection left in the surface it leaves | that same surface over four pigments |
 
-The coating strip is the same physics the slab uses — `sin²(2π·n·d/λ)` sampled at three
+The coating disc is the same physics the slab uses — `sin²(2π·n·d/λ)` sampled at three
 wavelengths — evaluated across the whole 100–600 nm range rather than at one thickness, so
-the picture and the product page cannot drift. The glow is a bloom, the reflection is a
-strip blurred by the roughness the finisher leaves, and both are plain raster work: a finisher is a
-still life, not a scene.
+the picture and the product page cannot drift. It is drawn as rings because that is the
+shape the effect takes: a film thickening away from a point returns its orders as rings,
+each wider than the last, which is what a soap bubble and a lens on glass both do. The mark
+is drawn at the radius its own thickness sits at rather than at a radius computed
+separately, so the ring and the color under it are one fact. The glow is a bloom, the
+reflection is a strip blurred by the roughness the finisher leaves, and both are plain raster
+work: a finisher is a still life, not a scene.
 
 ---
 
