@@ -471,6 +471,37 @@ describe("facets", () => {
     expect(counts.get("fluorescent")).toBe(1);
   });
 
+  it("narrows a finisher shelf to a stretch of the amount its finish names", async () => {
+    // A finisher is bought for how much of the one thing it does, so the shelf
+    // has to be askable by that amount and not only by the word.
+    await seedFinishers();
+
+    const slugs = (
+      jsonOf(
+        await get(
+          "/api/v1/products?category=finisher&finish=roughness&roughnessMin=50",
+        ),
+      )["items"] as readonly Record<string, unknown>[]
+    ).map((item) => item["slug"]);
+
+    expect(slugs).toEqual(["test-chalk"]);
+  });
+
+  it("counts every finish while a range on one of their amounts is applied", async () => {
+    // The range belongs to the finish that is chosen. A finisher carries the
+    // one amount its own finish is made of and nothing in the other two
+    // columns, so counting the fluorescent ones against a roughness range
+    // would answer zero and leave the shopper unable to switch away from it.
+    await seedFinishers();
+    const counts = await finishCounts(
+      "?category=finisher&finish=roughness&roughnessMin=50",
+    );
+
+    expect(counts.get("roughness")).toBe(2);
+    expect(counts.get("iridescent")).toBe(1);
+    expect(counts.get("fluorescent")).toBe(1);
+  });
+
   it("narrows to the finishers the finish names, and to no others", async () => {
     await seedFinishers();
 

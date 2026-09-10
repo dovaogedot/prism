@@ -375,3 +375,62 @@ test.describe("search", () => {
     await expect(page.getByRole("option").first()).toContainText(/Municipal/);
   });
 });
+
+test.describe("how much of the finish", () => {
+  /** The lowest each finish's own slider reaches, which is where its shelf starts. */
+  const AXIS_STARTS = [
+    ["Roughness", "Roughness", "5"],
+    ["Iridescent", "Coating", "100"],
+    ["Fluorescent", "Emission", "35"],
+  ] as const;
+
+  test("appears once a finish is chosen, on that finish's own axis", async ({ page }) => {
+    await page.goto("/?category=finisher");
+
+    const roughness = rail(page).getByRole("radio", { name: /^Roughness/ });
+
+    await expect(roughness).toBeVisible();
+
+    // A finisher does one thing, and the three of them are measured in three
+    // different units — so there is nothing to ask how much of until which one
+    // is settled. Price is asked of everything and is on the rail throughout.
+    for (const [, label] of AXIS_STARTS) {
+      await expect(
+        rail(page).getByRole("slider", { name: `${label}, minimum` }),
+      ).toHaveCount(0);
+    }
+
+    for (const [finish, label, starts] of AXIS_STARTS) {
+      await rail(page).getByRole("radio", { name: new RegExp(`^${finish}`) }).click();
+
+      const lowest = rail(page).getByRole("slider", { name: `${label}, minimum` });
+
+      await expect(lowest).toBeVisible();
+      // The slider runs the stretch of the axis the word names and no further:
+      // a thumb that could be dragged past the end of the shelf has somewhere
+      // to go that answers with nothing.
+      await expect(lowest).toHaveAttribute("aria-valuemin", starts);
+    }
+  });
+
+  test("narrows the shelf, and clears when a different finish is chosen", async ({
+    page,
+  }) => {
+    await page.goto("/?category=finisher&finish=roughness");
+
+    const lowest = rail(page).getByRole("slider", { name: "Roughness, minimum" });
+
+    await expect(lowest).toBeVisible();
+    await lowest.focus();
+    await page.keyboard.press("PageUp");
+
+    await expect(page).toHaveURL(/roughnessMin=/);
+
+    // A range says where on one axis to look, so it means nothing once a
+    // different axis is chosen.
+    await rail(page).getByRole("radio", { name: /^Fluorescent/ }).click();
+
+    await expect(page).toHaveURL(/finish=fluorescent/);
+    await expect(page).not.toHaveURL(/roughnessMin=/);
+  });
+});

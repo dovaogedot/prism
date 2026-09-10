@@ -134,9 +134,9 @@ export const buildConditions = (
   })(exclude);
 
   const acrossKinds = omitted === "kind";
-  // Only the name has a facet to count, so only the name is lifted for it.
-  // The three amounts are sliders a shopper sets independently, with no counts
-  // of their own to distort.
+  // Only the name has a facet to count, so only the name is lifted for it. The
+  // three amounts have no counts of their own to distort, but they belong to
+  // the finish that is chosen and leave with it.
   const acrossFinishes = acrossKinds || omitted === "finish";
   const conditions: SQL[] = [];
 
@@ -191,20 +191,24 @@ export const buildConditions = (
     conditions.push(lte(productListing.lightness, query.lightness.value.max));
   }
 
-  // The three amounts a finish is made of, which a color has and a finisher puts
-  // back. Independent of each other, so narrowing one says nothing about the
-  // other two.
-  if (!acrossKinds && Option.isSome(query.roughness)) {
+  // The three amounts a finish is made of, which a color has and a finisher
+  // puts back. Independent of each other, so narrowing one says nothing about
+  // the other two. They leave with the finish as well as with the category: a
+  // finisher carries the one amount its own finish is made of and nothing in
+  // the other two columns, so counting how many fluorescent finishers there
+  // are while a roughness range is applied would answer zero for a reason that
+  // has nothing to do with the shopper's question.
+  if (!acrossFinishes && Option.isSome(query.roughness)) {
     conditions.push(gte(productListing.roughness, query.roughness.value.min));
     conditions.push(lte(productListing.roughness, query.roughness.value.max));
   }
 
-  if (!acrossKinds && Option.isSome(query.coating)) {
+  if (!acrossFinishes && Option.isSome(query.coating)) {
     conditions.push(gte(productListing.coatingNanometers, query.coating.value.min));
     conditions.push(lte(productListing.coatingNanometers, query.coating.value.max));
   }
 
-  if (!acrossKinds && Option.isSome(query.emission)) {
+  if (!acrossFinishes && Option.isSome(query.emission)) {
     conditions.push(gte(productListing.emission, query.emission.value.min));
     conditions.push(lte(productListing.emission, query.emission.value.max));
   }

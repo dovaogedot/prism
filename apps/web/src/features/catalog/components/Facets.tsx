@@ -14,6 +14,7 @@ import {
   formatPrice,
   isCents,
   EMISSION_BOUNDS,
+  FINISH_BANDS,
   FINISH_PROPERTIES,
   FINISH_AXES,
   FINISH_LABELS,
@@ -25,6 +26,8 @@ import {
   SATURATION_BOUNDS,
   SHIFT_DIRECTIONS,
   type FacetBucket,
+  type Finish,
+  type FinishBand,
   type FinishProperty,
   type NumericRange,
   type ProductFacets,
@@ -458,24 +461,28 @@ const ROUGHNESS_RAMP = "linear-gradient(to right, #f4f4f5, #6b6b70)";
 const EMISSION_RAMP = "linear-gradient(to right, #cdbb6a, #fde047, #fffbea)";
 
 /**
- * Where on one amount's axis to look.
+ * Where on one amount to look, within a stretch of that amount's axis.
  *
- * All three are on screen at once and narrow independently, because a color
- * carries all three: a shopper can ask for a coated surface that also glows.
+ * The stretch is given rather than assumed, because the two shelves that ask
+ * this question hold different parts of the same axis. A color carries every
+ * amount there is, so its sliders run the whole of each; a shelf of finishers
+ * that apply one finish only holds the stretch that finish names, and a slider
+ * running past it would have a dead end a shopper can drag into.
+ *
  * Roughness is the one with two names on it — dragging the low end up asks for
  * matte and dragging the high end down asks for gloss, without the shop having
  * to pick the point where one becomes the other.
  */
 const AmountSlider = ({
-  property,
+  band,
   state,
   onChange,
 }: Readonly<{
-  property: FinishProperty;
+  band: FinishBand;
   state: FacetState;
   onChange: (next: Partial<FacetState>) => void;
 }>) => {
-  const range = FINISH_AXES[property];
+  const { property, range } = band;
 
   /** Dragged back to an end of the band means "no narrowing", not "the band". */
   const narrowed = (next: NumericRange): Readonly<{ min: string; max: string }> => ({
@@ -557,12 +564,15 @@ const isDirection = (value: string): value is ShiftDirection =>
 const isFinishProperty = (value: string): value is FinishProperty =>
   FINISH_PROPERTIES.some((property) => property === value);
 
-/** The word a chosen finish is written out as, or nothing while none is chosen. */
-const finishSummary = (chosen: string): string => {
-  const finish = FINISHES.find((candidate) => candidate === chosen);
+const isFinish = (value: string): value is Finish =>
+  FINISHES.some((finish) => finish === value);
 
-  return finish === undefined ? "" : FINISH_LABELS[finish];
-};
+/** The word a chosen finish is written out as, or nothing while none is chosen. */
+const finishSummary = (chosen: Option<Finish>): string =>
+  Option.match<Finish, string>({
+    onSome: (finish) => FINISH_LABELS[finish],
+    onNone: () => "",
+  })(chosen);
 
 /**
  * The filter rail.
@@ -579,6 +589,11 @@ export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
    * finishers, so the kind-specific sections appear only once a category is chosen —
    * and with none chosen the rail is just the four filters all three share.
    */
+  /** Which finish's amount to ask about, which is the one being shopped for. */
+  const chosenFinish: Option<Finish> = isFinish(state.finish)
+    ? Option.some(state.finish)
+    : Option.none;
+
   const chosenKind: Option<ProductKind> = isKind(state.category)
     ? Option.some(state.category)
     : Option.none;
@@ -810,7 +825,7 @@ export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
               {FINISH_PROPERTIES.map((property) => (
                 <AmountSlider
                   key={property}
-                  property={property}
+                  band={{ property, range: FINISH_AXES[property] }}
                   state={state}
                   onChange={onChange}
                 />
@@ -821,24 +836,37 @@ export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
         .exhaustive()}
 
       {/*
-        A finisher is not a surface with three amounts on it; it is bought for the
-        one effect it produces. So its filter is the word, not the axes — and
-        the four words partition the space rather than overlapping, because
-        each names a stretch no other one reaches into.
+        A finisher is not a surface with three amounts on it; it is bought for
+        the one effect it produces, and for how much of that effect it has. So
+        it is two questions: which of the three words, and then where on the
+        one amount that word names. The words partition the space rather than
+        overlapping, because each of them names a different amount — which is
+        also why the second question cannot be asked until the first is
+        answered, and why answering it again clears the range underneath.
       */}
       {match(showsKind("finisher"))
         .with(false, () => null)
         .with(true, () => (
-          <Section
-            title="Finish"
-            summary={finishSummary(state.finish)}
-          >
+          <Section title="Finish" summary={finishSummary(chosenFinish)}>
             <RadioList
               name="finish"
               buckets={facets.finishes}
               selected={state.finish}
-              onSelect={(value) => onChange({ finish: value })}
+              onSelect={(value) => onChange({ finish: value, ...NO_AMOUNTS })}
             />
+
+            {match(chosenFinish)
+              .with({ _tag: "None" }, () => null)
+              .with({ _tag: "Some" }, ({ value }) => (
+                <div className="mt-5">
+                  <AmountSlider
+                    band={FINISH_BANDS[value]}
+                    state={state}
+                    onChange={onChange}
+                  />
+                </div>
+              ))
+              .exhaustive()}
           </Section>
         ))
         .exhaustive()}
