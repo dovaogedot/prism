@@ -387,7 +387,16 @@ export const toProductQuery = (params: ProductQueryParams): ProductQuery => ({
 
 /** One image of a product, and where it sits in that product's gallery. */
 export type ProductImage = Readonly<{
+  /** The picture under the light theme, and under both where it does not change with the theme. */
   url: string;
+  /**
+   * The picture under the dark theme.
+   *
+   * A still of a product's scene is rendered once per theme, because the room
+   * it stands in is dressed for the page around it. A photograph reads the
+   * same under both, and this is `url` again.
+   */
+  darkUrl: string;
   alt: string;
   position: number;
 }>;

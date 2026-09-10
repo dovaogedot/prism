@@ -8,6 +8,7 @@
 
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   customType,
   index,
   integer,
@@ -305,10 +306,27 @@ export const productImages = pgTable(
     productId: uuid("product_id")
       .notNull()
       .references(() => products.id, { onDelete: "cascade" }),
-    /** Content-addressed filename on the media volume. */
+    /**
+     * The picture under the light theme, and under both where it does not
+     * change with the theme. Content-addressed, on the media volume.
+     */
     filename: text("filename").notNull(),
+    /**
+     * The same picture under the dark theme.
+     *
+     * A still of a product's scene is rendered once per theme. A photograph
+     * reads the same under both, and names the file in `filename` here too.
+     */
+    darkFilename: text("dark_filename").notNull(),
     alt: text("alt").notNull().default(""),
     position: integer("position").notNull().default(0),
+    /**
+     * Whether an admin uploaded the picture.
+     *
+     * Every other image of a product is one of its stills, which the seed
+     * replaces whenever the build it runs in rendered different ones.
+     */
+    uploaded: boolean("uploaded").notNull().default(false),
     createdAt: createdAt(),
   },
   (table) => [index("product_image_product_idx").on(table.productId)],

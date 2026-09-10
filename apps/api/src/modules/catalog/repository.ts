@@ -112,6 +112,13 @@ const LISTING_COLUMNS = {
 
 const mediaUrl = (filename: string): string => `/media/${filename}`;
 
+/**
+ * The order a product's images are shown in: its stills first, in the order
+ * of their angles, then whatever an admin uploaded, in the order it arrived.
+ * The first of them is the primary image.
+ */
+const GALLERY_ORDER = [asc(productImages.uploaded), asc(productImages.position)] as const;
+
 const toSummary = (
   row: ListingRow,
   spec: ProductSpec,
@@ -168,12 +175,13 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
       .select({
         productId: productImages.productId,
         filename: productImages.filename,
+        darkFilename: productImages.darkFilename,
         alt: productImages.alt,
         position: productImages.position,
       })
       .from(productImages)
       .where(inArray(productImages.productId, [...productIds]))
-      .orderBy(asc(productImages.position));
+      .orderBy(...GALLERY_ORDER);
 
     const byProduct = new Map<string, ProductImage>();
 
@@ -181,6 +189,7 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
       if (byProduct.has(row.productId)) continue;
       byProduct.set(row.productId, {
         url: mediaUrl(row.filename),
+        darkUrl: mediaUrl(row.darkFilename),
         alt: row.alt,
         position: row.position,
       });
@@ -395,12 +404,13 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
         db
           .select({
             filename: productImages.filename,
+            darkFilename: productImages.darkFilename,
             alt: productImages.alt,
             position: productImages.position,
           })
           .from(productImages)
           .where(eq(productImages.productId, row.id))
-          .orderBy(asc(productImages.position)),
+          .orderBy(...GALLERY_ORDER),
         db
           .select({
             id: productReviews.id,
@@ -418,6 +428,7 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
 
       const images: readonly ProductImage[] = imageRows.map((image) => ({
         url: mediaUrl(image.filename),
+        darkUrl: mediaUrl(image.darkFilename),
         alt: image.alt,
         position: image.position,
       }));
@@ -517,11 +528,13 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
 
       const position = existing[0]?.total ?? 0;
 
+      // A photograph reads the same under either theme, so it names its one
+      // file for both.
       await db
         .insert(productImages)
-        .values({ productId, filename, alt, position });
+        .values({ productId, filename, darkFilename: filename, alt, position, uploaded: true });
 
-      return { url: mediaUrl(filename), alt, position };
+      return { url: mediaUrl(filename), darkUrl: mediaUrl(filename), alt, position };
     },
   };
 };

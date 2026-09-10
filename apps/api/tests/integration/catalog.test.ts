@@ -660,8 +660,9 @@ describe("the three categories", () => {
     // `primaryImage` is the first of `images`, so the two cannot name
     // different files. A kind that is drawn from its own spec has neither.
     await harness.database.sql`
-      INSERT INTO product_image (product_id, filename, alt, position)
-      SELECT p.id, ${`${"a".repeat(64)}.png`}, 'Void Black, a swatch', 0
+      INSERT INTO product_image (product_id, filename, dark_filename, alt, position)
+      SELECT p.id, ${`${"a".repeat(64)}.webp`}, ${`${"b".repeat(64)}.webp`},
+             'Void Black, seen from the front', 0
       FROM product p WHERE p.slug = 'void-black'
     `;
     harness.clock.advanceSeconds(harness.config.cache.productTtlSeconds + 1);
@@ -675,6 +676,7 @@ describe("the three categories", () => {
     expect(images.length).toBeGreaterThan(0);
     expect(primary["_tag"]).toBe("Some");
     expect((primary["value"] as Record<string, unknown>)["url"]).toBe(images[0]?.["url"]);
+    expect(images[0]?.["darkUrl"]).toBe(`/media/${"b".repeat(64)}.webp`);
 
     expect(shifter["images"]).toEqual([]);
     expect((shifter["primaryImage"] as Record<string, unknown>)["_tag"]).toBe("None");
