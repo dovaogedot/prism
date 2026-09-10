@@ -104,10 +104,13 @@ test.describe("choosing a category", () => {
 
     await rail(page).getByRole("radio", { name: /^Iridescent/ }).click();
     await expect(page).toHaveURL(/finish=iridescent/);
-    await ready(page);
 
-    // The bug this replaces: every bucket returned the whole shelf.
-    expect(await results(page).getByRole("article").count()).toBeLessThan(everything);
+    // The shelf it replaces stays on screen while this one loads, so the count
+    // is polled rather than read once. A bucket that returned the whole shelf
+    // would hold it where it started.
+    await expect
+      .poll(() => results(page).getByRole("article").count())
+      .toBeLessThan(everything);
   });
 
   test("a category showing zero is still selectable", async ({ page }) => {
