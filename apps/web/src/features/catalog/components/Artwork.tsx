@@ -2,17 +2,15 @@
  * What a product looks like, chosen by what it is.
  *
  * A color gets a lit stage built from the three amounts of finish it carries.
- * A shifter has no stage either: it is drawn here from its own two numbers, so
- * there is nothing seeded that could disagree with the numbers beside it.
+ * A finisher gets a room of plain shapes with the finisher done to every one
+ * of them, because it holds no color of its own: a slab of it would be a slab
+ * of nothing, and what it sells is what it does to a color. A shifter has no
+ * stage at all — it is drawn here from its own two numbers, so there is
+ * nothing seeded that could disagree with the numbers beside it.
  *
- * A finisher is the one kind that is photographed. It holds no color,
- * so a slab of it would be a slab of nothing; what it sells is what it does to
- * a color, and that can only be shown by showing it done. Those pictures are
- * rendered once at seed time from the finisher's one amount, so they cannot drift
- * from it either.
- *
- * A color's stage has a still standing behind it, and the switch in the header
- * decides which of the two a visitor is shown.
+ * Both stages have a still standing behind them, and the switch in the header
+ * decides which of the two a visitor is shown. The stills are rendered at seed
+ * time from the same amounts the rooms are built from, so the two agree.
  */
 
 import {
@@ -28,6 +26,7 @@ import {
 import { match } from "ts-pattern";
 import { useRendering } from "../../../shared/render/use-rendering.ts";
 import { ColorStage } from "./ColorStage.tsx";
+import { FinisherStage } from "./FinisherStage.tsx";
 import { Photograph } from "./Photograph.tsx";
 import { Swatch } from "./Swatch.tsx";
 
@@ -156,6 +155,14 @@ export const Artwork = ({
           image={image}
           alt={describeSurface(`${name} — ${color.hex}`, color)}
           {...(captioned ? { caption: color.hex } : {})}
+          className={className}
+        />
+      ))
+      .with({ spec: { kind: "finisher" }, rendering: true }, ({ spec: finisher }) => (
+        <FinisherStage
+          application={finisher}
+          image={image}
+          alt={finisherAlt(name, finisher)}
           className={className}
         />
       ))

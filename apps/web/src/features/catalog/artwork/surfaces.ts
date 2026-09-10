@@ -105,6 +105,15 @@ const PBR_ROUGHNESS = { smoothest: 0.09, roughest: 0.92 } as const;
 const lacquerOver = (roughness: number): number =>
   Math.max(0, (MATTE_FLOOR - roughness) / (MATTE_FLOOR - ROUGHNESS_BOUNDS.min));
 
+/**
+ * Where a color's glow sits between none and as hard as pigment glows, 0 to 1.
+ *
+ * Shared with the finisher rooms, so a finisher that glows at 80 and a color
+ * that glows at 80 are asking for the same thing.
+ */
+export const glowFraction = (emission: number): number =>
+  Math.max(0, Math.min(1, emission / EMISSION_BOUNDS.max));
+
 /** Chalk has a sheen; a mirror has none. Nothing below halfway has any. */
 const SHEEN_FROM = 45;
 
@@ -132,7 +141,7 @@ const BLOOM_THRESHOLD = 1.15;
 export const surfaceFor = (finishing: Finishing): Surface => {
   const rough = roughnessFraction(finishing.roughness);
   const lacquer = lacquerOver(finishing.roughness);
-  const glow = Math.max(0, Math.min(1, finishing.emission / EMISSION_BOUNDS.max));
+  const glow = glowFraction(finishing.emission);
   const coated = finishing.coatingNanometers > 0;
 
   return {

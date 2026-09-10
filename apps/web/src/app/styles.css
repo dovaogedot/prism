@@ -143,12 +143,12 @@
 
 @layer components {
   /*
-   * The stage a color is sold on.
+   * The stage a product is sold on.
    *
    * There is almost nothing here, and that is the point: the picture is a
    * render, not a stack of gradients. `features/catalog/artwork` builds the
-   * room, the lamp and the slab, and this only decides how much of the card
-   * the canvas gets and where the placard sits.
+   * room and what stands in it, and this only decides how much of the card the
+   * canvas gets and where the placard sits.
    */
   .stage {
     position: relative;
@@ -167,6 +167,18 @@
 
   .stage__flat {
     object-fit: cover;
+  }
+
+  /*
+   * The photograph a stage stands behind until its room is built.
+   *
+   * Over the canvas rather than in place of it, so the canvas is already the
+   * size it will be when the first frame lands and the card does not resize
+   * around it. Opaque, because what is under it is a canvas with nothing on it.
+   */
+  .stage__still {
+    position: absolute;
+    inset: 0;
   }
 
   /*

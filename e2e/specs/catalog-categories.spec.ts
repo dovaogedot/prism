@@ -10,6 +10,7 @@
  */
 
 import { expect, test, type Page } from "@playwright/test";
+import { drawn, pretendGpu } from "../support/stages.ts";
 
 const rail = (page: Page) => page.getByRole("complementary");
 const results = (page: Page) => page.getByRole("region", { name: "Results" });
@@ -267,9 +268,12 @@ test.describe("measurements differ by category", () => {
   });
 });
 
-test.describe("a finisher is photographed", () => {
+test.describe("a finisher shows what it does", () => {
   /** The pictures of one finisher, which is the strip under the large one. */
   const pictures = (page: Page) => page.getByRole("list", { name: "Pictures" });
+
+  /** The large picture at the top of a product page, whatever it is made of. */
+  const lead = (page: Page) => page.getByRole("article").first();
 
   test("shows what it does on its card, rather than a slab of color", async ({
     page,
@@ -279,8 +283,9 @@ test.describe("a finisher is photographed", () => {
 
     const card = results(page).getByRole("article").first();
 
-    // A finisher holds no color, so there is nothing to light: its card carries the
-    // rendered picture of its effect instead of a stage.
+    // A finisher holds no color, so there is nothing to light: on a machine
+    // that cannot draw a room, its card carries the rendered picture of its
+    // effect instead.
     await expect(card.locator("img")).toHaveCount(1);
     await expect(card.locator("canvas")).toHaveCount(0);
   });
@@ -296,11 +301,56 @@ test.describe("a finisher is photographed", () => {
     const thumbnails = pictures(page).getByRole("button");
     await expect(thumbnails).toHaveCount(5);
 
-    const large = page.getByRole("article").locator("img").first();
+    const large = lead(page).locator("img").first();
     const before = await large.getAttribute("src");
 
     await thumbnails.last().click();
 
     await expect(large).not.toHaveAttribute("src", String(before));
+  });
+
+  test.describe("on a machine that can draw one", () => {
+    // A room here is rasterized in software, which the default does not allow
+    // enough time for.
+    test.describe.configure({ timeout: 120_000 });
+
+    test.beforeEach(async ({ page }) => {
+      await pretendGpu(page);
+    });
+
+    test("draws the room on its card in place of the photograph", async ({
+      page,
+    }) => {
+      await page.goto("/?category=finisher");
+      await ready(page);
+      await drawn(page);
+
+      const card = results(page).getByRole("article").first();
+
+      await expect(card.locator("canvas")).toHaveCount(1);
+      await expect(card.locator("img")).toHaveCount(0);
+    });
+
+    test("opens on the room, and the photographs are still under it", async ({
+      page,
+    }) => {
+      await page.goto("/?category=finisher");
+      await ready(page);
+      await results(page).getByRole("article").first().getByRole("link").click();
+      await expect(page.getByRole("heading", { name: "Measurements" })).toBeVisible();
+      await drawn(page);
+
+      await expect(lead(page).locator("canvas")).toHaveCount(1);
+
+      // The room stands in for the first picture only. The other four are what
+      // they always were, and choosing one puts a photograph back.
+      const thumbnails = pictures(page).getByRole("button");
+
+      await expect(thumbnails).toHaveCount(5);
+      await thumbnails.last().click();
+
+      await expect(lead(page).locator("canvas")).toHaveCount(0);
+      await expect(lead(page).getByRole("img")).toHaveCount(1);
+    });
   });
 });

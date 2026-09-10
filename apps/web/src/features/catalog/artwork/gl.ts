@@ -10,11 +10,12 @@
  *
  * What is drawn is not decided here. A caller hands over a function from its
  * own view to a `Frame` — a scene, a camera and a spill — and this points the
- * one render pass at it.
+ * one render pass at it. That is what lets a color slab and a finisher's room
+ * stand side by side in one grid on one context.
  *
- * This and the scene module are the only files in the feature that are not
- * referentially transparent, because a GPU context is a resource rather than
- * a value.
+ * This and the two scene modules are the only files in the feature that are
+ * not referentially transparent, because a GPU context is a resource rather
+ * than a value.
  */
 
 import { Option } from "@prism/shared";

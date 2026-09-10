@@ -21,6 +21,7 @@ import {
   KIND_LABELS,
   type Measurements,
   measurementRows,
+  Option,
   type ProductDetail,
   type ProductSpec,
   type UnitSystem,
@@ -194,10 +195,11 @@ export const ProductPage = () => {
         .otherwise(({ data }) => (
           <article className="grid gap-10 lg:grid-cols-2">
             {/*
-              A finisher is photographed, not drawn. It holds no color of its own,
-              so what it has to show is what it does to four that do, and that
-              is a set of pictures rather than one. The other two kinds carry
-              at most one picture and are drawn from their own numbers.
+              A finisher carries a set of pictures rather than one: it holds no
+              color of its own, so what it has to show is what it does to four
+              that do. The first of them is where its room is drawn, and the
+              rest stay photographs. The other two kinds carry at most one
+              picture and are drawn from their own numbers.
             */}
             {match(data)
               .with(
@@ -206,6 +208,14 @@ export const ProductPage = () => {
                   <Gallery
                     key={data.slug}
                     images={images}
+                    lead={(frame) => (
+                      <Artwork
+                        spec={spec}
+                        name={name}
+                        image={Option.some(images[0])}
+                        className={frame}
+                      />
+                    )}
                     alt={`${name} — ${describeApplication(spec)}`}
                   />
                 ),
