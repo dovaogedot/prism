@@ -9,7 +9,7 @@
  *
  * The mesh the rooms are built around arrives over the network, so a stage can
  * open before there is anything to stand in it. Until then it shows the
- * photograph the shop already has, over a canvas that is already the size it
+ * still the shop already has, over a canvas that is already the size it
  * will be — so what arrives replaces a picture rather than filling a gap, and
  * a grid of these never moves under the reader.
  *
@@ -40,7 +40,7 @@ import { Photograph } from "./Photograph.tsx";
 /**
  * What the stage is showing.
  *
- * `Waiting` and `Still` both show the photograph. What differs is whether
+ * `Waiting` and `Still` both show the still. What differs is whether
  * there is a canvas under it that may yet come to life: a browser that cannot
  * draw one never gets one, so nothing on the page announces a picture that is
  * never going to be there.
@@ -58,13 +58,13 @@ const STILL: Showing = { _tag: "Still" };
 export type FinisherStageProps = Readonly<{
   /** The one thing this finisher does to a surface, and how much of it. */
   application: FinishApplication;
-  /** The photograph of the same finisher, shown wherever the room cannot be. */
+  /** The still of the same room, shown wherever the room cannot be drawn. */
   image: Option<ProductImage>;
   alt: string;
   className?: string;
 }>;
 
-/** A finisher's room, or the photograph of one where nothing can draw it. */
+/** A finisher's room, or the still of it where nothing can draw it. */
 export const FinisherStage = ({
   application,
   image,

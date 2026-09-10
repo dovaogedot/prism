@@ -12,8 +12,10 @@
  */
 
 import {
+  type ColorSpec,
   describeApplication,
   DIRECTION_LABELS,
+  type FinisherSpec,
   finishAmount,
   FINISH_AXIS_LABELS,
   formatPrice,
@@ -150,6 +152,13 @@ const SpecRows = ({ spec }: Readonly<{ spec: ProductSpec }>) =>
     ))
     .exhaustive();
 
+/** What a picture of a product's scene is called, where it carries no words of its own. */
+const sceneAlt = (name: string, spec: ColorSpec | FinisherSpec): string =>
+  match(spec)
+    .with({ kind: "color" }, ({ hex }) => `${name} — ${hex}`)
+    .with({ kind: "finisher" }, (finisher) => `${name} — ${describeApplication(finisher)}`)
+    .exhaustive();
+
 /** What the spec block is called, which is not the same on all three shelves. */
 const SPEC_TITLES: Record<ProductSpec["kind"], string> = {
   color: "The color",
@@ -195,15 +204,17 @@ export const ProductPage = () => {
         .otherwise(({ data }) => (
           <article className="grid gap-10 lg:grid-cols-2">
             {/*
-              A finisher carries a set of pictures rather than one: it holds no
-              color of its own, so what it has to show is what it does to four
-              that do. The first of them is where its room is drawn, and the
-              rest stay photographs. The other two kinds carry at most one
-              picture and are drawn from their own numbers.
+              A color and a finisher carry stills of their scene, one per
+              angle, and the first is where the scene opens: wherever live
+              pictures are on, the large frame draws the scene in its place. A
+              shifter has no scene and is drawn from its own two numbers.
             */}
             {match(data)
               .with(
-                { spec: { kind: "finisher" }, images: [P.any, ...P.array()] },
+                {
+                  spec: { kind: P.union("color", "finisher") },
+                  images: [P.any, ...P.array()],
+                },
                 ({ spec, images, name }) => (
                   <Gallery
                     key={data.slug}
@@ -216,7 +227,7 @@ export const ProductPage = () => {
                         className={frame}
                       />
                     )}
-                    alt={`${name} — ${describeApplication(spec)}`}
+                    alt={sceneAlt(name, spec)}
                   />
                 ),
               )

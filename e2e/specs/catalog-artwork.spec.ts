@@ -33,8 +33,9 @@ const NEUTRAL_CEILING = 12;
 /**
  * Every color in the shop that makes its own light, a page at a time.
  *
- * Only colors: a finisher is photographed rather than lit, so there is no stage of
- * one to flood.
+ * Only colors: a color's slab stands in the one room whose background a glow
+ * of the product's own could flood. A glowing finisher's room is covered in
+ * `finisher-rooms.spec.ts`.
  */
 const glowing = (page: number): string =>
   `/?category=color&emissionMin=1&perPage=12&page=${page}`;

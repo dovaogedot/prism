@@ -4,10 +4,14 @@
  * A missing image is not an error and not an empty box: it is the same square
  * with nothing printed on it, still carrying the words, so a page whose media
  * has not been seeded keeps its shape and keeps its meaning.
+ *
+ * Shown in the file drawn for the theme in force, which follows the switch.
  */
 
 import { Option, type ProductImage } from "@prism/shared";
 import { match } from "ts-pattern";
+import { useThemeInForce } from "../../../shared/theme/in-force.ts";
+import { urlUnder } from "../images.ts";
 
 /** Which picture to show, and what to call it for a reader who cannot see it. */
 export type PhotographProps = Readonly<{
@@ -18,21 +22,25 @@ export type PhotographProps = Readonly<{
 }>;
 
 /** One product image, or the space one would have taken. */
-export const Photograph = ({ image, alt, className = "" }: PhotographProps) => (
-  <div className={`overflow-hidden bg-sunken ${className}`}>
-    {match(image)
-      .with({ _tag: "Some" }, ({ value }) => (
-        <img
-          src={value.url}
-          alt={value.alt.length > 0 ? value.alt : alt}
-          loading="lazy"
-          decoding="async"
-          className="size-full object-cover"
-        />
-      ))
-      .with({ _tag: "None" }, () => (
-        <div role="img" aria-label={alt} className="size-full" />
-      ))
-      .exhaustive()}
-  </div>
-);
+export const Photograph = ({ image, alt, className = "" }: PhotographProps) => {
+  const theme = useThemeInForce();
+
+  return (
+    <div className={`overflow-hidden bg-sunken ${className}`}>
+      {match(image)
+        .with({ _tag: "Some" }, ({ value }) => (
+          <img
+            src={urlUnder(value, theme)}
+            alt={value.alt.length > 0 ? value.alt : alt}
+            loading="lazy"
+            decoding="async"
+            className="size-full object-cover"
+          />
+        ))
+        .with({ _tag: "None" }, () => (
+          <div role="img" aria-label={alt} className="size-full" />
+        ))
+        .exhaustive()}
+    </div>
+  );
+};

@@ -38,13 +38,10 @@ import { FXAAPass } from "three/addons/postprocessing/FXAAPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
-import type { Theme } from "../../../shared/theme/use-theme.ts";
 import { buildRoom } from "./room.ts";
 import type { Bloom } from "./surfaces.ts";
 
-/** Which of the two rooms the shop is lit as, as the document has it. */
-export const themeNow = (): Theme =>
-  document.documentElement.classList.contains("dark") ? "dark" : "light";
+export { themeNow } from "../../../shared/theme/in-force.ts";
 
 /**
  * The smallest a shader feature may be set to.

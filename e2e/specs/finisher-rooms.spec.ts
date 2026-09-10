@@ -8,7 +8,7 @@
  *
  * Live rendering starts from what the machine can do and the visitor can
  * overrule it, so most of what is here is about which of the two pictures — the
- * room or the photograph the shop already has — a page ends up showing.
+ * room or the still of it the shop already has — a page ends up showing.
  */
 
 import { expect, test, type Page } from "@playwright/test";
@@ -264,7 +264,7 @@ test.describe("the switch in the header", () => {
   const control = (page: Page, to: "live" | "still") =>
     page.getByRole("button", { name: `Switch to ${to} pictures` });
 
-  test("puts the photographs back, and they stay back over a reload", async ({
+  test("puts the stills back, and they stay back over a reload", async ({
     page,
   }) => {
     await pretendGpu(page);

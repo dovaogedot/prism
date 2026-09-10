@@ -9,8 +9,9 @@
  * nothing seeded that could disagree with the numbers beside it.
  *
  * Both stages have a still standing behind them, and the switch in the header
- * decides which of the two a visitor is shown. The stills are rendered at seed
- * time from the same amounts the rooms are built from, so the two agree.
+ * decides which of the two a visitor is shown. The stills are these same
+ * stages, rendered ahead of time from where the eye rests, so the two are one
+ * picture.
  */
 
 import {

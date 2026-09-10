@@ -26,10 +26,9 @@ import {
 /**
  * The gray every finisher is demonstrated on.
  *
- * A finisher has no color of its own, so it is shown on a neutral — and on
- * this particular neutral, because it is the one the seeded stills are
- * rendered against. The live room and the thumbnails under it have to be the
- * same material, or turning live rendering off changes the product.
+ * A finisher has no color of its own, so it is shown on a neutral, and on the
+ * same one for all of them: two finishers in the same room differ by what they
+ * do to a surface and by nothing else.
  */
 export const BARE_PIGMENT = "#8a8a8f";
 

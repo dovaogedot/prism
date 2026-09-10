@@ -15,6 +15,21 @@ import { DRAWN, drawn, pretendGpu } from "../support/stages.ts";
 const rail = (page: Page) => page.getByRole("complementary");
 const results = (page: Page) => page.getByRole("region", { name: "Results" });
 
+/** The strip of pictures under the large one on a product's page. */
+const pictures = (page: Page) => page.getByRole("list", { name: "Pictures" });
+
+/** The large picture at the top of a product page, whatever it is made of. */
+const lead = (page: Page) => page.getByRole("article").first();
+
+/** How many angles a color's or a finisher's scene is rendered from. */
+const ANGLES = 4;
+
+/** The address of every picture in the strip, in order. */
+const stripSources = (page: Page): Promise<readonly string[]> =>
+  pictures(page)
+    .locator("img")
+    .evaluateAll((images) => images.map((image) => image.getAttribute("src") ?? ""));
+
 const section = (page: Page, title: string) =>
   rail(page).getByRole("button", { name: new RegExp(`^${title}`, "i") });
 
@@ -194,6 +209,13 @@ test.describe("measurements differ by category", () => {
     await expect(page.getByRole("heading", { name: "Measurements" })).toBeVisible();
   };
 
+  /**
+   * The button that reads the measurements in `system`, looked for inside the
+   * unit toggle so that no other button with the word in its name matches.
+   */
+  const unitButton = (page: Page, system: "metric" | "imperial") =>
+    page.getByRole("group", { name: "Unit system" }).getByRole("button", { name: system });
+
   test("a color measures how it burns, reads, is coated and looks", async ({
     page,
   }) => {
@@ -217,7 +239,7 @@ test.describe("measurements differ by category", () => {
     const coating = page.locator("dl").last().locator("dd").nth(2);
     await expect(coating).toHaveText(/^\d+ nm$/);
 
-    await page.getByRole("button", { name: "imperial" }).click();
+    await unitButton(page, "imperial").click();
     await expect(coating).toHaveText(/^[\d.]+ µin$/);
   });
 
@@ -248,7 +270,7 @@ test.describe("measurements differ by category", () => {
     await expect(temperature).toHaveText(/°C$/);
     await expect(temperature).not.toHaveText(/K/);
 
-    await page.getByRole("button", { name: "imperial" }).click();
+    await unitButton(page, "imperial").click();
     await expect(temperature).toHaveText(/°F$/);
   });
 
@@ -263,7 +285,7 @@ test.describe("measurements differ by category", () => {
       expect.stringContaining("g"),
     ]);
 
-    await page.getByRole("button", { name: "imperial" }).click();
+    await unitButton(page, "imperial").click();
 
     expect(await values()).toEqual([
       expect.stringContaining("lbf·ft"),
@@ -274,12 +296,6 @@ test.describe("measurements differ by category", () => {
 });
 
 test.describe("a finisher shows what it does", () => {
-  /** The pictures of one finisher, which is the strip under the large one. */
-  const pictures = (page: Page) => page.getByRole("list", { name: "Pictures" });
-
-  /** The large picture at the top of a product page, whatever it is made of. */
-  const lead = (page: Page) => page.getByRole("article").first();
-
   test("shows what it does on its card, rather than a slab of color", async ({
     page,
   }) => {
@@ -295,7 +311,7 @@ test.describe("a finisher shows what it does", () => {
     await expect(card.locator("canvas")).toHaveCount(0);
   });
 
-  test("opens on the effect and the same effect over four pigments", async ({
+  test("opens on its room from the front, with the room from every angle under it", async ({
     page,
   }) => {
     await page.goto("/?category=finisher");
@@ -304,7 +320,7 @@ test.describe("a finisher shows what it does", () => {
     await expect(page.getByRole("heading", { name: "Measurements" })).toBeVisible();
 
     const thumbnails = pictures(page).getByRole("button");
-    await expect(thumbnails).toHaveCount(5);
+    await expect(thumbnails).toHaveCount(ANGLES);
 
     const large = lead(page).locator("img").first();
     const before = await large.getAttribute("src");
@@ -323,7 +339,7 @@ test.describe("a finisher shows what it does", () => {
       await pretendGpu(page);
     });
 
-    test("draws the room on its card in place of the photograph", async ({
+    test("draws the room on its card in place of its still", async ({
       page,
     }) => {
       await page.goto("/?category=finisher");
@@ -336,7 +352,7 @@ test.describe("a finisher shows what it does", () => {
       await expect(card.locator("img")).toHaveCount(0);
     });
 
-    test("opens on the room, and the photographs are still under it", async ({
+    test("opens on the room, with its stills under it", async ({
       page,
     }) => {
       await page.goto("/?category=finisher");
@@ -347,15 +363,103 @@ test.describe("a finisher shows what it does", () => {
 
       await expect(lead(page).locator("canvas")).toHaveCount(1);
 
-      // The room stands in for the first picture only. The other four are what
-      // they always were, and choosing one puts a photograph back.
+      // The room stands in for the first still only. Choosing another angle
+      // puts that still in the frame.
       const thumbnails = pictures(page).getByRole("button");
 
-      await expect(thumbnails).toHaveCount(5);
+      await expect(thumbnails).toHaveCount(ANGLES);
       await thumbnails.last().click();
 
       await expect(lead(page).locator("canvas")).toHaveCount(0);
       await expect(lead(page).getByRole("img")).toHaveCount(1);
+    });
+  });
+});
+
+test.describe("a color shows its slab from every angle", () => {
+  /** Opens the first color on the shelf, waiting as long as `wait` allows at each step. */
+  const openFirstColor = async (
+    page: Page,
+    wait: Readonly<{ timeout?: number }> = {},
+  ): Promise<void> => {
+    await page.goto("/?category=color");
+    await ready(page, wait);
+    await results(page).getByRole("article").first().getByRole("link").click();
+    await expect(page.getByRole("heading", { name: "Measurements" })).toBeVisible(wait);
+  };
+
+  test("opens on the still from the front, and shows the angle chosen", async ({
+    page,
+  }) => {
+    await openFirstColor(page);
+
+    const thumbnails = pictures(page).getByRole("button");
+    await expect(thumbnails).toHaveCount(ANGLES);
+
+    for (const [index, side] of ["front", "left", "right", "above"].entries()) {
+      await expect(thumbnails.nth(index)).toHaveAccessibleName(
+        new RegExp(`seen from ${side === "above" ? "above" : `the ${side}`}$`),
+      );
+    }
+
+    // No GPU here, so the first still stands where the slab would be drawn.
+    const [front, left] = await stripSources(page);
+    const large = lead(page).getByRole("img", { name: /seen from/ });
+
+    await expect(large).toHaveAttribute("src", String(front));
+
+    await thumbnails.nth(1).click();
+    await expect(large).toHaveAttribute("src", String(left));
+
+    await thumbnails.first().click();
+    await expect(large).toHaveAttribute("src", String(front));
+  });
+
+  test("shows the stills drawn for the dark theme under it", async ({ page }) => {
+    await openFirstColor(page);
+    await expect(pictures(page).getByRole("button")).toHaveCount(ANGLES);
+    const light = await stripSources(page);
+
+    await page.evaluate(() => localStorage.setItem("hue-theme", "dark"));
+    await page.reload();
+    await expect(pictures(page).getByRole("button")).toHaveCount(ANGLES);
+    const dark = await stripSources(page);
+
+    // Every one of them a different file: the room behind the slab is dressed
+    // for the page around it.
+    expect(dark).toHaveLength(light.length);
+    dark.forEach((source, index) => expect(source).not.toBe(light[index]));
+    await expect(lead(page).getByRole("img", { name: /seen from/ })).toHaveAttribute(
+      "src",
+      String(dark[0]),
+    );
+  });
+
+  test.describe("on a machine that can draw one", () => {
+    // The slab is rasterized in software here, which the default does not
+    // allow enough time for.
+    test.describe.configure({ timeout: 120_000 });
+
+    test.beforeEach(async ({ page }) => {
+      await pretendGpu(page);
+    });
+
+    test("draws the slab in place of the first still, and again when it is chosen", async ({
+      page,
+    }) => {
+      await openFirstColor(page, DRAWN);
+      await drawn(page);
+
+      await expect(lead(page).locator("canvas")).toHaveCount(1);
+
+      const thumbnails = pictures(page).getByRole("button");
+
+      await thumbnails.nth(1).click();
+      await expect(lead(page).locator("canvas")).toHaveCount(0);
+      await expect(lead(page).getByRole("img", { name: /seen from the left$/ })).toBeVisible();
+
+      await thumbnails.first().click();
+      await expect(lead(page).locator("canvas")).toHaveCount(1);
     });
   });
 });

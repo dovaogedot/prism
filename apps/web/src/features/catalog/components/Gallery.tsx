@@ -5,15 +5,17 @@
  * and no index that could point past the end: the picture on show is one of
  * the images themselves rather than a number that has to stay in range.
  *
- * A product whose first picture is a still of something the browser can draw
- * live hands that in as the lead, and the large frame shows it wherever that
- * first picture would have been. The strip is unaffected — every thumbnail in
- * it is still a photograph, including the one that returns to the lead.
+ * A product whose pictures are stills of a scene the browser can draw live
+ * hands that scene in as the lead, and the large frame shows it wherever the
+ * first still would have been. The strip is unaffected — every thumbnail in it
+ * is a picture, including the one that returns to the lead.
  */
 
 import { Option, type ProductImage } from "@prism/shared";
 import { useState, type ReactNode } from "react";
 import { match, P } from "ts-pattern";
+import { useThemeInForce } from "../../../shared/theme/in-force.ts";
+import { urlUnder } from "../images.ts";
 import { Photograph } from "./Photograph.tsx";
 
 const FRAME = "aspect-square w-full rounded-[--radius-card] border border-line";
@@ -37,6 +39,7 @@ export type GalleryProps = Readonly<{
 /** Every picture of one product, with the strip left out when there is one. */
 export const Gallery = ({ images, lead, alt, className = "" }: GalleryProps) => {
   const [showing, setShowing] = useState<ProductImage>(images[0]);
+  const theme = useThemeInForce();
 
   return (
     <div className={`space-y-3 ${className}`}>
@@ -71,7 +74,7 @@ export const Gallery = ({ images, lead, alt, className = "" }: GalleryProps) => 
                     each sentence twice is not a second piece of information.
                   */}
                   <img
-                    src={image.url}
+                    src={urlUnder(image, theme)}
                     alt=""
                     loading="lazy"
                     decoding="async"
