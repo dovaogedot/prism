@@ -22,5 +22,16 @@
   },
   "devDependencies": {
     "typescript": "^7.0.2"
+  },
+  "overrides": {
+    "archiver-utils": {
+      "glob": "^13.0.6"
+    }
+  },
+  "allowScripts": {
+    "argon2": true,
+    "cpu-features": false,
+    "ssh2": false,
+    "protobufjs": false
   }
 }
