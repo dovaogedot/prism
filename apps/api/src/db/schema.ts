@@ -324,7 +324,7 @@ export const productImages = pgTable(
      * Whether an admin uploaded the picture.
      *
      * Every other image of a product is one of its stills, which the seed
-     * replaces whenever the build it runs in rendered different ones.
+     * replaces whenever its file in `apps/api/stills` changes.
      */
     uploaded: boolean("uploaded").notNull().default(false),
     createdAt: createdAt(),

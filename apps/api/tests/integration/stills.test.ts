@@ -98,7 +98,7 @@ describe("refreshStills", () => {
     expect(rows[0]?.alt).toBe("Void Black on a slab standing in a lit room, seen from the front");
   });
 
-  it("changes nothing when the build rendered the same stills", async () => {
+  it("changes nothing when handed the same stills again", async () => {
     await render("first");
     await refreshStills(harness.database.db, directories, [JOB]);
     const before = await stored();
@@ -107,7 +107,7 @@ describe("refreshStills", () => {
     expect(await stored()).toEqual(before);
   });
 
-  it("replaces the stills a new build rendered, and deletes the files nobody names", async () => {
+  it("replaces the stills that changed, and deletes the files nobody names", async () => {
     await render("first");
     await refreshStills(harness.database.db, directories, [JOB]);
     const before = await stored();

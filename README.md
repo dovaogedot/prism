@@ -14,8 +14,8 @@ There are three categories, and they have almost nothing in common:
 
 The unusual product turns out to be a good fit for the requirements. A color has real
 numeric attributes — hue angle, saturation, lightness — which makes faceted search
-genuinely interesting rather than a brand checkbox, and it means every image in the shop can
-be rendered by the build instead of committed as binaries. A color is a lit slab and a
+genuinely interesting rather than a brand checkbox, and it means every image in the shop is
+rendered by the shop's own code rather than photographed. A color is a lit slab and a
 finisher is a room with its finish done to what stands in it; the storefront draws both
 live, and their pictures are stills of those same scenes, from four angles under both
 themes. A shifter changes no surface, so it has no picture and the grid draws it from its
@@ -82,8 +82,7 @@ This is **Project 1 (Foundation)**: accounts, the database, and the catalog.
 
 That builds the images, starts the stack, sets up the database, seeds the catalog —
 every color and every finisher with the [stills](#stills) of its scene, and the shifters
-beside them — and waits until the storefront answers. The first build renders those stills,
-which adds a few minutes to it.
+beside them — and waits until the storefront answers.
 
 | Service | URL |
 | --- | --- |
@@ -825,20 +824,28 @@ on, and its still wherever they are off; every other picture is always its still
 and the names of the files are in [`stills.ts`](packages/shared/src/contracts/stills.ts),
 where both the storefront and the seed read them.
 
-The storefront renders them itself, so a still cannot disagree with the scene.
-[`render-stills.ts`](apps/web/scripts/render-stills.ts) serves
-[`stills.html`](apps/web/stills.html) from source, opens it in headless Chromium, and has the
-storefront's own stages draw every product with the eye moved to each angle. It runs while
-the API image is built, in a stage that copies in only what the pictures are made of — the
-scene modules, the mesh, the shared contracts and the planned catalog — so the render comes
-from Docker's cache unless one of those changed. Chromium is pointed at Mesa's llvmpipe
-rather than at the SwiftShader it ships with: both rasterize on the CPU and agree to within
-a level of 255, but llvmpipe shades these materials about four times faster. The whole
-catalog renders in a little over two minutes on a six-core Core i5-12400F with no GPU in
-use; the first build also downloads Chromium and Mesa.
+The storefront renders them itself. [`render-stills.ts`](apps/web/scripts/render-stills.ts)
+serves [`stills.html`](apps/web/stills.html) from source, opens it in headless Chromium, and
+has the storefront's own stages draw every product with the eye moved to each angle.
+Chromium is pointed at the system's Mesa llvmpipe rather than at the SwiftShader it ships
+with: both rasterize on the CPU and agree to within a level of 255, but llvmpipe shades these
+materials about four times faster.
+
+The renders are committed, under [`apps/api/stills`](apps/api/stills), so neither a build nor
+a deploy draws anything. After changing a scene, the angles or the catalog plan, render them
+again from the repository root:
+
+```bash
+npx playwright install chromium   # once
+npm run stills
+```
+
+That replaces the folder with the stills of exactly the products the plan holds. The whole
+catalog takes a little over two minutes on a six-core Core i5-12400F with no GPU in use,
+and comes to about 21 MB.
 
 The seed stores them. [`plan.ts`](apps/api/src/db/plan.ts) plans the catalog from a fixed
-seed, so the build knows which products there will be without a database to ask. On every
+seed, so the render knows which products there will be without a database to ask. On every
 start, [`stills.ts`](apps/api/src/db/stills.ts) copies each product's stills into the media
 volume under content-addressed names, replaces that product's stills wherever the build
 rendered different ones, and deletes the files no image names any longer. An image an admin
@@ -953,8 +960,7 @@ and their laws; metric↔imperial conversion; WCAG luminance and contrast; every
 across valid, invalid and boundary input; JWT generation, validation and expiration against
 a controllable clock; the TTL cache's expiry and eviction order; image type detection
 against disguised payloads; the search and facet SQL builders, asserting on generated SQL
-and bound parameters; which products the build renders stills of and the words each still
-is read out as; the seeded PRNG, `hslToHex` and the plan they draw the catalog from; the seam where
+and bound parameters; which products get stills and the words each still is read out as; the seeded PRNG, `hslToHex` and the plan they draw the catalog from; the seam where
 the product table's nullable columns become a discriminated union, including every shape
 the variant constraint forbids; and the arithmetic and tables behind the artwork, pinned by
 their relationships rather than by their tuned constants — the pointer turns the slab away

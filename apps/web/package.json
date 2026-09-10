@@ -8,7 +8,6 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p scripts/tsconfig.json --noEmit",
-    "stills": "node scripts/render-stills.ts",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

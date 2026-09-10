@@ -1,13 +1,13 @@
 /**
  * Builds a catalog worth browsing: two demo accounts, a shelf of foundries,
- * the colors, finishers and gears `plan.ts` plans, the stills the build
- * rendered of every color's and every finisher's scene, and enough reviews
- * that sorting by rating means something.
+ * the colors, finishers and gears `plan.ts` plans, the stills of every
+ * color's and every finisher's scene, and enough reviews that sorting by
+ * rating means something.
  *
  * Plants the catalog only into a database that holds no products, so `docker
  * compose up` on an existing volume does not double the shop. The stills are
- * the exception: they belong to the build rather than to the database, so
- * every run replaces whichever of them the build rendered differently.
+ * the exception: they belong to `apps/api/stills` rather than to the database,
+ * so every run replaces whichever of them differ from the files there.
  *
  * Note what is never written: hue, saturation, lightness, temperature, reach,
  * grain, weight and every rating. Postgres derives the first seven from the
@@ -215,10 +215,10 @@ const plant = async (
 
 /**
  * Plants the catalog into an empty database, and brings every product's
- * stills up to date with the ones the build rendered.
+ * stills up to date with the files in `directories.stills`.
  *
  * Safe to run on every start: a database that already holds products keeps
- * them, and only stills the build rendered differently are replaced. Every
+ * them, and only stills whose files differ are replaced. Every
  * value is drawn from a seeded generator, so two runs against an empty
  * database plant the same catalog. Rejects if a still of a planted product is
  * missing from `directories.stills`.
@@ -244,7 +244,8 @@ const isEntrypoint = process.argv[1] === fileURLToPath(import.meta.url);
 if (isEntrypoint) {
   const url = process.env["DATABASE_URL"];
   const media = process.env["MEDIA_DIR"] ?? "/srv/media";
-  const stills = process.env["STILLS_DIR"] ?? "/app/stills";
+  // Rendered by `npm run stills` and committed, so it travels with this file.
+  const stills = fileURLToPath(new URL("../../stills", import.meta.url));
 
   if (url === undefined || url.length === 0) {
     process.stderr.write("DATABASE_URL is required.\n");

@@ -1,9 +1,10 @@
 /**
  * Renders the stills of every product it is handed, in a headless browser.
  *
- *   node scripts/render-stills.ts <jobs.json> <directory>
+ *   node scripts/render-stills.ts <jobs.json | -> <directory>
  *
- * The jobs are what `apps/api/src/db/stills.ts` prints. Each product's scene
+ * The jobs are what `apps/api/src/db/stills.ts` prints, read from a file or,
+ * given `-`, from standard input. Each product's scene
  * is rendered from every angle in `STILL_ANGLES` under both themes, and each
  * picture is written to `stillPath` under the directory.
  *
@@ -16,6 +17,7 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { text } from "node:stream/consumers";
 import { fileURLToPath } from "node:url";
 import {
   STILL_ANGLES,
@@ -122,11 +124,12 @@ const work = async (page: Page, queue: StillJob[], directory: string): Promise<n
 const [jobsFile, directory] = process.argv.slice(2);
 
 if (jobsFile === undefined || directory === undefined) {
-  process.stderr.write("Usage: node scripts/render-stills.ts <jobs.json> <directory>\n");
+  process.stderr.write("Usage: node scripts/render-stills.ts <jobs.json | -> <directory>\n");
   process.exit(2);
 }
 
-const jobs = JOBS.parse(JSON.parse(await readFile(jobsFile, "utf8")));
+const listed = jobsFile === "-" ? await text(process.stdin) : await readFile(jobsFile, "utf8");
+const jobs = JOBS.parse(JSON.parse(listed));
 const started = performance.now();
 
 const server = await createServer({

@@ -48,10 +48,6 @@ services:
     environment:
       DATABASE_URL: postgres://prism:${POSTGRES_PASSWORD:-prism}@postgres:5432/prism
       MEDIA_DIR: /srv/media
-      # Where the image keeps the stills it was built with. The seed stores
-      # them as the products' images, replacing any the last build drew
-      # differently.
-      STILLS_DIR: /app/stills
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       # Per address per minute, on /auth/* — and /auth/refresh is one of them,
       # which every page load calls to restore the session. Ten is the right

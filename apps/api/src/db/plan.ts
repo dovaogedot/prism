@@ -7,8 +7,9 @@
  * answer, not a label chosen here.
  *
  * Pure. Every value is drawn from the generator it is handed, so one state of
- * the generator plans one catalog: the seed plants it, and the build renders
- * the stills of the same products without a database to read them from.
+ * the generator plans one catalog: the seed plants it, and `npm run stills`
+ * renders the stills of the same products without a database to read them
+ * from.
  */
 
 import {
