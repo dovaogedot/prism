@@ -62,7 +62,7 @@ const openFirst = async (page: Page, finish: string): Promise<void> => {
   await page.goto(shelf(finish));
   await expect(results(page).getByRole("article").first()).toBeVisible(DRAWN);
   await results(page).getByRole("article").first().getByRole("link").click();
-  await expect(page.getByRole("heading", { name: "Measurements" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Measurements" })).toBeVisible(DRAWN);
 };
 
 /** Points at a spot a quarter of the way into the first stage on the page. */

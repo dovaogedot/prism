@@ -10,7 +10,7 @@
  */
 
 import { expect, test, type Page } from "@playwright/test";
-import { drawn, pretendGpu } from "../support/stages.ts";
+import { DRAWN, drawn, pretendGpu } from "../support/stages.ts";
 
 const rail = (page: Page) => page.getByRole("complementary");
 const results = (page: Page) => page.getByRole("region", { name: "Results" });
@@ -24,9 +24,14 @@ const categoryRadio = (page: Page, label: string) =>
 const documentHeight = (page: Page): Promise<number> =>
   page.evaluate(() => document.documentElement.scrollHeight);
 
-/** Waits for the grid, so nothing below is measured against a skeleton. */
-const ready = async (page: Page): Promise<void> => {
-  await expect(results(page).getByRole("article").first()).toBeVisible();
+/**
+ * Waits for the grid, so nothing below is measured against a skeleton.
+ *
+ * A shelf drawn in software keeps the page busy for longer than the default
+ * wait, so a test that pretends a GPU passes `DRAWN` as `wait`.
+ */
+const ready = async (page: Page, wait: Readonly<{ timeout?: number }> = {}): Promise<void> => {
+  await expect(results(page).getByRole("article").first()).toBeVisible(wait);
 };
 
 test.describe("choosing a category", () => {
@@ -322,7 +327,7 @@ test.describe("a finisher shows what it does", () => {
       page,
     }) => {
       await page.goto("/?category=finisher");
-      await ready(page);
+      await ready(page, DRAWN);
       await drawn(page);
 
       const card = results(page).getByRole("article").first();
@@ -335,9 +340,9 @@ test.describe("a finisher shows what it does", () => {
       page,
     }) => {
       await page.goto("/?category=finisher");
-      await ready(page);
+      await ready(page, DRAWN);
       await results(page).getByRole("article").first().getByRole("link").click();
-      await expect(page.getByRole("heading", { name: "Measurements" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Measurements" })).toBeVisible(DRAWN);
       await drawn(page);
 
       await expect(lead(page).locator("canvas")).toHaveCount(1);
