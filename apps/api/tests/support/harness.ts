@@ -133,8 +133,14 @@ export const startHarness = async (): Promise<Harness> => {
   const mediaDirectory = await mkdtemp(join(tmpdir(), "hue-media-"));
 
   const migrator = postgres(databaseUrl, { max: 1, onnotice: () => {} });
-  await runMigrations(migrator);
+  const migrated = await runMigrations(migrator);
   await migrator.end();
+
+  // A fresh container records nothing, so a refusal here is a fault in the
+  // runner rather than in the database.
+  if (migrated._tag === "Refused") {
+    throw new Error(`The migrations refused an empty database: ${JSON.stringify(migrated.mismatches)}`);
+  }
 
   const config = toConfig(testEnvironment(databaseUrl, mediaDirectory));
   const database = createDatabase(config.database.url, config.database.poolSize);

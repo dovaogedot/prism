@@ -102,6 +102,11 @@ Two accounts are seeded, both with the password `colors are not paint`:
 ./start.sh reset    # stop and delete the volumes
 ```
 
+The database keeps a checksum of every migration it applied. If one of those files is
+edited afterward, the stack refuses to start and names the file, because the schema it
+holds is not the one the code expects. `./start.sh reset` builds it again from the files,
+keeping only what the seed creates.
+
 ### Editing the storefront while it runs
 
 `./start.sh` serves a built image, so a change to the source is picked up the next time it

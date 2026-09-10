@@ -390,6 +390,8 @@ export const productListing = pgView("product_listing", {
 export const schemaMigrations = pgTable("schema_migration", {
   name: text("name").primaryKey(),
   appliedAt: createdAt(),
+  /** SHA-256 of the file as it ran, as lowercase hex; a rerun refuses a file that reads differently. */
+  checksum: text("checksum"),
 });
 
 /** Every table and view, as the query builder is typed against. */
