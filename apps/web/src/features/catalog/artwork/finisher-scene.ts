@@ -66,7 +66,7 @@ import {
 import { hueShifted } from "./hueshift.ts";
 import { LAGS, type Lamp, ringAt } from "./lightring.ts";
 import { meshNow } from "./mesh.ts";
-import { eyeAt, type Orbit } from "./orbit.ts";
+import { type Eye, eyeAt, type Orbit } from "./orbit.ts";
 import { pairedWith } from "./pairs.ts";
 import {
   EYE_DISTANCE,
@@ -82,6 +82,7 @@ import {
   WALL_AT,
 } from "./rooms.ts";
 import { COATING_IOR, emissiveScale, excite, type Surface } from "./surfaces.ts";
+import { eyeFrom, type Viewpoint } from "./viewpoint.ts";
 
 /* ---------------------------------------------------------------- the finish */
 
@@ -403,11 +404,27 @@ const buildShell = (scene: Scene, shell: Shell): MeshStandardMaterial => {
  * On the bearing both walls are equally in the picture from, which is the one
  * the arrangement in front of them is composed for.
  */
-const cornerEye = (distance: number, height: number): readonly [number, number, number] => [
-  distance * Math.sin(CORNER_BEARING),
-  height,
-  distance * Math.cos(CORNER_BEARING),
-];
+const cornerEye = (distance: number, height: number): Eye => ({
+  x: distance * Math.sin(CORNER_BEARING),
+  y: height,
+  z: distance * Math.cos(CORNER_BEARING),
+});
+
+/** Where a room's eye stands before anybody points at it, and what it looks at. */
+type Gaze = Readonly<{ eye: Eye; target: Eye }>;
+
+/**
+ * Stand a room's eye at a viewpoint around where it rests.
+ *
+ * Whatever the viewpoint, the eye looks at what it looks at from rest, from as
+ * far away as it rests.
+ */
+const standEye = (camera: PerspectiveCamera, gaze: Gaze, viewpoint: Viewpoint): void => {
+  const eye = eyeFrom(gaze.eye, gaze.target, viewpoint);
+
+  camera.position.set(eye.x, eye.y, eye.z);
+  camera.lookAt(gaze.target.x, gaze.target.y, gaze.target.z);
+};
 
 /** Everything a room is, before anything is demonstrated in it. */
 type RoomPlan = Readonly<{
@@ -812,7 +829,7 @@ const lightCorner = (corner: Corner, light: number): void => {
 /* ------------------------------------------------------- the roughness room */
 
 /** A roughness room: a gray subject in a lit corner, under a ring that travels. */
-type Rough = Readonly<{ room: Room; corner: Corner }>;
+type Rough = Readonly<{ room: Room; corner: Corner; gaze: Gaze }>;
 
 const buildRough = (kit: Kit): Rough => {
   const room = buildRoom(kit, {
@@ -823,15 +840,17 @@ const buildRough = (kit: Kit): Rough => {
     casts: true,
   });
 
-  room.camera.position.set(
-    ...cornerEye(EYE_DISTANCE.roughness, EYE_HEIGHT.roughness.stands),
-  );
-  // Low and near. A rough surface and a smooth one differ most at a grazing
-  // angle, where one returns the room in a line and the other spreads it over
-  // the whole face.
-  room.camera.lookAt(0, EYE_HEIGHT.roughness.looksAt, 0);
-
-  return { room, corner: litCorner(room) };
+  return {
+    room,
+    corner: litCorner(room),
+    // Low and near. A rough surface and a smooth one differ most at a grazing
+    // angle, where one returns the room in a line and the other spreads it over
+    // the whole face.
+    gaze: {
+      eye: cornerEye(EYE_DISTANCE.roughness, EYE_HEIGHT.roughness.stands),
+      target: { x: 0, y: EYE_HEIGHT.roughness.looksAt, z: 0 },
+    },
+  };
 };
 
 /* ------------------------------------------------------------- the open room */
@@ -898,7 +917,7 @@ const buildGlow = (kit: Kit): Glow => {
 /* --------------------------------------------------------- the coating room */
 
 /** A coating room: two coated subjects in the same corner, lit the same way. */
-type Coat = Readonly<{ room: Room; corner: Corner }>;
+type Coat = Readonly<{ room: Room; corner: Corner; gaze: Gaze }>;
 
 const buildCoat = (kit: Kit): Coat => {
   const room = buildRoom(kit, {
@@ -909,14 +928,16 @@ const buildCoat = (kit: Kit): Coat => {
     casts: true,
   });
 
-  room.camera.position.set(
-    ...cornerEye(EYE_DISTANCE.coating, EYE_HEIGHT.coating.stands),
-  );
-  // Higher than the roughness eye, because there is a second subject behind
-  // the first and from any lower the near one covers it.
-  room.camera.lookAt(0, EYE_HEIGHT.coating.looksAt, 0);
-
-  return { room, corner: litCorner(room) };
+  return {
+    room,
+    corner: litCorner(room),
+    // Higher than the roughness eye, because there is a second subject behind
+    // the first and from any lower the near one covers it.
+    gaze: {
+      eye: cornerEye(EYE_DISTANCE.coating, EYE_HEIGHT.coating.stands),
+      target: { x: 0, y: EYE_HEIGHT.coating.looksAt, z: 0 },
+    },
+  };
 };
 
 /* ----------------------------------------------------------------- the rig */
@@ -962,6 +983,8 @@ export type RoughnessView = Readonly<{
   roughness: number;
   /** Where the four lamps have got to, as `lightring` has moved them. */
   lamps: readonly Lamp[];
+  /** Where the room is looked at from. */
+  viewpoint: Viewpoint;
 }>;
 
 /** A fluorescent finisher's picture: its amount and its eye. */
@@ -971,6 +994,8 @@ export type EmissionView = Readonly<{
   emission: number;
   /** Where the eye has got to, as `orbit` has moved it. */
   orbit: Orbit;
+  /** Where the room is looked at from, around wherever the orbit has put the eye. */
+  viewpoint: Viewpoint;
 }>;
 
 /** A coating finisher's picture: its amount and its hue. */
@@ -980,6 +1005,8 @@ export type CoatingView = Readonly<{
   coatingNanometers: number;
   /** How far around the wheel every subject's hue has been carried. */
   hueOffset: number;
+  /** Where the room is looked at from. */
+  viewpoint: Viewpoint;
 }>;
 
 /**
@@ -1011,13 +1038,13 @@ const roughFrame = (rig: Rough, view: RoughnessView): Frame => {
   const light = dressed.light;
 
   for (const subject of rig.room.subjects) {
-    // The one gray the seeded stills are rendered against, so turning live
-    // rendering off changes the picture and not the product.
+    // The one neutral every finisher is shown on, since none has a color.
     subject.pigment.color.setStyle(BARE_PIGMENT, SRGBColorSpace);
     applySurface(subject.pigment, finish.surface);
   }
 
   lightCorner(rig.corner, light);
+  standEye(rig.room.camera, rig.gaze, view.viewpoint);
 
   // The one thing either corner does that the other does not: its ring travels
   // with the pointer, because a grain is read from a highlight moving over a
@@ -1029,6 +1056,9 @@ const roughFrame = (rig: Rough, view: RoughnessView): Frame => {
 
   return frameOf(rig.room, finish, dressed);
 };
+
+/** What a glowing room's eye looks at, wherever it has walked to. */
+const GLOW_TARGET: Eye = { x: 0, y: EYE_HEIGHT.emission.looksAt, z: 0 };
 
 const glowFrame = (rig: Glow, view: EmissionView): Frame => {
   const finish = roomFor(view);
@@ -1061,9 +1091,15 @@ const glowFrame = (rig: Glow, view: EmissionView): Frame => {
   rig.key.intensity = GLOW_KEY * light;
   rig.side.intensity = GLOW_KEY * SIDE_SHARE * light;
 
-  const eye = eyeAt(view.orbit, EYE_RADIUS);
-  rig.room.camera.position.set(eye.x, EYE_HEIGHT.emission.looksAt + eye.y, eye.z);
-  rig.room.camera.lookAt(0, EYE_HEIGHT.emission.looksAt, 0);
+  const orbiting = eyeAt(view.orbit, EYE_RADIUS);
+  standEye(
+    rig.room.camera,
+    {
+      eye: { x: orbiting.x, y: GLOW_TARGET.y + orbiting.y, z: orbiting.z },
+      target: GLOW_TARGET,
+    },
+    view.viewpoint,
+  );
 
   return frameOf(rig.room, finish, dressed);
 };
@@ -1081,6 +1117,7 @@ const coatFrame = (rig: Coat, view: CoatingView): Frame => {
   }
 
   lightCorner(rig.corner, light);
+  standEye(rig.room.camera, rig.gaze, view.viewpoint);
 
   return frameOf(rig.room, finish, dressed);
 };
@@ -1103,7 +1140,7 @@ const frameFor = (rig: Rig, view: FinisherView): Frame =>
  *
  * `None` means no WebGL2, a software rasterizer, or a mesh that has not
  * arrived — three answers the caller gives the same reply to, by showing the
- * photograph of the finisher that the shop already has.
+ * still of the room that the shop already has.
  */
 export const openStage = (canvas: HTMLCanvasElement): Option<Stage> =>
   Option.flatMap((rig: Rig) =>

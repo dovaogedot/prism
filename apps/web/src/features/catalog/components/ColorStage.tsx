@@ -18,6 +18,7 @@ import { usePrefersStillness } from "../../../shared/motion/use-stillness.ts";
 import { openStage, type Stage } from "../artwork/scene.ts";
 import type { Finishing } from "../artwork/surfaces.ts";
 import { approach, REST, settled, tiltAt, type Tilt } from "../artwork/tilt.ts";
+import { AT_REST } from "../artwork/viewpoint.ts";
 import { Placard } from "./Placard.tsx";
 import { Swatch } from "./Swatch.tsx";
 
@@ -70,7 +71,7 @@ export const ColorStage = ({
 
   const drawAt = (tilt: Tilt): void =>
     Option.match<Stage, void>({
-      onSome: (open) => open.draw({ ...paint.current, tilt }),
+      onSome: (open) => open.draw({ ...paint.current, tilt, viewpoint: AT_REST }),
       onNone: () => undefined,
     })(stage.current);
 
@@ -125,7 +126,7 @@ export const ColorStage = ({
     stage.current = opened;
 
     Option.match<Stage, void>({
-      onSome: (open) => open.draw({ hex, finishing, tilt: REST }),
+      onSome: (open) => open.draw({ hex, finishing, tilt: REST, viewpoint: AT_REST }),
       onNone: () => setShowing(FLAT),
     })(opened);
 

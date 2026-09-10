@@ -30,6 +30,7 @@ import {
 } from "./orbit.ts";
 import type { Point, Size } from "./pointer.ts";
 import { LAMP_RADIUS, RING_AT_REST } from "./rooms.ts";
+import { AT_REST } from "./viewpoint.ts";
 
 /**
  * Where a coated room's wheel sits with nothing pointed at it.
@@ -196,15 +197,18 @@ export const viewOf = (movement: Movement): FinisherView =>
       applies: "roughness" as const,
       roughness,
       lamps,
+      viewpoint: AT_REST,
     }))
     .with({ applies: "emission" }, ({ emission, orbit }) => ({
       applies: "emission" as const,
       emission,
       orbit,
+      viewpoint: AT_REST,
     }))
     .with({ applies: "coating" }, ({ coatingNanometers, hueOffset }) => ({
       applies: "coating" as const,
       coatingNanometers,
       hueOffset,
+      viewpoint: AT_REST,
     }))
     .exhaustive();

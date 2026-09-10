@@ -46,6 +46,7 @@ import {
 } from "./surfaces.ts";
 import { grainTexture } from "./textures.ts";
 import type { Tilt } from "./tilt.ts";
+import { eyeFrom, type Viewpoint } from "./viewpoint.ts";
 
 /* --------------------------------------------------------------- the room */
 
@@ -170,6 +171,12 @@ type Rig = Readonly<{
 const CAMERA_DISTANCE = 3.9;
 const FIELD_OF_VIEW = 26;
 
+/** What the camera looks at, which is the middle of the slab. */
+const SLAB_MIDDLE = { x: 0, y: 0, z: 0 } as const;
+
+/** Where the camera stands at rest: straight in front of the slab. */
+const CAMERA_AT_REST = { x: 0, y: 0, z: CAMERA_DISTANCE } as const;
+
 /**
  * How far the wall is behind the slab.
  *
@@ -212,7 +219,6 @@ const buildRig = ({ environment }: Studio): Rig => {
   scene.environment = environment;
 
   const camera = new PerspectiveCamera(FIELD_OF_VIEW, 1, 0.1, 40);
-  camera.position.set(0, 0, CAMERA_DISTANCE);
 
   const geometry = new ExtrudeGeometry(roundedSquare(), {
     depth: SLAB_DEPTH,
@@ -332,11 +338,12 @@ let shadowTilt: Option<Tilt> = Option.none;
 
 /* -------------------------------------------------------------- the stages */
 
-/** One product's picture: what color, made of what, standing at what angle. */
+/** One product's picture: what color, made of what, standing at what angle, seen from where. */
 export type StageView = Readonly<{
   hex: string;
   finishing: Finishing;
   tilt: Tilt;
+  viewpoint: Viewpoint;
 }>;
 
 /** A canvas the renderer has agreed to keep painting a color onto. */
@@ -411,6 +418,10 @@ const frameFor = (rig: Rig, view: StageView): Frame => {
   ];
 
   rig.slab.rotation.set(view.tilt.x, view.tilt.y, 0);
+
+  const eye = eyeFrom(CAMERA_AT_REST, SLAB_MIDDLE, view.viewpoint);
+  rig.camera.position.set(eye.x, eye.y, eye.z);
+  rig.camera.lookAt(SLAB_MIDDLE.x, SLAB_MIDDLE.y, SLAB_MIDDLE.z);
 
   rig.key.shadow.needsUpdate = Option.match<Tilt, boolean>({
     onSome: (drawn) => drawn.x !== view.tilt.x || drawn.y !== view.tilt.y,
