@@ -449,6 +449,12 @@ describe("facets", () => {
     );
   };
 
+  /** The slugs a query answers with, sorted so the order of the shelf does not matter. */
+  const slugsFor = async (query: string) =>
+    (jsonOf(await get(`/api/v1/products${query}`))["items"] as readonly Record<string, unknown>[])
+      .map((item) => item["slug"])
+      .sort();
+
   it("counts each finish over the finishers it names", async () => {
     // The three words name finishers, not colors: a finisher is bought for the
     // one effect it produces, so it has one answer to which finish it is, and
@@ -487,17 +493,17 @@ describe("facets", () => {
     expect(slugs).toEqual(["test-chalk"]);
   });
 
-  it("counts every finish while a range on one of their amounts is applied", async () => {
-    // The range belongs to the finish that is chosen. A finisher carries the
-    // one amount its own finish is made of and nothing in the other two
-    // columns, so counting the fluorescent ones against a roughness range
-    // would answer zero and leave the shopper unable to switch away from it.
+  it("counts each finish within the range on its own amount, and no other", async () => {
+    // A finisher carries the one amount its own finish is made of and nothing
+    // in the other two columns, so a range on the grain narrows the grain's
+    // count and leaves the other two whole: each count is what ticking that
+    // finish adds.
     await seedFinishers();
     const counts = await finishCounts(
       "?category=finisher&finish=roughness&roughnessMin=50",
     );
 
-    expect(counts.get("roughness")).toBe(2);
+    expect(counts.get("roughness")).toBe(1);
     expect(counts.get("iridescent")).toBe(1);
     expect(counts.get("fluorescent")).toBe(1);
   });
@@ -520,6 +526,25 @@ describe("facets", () => {
     expect(await slugsOf("roughness")).toEqual(["test-chalk", "test-lacquer"]);
     expect(await slugsOf("iridescent")).toEqual(["test-film"]);
     expect(await slugsOf("fluorescent")).toEqual(["test-lamp"]);
+  });
+
+  it("shows the finishers of every finish ticked", async () => {
+    await seedFinishers();
+
+    expect(await slugsFor("?category=finisher&finish=iridescent,fluorescent")).toEqual([
+      "test-film",
+      "test-lamp",
+    ]);
+  });
+
+  it("narrows one finish by the range on its amount, and leaves the others ticked whole", async () => {
+    // Only the grain's finishers carry a roughness, so a roughness range has
+    // nothing to say about a coating finisher ticked beside them.
+    await seedFinishers();
+
+    expect(
+      await slugsFor("?category=finisher&finish=roughness,iridescent&roughnessMin=50"),
+    ).toEqual(["test-chalk", "test-film"]);
   });
 
   it("leaves the three words out of the color shelf, which has no answer to them", async () => {

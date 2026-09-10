@@ -19,6 +19,7 @@ describe("productQueryParamsSchema", () => {
   it("supplies defaults for an empty query string", () => {
     expect(parse({})).toEqual({
       brands: [],
+      finish: [],
       sort: "relevance",
       page: 1,
       perPage: DEFAULT_PER_PAGE,
@@ -37,6 +38,19 @@ describe("productQueryParamsSchema", () => {
       "chroma-labs",
       "cyan-and-sons",
     ]);
+  });
+
+  it("takes any of the finishes, comma-separated like any list", () => {
+    expect(parse({ finish: "iridescent,fluorescent" }).finish).toEqual([
+      "iridescent",
+      "fluorescent",
+    ]);
+  });
+
+  it("rejects a finish it does not know", () => {
+    expect(productQueryParamsSchema.safeParse({ finish: "iridescent,glitter" }).success).toBe(
+      false,
+    );
   });
 
   it("coerces numeric parameters from their string form", () => {
@@ -108,6 +122,14 @@ describe("toProductQuery", () => {
   it("keeps empty multi-value filters as empty arrays, not absence", () => {
     const result = query({});
     expect(result.brandSlugs).toEqual([]);
+    expect(result.finishes).toEqual([]);
+  });
+
+  it("carries every finish asked for", () => {
+    expect(query({ finish: "fluorescent,roughness" }).finishes).toEqual([
+      "fluorescent",
+      "roughness",
+    ]);
   });
 
   it("treats a blank search term as no search term", () => {

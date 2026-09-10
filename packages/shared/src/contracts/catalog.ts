@@ -39,8 +39,8 @@ export type Finish = (typeof FINISHES)[number];
  *
  * A color carries all three at once and is filtered on each independently — a
  * shopper can ask for a coated surface that also glows. A finisher is bought
- * for the one effect it produces, which is why its own filter is the four
- * words rather than these three axes.
+ * for the one effect it produces, so its shelf is narrowed by the words first
+ * and then by the amount each word names.
  */
 export const FINISH_PROPERTIES = ["roughness", "coating", "emission"] as const;
 /** One amount a finish is made of. */
@@ -206,8 +206,11 @@ export const productQueryParamsSchema = z.object({
   /** A color family, which only colors have. */
   family: z.enum(COLOR_FAMILIES).optional(),
   brands: commaSeparated.pipe(z.array(slugSchema).max(20)),
-  /** Which finish a finisher applies. Finishers only — a color carries all three amounts. */
-  finish: z.enum(FINISHES).optional(),
+  /**
+   * The finishes of the finishers to show, comma-separated. None is every
+   * finish. Finishers only — a color carries all three amounts.
+   */
+  finish: commaSeparated.pipe(z.array(z.enum(FINISHES)).max(FINISHES.length)),
   roughnessMin: z.coerce
     .number()
     .int()
@@ -297,14 +300,17 @@ export type ProductQuery = Readonly<{
   family: Option<ColorFamily>;
   brandSlugs: readonly string[];
   /**
-   * Which finish a finisher applies, which is what it is bought for.
-   * A color has no single answer, so this narrows the other two categories
-   * to nothing.
+   * The finishes asked for, each naming the finishers that apply it, which is
+   * what a finisher is bought for. Empty means no claim about the finish. A
+   * color has no single answer, so any finish narrows the other two
+   * categories to nothing.
    */
-  finish: Option<Finish>;
+  finishes: readonly Finish[];
   /**
-   * The three amounts a finish is made of. Independent of each other and of
-   * the filter above: a color can be asked to be both coated and glowing.
+   * The three amounts a finish is made of. Independent of each other: a color
+   * can be asked to be both coated and glowing. A finisher carries one amount,
+   * so while finishes are asked for each range narrows only the finishers of
+   * the finish that names it.
    */
   roughness: Option<NumericRange>;
   /** Nanometers of coating. */
@@ -352,7 +358,7 @@ export const toProductQuery = (params: ProductQueryParams): ProductQuery => ({
   kind: Option.fromNullable(params.category),
   family: Option.fromNullable(params.family),
   brandSlugs: params.brands,
-  finish: Option.fromNullable(params.finish),
+  finishes: params.finish,
   roughness: Option.map(ordered)(
     rangeOf(params.roughnessMin, params.roughnessMax, ROUGHNESS_BOUNDS),
   ),
@@ -644,11 +650,10 @@ export type ProductFacets = Readonly<{
   categories: readonly FacetBucket[];
   brands: readonly FacetBucket[];
   /**
-   * The three amounts, always all three, counted independently.
+   * The three finishes, always all three.
    *
-   * They overlap on purpose: the amounts are independent, so a coated color
-   * has a roughness too and is counted under both, and the three sum to more
-   * than the total.
+   * Each counts the finishers that apply it under every other filter, the
+   * range on its own amount included, which is what ticking it adds.
    */
   finishes: readonly FacetBucket[];
   /** "4 stars & up", "3 stars & up", … */

@@ -69,7 +69,7 @@ const facetCacheKey = (query: ProductQuery): string =>
     kind: Option.getOrElse<string>(() => "")(query.kind),
     family: Option.getOrElse<string>(() => "")(query.family),
     brands: query.brandSlugs,
-    finish: Option.getOrElse<string>(() => "")(query.finish),
+    finishes: query.finishes,
     direction: Option.getOrElse<string>(() => "")(query.direction),
     arc: rangeKey(query.arc),
     price: rangeKey(query.price),

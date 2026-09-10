@@ -352,7 +352,7 @@ test.describe("search", () => {
     // The name is the filter, rather than a stretch of an axis it has to be
     // translated into.
     await expect(page).toHaveURL(/finish=roughness/);
-    await expect(rail(page).getByRole("radio", { name: /^Roughness/ })).toBeChecked();
+    await expect(rail(page).getByRole("checkbox", { name: /^Roughness/ })).toBeChecked();
   });
 
   test("the family a search landed on can be cleared again", async ({ page }) => {
@@ -384,16 +384,16 @@ test.describe("how much of the finish", () => {
     ["Fluorescent", "Emission", "35"],
   ] as const;
 
-  test("appears once a finish is chosen, on that finish's own axis", async ({ page }) => {
+  test("appears for every finish ticked, each on that finish's own axis", async ({ page }) => {
     await page.goto("/?category=finisher");
 
-    const roughness = rail(page).getByRole("radio", { name: /^Roughness/ });
+    const roughness = rail(page).getByRole("checkbox", { name: /^Roughness/ });
 
     await expect(roughness).toBeVisible();
 
     // A finisher does one thing, and the three of them are measured in three
-    // different units — so there is nothing to ask how much of until which one
-    // is settled. Price is asked of everything and is on the rail throughout.
+    // different units — so there is nothing to ask how much of until a finish
+    // is ticked. Price is asked of everything and is on the rail throughout.
     for (const [, label] of AXIS_STARTS) {
       await expect(
         rail(page).getByRole("slider", { name: `${label}, minimum` }),
@@ -401,7 +401,7 @@ test.describe("how much of the finish", () => {
     }
 
     for (const [finish, label, starts] of AXIS_STARTS) {
-      await rail(page).getByRole("radio", { name: new RegExp(`^${finish}`) }).click();
+      await rail(page).getByRole("checkbox", { name: new RegExp(`^${finish}`) }).click();
 
       const lowest = rail(page).getByRole("slider", { name: `${label}, minimum` });
 
@@ -411,9 +411,14 @@ test.describe("how much of the finish", () => {
       // to go that answers with nothing.
       await expect(lowest).toHaveAttribute("aria-valuemin", starts);
     }
+
+    // Each finish ticked adds its slider beside the ones before it.
+    for (const [, label] of AXIS_STARTS) {
+      await expect(rail(page).getByRole("slider", { name: `${label}, minimum` })).toBeVisible();
+    }
   });
 
-  test("narrows the shelf, and clears when a different finish is chosen", async ({
+  test("keeps a range while its finish is ticked, and drops it with the finish", async ({
     page,
   }) => {
     await page.goto("/?category=finisher&finish=roughness");
@@ -426,9 +431,16 @@ test.describe("how much of the finish", () => {
 
     await expect(page).toHaveURL(/roughnessMin=/);
 
-    // A range says where on one axis to look, so it means nothing once a
-    // different axis is chosen.
-    await rail(page).getByRole("radio", { name: /^Fluorescent/ }).click();
+    // Another finish is another set of finishers, so the range stays on the
+    // ones it narrows.
+    await rail(page).getByRole("checkbox", { name: /^Fluorescent/ }).click();
+
+    await expect(page).toHaveURL(/finish=roughness%2Cfluorescent/);
+    await expect(page).toHaveURL(/roughnessMin=/);
+
+    // Unticked, its slider leaves the rail, and a range nobody can see is one
+    // nobody can clear.
+    await rail(page).getByRole("checkbox", { name: /^Roughness/ }).click();
 
     await expect(page).toHaveURL(/finish=fluorescent/);
     await expect(page).not.toHaveURL(/roughnessMin=/);

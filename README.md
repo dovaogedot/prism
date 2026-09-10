@@ -536,22 +536,22 @@ thing real paint is. The roughness slider spans the whole axis and a shopper dra
 whichever end they mean, rather than the shop picking the point where a mirror becomes
 chalk. The sliders carry no counts, because a range has no buckets to distort.
 
-The three words belong to the finishers, and that is the whole of a finisher's filter. A
-finisher does one thing, so it has one answer to which finish it is, and the word is a
-question about which column its row has: asking for the iridescent finishers is asking which
-rows carry a coating at all. No threshold recovers it and nothing has to agree about where
-one finish becomes another. Each word names a different amount, so the three of them cannot
-overlap however wide each one is.
+The three words belong to the finishers, and narrow nothing else. A finisher does one thing,
+so it has one answer to which finish it is, and the word is a question about which column its
+row has: asking for the iridescent finishers is asking which rows carry a coating at all. No
+threshold recovers it and nothing has to agree about where one finish becomes another. Each
+word names a different amount, so the three of them cannot overlap however wide each one is,
+and ticking several shows the finishers of every word ticked.
 
 There is no such thing as *the* roughness finisher: one finisher leaves a surface at 20 and
 the next at 15, and a shopper who wants the second is not served by being sold the first. So
-the word is only half the question. Choosing one opens a slider for the amount that word
+the word is only half the question. Ticking one opens a slider for the amount that word
 names — percent for a grain, nanometers for a coating, percent again for a glow — running
 the stretch of that axis the word covers and no further, so there is no part of the track a
-thumb can be dragged into that answers with nothing. Choosing a different word clears the
-range with it: a range says where on one axis to look, and the next word names a different
-axis. The counts beside the three words ignore the range for the same reason, so a shopper
-who has narrowed one of them can still see how many of the other two there are and switch.
+thumb can be dragged into that answers with nothing. Ticking a second word opens a second
+slider beside the first. A range narrows only the finishers of its own word, which are the
+only ones that carry that amount, and it leaves the rail with the word. The count beside each
+word is taken within the range on its own amount, so it says what ticking that word adds.
 
 [`surfaces.ts`](apps/web/src/features/catalog/artwork/surfaces.ts) is where those amounts
 become rendering parameters, and every one of its outputs is a **continuous** function of
@@ -1072,11 +1072,12 @@ GET /api/v1/products
   &minRating=4
 
   finishers — the one effect a finisher is bought for:
-  &finish=iridescent      one of roughness | iridescent | fluorescent
+  &finish=iridescent      any of roughness | iridescent | fluorescent,
+                          comma-separated; none is every finish
 
   the three amounts a finish is made of. A color carries all three at once and
   narrows them independently; a finisher carries the one its own finish is made
-  of, so on that shelf the axis to narrow is the one the chosen word names:
+  of, so a range narrows only the finishers of the word that names its amount:
   &roughnessMin=5&roughnessMax=40      a mirror at one end, chalk at the other
   &coatingMin=100&coatingMax=600       nanometers of interference layer
   &emissionMin=35&emissionMax=100      how hard it gives off its own light
@@ -1107,10 +1108,11 @@ ticking a second brand widens the result rather than emptying it. The category d
 drops more than its own filter: it drops every filter only one kind can satisfy. Counting
 how many *colors* satisfy an arc would answer zero, for a reason that has nothing to do
 with the question — so those filters leave with the category that owns them, which is also
-what the rail does when you switch. The finish dimension drops the three amounts for the
-same reason: a finisher carries one of them and nothing in the other two columns, so
-counting the fluorescent finishers while a roughness range is applied would answer zero and
-leave the shopper unable to switch away from the range they had set.
+what the rail does when you switch. The finish dimension drops the three amounts as well,
+and counts each finish within the range on its own amount instead: a finisher carries one
+amount and nothing in the other two columns, so a roughness range on every row would count
+the fluorescent finishers as zero, while on the grain alone it leaves each count saying what
+ticking that finish adds.
 
 ---
 

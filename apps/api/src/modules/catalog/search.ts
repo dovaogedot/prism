@@ -17,7 +17,7 @@ import type {
   ProductQuery,
   ProductSort,
 } from "@prism/shared";
-import { FINISH_BANDS, Option } from "@prism/shared";
+import { FINISH_BANDS, FINISHES, Option } from "@prism/shared";
 import {
   and,
   asc,
@@ -30,6 +30,7 @@ import {
   or,
   sql,
   type SQL,
+  type SQLWrapper,
 } from "drizzle-orm";
 import { productListing } from "../../db/schema.ts";
 
@@ -87,8 +88,25 @@ const FINISH_COLUMNS = {
   emission: productListing.emission,
 } as const satisfies Record<FinishProperty, unknown>;
 
+/** Every one of `conditions`, which every row meets when there are none. */
+const allOf = (conditions: readonly SQL[]): SQL =>
+  conditions.length === 0 ? sql`TRUE` : sql`(${sql.join([...conditions], sql` AND `)})`;
+
+/** Any one of `conditions`, which no row meets when there are none. */
+const anyOf = (conditions: readonly SQL[]): SQL =>
+  conditions.length === 0 ? sql`FALSE` : sql`(${sql.join([...conditions], sql` OR `)})`;
+
+/** `column` inside `range`, both ends included. */
+const between = (column: SQLWrapper, range: NumericRange): SQL =>
+  sql`${column} BETWEEN ${range.min} AND ${range.max}`;
+
+/** `column` inside `range`, or no condition at all while the query sets none. */
+const rangeOn = (column: SQLWrapper, range: Option<NumericRange>): readonly SQL[] =>
+  Option.isSome(range) ? [between(column, range.value)] : [];
+
 /**
- * The finishers a finish name picks out.
+ * The finishers that apply `finish`, at an amount inside the range `query`
+ * puts on that amount.
  *
  * A finisher does one thing, and the column that is present is which one — so
  * asking for the iridescent ones is asking which rows have a coating at all.
@@ -98,16 +116,16 @@ const FINISH_COLUMNS = {
  * Scoped to finishers, because a color carries all three amounts at once and
  * has no single answer to which finish it is.
  */
-export const finishCondition = (finish: Finish): SQL => {
+export const finishCondition = (finish: Finish, query: ProductQuery): SQL => {
   const band = FINISH_BANDS[finish];
   const column = FINISH_COLUMNS[band.property];
 
-  return and(
+  return allOf([
     eq(productListing.kind, "finisher"),
     isNotNull(column),
-    gte(column, band.range.min),
-    lte(column, band.range.max),
-  ) as SQL;
+    between(column, band.range),
+    ...rangeOn(column, query[band.property]),
+  ]);
 };
 
 /**
@@ -134,10 +152,16 @@ export const buildConditions = (
   })(exclude);
 
   const acrossKinds = omitted === "kind";
-  // Only the name has a facet to count, so only the name is lifted for it. The
-  // three amounts have no counts of their own to distort, but they belong to
-  // the finish that is chosen and leave with it.
+  // Only the finishes have a facet to count, so only they are lifted for it.
+  // The three amounts have no counts of their own to distort, but they belong
+  // to the finishes that are chosen and leave with them.
   const acrossFinishes = acrossKinds || omitted === "finish";
+  // While finishes are asked for, each range is part of the finish whose
+  // amount it is rather than a condition of its own. A finisher carries that
+  // one amount and nothing in the other two columns, so a roughness range on
+  // every row would drop the coating finishers ticked beside the grain.
+  const finishing = !acrossFinishes && query.finishes.length > 0;
+  const amountsApart = !acrossFinishes && !finishing;
   const conditions: SQL[] = [];
 
   if (Option.isSome(query.text)) {
@@ -164,8 +188,14 @@ export const buildConditions = (
     conditions.push(inArray(productListing.brandSlug, [...query.brandSlugs]));
   }
 
-  if (!acrossFinishes && Option.isSome(query.finish)) {
-    conditions.push(finishCondition(query.finish.value));
+  if (finishing) {
+    conditions.push(
+      anyOf(
+        FINISHES.filter((finish) => query.finishes.includes(finish)).map((finish) =>
+          finishCondition(finish, query),
+        ),
+      ),
+    );
   }
 
   if (omitted !== "price" && Option.isSome(query.price)) {
@@ -193,22 +223,22 @@ export const buildConditions = (
 
   // The three amounts a finish is made of, which a color has and a finisher
   // puts back. Independent of each other, so narrowing one says nothing about
-  // the other two. They leave with the finish as well as with the category: a
-  // finisher carries the one amount its own finish is made of and nothing in
-  // the other two columns, so counting how many fluorescent finishers there
-  // are while a roughness range is applied would answer zero for a reason that
-  // has nothing to do with the shopper's question.
-  if (!acrossFinishes && Option.isSome(query.roughness)) {
+  // the other two. While finishes are asked for they are inside the finishes
+  // above instead. They leave with the finish as well as with the category:
+  // each finish is counted within the range on its own amount, and a
+  // roughness range on every row would count the fluorescent finishers as
+  // zero for a reason that has nothing to do with the shopper's question.
+  if (amountsApart && Option.isSome(query.roughness)) {
     conditions.push(gte(productListing.roughness, query.roughness.value.min));
     conditions.push(lte(productListing.roughness, query.roughness.value.max));
   }
 
-  if (!acrossFinishes && Option.isSome(query.coating)) {
+  if (amountsApart && Option.isSome(query.coating)) {
     conditions.push(gte(productListing.coatingNanometers, query.coating.value.min));
     conditions.push(lte(productListing.coatingNanometers, query.coating.value.max));
   }
 
-  if (!acrossFinishes && Option.isSome(query.emission)) {
+  if (amountsApart && Option.isSome(query.emission)) {
     conditions.push(gte(productListing.emission, query.emission.value.min));
     conditions.push(lte(productListing.emission, query.emission.value.max));
   }

@@ -18,7 +18,8 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { api, toQueryString } from "../../../shared/api/client.ts";
-import { Facets, type FacetState } from "../components/Facets.tsx";
+import { Facets } from "../components/Facets.tsx";
+import { type FacetState, withoutHidden } from "../filters.ts";
 import { ProductCard, ProductCardSlot } from "../components/ProductCard.tsx";
 import { SearchBox } from "../components/SearchBox.tsx";
 import { Alert, Button, Skeleton } from "../../../shared/ui/index.ts";
@@ -49,7 +50,7 @@ export const CatalogPage = () => {
     category: params.get("category") ?? "",
     family: params.get("family") ?? "",
     brands: splitList(params.get("brands") ?? ""),
-    finish: params.get("finish") ?? "",
+    finish: splitList(params.get("finish") ?? ""),
     direction: params.get("direction") ?? "",
     arcMin: params.get("arcMin") ?? "",
     arcMax: params.get("arcMax") ?? "",
@@ -85,12 +86,19 @@ export const CatalogPage = () => {
     placeholderData: keepPreviousData,
   });
 
-  /** Any filter change resets to page 1 — page 4 of a new filter is nowhere. */
+  /**
+   * Any filter change resets to page 1 — page 4 of a new filter is nowhere.
+   *
+   * A filter whose control the change takes off the rail leaves the URL with
+   * it, so nothing narrows the shelf that the rail cannot show and clear.
+   */
   const update = (next: Partial<FacetState & { q: string; sort: string; page: number }>): void => {
+    const changes = { ...next, ...withoutHidden({ ...facetState, ...next }) };
+
     setParams((current) => {
       const updated = new URLSearchParams(current);
 
-      for (const [key, value] of Object.entries(next)) {
+      for (const [key, value] of Object.entries(changes)) {
         const encoded = Array.isArray(value) ? value.join(",") : String(value);
 
         // An empty value means "no filter" and leaves the URL. `0` is only
@@ -126,11 +134,11 @@ export const CatalogPage = () => {
       // finishers that apply it rather than a search through the prose — and the
       // name itself is a place on one of the three amounts.
       .with({ kind: "finish" }, ({ finish }) =>
-        update({ q: "", category: "finisher", family: "", finish }),
+        update({ q: "", category: "finisher", finish: [finish] }),
       )
       // Only a shifter turns, so the word picks the shelf as well as the way.
       .with({ kind: "direction" }, ({ direction }) =>
-        update({ q: "", category: "shifter", family: "", direction }),
+        update({ q: "", category: "shifter", direction }),
       )
       // Only a color has a family, so the same is true the other way.
       .with({ kind: "family" }, ({ family }) =>

@@ -86,7 +86,7 @@ test.describe("choosing a category", () => {
     await expect(page.getByRole("slider", { name: /Coating, minimum/ })).toBeVisible();
     await expect(page.getByRole("slider", { name: /Emission, minimum/ })).toBeVisible();
     // Nothing to pick between them.
-    await expect(rail(page).getByRole("radio", { name: /^Iridescent/ })).toHaveCount(0);
+    await expect(rail(page).getByRole("checkbox", { name: /^Iridescent/ })).toHaveCount(0);
     await expect(section(page, "Arc")).toBeHidden();
   });
 
@@ -101,7 +101,7 @@ test.describe("choosing a category", () => {
     await expect(section(page, "Finish")).toBeVisible();
     await expect(section(page, "HSL")).toBeHidden();
     for (const name of ["Roughness", "Iridescent", "Fluorescent"]) {
-      await expect(rail(page).getByRole("radio", { name: new RegExp(`^${name}`) })).toBeVisible();
+      await expect(rail(page).getByRole("checkbox", { name: new RegExp(`^${name}`) })).toBeVisible();
     }
     await expect(page.getByRole("slider", { name: /Roughness/ })).toHaveCount(0);
   });
@@ -123,7 +123,7 @@ test.describe("choosing a category", () => {
 
     const everything = await results(page).getByRole("article").count();
 
-    await rail(page).getByRole("radio", { name: /^Iridescent/ }).click();
+    await rail(page).getByRole("checkbox", { name: /^Iridescent/ }).click();
     await expect(page).toHaveURL(/finish=iridescent/);
 
     // The shelf it replaces stays on screen while this one loads, so the count

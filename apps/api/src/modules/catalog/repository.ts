@@ -268,13 +268,14 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
       })(whereExcept("rating"));
 
       /**
-       * One finish counted over the scope that ignores the finish filter.
+       * One finish counted over the scope that lifts the finishes asked for,
+       * within the range on its own amount.
        *
        * `FILTER` rather than one statement each: they are predicates over the
        * same rows, so one pass answers all of them.
        */
       const countWithin = (finish: Finish) =>
-        sql<number>`count(*) FILTER (WHERE ${finishCondition(finish)})`.mapWith(Number);
+        sql<number>`count(*) FILTER (WHERE ${finishCondition(finish, query)})`.mapWith(Number);
 
       const [kindRows, brandRows, finishRow, summaryRows] = await Promise.all([
         scoped(

@@ -13,6 +13,7 @@ import {
   buildConditions,
   buildOrderBy,
   combineConditions,
+  finishCondition,
   hueCondition,
   nameContains,
   ratingFacetLabel,
@@ -35,7 +36,7 @@ const baseQuery: ProductQuery = {
   kind: Option.none,
   family: Option.none,
   brandSlugs: [],
-  finish: Option.none,
+  finishes: [],
   roughness: Option.none,
   coating: Option.none,
   emission: Option.none,
@@ -138,6 +139,54 @@ describe("buildConditions", () => {
     expect(sql).toContain("ILIKE");
   });
 
+  describe("finishes", () => {
+    it("shows the finishers of every finish asked for", () => {
+      const conditions = buildConditions({
+        ...baseQuery,
+        kind: Option.some("finisher"),
+        finishes: ["fluorescent", "iridescent"],
+      });
+
+      // The kind, then one condition holding each finish as a finisher with
+      // its column inside its band.
+      expect(conditions).toHaveLength(2);
+      expect(render(conditions[1]!).params).toEqual([
+        ...["finisher", 100, 600],
+        ...["finisher", 35, 100],
+      ]);
+    });
+
+    it("narrows the finishers of one finish by its amount, and leaves the others whole", () => {
+      const conditions = buildConditions({
+        ...baseQuery,
+        kind: Option.some("finisher"),
+        finishes: ["roughness", "iridescent"],
+        roughness: Option.some({ min: 50, max: 95 }),
+      });
+
+      // Only the grain's finishers carry a roughness, so the range is inside
+      // theirs rather than a condition of its own.
+      expect(conditions).toHaveLength(2);
+      expect(render(conditions[1]!).params).toEqual([
+        ...["finisher", 5, 95, 50, 95],
+        ...["finisher", 100, 600],
+      ]);
+    });
+
+    it("narrows by every amount directly while no finish is asked for", () => {
+      // A color carries all three, so each range is two bounds on its own column.
+      const conditions = buildConditions({
+        ...baseQuery,
+        kind: Option.some("color"),
+        roughness: Option.some({ min: 5, max: 40 }),
+        coating: Option.some({ min: 100, max: 600 }),
+      });
+
+      // The kind, and two bounds for each range.
+      expect(conditions).toHaveLength(5);
+    });
+  });
+
   describe("facet exclusion", () => {
     const filtered: ProductQuery = {
       ...baseQuery,
@@ -208,6 +257,26 @@ describe("buildConditions", () => {
       const inFamily = { ...baseQuery, family: Option.some("gold" as const) };
 
       expect(buildConditions(inFamily, Option.some("kind"))).toHaveLength(1);
+    });
+
+    it("lifts the finishes and their ranges when counting finishes", () => {
+      // Each finish is counted within the range on its own amount, which the
+      // count carries itself, so the scope around it carries neither.
+      const roughness: ProductQuery = {
+        ...baseQuery,
+        kind: Option.some("finisher"),
+        finishes: ["roughness"],
+        roughness: Option.some({ min: 50, max: 95 }),
+      };
+
+      expect(buildConditions(roughness, Option.some("finish"))).toHaveLength(1);
+      expect(render(finishCondition("roughness", roughness)).params).toEqual([
+        "finisher",
+        5,
+        95,
+        50,
+        95,
+      ]);
     });
 
     it("keeps the search term in every facet count", () => {

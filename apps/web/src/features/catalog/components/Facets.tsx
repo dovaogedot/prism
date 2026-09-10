@@ -13,65 +13,21 @@ import {
   DIRECTION_LABELS,
   formatPrice,
   isCents,
-  EMISSION_BOUNDS,
-  FINISH_BANDS,
-  FINISH_PROPERTIES,
-  FINISH_AXES,
-  FINISH_LABELS,
-  FINISHES,
   LIGHTNESS_BOUNDS,
-  ROUGHNESS_BOUNDS,
   Option,
-  PRODUCT_KINDS,
   SATURATION_BOUNDS,
   SHIFT_DIRECTIONS,
   type FacetBucket,
-  type Finish,
   type FinishBand,
-  type FinishProperty,
   type NumericRange,
   type ProductFacets,
-  type ProductKind,
   type ShiftDirection,
 } from "@prism/shared";
 import { useState, type ReactNode } from "react";
 import { match, P } from "ts-pattern";
+import { railControls, type FacetState } from "../filters.ts";
 import { HueRing } from "./HueRing.tsx";
 import { RangeSlider } from "./RangeSlider.tsx";
-
-/**
- * Every filter, as the strings the URL carries them as.
- *
- * Strings rather than numbers because this is the query string's own shape: an
- * empty string is a filter nobody set, which keeps the URL free of `NaN`.
- */
-export type FacetState = Readonly<{
-  /** The category, or "" for all three at once. */
-  category: string;
-  /** A color family, or "" for no claim about it. Set by search, not by the rail. */
-  family: string;
-  brands: readonly string[];
-  /** Which amount of the finish is being asked about, or "" for none of them. */
-  finish: string;
-  direction: string;
-  arcMin: string;
-  arcMax: string;
-  minRating: string;
-  priceMin: string;
-  priceMax: string;
-  hueMin: string;
-  hueMax: string;
-  saturationMin: string;
-  saturationMax: string;
-  lightnessMin: string;
-  lightnessMax: string;
-  roughnessMin: string;
-  roughnessMax: string;
-  coatingMin: string;
-  coatingMax: string;
-  emissionMin: string;
-  emissionMax: string;
-}>;
 
 /** The choices on offer, the ones taken, and where a change goes. */
 export type FacetsProps = Readonly<{
@@ -427,21 +383,6 @@ const numberOr = (raw: string, fallback: number): number =>
   raw === "" ? fallback : Number(raw);
 
 /**
- * The three ranges, cleared.
- *
- * A range says where on one axis to look, so it means nothing once a
- * different axis is chosen.
- */
-const NO_AMOUNTS = {
-  roughnessMin: "",
-  roughnessMax: "",
-  coatingMin: "",
-  coatingMax: "",
-  emissionMin: "",
-  emissionMax: "",
-} as const satisfies Partial<FacetState>;
-
-/**
  * What a coating looks like along its range, thinnest to thickest.
  *
  * Interference color does not run round the hue wheel once. It walks a series
@@ -555,51 +496,21 @@ const AmountSlider = ({
 /** The ring is shown in a neutral blue while no hue is selected. */
 const DEFAULT_RAMP_HUE = 220;
 
-const isKind = (value: string): value is ProductKind =>
-  PRODUCT_KINDS.some((kind) => kind === value);
-
 const isDirection = (value: string): value is ShiftDirection =>
   SHIFT_DIRECTIONS.some((direction) => direction === value);
-
-const isFinishProperty = (value: string): value is FinishProperty =>
-  FINISH_PROPERTIES.some((property) => property === value);
-
-const isFinish = (value: string): value is Finish =>
-  FINISHES.some((finish) => finish === value);
-
-/** The word a chosen finish is written out as, or nothing while none is chosen. */
-const finishSummary = (chosen: Option<Finish>): string =>
-  Option.match<Finish, string>({
-    onSome: (finish) => FINISH_LABELS[finish],
-    onNone: () => "",
-  })(chosen);
 
 /**
  * The filter rail.
  *
  * Offers each category only the controls that category has, so switching
- * category changes which sections exist rather than graying them out.
+ * category changes which sections exist rather than graying them out. A hue
+ * ring means nothing on a shelf of finishers, so with no category chosen the
+ * rail is just the filters all three share.
  */
 export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
   const priceBounds = facets.priceCents;
   const hueActive = state.hueMin !== "" || state.hueMax !== "";
-
-  /**
-   * Which category's controls to show. A hue ring means nothing on a shelf of
-   * finishers, so the kind-specific sections appear only once a category is chosen —
-   * and with none chosen the rail is just the four filters all three share.
-   */
-  /** Which finish's amount to ask about, which is the one being shopped for. */
-  const chosenFinish: Option<Finish> = isFinish(state.finish)
-    ? Option.some(state.finish)
-    : Option.none;
-
-  const chosenKind: Option<ProductKind> = isKind(state.category)
-    ? Option.some(state.category)
-    : Option.none;
-
-  const showsKind = (kind: ProductKind): boolean =>
-    Option.isSome(chosenKind) && chosenKind.value === kind;
+  const controls = railControls(state);
 
   /** Which of the three axes a shopper has narrowed, for the section summary. */
   const amountsNarrowed: readonly boolean[] = [
@@ -677,40 +588,19 @@ export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
       {/*
         Category first, because it decides what the rest of the rail even is.
         The three below it are exclusive: a product is one of these things, not
-        a combination of them.
+        a combination of them. Choosing one takes the filters of the others off
+        the rail and out of the URL together.
       */}
       <Section
         title="Category"
-        summary={Option.match<ProductKind, string>({
-          onSome: (kind) => facets.categories.find((b) => b.value === kind)?.label ?? "",
-          onNone: () => "",
-        })(chosenKind)}
+        summary={facets.categories.find((bucket) => bucket.value === state.category)?.label ?? ""}
       >
         <RadioList
           name="category"
           lockEmpty={false}
           buckets={facets.categories}
           selected={state.category}
-          onSelect={(value) =>
-            // Every kind-specific filter goes with the category that owns it.
-            // Leaving an arc behind on a shelf of colors would silently return
-            // nothing, with no visible control to explain why.
-            onChange({
-              category: value,
-              family: "",
-              finish: "",
-              ...NO_AMOUNTS,
-              direction: "",
-              arcMin: "",
-              arcMax: "",
-              hueMin: "",
-              hueMax: "",
-              saturationMin: "",
-              saturationMax: "",
-              lightnessMin: "",
-              lightnessMax: "",
-            })
-          }
+          onSelect={(value) => onChange({ category: value })}
         />
       </Section>
 
@@ -718,7 +608,7 @@ export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
         Colors. The three controls read as one instrument when they sit
         together, which is why they lead the color-specific half.
       */}
-      {match(showsKind("color"))
+      {match(controls.colors)
         .with(false, () => null)
         .with(true, () => (
           <>
@@ -806,26 +696,46 @@ export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
         .exhaustive()}
 
       {/*
-        A color's finish, which is three amounts and therefore three questions.
-        Each is asked on its own axis, because they are measured in different
-        things: a roughness is a percentage, a coating is a thickness in
-        nanometers, and a glow is how hard the pigment gives light back.
+        The finish, which colors and finishers are both narrowed by.
+
+        A color's finish is three amounts and therefore three questions, all of
+        them live at once: a color carries all three, so a shopper can ask for
+        a lacquered surface that is also iridescent and also glowing, which is
+        a thing real paint is. Each is asked on its own axis, because they are
+        measured in different things: a roughness is a percentage, a coating is
+        a thickness in nanometers, and a glow is how hard the pigment gives
+        light back.
+
+        A finisher is not a surface with three amounts on it; it is bought for
+        the one effect it produces, and for how much of that effect it has. So
+        it is two questions: which of the three words, and then where on the
+        amount each ticked word names. Each word names a different amount,
+        which is why a word's slider appears only once it is ticked.
       */}
-      {match(showsKind("color"))
+      {match(controls.finishers || controls.amounts.length > 0)
         .with(false, () => null)
         .with(true, () => (
-          <Section title="Finish" summary={settledCount(amountsNarrowed)}>
-            {/*
-              Three axes, all of them live at once. A color carries all three,
-              so narrowing one has nothing to do with narrowing another — a
-              shopper can ask for a lacquered surface that is also iridescent
-              and also glowing, which is a thing real paint is.
-            */}
+          <Section
+            title="Finish"
+            summary={settledCount([...state.finish.map(() => true), ...amountsNarrowed])}
+          >
             <div className="space-y-4">
-              {FINISH_PROPERTIES.map((property) => (
+              {match(controls.finishers)
+                .with(false, () => null)
+                .with(true, () => (
+                  <CheckList
+                    name="finish"
+                    buckets={facets.finishes}
+                    selected={state.finish}
+                    onToggle={(value) => onChange({ finish: toggle(state.finish, value) })}
+                  />
+                ))
+                .exhaustive()}
+
+              {controls.amounts.map((band) => (
                 <AmountSlider
-                  key={property}
-                  band={{ property, range: FINISH_AXES[property] }}
+                  key={band.property}
+                  band={band}
                   state={state}
                   onChange={onChange}
                 />
@@ -835,44 +745,8 @@ export const Facets = ({ facets, state, onChange, onReset }: FacetsProps) => {
         ))
         .exhaustive()}
 
-      {/*
-        A finisher is not a surface with three amounts on it; it is bought for
-        the one effect it produces, and for how much of that effect it has. So
-        it is two questions: which of the three words, and then where on the
-        one amount that word names. The words partition the space rather than
-        overlapping, because each of them names a different amount — which is
-        also why the second question cannot be asked until the first is
-        answered, and why answering it again clears the range underneath.
-      */}
-      {match(showsKind("finisher"))
-        .with(false, () => null)
-        .with(true, () => (
-          <Section title="Finish" summary={finishSummary(chosenFinish)}>
-            <RadioList
-              name="finish"
-              buckets={facets.finishes}
-              selected={state.finish}
-              onSelect={(value) => onChange({ finish: value, ...NO_AMOUNTS })}
-            />
-
-            {match(chosenFinish)
-              .with({ _tag: "None" }, () => null)
-              .with({ _tag: "Some" }, ({ value }) => (
-                <div className="mt-5">
-                  <AmountSlider
-                    band={FINISH_BANDS[value]}
-                    state={state}
-                    onChange={onChange}
-                  />
-                </div>
-              ))
-              .exhaustive()}
-          </Section>
-        ))
-        .exhaustive()}
-
       {/* Shifters: how far it turns a color, and which way round. */}
-      {match(showsKind("shifter"))
+      {match(controls.shifters)
         .with(false, () => null)
         .with(true, () => (
           <>
