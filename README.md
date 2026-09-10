@@ -15,11 +15,11 @@ There are three categories, and they have almost nothing in common:
 The unusual product turns out to be a good fit for the requirements. A color has real
 numeric attributes — hue angle, saturation, lightness — which makes faceted search
 genuinely interesting rather than a brand checkbox, and it means every image in the shop can
-be generated at seed time instead of committed as binaries. A color gets one swatch of
-itself. A finisher holds no color, so what there is to show is the effect: the thing it does,
-then the same thing done to four ordinary pigments — five pictures rendered from the one
-number the finisher carries. A shifter changes no surface, so it has no picture and the grid
-draws it from its own two numbers.
+be rendered by the build instead of committed as binaries. A color is a lit slab and a
+finisher is a room with its finish done to what stands in it; the storefront draws both
+live, and their pictures are stills of those same scenes, from four angles under both
+themes. A shifter changes no surface, so it has no picture and the grid draws it from its
+own two numbers.
 
 Three categories with disjoint attributes is the interesting modeling problem here, and it
 is solved the normalized way: a `product` table for what all three share, and a `color`,
@@ -81,8 +81,9 @@ This is **Project 1 (Foundation)**: accounts, the database, and the catalog.
 ```
 
 That builds the images, starts the stack, sets up the database, seeds the catalog —
-every color with its swatch, every finisher with the five pictures of what it does, and the
-shifters beside them — and waits until the storefront answers.
+every color and every finisher with the [stills](#stills) of its scene, and the shifters
+beside them — and waits until the storefront answers. The first build renders those stills,
+which adds a few minutes to it.
 
 | Service | URL |
 | --- | --- |
@@ -462,7 +463,7 @@ apps/api/src/
   modules/
     auth/        routes | service | repository | emails | mock-consent
     catalog/     routes | service | repository | search
-  db/            schema · migrate · seed · palette · swatch · finish-art
+  db/            schema · migrate · plan · seed · stills · palette
 
 packages/shared/ Option · Result · units · color · errors · Zod contracts
 apps/web/        React SPA
@@ -646,41 +647,16 @@ referential transparency stops, because a GPU context is a resource rather than 
 runs the frames — none of it through React state, because re-rendering a card's subtree
 sixty times a second to move a number no React tree reads is not what React is for.
 
-A browser with no WebGL2 gets the flat swatch instead, and so does one whose "GPU" is really
-the CPU — a grid of flat swatches that arrives at once is a better page than a grid of lit
-ones that arrives two seconds late. Which machines those are, and how a visitor overrules
+A browser with no WebGL2 gets the stills instead, and so does one whose "GPU" is really the
+CPU — a grid of stills that arrives at once is a better page than a grid of lit ones that
+arrives two seconds late. Which machines those are, and how a visitor overrules
 the answer, is the switch described below.
 
 ### Drawing a finisher
 
 A finisher holds no color, so a slab of one would be a slab of nothing. What it sells is
-what it *does* to a color, so that is what its pictures show — the effect itself, then the
-same effect over red, green, blue and yellow, five in all.
-
-[`finish-art.ts`](apps/api/src/db/finish-art.ts) renders them at seed time from the one
-number the finisher carries, straight to PNG, so nothing on disk can disagree with the number
-beside it and nothing is committed as a binary. Which five follows from what the finisher does,
-and no branch can borrow another's picture because no branch carries another's number:
-
-| The finisher does | Leads with | Then |
-| --- | --- | --- |
-| a coating | every color a film returns as it thickens outward from a point, ringed at this finisher's thickness | the same film over four pigments, thin to full |
-| a glow | how far the glow it leaves carries | that glow on four pigments |
-| a surface | the reflection left in the surface it leaves | that same surface over four pigments |
-
-The coating disc is the same physics the slab uses — `sin²(2π·n·d/λ)` sampled at three
-wavelengths — evaluated across the whole 100–600 nm range rather than at one thickness, so
-the picture and the product page cannot drift. It is drawn as rings because that is the
-shape the effect takes: a film thickening away from a point returns its orders as rings,
-each wider than the last, which is what a soap bubble and a lens on glass both do. The mark
-is drawn at the radius its own thickness sits at rather than at a radius computed
-separately, so the ring and the color under it are one fact. The glow is a bloom, the
-reflection is a strip blurred by the roughness the finisher leaves, and both are plain raster
-work.
-
-**And the same finisher, as a room.** A photograph is a picture of an effect; a room is the
-effect happening, with a shopper's own hand moving the light. So a finisher gets one of
-those too — three rooms, one per thing a finish can apply to, built around
+what it *does* to a color, so that is what it is shown doing, with a shopper's own hand
+moving the light: three rooms, one per thing a finish can apply to, built around
 [Suzanne](https://github.com/KhronosGroup/glTF-Sample-Assets) from the Khronos glTF sample
 assets, stripped to positions, normals and indices and vendored at 72 796 bytes. One shape
 for all three, because the thing that should differ between two rooms is the finish. The
@@ -695,7 +671,7 @@ nothing anywhere branches on a finish's *name*:
 
 | The finisher does | The room | What the pointer does |
 | --- | --- | --- |
-| a surface | plainly lit, one subject on the bare gray the photographs are rendered against, seen from low down and close | turns the ring of four cone lamps around it, each walking to its own place on the turned ring at its own rate, so a flick throws them out of formation and they come back in order |
+| a surface | plainly lit, one subject on bare gray, seen from low down and close | turns the ring of four cone lamps around it, each walking to its own place on the turned ring at its own rate, so a flick throws them out of formation and they come back in order |
 | a glow | dim, and dimmer the harder the glow, on a floor that fades out before it ends, with the light coming off the subjects spilling into the air around them | walks the eye around the three subjects standing on it |
 | a coating | bright, because interference is a reflection and a dim room gives it nothing to reflect, and framed on the near subject from low down | carries every hue in the room around the wheel, a full turn from one edge of the stage to the other — so both edges show the same colors and there is no seam in the middle to jump across |
 
@@ -807,7 +783,7 @@ yellow, each of which is two of the display's channels at once and so carries th
 for the paint it is mixed at; a coating on a deep blue and an amber, which are across the
 wheel from each other, so between the two subjects both halves of what the film returns are
 shown against paint that is not already that color. A room demonstrating a surface has no
-color at all — its one subject wears the bare gray the photographs are rendered against.
+color at all — its one subject wears bare gray.
 
 **The rooms and the slabs share one context.** Building that rig costs about two seconds on
 a software rasterizer — once, whatever is on the page — and after it a finisher room costs
@@ -822,8 +798,8 @@ of the pixels — and how many frames it draws.
 one and working the same way. It starts where the machine is: a browser with no WebGL2, or
 one whose "GPU" is really the CPU, is shown the stills, which is a better page than a grid
 that arrives two seconds late. Once a visitor flips it, their choice outranks the machine
-and is remembered. Off, every stage is the picture that was already there — the seeded
-photograph for a finisher, the hex for a color. `prefers-reduced-motion` is a different
+and is remembered. Off, every stage is its still from the front, under the theme in force,
+and a color with no still is its hex. `prefers-reduced-motion` is a different
 question and keeps its own answer: it stops the movement, not the drawing, so a room still
 arrives and simply stands still.
 
@@ -832,8 +808,41 @@ browser — each finish draws a room, the pointer changes the pixels, each corne
 overlapping shadows and lights both its walls unevenly under both themes, a glowing room
 keeps its corners well under the faces glowing in it even with the spill drawn around them,
 a coating room frames its near subject large and whole and shows colors nothing in it was
-painted, reduced motion draws once and stays put, and the switch off leaves photographs and
-no canvases across a reload.
+painted, reduced motion draws once and stays put, and the switch off leaves stills and no
+canvases across a reload.
+
+### Stills
+
+Every color's slab and every finisher's room is also rendered ahead of time, and those
+renders are the product's images. They are what a browser that draws nothing live shows,
+and the strip under a product's large picture is made of them.
+
+Each scene is taken from four angles — the front, which is where the live scene's eye rests
+before anybody points at it, then a step to the left, to the right and up — under both
+themes, because the room around a slab or a finisher is dressed for the page it is on.
+Choosing the first picture puts the live scene in the large frame wherever live pictures are
+on, and its still wherever they are off; every other picture is always its still. The angles
+and the names of the files are in [`stills.ts`](packages/shared/src/contracts/stills.ts),
+where both the storefront and the seed read them.
+
+The storefront renders them itself, so a still cannot disagree with the scene.
+[`render-stills.ts`](apps/web/scripts/render-stills.ts) serves
+[`stills.html`](apps/web/stills.html) from source, opens it in headless Chromium, and has the
+storefront's own stages draw every product with the eye moved to each angle. It runs while
+the API image is built, in a stage that copies in only what the pictures are made of — the
+scene modules, the mesh, the shared contracts and the planned catalog — so the render comes
+from Docker's cache unless one of those changed. Chromium is pointed at Mesa's llvmpipe
+rather than at the SwiftShader it ships with: both rasterize on the CPU and agree to within
+a level of 255, but llvmpipe shades these materials about four times faster. The whole
+catalog renders in a little over two minutes on a six-core Core i5-12400F with no GPU in
+use; the first build also downloads Chromium and Mesa.
+
+The seed stores them. [`plan.ts`](apps/api/src/db/plan.ts) plans the catalog from a fixed
+seed, so the build knows which products there will be without a database to ask. On every
+start, [`stills.ts`](apps/api/src/db/stills.ts) copies each product's stills into the media
+volume under content-addressed names, replaces that product's stills wherever the build
+rendered different ones, and deletes the files no image names any longer. An image an admin
+uploaded is never touched, and is shown after the stills.
 
 ---
 
@@ -944,7 +953,8 @@ and their laws; metric↔imperial conversion; WCAG luminance and contrast; every
 across valid, invalid and boundary input; JWT generation, validation and expiration against
 a controllable clock; the TTL cache's expiry and eviction order; image type detection
 against disguised payloads; the search and facet SQL builders, asserting on generated SQL
-and bound parameters; the PNG encoder; the seeded PRNG and `hslToHex`; the seam where
+and bound parameters; which products the build renders stills of and the words each still
+is read out as; the seeded PRNG, `hslToHex` and the plan they draw the catalog from; the seam where
 the product table's nullable columns become a discriminated union, including every shape
 the variant constraint forbids; and the arithmetic and tables behind the artwork, pinned by
 their relationships rather than by their tuned constants — the pointer turns the slab away
