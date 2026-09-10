@@ -6,12 +6,13 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
-    // Only used by `npm run dev`. In Docker, Caddy sits in front and both the
-    // SPA and the API share an origin, which is what lets the refresh cookie
-    // work without any CORS involvement.
+    // Only used by `npm run dev`, which serves the storefront from source and
+    // hands everything else to the stack `./start.sh` is already running.
+    // Cookies are scoped to a host and not to a port, so the refresh cookie
+    // the API sets on localhost arrives here as well and the session survives.
     proxy: {
-      "/api": { target: "http://localhost:8080", changeOrigin: true },
-      "/media": { target: "http://localhost:8080", changeOrigin: true },
+      "/api": { target: "http://localhost:3000", changeOrigin: true },
+      "/media": { target: "http://localhost:3000", changeOrigin: true },
     },
   },
   build: {
