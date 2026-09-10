@@ -1,4 +1,9 @@
+# check=skip=SecretsUsedInArgOrEnv
 # Build context is the repository root.
+#
+# The build checks are told to let `VITE_RECAPTCHA_SITE_KEY` through: a
+# reCAPTCHA site key is public, since the widget hands it to every visitor's
+# browser, and only the secret key on the API has to be kept.
 
 FROM node:26-slim AS build
 WORKDIR /app
