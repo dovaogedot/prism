@@ -62,7 +62,7 @@ describes a light source rather than a color.
 
 **Every word resolves against what a product is.** Adding a color says what the color *is*,
 and nothing else — no taxonomy, no label, no shelf chosen by hand.
-`shifters` is a category, `cw` and `clock-wise` are a direction, `matte` is a stretch of the
+`shifters` is a category, `cw` and `clock-wise` are a direction, `iridescent` is a stretch of the
 roughness axis, and `gold` is a point in RGB space — every color belongs to the landmark
 nearest it, which partitions the color cube into one Voronoi cell per name. `color_family`
 holds those landmarks and a generated column holds the answer, so the family is indexed and
@@ -101,6 +101,21 @@ Two accounts are seeded, both with the password `colors are not paint`:
 ./start.sh down     # stop
 ./start.sh reset    # stop and delete the volumes
 ```
+
+### Editing the storefront while it runs
+
+`./start.sh` serves a built image, so a change to the source is picked up the next time it
+builds. To see one immediately:
+
+```bash
+npm run dev --workspace @prism/web    # http://localhost:5173
+```
+
+That serves the storefront from source with hot reloading and hands `/api` and `/media` to
+the stack already running on port 3000, so the database, the sessions and the uploaded media
+are the same ones. Cookies are scoped to a host and not to a port, so a session signed in on
+3000 is signed in here too. Nothing else has to be running for it, and nothing about the
+stack has to be restarted afterward.
 
 ### Why it needs no secrets
 
@@ -491,34 +506,39 @@ is three **amounts**, rolled independently, because a real surface is several th
 
 | Amount | Range | What it means, and what the slab does |
 | --- | --- | --- |
-| `roughness` | 5–95 | How scattered the surface is. Low is lacquered: a clearcoat over the pigment returns the strip lamp as a broad soft band. High is chalk — no band at all, a sheen lobe, and visible relief. Matte and gloss are the two ends of this one axis, which is why they share it |
+| `roughness` | 5–95 | How scattered the surface is. Low is lacquered: a clearcoat over the pigment returns the strip lamp as a broad soft band. High is chalk — no band at all, a sheen lobe, and visible relief. A mirror and a wall of chalk are the two ends of this one axis, which is why they share it |
 | `coating` | 0, or 100–600 nm | The thickness of a transparent interference layer over the paint. Not a color and not an arc: the thickness *is* the color, and everything the layer does follows from it |
 | `emission` | 0, or 35–100 | How hard the pigment gives off its own light, on top of the light it returns rather than instead of it |
 
 None of the three says what the color *is*. A color can be lacquered and iridescent at once,
-which real paint routinely is. The four words are still how the shop talks about itself, but
-they are **readings** of the numbers rather than values anything stores: `FINISH_BANDS` maps
-each word to the stretch of one amount it names, so typing "gloss" into the search box lands
-somewhere sensible.
+which real paint routinely is. The three words — `roughness`, `iridescent`, `fluorescent` —
+are how the shop talks about itself, but they are **readings** of the numbers rather than
+values anything stores: `FINISH_BANDS` maps each word to the stretch of one amount it names,
+so typing "iridescent" into the search box lands somewhere sensible.
 
 So a color is narrowed by the amounts rather than by the words, and by all three at once:
 three sliders, live together, because narrowing one says nothing about the other two. A
 shopper can ask for a lacquered surface that is also coated and also glowing, which is a
-thing real paint is. Matte and gloss are *not* two of the three — they are the two ends of
-the first one, so the roughness slider spans the whole axis and a shopper drags toward
-whichever end they mean, rather than the shop picking the point where one word becomes the
-other. The sliders carry no counts, because a range has no buckets to distort.
+thing real paint is. The roughness slider spans the whole axis and a shopper drags toward
+whichever end they mean, rather than the shop picking the point where a mirror becomes
+chalk. The sliders carry no counts, because a range has no buckets to distort.
 
-The four words belong to the finishers, and that is the whole of a finisher's filter. A finisher does one
-thing, so it has one answer to which finish it is, and the word is a question about which
-column its row has: asking for the iridescent finishers is asking which rows carry a coating at
-all. No threshold recovers it and nothing has to agree about where one finish becomes
-another. Matte and gloss are the exception, and only because they are one thing — two ends
-of the roughness a finisher leaves, split where a reflection stops being worth naming.
+The three words belong to the finishers, and that is the whole of a finisher's filter. A
+finisher does one thing, so it has one answer to which finish it is, and the word is a
+question about which column its row has: asking for the iridescent finishers is asking which
+rows carry a coating at all. No threshold recovers it and nothing has to agree about where
+one finish becomes another. Each word names a different amount, so the three of them cannot
+overlap however wide each one is.
 
-There is still no such thing as *the* gloss finisher: one finisher leaves a surface at 20 and the
-next at 15, and a shopper who wants the second is not served by being sold the first. What
-the word does is narrow the shelf to the finishers that answer to it.
+There is no such thing as *the* roughness finisher: one finisher leaves a surface at 20 and
+the next at 15, and a shopper who wants the second is not served by being sold the first. So
+the word is only half the question. Choosing one opens a slider for the amount that word
+names — percent for a grain, nanometers for a coating, percent again for a glow — running
+the stretch of that axis the word covers and no further, so there is no part of the track a
+thumb can be dragged into that answers with nothing. Choosing a different word clears the
+range with it: a range says where on one axis to look, and the next word names a different
+axis. The counts beside the three words ignore the range for the same reason, so a shopper
+who has narrowed one of them can still see how many of the other two there are and switch.
 
 [`surfaces.ts`](apps/web/src/features/catalog/artwork/surfaces.ts) is where those amounts
 become rendering parameters, and every one of its outputs is a **continuous** function of
@@ -606,23 +626,23 @@ the reflection and a bright pigment's own color is louder than it.
 
 The split is the same one the rest of the codebase uses.
 [`tilt.ts`](apps/web/src/features/catalog/artwork/tilt.ts) and `surfaces.ts` are arithmetic,
-pure and unit-tested and unaware that a GPU exists; `scene.ts` is the one file in the
-feature that is not referentially transparent, because a GPU context is a resource rather
-than a value. The component between them owns a canvas, turns the pointer into an angle, and
+pure and unit-tested and unaware that a GPU exists;
+[`gl.ts`](apps/web/src/features/catalog/artwork/gl.ts) holds the renderer, the composer and
+the environment, and `scene.ts` builds the slab's room on top of it. Those two are where
+referential transparency stops, because a GPU context is a resource rather than a value. The component between them owns a canvas, turns the pointer into an angle, and
 runs the frames — none of it through React state, because re-rendering a card's subtree
 sixty times a second to move a number no React tree reads is not what React is for.
 
 A browser with no WebGL2 gets the flat swatch instead, and so does one whose "GPU" is really
-the CPU: building the rig costs about a second and a half on a software renderer and every
-stage another eighty milliseconds, which is a worse page than a grid of flat swatches that
-arrives at once.
+the CPU — a grid of flat swatches that arrives at once is a better page than a grid of lit
+ones that arrives two seconds late. Which machines those are, and how a visitor overrules
+the answer, is the switch described below.
 
 ### Drawing a finisher
 
-A finisher is the one product that is photographed rather than lit, and it has to be: it holds no
-color, so a slab of it would be a slab of nothing. What it sells is what it does to a color,
-so that is what its pictures show — the effect itself, then the same effect over red, green,
-blue and yellow, five in all.
+A finisher holds no color, so a slab of one would be a slab of nothing. What it sells is
+what it *does* to a color, so that is what its pictures show — the effect itself, then the
+same effect over red, green, blue and yellow, five in all.
 
 [`finish-art.ts`](apps/api/src/db/finish-art.ts) renders them at seed time from the one
 number the finisher carries, straight to PNG, so nothing on disk can disagree with the number
@@ -643,7 +663,164 @@ each wider than the last, which is what a soap bubble and a lens on glass both d
 is drawn at the radius its own thickness sits at rather than at a radius computed
 separately, so the ring and the color under it are one fact. The glow is a bloom, the
 reflection is a strip blurred by the roughness the finisher leaves, and both are plain raster
-work: a finisher is a still life, not a scene.
+work.
+
+**And the same finisher, as a room.** A photograph is a picture of an effect; a room is the
+effect happening, with a shopper's own hand moving the light. So a finisher gets one of
+those too — three rooms, one per thing a finish can apply to, built around
+[Suzanne](https://github.com/KhronosGroup/glTF-Sample-Assets) from the Khronos glTF sample
+assets, stripped to positions, normals and indices and vendored at 72 796 bytes. One shape
+for all three, because the thing that should differ between two rooms is the finish. The
+walls and floor they stand in are plain diffuse gray, so nothing in the room competes with
+what is being demonstrated on it.
+
+Every number in a room comes out of
+[`roomFor`](apps/web/src/features/catalog/artwork/finishers.ts), which is handed the
+finisher's one amount and nothing else — the same rule the slab follows, applied to a room
+instead of a face. Two finishers a point apart are lit and painted a point apart, and
+nothing anywhere branches on a finish's *name*:
+
+| The finisher does | The room | What the pointer does |
+| --- | --- | --- |
+| a surface | plainly lit, one subject on the bare gray the photographs are rendered against, seen from low down and close | turns the ring of four cone lamps around it, each walking to its own place on the turned ring at its own rate, so a flick throws them out of formation and they come back in order |
+| a glow | dim, and dimmer the harder the glow, on a floor that fades out before it ends, with the light coming off the subjects spilling into the air around them | walks the eye around the three subjects standing on it |
+| a coating | bright, because interference is a reflection and a dim room gives it nothing to reflect, and framed on the near subject from low down | carries every hue in the room around the wheel, a full turn from one edge of the stage to the other — so both edges show the same colors and there is no seam in the middle to jump across |
+
+**A coated subject is painted dark.** Interference lives in the reflection, and a pigment's
+own color is added underneath it, so a bright subject covers the coating that is standing
+there to demonstrate it. The coated rooms mix their pigment dark and stand it on a surface
+in the middle of the range a coated color is sold on — the ceiling
+`product_coating_needs_a_reflection` enforces is the roughest a coating survives rather than
+a surface anybody buys, and the floor is a mirror, which returns the room instead of the
+shape it is poured over. What is left is dark enough to show the film's colors and colored
+enough to say which hue the pointer is turning. Both are measured on the hue wheel, cut into
+thirty-six steps of ten degrees, in the light theme, where the room is gray and every colored
+pixel is on a subject: every room on the shelf reaches at least eight of the steps and the
+strongest at least sixteen, while the busiest step still holds at least nine percent of the
+colored pixels.
+
+**A glowing room has no edge to its floor.** A floor that stops has one, and an eye lowered
+toward the height of what it is looking at sees over it into nothing; so the floor fades into
+the color of the room before it gets there, and the wall behind it fades to the same color,
+which leaves no seam anywhere for an eye to find the end of the room at. The light coming off
+the subjects spills into the air around them too, above a threshold under what a lit face
+reaches rather than above what a display can show — a slab's spill says the display has run
+out of range, and a glowing room's spill is the subject of the picture.
+
+**A glowing subject is a lit surface that also gives off light**, not a shape drawn in its
+own color. Fluorescence is absorption and re-emission: the paint underneath keeps the color
+it was mixed at and is shaded, shadowed and highlighted like any other paint, and what the
+pigment hands back in its own band is added on top of that. Part of the glow is drawn as
+light leaving the face and the rest is left to the paint, because light leaves a face at the
+same strength wherever on it it leaves from — a face drawn from its glow alone carries one
+value over the whole of itself, which is a patch of color with a head-shaped edge. The room
+has lamps of its own for the same reason, so there is a lit side and an unlit one to read
+the shape off.
+
+**The two ends of the glow range have to look like two ends.** The finishers on that shelf
+sit in the top half of the range, so a spill straight in the amount separates them by the
+same fraction they differ by, which is a difference nobody sees. Three things move together
+instead: the room dims, the light leaving the face rises, and the height a pixel has to
+reach before it spills comes down — from over what a lit face reaches, where nothing spills
+at all, to under its shaded side, where the whole subject does. Measured on the shelf, in the
+dark theme a glow is dressed for: the outer fifth of a stage carries a seventh of full
+lightness at the faintest finisher on it, and close to twice that at the hardest.
+`finisher-rooms.spec.ts` holds the ratio at seven tenths.
+
+**A coated room is framed on the near subject**, not on the floor it stands on: the eye
+stands where that one subject fills most of the frame, and low enough to see across its
+curve rather than down onto its top. Both halves are measured on the real picture, as the
+box the colored pixels of a stage fit inside — that box spans at least seven tenths of the
+stage's width, and stops at least a twentieth of the way short of every edge, so the subject
+is close and whole rather than either far off or cut by the frame.
+
+**Every subject lies on two points**, its chin and the back of its head, leaning back 35.61
+degrees about its own left-right axis. That figure is not a taste: it is measured off the
+vertices as the one tilt at which those two points are level with each other and everything
+between them is clear of the floor. A degree further back and the chin lifts off; a degree
+less and the back of the head does. It leaves the face turned up at whoever is looking into
+the room, which is what both walled rooms are looked into from. Each room aims its eye at the
+middle of whichever subject lies nearest it, so what is being shown sits in the middle of the
+frame.
+
+**The two walled rooms are one room.** The roughness room and the coating room stand their
+subjects in the same corner, with both walls at one distance behind the middle, and light it
+with the same lamps at the same places and strengths, from one piece of code that names
+neither room. Three lamps cast. They are cones aimed at the middle of the floor, hung to the
+reader's right, to their left and straight behind the middle, so a subject's shadows leave it
+to the left, to the right and toward the reader. A subject lying flat has almost no gap under
+it for a shadow to come out of, so two shadows are two only if they leave it in different
+directions. The lamps hang high, so each shadow stays close to what lays it: lower lamps lay
+long shadows that cover the floor in front of a subject between them and fill one another in,
+which leaves one gray field instead of three shapes with lit floor between them. Their edges
+are kept sharp, because a shadow is told apart from the floor around it by its edge.
+
+Each wall has a lamp of its own, hung high and close in front of it and pointed down it. It
+lays a bright scallop that falls away toward the floor and out to either side — a wall lit
+only by lamps aimed at the floor is one flat value from edge to edge. Every lamp in a corner
+is white, so the lamps add no color of their own.
+
+Both corners are measured on the real picture, in both themes: each wall's brightest part is
+at least twice its dimmest, and at least a fiftieth of the floor lies where two shadows
+overlap. One lamp cannot lay a shadow inside its own shadow, so an overlap is what says more
+than one lamp is casting, however large or dark any one shadow is.
+
+**The lamps that do not cast are cones.** Both corners hang a ring of four of them around
+what is standing there, evenly spaced at one height and one radius, turned onto the bearing
+the room is looked into from. The roughness room's ring travels with the pointer and the
+coating room's stays where it rests, which is the one thing either corner does that the other
+does not. Each is opened wide enough to cover the subject and carry on to the wall behind it,
+with its edge carried all the way in to its own axis so there is no rim anywhere on what it
+lays: a hard-edged pool of light on a wall reads as a second object in the room. The ring is
+held well under the lamps that cast. It lays no shadow of its own, so all of its light lands
+in the shadows the others lay, and a shadow filled back in is a smudge rather than a shape.
+
+**The glowing room is lit by two lamps.** One stands high and to one side and is what the eye
+reads as the light in the room; a second, weaker one stands lower and across the floor from it
+and lays a softer shadow the other way. The second is also what opens the side of a subject the
+first is turned away from, so a face has a dark side rather than a black one.
+
+**Every room is dressed twice.** A room is looked at through a page that is either bright or
+dark, and a wall mixed to sit inside a bright page is a lamp in a dark one. So each room keeps
+two sets of paint, light level, fill share and spill threshold, and picks by the theme in force
+when it is drawn.
+
+**A room is the same room for every finisher shown in it.** How many subjects there are,
+where they stand, how big they are, which way they face and what they are painted is written
+per room and kept, so two finishers on the same shelf differ by the finish and by nothing
+else. Nothing about a product but the one amount it is sold with reaches the picture. The
+hues are chosen for what each room has to show: a glow is demonstrated on cyan, magenta and
+yellow, each of which is two of the display's channels at once and so carries the most light
+for the paint it is mixed at; a coating on a deep blue and an amber, which are across the
+wheel from each other, so between the two subjects both halves of what the film returns are
+shown against paint that is not already that color. A room demonstrating a surface has no
+color at all — its one subject wears the bare gray the photographs are rendered against.
+
+**The rooms and the slabs share one context.** Building that rig costs about two seconds on
+a software rasterizer — once, whatever is on the page — and after it a finisher room costs
+about 120 ms against a color slab's 73 ms. First contentful paint does not move, because
+every stage draws after it. A smaller rig for cards is not on the table: three's program
+cache key is built from how many lights and shadow casters a render has, so a card rig and
+a product-page rig would be two shader programs and every alternation between them would
+compile one. What separates the two is the size of the canvas — a card is about a quarter
+of the pixels — and how many frames it draws.
+
+**A switch in the header decides whether any of it is drawn**, next to the light and dark
+one and working the same way. It starts where the machine is: a browser with no WebGL2, or
+one whose "GPU" is really the CPU, is shown the stills, which is a better page than a grid
+that arrives two seconds late. Once a visitor flips it, their choice outranks the machine
+and is remembered. Off, every stage is the picture that was already there — the seeded
+photograph for a finisher, the hex for a color. `prefers-reduced-motion` is a different
+question and keeps its own answer: it stops the movement, not the drawing, so a room still
+arrives and simply stands still.
+
+[`finisher-rooms.spec.ts`](e2e/specs/finisher-rooms.spec.ts) drives all of it in a real
+browser — each finish draws a room, the pointer changes the pixels, each corner lays
+overlapping shadows and lights both its walls unevenly under both themes, a glowing room
+keeps its corners well under the faces glowing in it even with the spill drawn around them,
+a coating room frames its near subject large and whole and shows colors nothing in it was
+painted, reduced motion draws once and stays put, and the switch off leaves photographs and
+no canvases across a reload.
 
 ---
 
@@ -760,8 +937,12 @@ their relationships rather than by their tuned constants — the pointer turns t
 from the finger and gets there at the same speed whatever the framerate; a lacquer thins as
 the pigment under it coarsens and is gone by chalk; the arc a color is sold with is the arc
 its coating actually shows; the grain tile wraps, because a slab with a seam down its
-face is a slab with a mistake on it; and, the one that matters most, every parameter moves
-by a hair for a color that differs by a point, because a band anywhere in that function is a
+face is a slab with a mistake on it; a finisher's room stands its subjects clear of each
+other and inside the floor it lays, closes above the top of its own frame wherever the eye
+can be put, and paints from its slug the same way the next time it is opened; every hue in
+a coated room comes back to where it started after a full turn, because a stage with a seam
+across its middle is the same mistake in the other medium; and, the one that matters most, every parameter moves by a
+hair for a color that differs by a point, because a band anywhere in that function is a
 place where two colors a filter returned together disagree about what they are.
 
 *API integration* — the real application over a real Postgres from Testcontainers,
@@ -783,7 +964,8 @@ be a worse product and no safer.
 
 *End-to-end* — Playwright against the running stack, for the things that only exist in
 a browser: that the filter rail does not reflow, that dragging the hue ring works, that the
-rail offers each category only the controls that category has, and that the auth routes send
+rail offers each category only the controls that category has, that the artwork draws and
+answers the pointer and stays inside its own stage, and that the auth routes send
 you where they should — including that signing in lands on the catalog rather than the
 account page, which depends on a redirect and a form navigation resolving in the same tick.
 
@@ -851,10 +1033,12 @@ GET /api/v1/products
   &minRating=4
 
   finishers — the one effect a finisher is bought for:
-  &finish=gloss           one of matte | gloss | iridescent | fluorescent
+  &finish=iridescent      one of roughness | iridescent | fluorescent
 
-  colors — the three amounts a surface carries, narrowed independently:
-  &roughnessMin=5&roughnessMax=40      matte at one end, gloss at the other
+  the three amounts a finish is made of. A color carries all three at once and
+  narrows them independently; a finisher carries the one its own finish is made
+  of, so on that shelf the axis to narrow is the one the chosen word names:
+  &roughnessMin=5&roughnessMax=40      a mirror at one end, chalk at the other
   &coatingMin=100&coatingMax=600       nanometers of interference layer
   &emissionMin=35&emissionMax=100      how hard it gives off its own light
 
@@ -884,7 +1068,10 @@ ticking a second brand widens the result rather than emptying it. The category d
 drops more than its own filter: it drops every filter only one kind can satisfy. Counting
 how many *colors* satisfy an arc would answer zero, for a reason that has nothing to do
 with the question — so those filters leave with the category that owns them, which is also
-what the rail does when you switch.
+what the rail does when you switch. The finish dimension drops the three amounts for the
+same reason: a finisher carries one of them and nothing in the other two columns, so
+counting the fluorescent finishers while a roughness range is applied would answer zero and
+leave the shopper unable to switch away from the range they had set.
 
 ---
 
@@ -946,5 +1133,7 @@ The storefront is built for the catalog rather than for a design system. It is
 responsive, keyboard-navigable, and honors `prefers-reduced-motion` and
 `prefers-color-scheme`, with a light/dark toggle that overrides the system preference —
 blue accents in daylight, yellow after dark, and near-neutral chrome throughout so that the
-only vivid things on the page are the products. Where effort has gone into the interface it
+only vivid things on the page are the products. Beside it is a second toggle on the same
+pattern, over what the machine can draw rather than what the system prefers: it turns the
+live artwork off and leaves the still pictures in its place. Where effort has gone into the interface it
 has gone into showing a product honestly, which for a color means the artwork above.
