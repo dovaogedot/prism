@@ -112,7 +112,10 @@ const work = async (page: Page, queue: StillJob[], directory: string): Promise<n
         const file = join(directory, stillPath(job.slug, angle, theme));
 
         await mkdir(dirname(file), { recursive: true });
-        await writeFile(file, await still(page, { subject: job.subject, angle, theme, size: SIZE }));
+        await writeFile(
+          file,
+          await still(page, { slug: job.slug, subject: job.subject, angle, theme, size: SIZE }),
+        );
         written += 1;
       }
     }

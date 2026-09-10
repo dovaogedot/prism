@@ -824,6 +824,13 @@ on, and its still wherever they are off; every other picture is always its still
 and the names of the files are in [`stills.ts`](packages/shared/src/contracts/stills.ts),
 where both the storefront and the seed read them.
 
+No two products are seen from quite the same places. Every picture but the front strays from
+its angle by an amount drawn from the product's slug, in
+[`viewpoint.ts`](apps/web/src/features/catalog/artwork/viewpoint.ts): some degrees further
+around the subject it shows or up over it, a wider or a longer lens, and the eye standing in
+or back as far as that lens needs to draw the subject at its resting size or a little smaller. The same slug always strays the
+same way, so rendering again changes a still only when its scene does.
+
 The storefront renders them itself. [`render-stills.ts`](apps/web/scripts/render-stills.ts)
 serves [`stills.html`](apps/web/stills.html) from source, opens it in headless Chromium, and
 has the storefront's own stages draw every product with the eye moved to each angle.
@@ -969,7 +976,9 @@ the pigment under it coarsens and is gone by chalk; the arc a color is sold with
 its coating actually shows; the grain tile wraps, because a slab with a seam down its
 face is a slab with a mistake on it; a finisher's room stands its subjects clear of each
 other and inside the floor it lays, closes above the top of its own frame wherever the eye
-can be put, and paints from its slug the same way the next time it is opened; every hue in
+can be put, and paints from its slug the same way the next time it is opened; every scene
+stays closed from every viewpoint a still can stray to, checked by casting the edge of the
+frame into it; every hue in
 a coated room comes back to where it started after a full turn, because a stage with a seam
 across its middle is the same mistake in the other medium; and, the one that matters most, every parameter moves by a
 hair for a color that differs by a point, because a band anywhere in that function is a

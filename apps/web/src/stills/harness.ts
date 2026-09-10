@@ -3,8 +3,8 @@
  *
  * Opened by `scripts/render-stills.ts` in a headless browser, never by a
  * shopper, and left out of the storefront's build. It draws through the same
- * stages the storefront does, with the eye moved to the angle asked for, so a
- * still and the live scene are one picture.
+ * stages the storefront does, with the eye moved to where `viewpointOf` puts
+ * the angle asked for, so a still and the live scene are one picture.
  */
 
 import { Option, type StillSubject } from "@prism/shared";
@@ -69,7 +69,7 @@ const drawOn = (
     )
     .exhaustive();
 
-const render = async ({ subject, angle, theme, size }: StillRequest): Promise<string> => {
+const render = async ({ slug, subject, angle, theme, size }: StillRequest): Promise<string> => {
   await meshArrived;
 
   document.documentElement.classList.toggle("dark", theme === "dark");
@@ -80,7 +80,7 @@ const render = async ({ subject, angle, theme, size }: StillRequest): Promise<st
   canvas.style.height = `${size}px`;
   document.body.append(canvas);
 
-  const drawn = drawOn(canvas, subject, viewpointOf(angle));
+  const drawn = drawOn(canvas, subject, viewpointOf(angle, slug));
   const still = canvas.toDataURL("image/webp", QUALITY);
   canvas.remove();
 

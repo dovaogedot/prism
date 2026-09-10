@@ -18,7 +18,8 @@ import {
   STANDING_IN,
   STANDING_MIDDLE,
 } from "./arrangement.ts";
-import { ELEVATION_BOUNDS, type Orbit, REST_ORBIT, turnedBy } from "./orbit.ts";
+import { ELEVATION_BOUNDS, type Eye, type Orbit, REST_ORBIT, turnedBy } from "./orbit.ts";
+import { distanceAt, type Gaze, type Viewpoint } from "./viewpoint.ts";
 
 /** How much floor each room's arrangement needs, from its own middle. */
 export const REACH = {
@@ -109,6 +110,50 @@ export const EYE_HEIGHT = {
 } as const;
 
 /**
+ * Where an eye stands to look into a corner.
+ *
+ * On the bearing both walls are equally in the picture from, which is the one
+ * the arrangement in front of them is composed for.
+ */
+const cornerEye = (distance: number, height: number): Eye => ({
+  x: distance * Math.sin(CORNER_BEARING),
+  y: height,
+  z: distance * Math.cos(CORNER_BEARING),
+});
+
+/** The middle of a roughness room's one subject, which stands in the middle of the floor. */
+const ROUGHNESS_SUBJECT: Eye = { x: 0, y: EYE_HEIGHT.roughness.looksAt, z: 0 };
+
+/** Where each corner's eye rests, what it looks at, and what it walks around. */
+export const CORNER_GAZE = {
+  // Low and near. A rough surface and a smooth one differ most at a grazing
+  // angle, where one returns the room in a line and the other spreads it over
+  // the whole face.
+  roughness: {
+    eye: cornerEye(EYE_DISTANCE.roughness, EYE_HEIGHT.roughness.stands),
+    target: ROUGHNESS_SUBJECT,
+    pivot: ROUGHNESS_SUBJECT,
+  },
+  // Higher than the roughness eye, because there is a second subject behind
+  // the first and from any lower the near one covers it.
+  coating: {
+    eye: cornerEye(EYE_DISTANCE.coating, EYE_HEIGHT.coating.stands),
+    target: { x: 0, y: EYE_HEIGHT.coating.looksAt, z: 0 },
+    // The near subject, which the room is framed on. It stands in front of
+    // the middle of the floor, so an eye that walked around the middle would
+    // swing it out of the side of the picture.
+    pivot: {
+      x: COATED_FRONT.toward * Math.sin(CORNER_BEARING),
+      y: EYE_HEIGHT.coating.looksAt,
+      z: COATED_FRONT.toward * Math.cos(CORNER_BEARING),
+    },
+  },
+} as const satisfies Record<"roughness" | "coating", Gaze>;
+
+/** What a glowing room's eye looks at, wherever it has walked to. */
+export const GLOW_TARGET: Eye = { x: 0, y: EYE_HEIGHT.emission.looksAt, z: 0 };
+
+/**
  * How far a corner's ring of lamps hangs from the middle of that corner.
  *
  * Outside the deepest arrangement a corner stands, so no lamp on the ring ever
@@ -166,6 +211,19 @@ export const OPEN_FOG = {
   near: EYE_RADIUS,
   far: (OPEN_RADIUS - EYE_RADIUS) * 0.9,
 } as const;
+
+/**
+ * Where the open room's haze begins and where it has closed, seen from `viewpoint`.
+ *
+ * `OPEN_FOG` at rest. A haze is measured from the eye, so an eye that stands
+ * back takes the haze back with it by as far as it stepped, and the subjects
+ * fade no more than they do from where it rests.
+ */
+export const hazeAt = (viewpoint: Viewpoint): Readonly<{ near: number; far: number }> => {
+  const back = EYE_RADIUS * (distanceAt(FIELD_OF_VIEW.emission, viewpoint) - 1);
+
+  return { near: OPEN_FOG.near + back, far: OPEN_FOG.far + back };
+};
 
 /**
  * The floor a glow is demonstrated on, and the wall that closes it.

@@ -37,6 +37,7 @@ import {
   themeNow,
 } from "./gl.ts";
 import { STRIP_LEAN } from "./room.ts";
+import { FIELD_OF_VIEW, SLAB_GAZE, WALL_DISTANCE, WALL_SIZE } from "./slab-framing.ts";
 import {
   emissiveScale,
   excite,
@@ -46,7 +47,7 @@ import {
 } from "./surfaces.ts";
 import { grainTexture } from "./textures.ts";
 import type { Tilt } from "./tilt.ts";
-import { eyeFrom, type Viewpoint } from "./viewpoint.ts";
+import { fieldOfViewAt, lookFrom, type Viewpoint } from "./viewpoint.ts";
 
 /* --------------------------------------------------------------- the room */
 
@@ -166,27 +167,6 @@ type Rig = Readonly<{
   /** The paint's grain, held so the material can be pointed back at it. */
   grain: Texture;
 }>;
-
-/** How far the camera stands back, in slab widths. A long lens on a product. */
-const CAMERA_DISTANCE = 3.9;
-const FIELD_OF_VIEW = 26;
-
-/** What the camera looks at, which is the middle of the slab. */
-const SLAB_MIDDLE = { x: 0, y: 0, z: 0 } as const;
-
-/** Where the camera stands at rest: straight in front of the slab. */
-const CAMERA_AT_REST = { x: 0, y: 0, z: CAMERA_DISTANCE } as const;
-
-/**
- * How far the wall is behind the slab.
- *
- * Close, because the shadow lands on it: a wall further back takes the shadow
- * out of the picture with it and leaves the slab floating in front of nothing.
- */
-const WALL_DISTANCE = 0.36;
-
-/** Comfortably wider than the frame at the wall's depth, and no wider. */
-const WALL_SIZE = 3.6;
 
 const buildFace = (environment: Texture, grain: Texture): MeshPhysicalMaterial =>
   new MeshPhysicalMaterial({
@@ -419,9 +399,11 @@ const frameFor = (rig: Rig, view: StageView): Frame => {
 
   rig.slab.rotation.set(view.tilt.x, view.tilt.y, 0);
 
-  const eye = eyeFrom(CAMERA_AT_REST, SLAB_MIDDLE, view.viewpoint);
-  rig.camera.position.set(eye.x, eye.y, eye.z);
-  rig.camera.lookAt(SLAB_MIDDLE.x, SLAB_MIDDLE.y, SLAB_MIDDLE.z);
+  const look = lookFrom(SLAB_GAZE, view.viewpoint, FIELD_OF_VIEW);
+  rig.camera.position.set(look.eye.x, look.eye.y, look.eye.z);
+  rig.camera.lookAt(look.target.x, look.target.y, look.target.z);
+  rig.camera.fov = fieldOfViewAt(FIELD_OF_VIEW, view.viewpoint);
+  rig.camera.updateProjectionMatrix();
 
   rig.key.shadow.needsUpdate = Option.match<Tilt, boolean>({
     onSome: (drawn) => drawn.x !== view.tilt.x || drawn.y !== view.tilt.y,

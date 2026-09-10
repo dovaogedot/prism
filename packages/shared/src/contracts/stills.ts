@@ -44,8 +44,10 @@ export type StillAngle = Readonly<{
  *
  * The first is where the eye stands in the live scene before anybody points at
  * it, so the first picture of a product is what its live scene opens on. The
- * rest walk the eye to either side and up, no further than every room stays
- * closed at: past that, a still would show where a wall ends.
+ * rest walk the eye to either side and up. The storefront strays each product's
+ * stills from these by an amount of that product's own, so these are where
+ * every product is seen from on the way to its own viewpoint, not the
+ * viewpoint itself.
  */
 export const STILL_ANGLES: readonly [StillAngle, ...StillAngle[]] = [
   { name: "front", aroundDegrees: 0, upDegrees: 0, seenFrom: "from the front" },

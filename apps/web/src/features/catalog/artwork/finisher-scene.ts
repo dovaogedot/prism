@@ -69,10 +69,12 @@ import { meshNow } from "./mesh.ts";
 import { type Eye, eyeAt, type Orbit } from "./orbit.ts";
 import { pairedWith } from "./pairs.ts";
 import {
-  EYE_DISTANCE,
+  CORNER_GAZE,
   EYE_HEIGHT,
   EYE_RADIUS,
   FIELD_OF_VIEW,
+  GLOW_TARGET,
+  hazeAt,
   LAMP_RADIUS,
   OPEN_FOG,
   OPEN_ROOM,
@@ -82,7 +84,7 @@ import {
   WALL_AT,
 } from "./rooms.ts";
 import { COATING_IOR, emissiveScale, excite, type Surface } from "./surfaces.ts";
-import { eyeFrom, type Viewpoint } from "./viewpoint.ts";
+import { fieldOfViewAt, type Gaze, lookFrom, type Viewpoint } from "./viewpoint.ts";
 
 /* ---------------------------------------------------------------- the finish */
 
@@ -322,6 +324,8 @@ const buildSubjects = (
 type Room = Readonly<{
   scene: Scene;
   camera: PerspectiveCamera;
+  /** The lens the room is seen through at rest, in degrees. */
+  fieldOfView: number;
   subjects: readonly Subject[];
   /** The floor and any walls, held so the room can be repainted with the theme. */
   paint: MeshStandardMaterial;
@@ -399,31 +403,16 @@ const buildShell = (scene: Scene, shell: Shell): MeshStandardMaterial => {
 };
 
 /**
- * Where an eye stands to look into a corner.
- *
- * On the bearing both walls are equally in the picture from, which is the one
- * the arrangement in front of them is composed for.
+ * Stand a room's eye at a viewpoint around where it rests, where `lookFrom`
+ * puts it, and see through the viewpoint's lens.
  */
-const cornerEye = (distance: number, height: number): Eye => ({
-  x: distance * Math.sin(CORNER_BEARING),
-  y: height,
-  z: distance * Math.cos(CORNER_BEARING),
-});
+const standEye = (room: Room, gaze: Gaze, viewpoint: Viewpoint): void => {
+  const look = lookFrom(gaze, viewpoint, room.fieldOfView);
 
-/** Where a room's eye stands before anybody points at it, and what it looks at. */
-type Gaze = Readonly<{ eye: Eye; target: Eye }>;
-
-/**
- * Stand a room's eye at a viewpoint around where it rests.
- *
- * Whatever the viewpoint, the eye looks at what it looks at from rest, from as
- * far away as it rests.
- */
-const standEye = (camera: PerspectiveCamera, gaze: Gaze, viewpoint: Viewpoint): void => {
-  const eye = eyeFrom(gaze.eye, gaze.target, viewpoint);
-
-  camera.position.set(eye.x, eye.y, eye.z);
-  camera.lookAt(gaze.target.x, gaze.target.y, gaze.target.z);
+  room.camera.position.set(look.eye.x, look.eye.y, look.eye.z);
+  room.camera.lookAt(look.target.x, look.target.y, look.target.z);
+  room.camera.fov = fieldOfViewAt(room.fieldOfView, viewpoint);
+  room.camera.updateProjectionMatrix();
 };
 
 /** Everything a room is, before anything is demonstrated in it. */
@@ -448,6 +437,7 @@ const buildRoom = (kit: Kit, plan: RoomPlan): Room => {
   return {
     scene,
     camera: new PerspectiveCamera(plan.fieldOfView, 1, 0.1, farOf(plan.shell)),
+    fieldOfView: plan.fieldOfView,
     subjects: buildSubjects(scene, kit, plan.standing, plan.casts),
     paint: buildShell(scene, plan.shell),
     dressings: plan.dressings,
@@ -840,17 +830,7 @@ const buildRough = (kit: Kit): Rough => {
     casts: true,
   });
 
-  return {
-    room,
-    corner: litCorner(room),
-    // Low and near. A rough surface and a smooth one differ most at a grazing
-    // angle, where one returns the room in a line and the other spreads it over
-    // the whole face.
-    gaze: {
-      eye: cornerEye(EYE_DISTANCE.roughness, EYE_HEIGHT.roughness.stands),
-      target: { x: 0, y: EYE_HEIGHT.roughness.looksAt, z: 0 },
-    },
-  };
+  return { room, corner: litCorner(room), gaze: CORNER_GAZE.roughness };
 };
 
 /* ------------------------------------------------------------- the open room */
@@ -928,16 +908,7 @@ const buildCoat = (kit: Kit): Coat => {
     casts: true,
   });
 
-  return {
-    room,
-    corner: litCorner(room),
-    // Higher than the roughness eye, because there is a second subject behind
-    // the first and from any lower the near one covers it.
-    gaze: {
-      eye: cornerEye(EYE_DISTANCE.coating, EYE_HEIGHT.coating.stands),
-      target: { x: 0, y: EYE_HEIGHT.coating.looksAt, z: 0 },
-    },
-  };
+  return { room, corner: litCorner(room), gaze: CORNER_GAZE.coating };
 };
 
 /* ----------------------------------------------------------------- the rig */
@@ -1044,7 +1015,7 @@ const roughFrame = (rig: Rough, view: RoughnessView): Frame => {
   }
 
   lightCorner(rig.corner, light);
-  standEye(rig.room.camera, rig.gaze, view.viewpoint);
+  standEye(rig.room, rig.gaze, view.viewpoint);
 
   // The one thing either corner does that the other does not: its ring travels
   // with the pointer, because a grain is read from a highlight moving over a
@@ -1057,15 +1028,16 @@ const roughFrame = (rig: Rough, view: RoughnessView): Frame => {
   return frameOf(rig.room, finish, dressed);
 };
 
-/** What a glowing room's eye looks at, wherever it has walked to. */
-const GLOW_TARGET: Eye = { x: 0, y: EYE_HEIGHT.emission.looksAt, z: 0 };
-
 const glowFrame = (rig: Glow, view: EmissionView): Frame => {
   const finish = roomFor(view);
   const dressed = dressRoom(rig.room, finish);
   const light = dressed.light;
 
   rig.haze.color.copy(rig.room.clear);
+
+  const haze = hazeAt(view.viewpoint);
+  rig.haze.near = haze.near;
+  rig.haze.far = haze.far;
 
   for (const [subject, hue] of pairedWith(rig.lit, GLOWING_HUES)) {
     // The paint the subject is mixed at, which is what the lamps in the room
@@ -1093,10 +1065,11 @@ const glowFrame = (rig: Glow, view: EmissionView): Frame => {
 
   const orbiting = eyeAt(view.orbit, EYE_RADIUS);
   standEye(
-    rig.room.camera,
+    rig.room,
     {
       eye: { x: orbiting.x, y: GLOW_TARGET.y + orbiting.y, z: orbiting.z },
       target: GLOW_TARGET,
+      pivot: GLOW_TARGET,
     },
     view.viewpoint,
   );
@@ -1117,7 +1090,7 @@ const coatFrame = (rig: Coat, view: CoatingView): Frame => {
   }
 
   lightCorner(rig.corner, light);
-  standEye(rig.room.camera, rig.gaze, view.viewpoint);
+  standEye(rig.room, rig.gaze, view.viewpoint);
 
   return frameOf(rig.room, finish, dressed);
 };

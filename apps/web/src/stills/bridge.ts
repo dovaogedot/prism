@@ -9,6 +9,8 @@ import type { StillAngle, StillSubject, StillTheme } from "@prism/shared";
 
 /** One picture to take. */
 export type StillRequest = Readonly<{
+  /** The slug of the product pictured, which decides where around the angle the eye strays to. */
+  slug: string;
   subject: StillSubject;
   angle: StillAngle;
   theme: StillTheme;
