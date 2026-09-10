@@ -1,49 +1,42 @@
 /**
- * One WebGL context, drawing every color on the page.
+ * A color, as a slab standing in a lit room.
  *
- * A page holds a dozen stages and a browser will not give a dozen WebGL
- * contexts to one document — so there is exactly one renderer, one scene and
- * one slab in this module, and a stage is a plain 2D canvas that the render of
- * its own view is copied into. Only one stage is ever under the pointer, and
- * the rest are still pictures that hold whatever was last drawn on them, so
- * the shared renderer is idle except while something is actually moving.
+ * One scene and one slab serve every color on the page: the stage under the
+ * pointer paints the slab its own color, points it at its own angle and hands
+ * `gl.ts` the frame, and the rest are still pictures of the last time their
+ * turn came. That is why nothing in here is re-entrant, and why the material
+ * has every shader feature it can use switched on permanently.
  *
- * This is the only file in the feature that is not referentially transparent,
- * because a GPU context is a resource rather than a value. Everything it
- * decides comes from `surfaces.ts` and `tilt.ts`, which are.
+ * Everything it decides comes from `surfaces.ts` and `tilt.ts`, which are pure.
  */
 
 import { Option, parseHex, toRgb, type Rgb } from "@prism/shared";
 import {
-  Color,
   DirectionalLight,
   ExtrudeGeometry,
   HemisphereLight,
   Mesh,
   MeshPhysicalMaterial,
   MeshStandardMaterial,
-  NeutralToneMapping,
   PerspectiveCamera,
   PlaneGeometry,
-  PMREMGenerator,
   RectAreaLight,
   Scene,
   Shape,
   SRGBColorSpace,
-  HalfFloatType,
   type Texture,
-  Vector2,
-  VSMShadowMap,
-  WebGLRenderer,
-  WebGLRenderTarget,
 } from "three";
-import { RectAreaLightUniformsLib } from "three/addons/lights/RectAreaLightUniformsLib.js";
-import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
-import { FXAAPass } from "three/addons/postprocessing/FXAAPass.js";
-import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
-import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
-import { buildRoom, STRIP_LEAN } from "./room.ts";
+import type { Theme } from "../../../shared/theme/use-theme.ts";
+import {
+  type Frame,
+  MINIMUM_FEATURE,
+  openStage as openGlStage,
+  type Stage as GlStage,
+  studio,
+  type Studio,
+  themeNow,
+} from "./gl.ts";
+import { STRIP_LEAN } from "./room.ts";
 import {
   emissiveScale,
   excite,
@@ -55,9 +48,6 @@ import { grainTexture } from "./textures.ts";
 import type { Tilt } from "./tilt.ts";
 
 /* --------------------------------------------------------------- the room */
-
-/** Which of the two rooms the shop is currently lit as. */
-type Theme = "light" | "dark";
 
 /**
  * How the room changes between themes.
@@ -112,34 +102,10 @@ const ROOMS: Record<Theme, Room> = {
   dark: { wall: 0x232323, environment: 0.95, key: 2.6, fill: 2.05, strip: 1.5, bloom: 0.35 },
 };
 
-const themeNow = (): Theme =>
-  document.documentElement.classList.contains("dark") ? "dark" : "light";
-
-/** Reused rather than allocated: `paint` runs on every frame of a hover. */
-const CLEAR = new Color();
-
 /** What a hex nobody can parse re-emits. */
 const BLACK: Rgb = { red: 0, green: 0, blue: 0 };
 
-/**
- * The smallest a shader feature may be set to.
- *
- * Above zero, because three compiles the lacquer and the sheen in or out by
- * whether they are above it — and one material serving a page of colors cannot
- * afford a recompile between two of them.
- */
-const MINIMUM_FEATURE = 0.0001;
-
 /* --------------------------------------------------------------- the slab */
-
-/**
- * How far a spilling pixel reaches, as a fraction of the frame.
- *
- * Small on purpose: the point of the spill is to say a surface is brighter
- * than the display can show, and a spill wide enough to reach the wall says
- * instead that the room is that color.
- */
-const BLOOM_RADIUS = 0.07;
 
 /** Half a degree of corner radius on a slab a meter across, in slab widths. */
 const CORNER = 0.055;
@@ -173,17 +139,14 @@ const roundedSquare = (): Shape => {
 /* ---------------------------------------------------------------- the rig */
 
 /**
- * Everything that exists once.
+ * Everything the slab's scene holds.
  *
  * Held together rather than as loose module variables so that the whole thing
  * is either built or not built, which is the only two states it has.
  */
 type Rig = Readonly<{
-  renderer: WebGLRenderer;
   scene: Scene;
   camera: PerspectiveCamera;
-  composer: EffectComposer;
-  bloom: UnrealBloomPass;
   slab: Mesh;
   wall: MeshStandardMaterial;
   key: DirectionalLight;
@@ -218,16 +181,10 @@ const WALL_DISTANCE = 0.36;
 /** Comfortably wider than the frame at the wall's depth, and no wider. */
 const WALL_SIZE = 3.6;
 
-/** The device pixels of one edge, past which more resolution is not visible. */
-const MAX_EDGE = 1400;
-
-const buildFace = (
-  environment: ReturnType<PMREMGenerator["fromScene"]>,
-  grain: Texture,
-): MeshPhysicalMaterial =>
+const buildFace = (environment: Texture, grain: Texture): MeshPhysicalMaterial =>
   new MeshPhysicalMaterial({
     color: 0xffffff,
-    // Placeholders. Every one of these is overwritten per color in `paint`;
+    // Placeholders. Every one of these is overwritten per color in `frameFor`;
     // what matters here is only that none of them is zero, so that the shader
     // compiled from this material is the one every color goes on using.
     roughness: 0.5,
@@ -245,73 +202,14 @@ const buildFace = (
     roughnessMap: grain,
     bumpMap: grain,
     bumpScale: 0.001,
-    envMap: environment.texture,
+    envMap: environment,
     envMapIntensity: 1,
     emissiveIntensity: 1,
   });
 
-const SOFTWARE_RENDERER = /swiftshader|llvmpipe|softpipe|software|basic render/i;
-
-/**
- * Whether this context is the CPU pretending to be a GPU.
- *
- * Worth asking, because the answer changes what is worth drawing. Building the
- * rig — convolving the room into an environment map, compiling four physical
- * shaders — costs a second and a half without hardware behind it, and every
- * stage after that costs another eighty milliseconds. A grid of flat swatches
- * is a better page than a grid of slabs that arrives three seconds late.
- *
- * The extension is the only way to ask and some browsers withhold it, in which
- * case the honest answer is that we do not know, and the scene gets the
- * benefit of the doubt.
- */
-const isSoftware = (context: WebGL2RenderingContext): boolean => {
-  const info = context.getExtension("WEBGL_debug_renderer_info");
-
-  if (info === null) return false;
-
-  // `getParameter` is typed as `any`, which is the one place a value really is
-  // unknown until it has been checked.
-  const name: unknown = context.getParameter(info.UNMASKED_RENDERER_WEBGL);
-
-  return typeof name === "string" && SOFTWARE_RENDERER.test(name);
-};
-
-const buildRig = (): Option<Rig> => {
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("webgl2", { antialias: false, alpha: false });
-
-  // Neither of these is a failure to handle: they are the answer that this
-  // browser should be shown the flat swatch instead.
-  if (context === null || isSoftware(context)) return Option.none;
-
-  // Antialiasing is off on the context because nothing is drawn to it
-  // directly — every pass goes through the composer's own targets.
-  const renderer = new WebGLRenderer({ canvas, context });
-  renderer.setPixelRatio(1);
-  renderer.toneMapping = NeutralToneMapping;
-  // Under one, so that a near-white pigment still has somewhere to go. At full
-  // exposure the palest colors in the catalog sit against the ceiling of the
-  // curve, where turning the slab changes nothing because nothing can get
-  // brighter than it already is.
-  renderer.toneMappingExposure = 0.84;
-  renderer.shadowMap.enabled = true;
-  // Variance shadows, because they are the ones that honor `radius`: the
-  // percentage-closer filter takes its kernel from the texel size and gives
-  // the same hard edge whatever is asked of it, and a hard-edged shadow on a
-  // wall this close to the slab reads as a second object rather than a shadow.
-  renderer.shadowMap.type = VSMShadowMap;
-
+const buildRig = ({ environment }: Studio): Rig => {
   const scene = new Scene();
-
-  const pmrem = new PMREMGenerator(renderer);
-  // Convolved rather than sampled sharp. The cube map behind it is 256 pixels
-  // on a side, so a strip crossing it is a couple of texels wide — magnified
-  // across a slab four hundred pixels across, an unblurred one arrives with
-  // its own staircase, which the coating's interference then paints in color.
-  const environment = pmrem.fromScene(buildRoom(), 0.075);
-  pmrem.dispose();
-  scene.environment = environment.texture;
+  scene.environment = environment;
 
   const camera = new PerspectiveCamera(FIELD_OF_VIEW, 1, 0.1, 40);
   camera.position.set(0, 0, CAMERA_DISTANCE);
@@ -385,9 +283,6 @@ const buildRig = (): Option<Rig> => {
   const fill = new HemisphereLight(0xeff3fb, 0xcdc8c1);
   scene.add(fill);
 
-  // The lookup textures the area light's integration needs, loaded once.
-  RectAreaLightUniformsLib.init();
-
   const strip = new RectAreaLight(0xffffff, 1, 16, 0.4);
   // On the same line as its reflection in the room, because it is the same
   // lamp: a strip the slab returns from one direction while being lit from
@@ -403,54 +298,26 @@ const buildRig = (): Option<Rig> => {
   strip.rotateZ(STRIP_LEAN);
   scene.add(strip);
 
-  // Multisampled, which FXAA on its own cannot be. The slab is four straight
-  // edges and a corner radius against a flat wall — geometric aliasing, which
-  // is what multisampling is for; the screen-space filter after it is left to
-  // clean up the shading, which is what that is for.
-  const composer = new EffectComposer(
-    renderer,
-    new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: 4 }),
-  );
-  composer.addPass(new RenderPass(scene, camera));
-
-  // The radius is what decides whether the wall stays a wall. A wide one
-  // spreads a glowing face over the whole stage until the background is the
-  // color and the slab has no edge left; this one keeps the spill against the
-  // edge that threw it.
-  const bloom = new UnrealBloomPass(new Vector2(1, 1), 0, BLOOM_RADIUS, 0.6);
-  composer.addPass(bloom);
-  composer.addPass(new OutputPass());
-  // Last, after tone mapping: FXAA works on luminance, and the luminance it
-  // should be reading is the one the shopper sees. A screen-space filter
-  // rather than multisampling, because the slab is four straight edges and a
-  // corner radius — there is nothing here that needs the expensive kind.
-  composer.addPass(new FXAAPass());
-
-  return Option.some({
-    renderer,
-    scene,
-    camera,
-    composer,
-    bloom,
-    slab,
-    wall,
-    key,
-    fill,
-    strip,
-    face,
-    grain,
-  });
+  return { scene, camera, slab, wall, key, fill, strip, face, grain };
 };
 
 /**
- * The rig, built the first time a stage asks for it.
+ * The slab's scene, built the first time a stage asks for it.
  *
- * A module-level binding because there is one GPU context per document and no
- * component owns it. `Option` rather than a nullable so that "not built yet"
- * and "cannot be built" are the same shape everywhere downstream.
+ * One for the document, because there is one of everything in it and only one
+ * stage is ever being drawn.
  */
 let theRig: Option<Rig> = Option.none;
-let rigAttempted = false;
+let attempted = false;
+
+const rigNow = (): Option<Rig> => {
+  if (!attempted) {
+    attempted = true;
+    theRig = Option.map(buildRig)(studio());
+  }
+
+  return theRig;
+};
 
 /**
  * The angle the shadow map was last rendered at.
@@ -463,30 +330,6 @@ let rigAttempted = false;
  */
 let shadowTilt: Option<Tilt> = Option.none;
 
-const rigNow = (): Option<Rig> => {
-  if (!rigAttempted) {
-    rigAttempted = true;
-    theRig = buildRig();
-    watchTheme();
-  }
-
-  return theRig;
-};
-
-/**
- * The room is themed and the pictures of it are not live, so every stage on
- * the page has to be repainted when the lights change. One observer for all of
- * them, because the theme is one fact about the document rather than a prop.
- */
-const watchTheme = (): void => {
-  new MutationObserver(() => {
-    for (const entry of painted.values()) repaint(entry);
-  }).observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ["class"],
-  });
-};
-
 /* -------------------------------------------------------------- the stages */
 
 /** One product's picture: what color, made of what, standing at what angle. */
@@ -496,28 +339,8 @@ export type StageView = Readonly<{
   tilt: Tilt;
 }>;
 
-/** A canvas the renderer has agreed to keep painting. */
-export type Stage = Readonly<{
-  /** Draw this view onto the canvas, now. */
-  draw: (view: StageView) => void;
-  /** Give the canvas back. Nothing is drawn on it afterwards. */
-  close: () => void;
-}>;
-
-/**
- * A canvas that is being painted, and the last thing painted on it.
- *
- * The view is kept so that a theme change or a resize can repaint a stage
- * nobody is pointing at, which is every stage but one.
- */
-type Painted = {
-  readonly context: CanvasRenderingContext2D;
-  readonly canvas: HTMLCanvasElement;
-  readonly observer: ResizeObserver;
-  view: Option<StageView>;
-};
-
-const painted = new Map<HTMLCanvasElement, Painted>();
+/** A canvas the renderer has agreed to keep painting a color onto. */
+export type Stage = GlStage<StageView>;
 
 /** One room, the same for every finish, so the wall is one gray everywhere. */
 const applyRoom = (rig: Rig, room: Room): void => {
@@ -529,25 +352,13 @@ const applyRoom = (rig: Rig, room: Room): void => {
 };
 
 /**
- * Point the slab, paint it, and copy the result onto the stage's own canvas.
+ * Paint the slab and point it, and say what the frame is then made of.
  *
  * Not re-entrant: it moves the one slab and the one material there is, so a
  * second call while it is running would draw the first stage's color onto the
- * second stage's canvas. Every call site is synchronous for that reason.
+ * second stage's canvas. `gl.ts` calls it synchronously for that reason.
  */
-const paint = (rig: Rig, entry: Painted, view: StageView): void => {
-  const width = Math.min(entry.canvas.width, MAX_EDGE);
-  const height = Math.min(entry.canvas.height, MAX_EDGE);
-
-  if (width === 0 || height === 0) return;
-
-  if (rig.renderer.domElement.width !== width || rig.renderer.domElement.height !== height) {
-    rig.renderer.setSize(width, height, false);
-    rig.composer.setSize(width, height);
-    rig.camera.aspect = width / height;
-    rig.camera.updateProjectionMatrix();
-  }
-
+const frameFor = (rig: Rig, view: StageView): Frame => {
   const surface = surfaceFor(view.finishing);
   const { face } = rig;
   const room = ROOMS[themeNow()];
@@ -607,85 +418,25 @@ const paint = (rig: Rig, entry: Painted, view: StageView): void => {
   })(shadowTilt);
   shadowTilt = Option.some(view.tilt);
 
-  rig.bloom.enabled = surface.bloom.strength > 0;
-  rig.bloom.strength = surface.bloom.strength * room.bloom;
-  rig.bloom.threshold = surface.bloom.threshold;
-
-  rig.renderer.setClearColor(rig.wall.color);
-  rig.composer.render();
-
-  entry.context.clearRect(0, 0, entry.canvas.width, entry.canvas.height);
-  entry.context.drawImage(rig.renderer.domElement, 0, 0, entry.canvas.width, entry.canvas.height);
-};
-
-const repaint = (entry: Painted): void => {
-  Option.match<Rig, void>({
-    onSome: (rig) =>
-      Option.match<StageView, void>({
-        onSome: (view) => paint(rig, entry, view),
-        onNone: () => undefined,
-      })(entry.view),
-    onNone: () => undefined,
-  })(rigNow());
+  return {
+    scene: rig.scene,
+    camera: rig.camera,
+    bloom: {
+      strength: surface.bloom.strength * room.bloom,
+      threshold: surface.bloom.threshold,
+    },
+    clear: rig.wall.color,
+  };
 };
 
 /**
- * Match the canvas's pixels to the space CSS gave it.
- *
- * Capped at two, above which the extra pixels cost the whole render and buy
- * nothing a shopper can see on a square this small.
- */
-const resize = (entry: Painted): boolean => {
-  const ratio = Math.min(window.devicePixelRatio, 2);
-  const width = Math.round(entry.canvas.clientWidth * ratio);
-  const height = Math.round(entry.canvas.clientHeight * ratio);
-
-  if (width === entry.canvas.width && height === entry.canvas.height) return false;
-
-  entry.canvas.width = width;
-  entry.canvas.height = height;
-
-  return true;
-};
-
-/**
- * Start painting a canvas, if there is anything to paint with.
+ * Start painting a color onto a canvas, if there is anything to paint with.
  *
  * `None` means this browser has no WebGL2, which the caller answers by showing
  * the color flat — a worse picture, but the right color, which is the part
  * the shop is actually selling.
  */
 export const openStage = (canvas: HTMLCanvasElement): Option<Stage> =>
-  Option.match<Rig, Option<Stage>>({
-    onNone: () => Option.none,
-    onSome: () => {
-      const context = canvas.getContext("2d");
-
-      if (context === null) return Option.none;
-
-      const entry: Painted = {
-        canvas,
-        context,
-        view: Option.none,
-        observer: new ResizeObserver(() => {
-          if (resize(entry)) repaint(entry);
-        }),
-      };
-
-      painted.set(canvas, entry);
-      entry.observer.observe(canvas);
-
-      return Option.some({
-        draw: (view) => {
-          entry.view = Option.some(view);
-          resize(entry);
-          repaint(entry);
-        },
-        close: () => {
-          entry.observer.disconnect();
-          painted.delete(canvas);
-        },
-      });
-    },
-  })(rigNow());
-
+  Option.flatMap((rig: Rig) =>
+    openGlStage<StageView>(canvas, (view) => frameFor(rig, view)),
+  )(rigNow());

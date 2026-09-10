@@ -7,22 +7,7 @@
  */
 
 import { DataTexture, RGBAFormat, RepeatWrapping, type Texture } from "three";
-
-/**
- * Mulberry32. Small, fast, and — the only property that matters here — the
- * same sequence on every machine, so the grain is part of the design rather
- * than something that differs per visit.
- */
-const randomFrom = (seed: number): (() => number) => {
-  let state = seed >>> 0;
-
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let drawn = Math.imul(state ^ (state >>> 15), 1 | state);
-    drawn = (drawn + Math.imul(drawn ^ (drawn >>> 7), 61 | drawn)) ^ drawn;
-    return ((drawn ^ (drawn >>> 14)) >>> 0) / 4294967296;
-  };
-};
+import { randomFrom } from "./seeded.ts";
 
 /** One edge of the grain tile, in pixels. */
 export const GRAIN_SIZE = 128;

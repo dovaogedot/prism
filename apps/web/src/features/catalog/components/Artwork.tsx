@@ -10,6 +10,9 @@
  * a color, and that can only be shown by showing it done. Those pictures are
  * rendered once at seed time from the finisher's one amount, so they cannot drift
  * from it either.
+ *
+ * A color's stage has a still standing behind it, and the switch in the header
+ * decides which of the two a visitor is shown.
  */
 
 import {
@@ -23,8 +26,10 @@ import {
   type ShiftDirection,
 } from "@prism/shared";
 import { match } from "ts-pattern";
+import { useRendering } from "../../../shared/render/use-rendering.ts";
 import { ColorStage } from "./ColorStage.tsx";
 import { Photograph } from "./Photograph.tsx";
+import { Swatch } from "./Swatch.tsx";
 
 /**
  * A surface written out as the three amounts that make it.
@@ -119,43 +124,59 @@ export type ArtworkProps = Readonly<{
   className?: string;
 }>;
 
-/** A product's picture: the stage for a color, and a drawn spec for the other two. */
+/** A product's picture: a stage where one can be drawn, and a still where not. */
 export const Artwork = ({
   spec,
   name,
   image,
   captioned = false,
   className = "",
-}: ArtworkProps) =>
-  match(spec)
-    .with({ kind: "color" }, (color) => (
-      <ColorStage
-        hex={color.hex}
-        finishing={{
-          roughness: color.roughness,
-          coatingNanometers: color.coatingNanometers,
-          emission: color.emission,
-        }}
-        image={image}
-        alt={describeSurface(`${name} — ${color.hex}`, color)}
-        {...(captioned ? { caption: color.hex } : {})}
-        className={className}
-      />
-    ))
-    .with({ kind: "finisher" }, (finisher) => (
-      <Photograph
-        image={image}
-        alt={finisherAlt(name, finisher)}
-        className={className}
-      />
-    ))
-    .with({ kind: "shifter" }, (shifter) => (
-      <div className={`overflow-hidden ${className}`}>
-        <ShiftDial
-          direction={shifter.direction}
-          arcDegrees={shifter.arcDegrees}
-          label={`${name} — turns a color ${shifter.arcDegrees}° ${DIRECTION_LABELS[shifter.direction].toLowerCase()}`}
+}: ArtworkProps) => {
+  const { rendering } = useRendering();
+
+  return (
+    match({ spec, rendering })
+      .with({ spec: { kind: "color" }, rendering: true }, ({ spec: color }) => (
+        <ColorStage
+          hex={color.hex}
+          finishing={{
+            roughness: color.roughness,
+            coatingNanometers: color.coatingNanometers,
+            emission: color.emission,
+          }}
+          image={image}
+          alt={describeSurface(`${name} — ${color.hex}`, color)}
+          {...(captioned ? { caption: color.hex } : {})}
+          className={className}
         />
-      </div>
-    ))
-    .exhaustive();
+      ))
+      .with({ spec: { kind: "color" } }, ({ spec: color }) => (
+        <Swatch
+          hex={color.hex}
+          image={image}
+          alt={describeSurface(`${name} — ${color.hex}`, color)}
+          {...(captioned ? { caption: color.hex } : {})}
+          className={className}
+        />
+      ))
+      .with({ spec: { kind: "finisher" } }, ({ spec: finisher }) => (
+        <Photograph
+          image={image}
+          alt={finisherAlt(name, finisher)}
+          className={className}
+        />
+      ))
+      // A dial is a drawing of two numbers rather than a picture of anything,
+      // so there is no live version of it for the switch to choose between.
+      .with({ spec: { kind: "shifter" } }, ({ spec: shifter }) => (
+        <div className={`overflow-hidden ${className}`}>
+          <ShiftDial
+            direction={shifter.direction}
+            arcDegrees={shifter.arcDegrees}
+            label={`${name} — turns a color ${shifter.arcDegrees}° ${DIRECTION_LABELS[shifter.direction].toLowerCase()}`}
+          />
+        </div>
+      ))
+      .exhaustive()
+  );
+};

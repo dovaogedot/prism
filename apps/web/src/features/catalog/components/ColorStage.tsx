@@ -14,32 +14,12 @@
 import { Option, type ProductImage } from "@prism/shared";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { match } from "ts-pattern";
+import { usePrefersStillness } from "../../../shared/motion/use-stillness.ts";
 import { openStage, type Stage } from "../artwork/scene.ts";
 import type { Finishing } from "../artwork/surfaces.ts";
 import { approach, REST, settled, tiltAt, type Tilt } from "../artwork/tilt.ts";
-
-const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
-
-/**
- * Whether the visitor has asked for less movement.
- *
- * The slab simply stays square on for them. Cutting the easing instead would
- * leave it snapping from angle to angle under the pointer, which is the one
- * thing worse than the animation.
- */
-const usePrefersStillness = (): boolean => {
-  const [still, setStill] = useState(() => window.matchMedia(REDUCED_MOTION).matches);
-
-  useEffect(() => {
-    const query = window.matchMedia(REDUCED_MOTION);
-    const onChange = (): void => setStill(query.matches);
-
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
-  }, []);
-
-  return still;
-};
+import { Placard } from "./Placard.tsx";
+import { Swatch } from "./Swatch.tsx";
 
 /**
  * What the stage is showing.
@@ -172,49 +152,34 @@ export const ColorStage = ({
     drawAt(standing.current);
   }, [hex, finishing]);
 
-  return (
-    <div
-      className={`stage ${className}`}
-      onPointerMove={aimAt}
-      onPointerLeave={() => {
-        target.current = REST;
-        startMoving();
-      }}
-    >
-      {match(showing)
-        .with({ _tag: "Rendered" }, () => (
-          <canvas ref={canvasRef} role="img" aria-label={alt} className="stage__canvas" />
-        ))
-        .with({ _tag: "Flat" }, () =>
-          match(image)
-            .with({ _tag: "Some" }, ({ value }) => (
-              <img
-                src={value.url}
-                alt={value.alt.length > 0 ? value.alt : alt}
-                loading="lazy"
-                decoding="async"
-                className="stage__flat"
-              />
-            ))
-            .with({ _tag: "None" }, () => (
-              <div
-                role="img"
-                aria-label={alt}
-                className="stage__flat"
-                style={{ backgroundColor: hex }}
-              />
-            ))
-            .exhaustive(),
-        )
-        .exhaustive()}
+  return match(showing)
+    .with({ _tag: "Flat" }, () => (
+      <Swatch
+        hex={hex}
+        image={image}
+        alt={alt}
+        {...(caption === undefined ? {} : { caption })}
+        className={className}
+      />
+    ))
+    .with({ _tag: "Rendered" }, () => (
+      <div
+        className={`stage ${className}`}
+        onPointerMove={aimAt}
+        onPointerLeave={() => {
+          target.current = REST;
+          startMoving();
+        }}
+      >
+        <canvas
+          ref={canvasRef}
+          role="img"
+          aria-label={alt}
+          className="stage__canvas"
+        />
 
-      {match(caption)
-        .with(undefined, () => null)
-        .otherwise((text) => (
-          // A placard beside the work rather than a label on it: the slab is
-          // the product, and printing on the product is not what a shop does.
-          <span className="stage__placard">{text}</span>
-        ))}
-    </div>
-  );
+        <Placard caption={Option.fromNullable(caption)} />
+      </div>
+    ))
+    .exhaustive();
 };
