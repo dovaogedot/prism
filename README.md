@@ -203,6 +203,14 @@ runner builds both images, pushes them to GHCR tagged with the commit SHA, and
 the server pulls and restarts. Rolling back needs no rebuild: point `.env` at an
 older tag and `up -d`.
 
+The migrations and the seed run first, on their own. If they fail, or the runner
+refuses the database because a migration it applied was edited afterward, the
+deploy stops there with the runner's output in the log, and the version already
+running keeps serving. A refusal is settled by running the workflow by hand with
+**Rebuild the database** ticked. That is the server's `./start.sh reset`: the
+database and the uploaded media are deleted, and the start builds both again
+from the migrations and the seed.
+
 Host side, there are two things: a `docker` group for the deploy account, and a
 proxy block pointing the subdomain at `WEB_PORT`.
 
@@ -896,7 +904,8 @@ the mechanism it was meant to protect.
 
 **Durability** — Postgres commits to the WAL before acknowledging, and the data directory
 is a named Docker volume, so a `docker compose down` and back up finds every account and
-order intact. Only `./start.sh reset` removes it.
+order intact. Only `./start.sh reset` removes it, or on the server a deploy run by hand
+with **Rebuild the database** ticked.
 
 ### Postgres, and how it scales from here
 

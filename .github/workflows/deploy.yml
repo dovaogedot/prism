@@ -7,9 +7,14 @@
 # Nothing is compiled on the server either. A box small enough to be cheap
 # runs this stack comfortably and cannot build it, so the runner builds both
 # images, pushes them to the registry tagged with the commit, and the deploy
-# step is a pull and an `up`. The tag is the commit SHA rather than `latest`,
-# so what is running is always traceable to one commit and a rollback is one
-# variable in the server's `.env`.
+# step is a pull, a migration and an `up`. The tag is the commit SHA rather
+# than `latest`, so what is running is always traceable to one commit and a
+# rollback is one variable in the server's `.env`.
+#
+# The migrations run on their own before anything is replaced. If they fail,
+# or the runner refuses the database because a migration it applied was
+# edited afterward, the deploy stops there with the runner's output in the
+# log, and the version already running keeps serving.
 
 name: Deploy
 
@@ -17,6 +22,14 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      # The way on from a refused migration, and the server's `./start.sh
+      # reset`: the database and the uploaded media are deleted, and the start
+      # builds both again from the migrations and the seed.
+      rebuild_database:
+        description: Rebuild the database from the migrations and the seed, deleting every account, order and upload
+        type: boolean
+        default: false
 
 concurrency:
   # A second push while a deploy is in flight waits for it rather than racing
@@ -196,12 +209,34 @@ jobs:
           printf '%s' "$TOKEN" | ssh -i ~/.ssh/id_deploy "$SSH_TARGET" \
             "docker login ghcr.io -u '$ACTOR' --password-stdin"
 
-      - name: Pull and start
+      - name: Pull the images
         run: |
           ssh -i ~/.ssh/id_deploy "$SSH_TARGET" "
             set -eu
             cd $DEPLOY_PATH
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull --quiet
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull --quiet"
+
+      # Takes the stack down with its volumes, so the start below creates an
+      # empty database, migrates it and seeds it. Only a run started by hand
+      # with the box ticked gets here.
+      - name: Delete the database
+        if: github.event_name == 'workflow_dispatch' && inputs.rebuild_database
+        run: |
+          ssh -i ~/.ssh/id_deploy "$SSH_TARGET" "
+            set -eu
+            cd $DEPLOY_PATH
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml down --volumes"
+
+      # The migration and the seed run by themselves first, attached, so their
+      # output lands in this log and a failure stops the deploy before any
+      # running container is replaced. `up` runs them again as the api's
+      # dependency and they find nothing left to do.
+      - name: Migrate and start
+        run: |
+          ssh -i ~/.ssh/id_deploy "$SSH_TARGET" "
+            set -eu
+            cd $DEPLOY_PATH
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm -T migrate
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
             docker logout ghcr.io"
 
