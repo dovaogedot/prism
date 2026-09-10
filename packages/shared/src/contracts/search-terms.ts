@@ -3,8 +3,8 @@
  *
  * Nothing in the catalog is filed under a label. A product carries only what it
  * physically is, and every word a shopper might type is resolved against those
- * facts instead: "shifters" is a category, "cw" is a direction, "matte" is a
- * stretch of the roughness axis, and "gold" is a region of the color cube.
+ * facts instead: "shifters" is a category, "cw" is a direction, "iridescent"
+ * is a stretch of the coating axis, and "gold" is a region of the color cube.
  * Anything left over is free text for full-text search.
  *
  * Pure functions over data the client already holds, which is what keeps them
@@ -33,7 +33,7 @@ const endsWithSibilant = (stem: string): boolean =>
  * "navies" → navy, "blushes" → blush.
  *
  * Deliberately not a general pluralizer. It leaves anything it does not
- * recognize alone, and a word that only looks plural — "gloss" — survives
+ * recognize alone, and a word that only looks plural — "roughness" — survives
  * because "-ss" is not a plural ending.
  */
 export const singular = (word: string): string => {

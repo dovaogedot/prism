@@ -95,11 +95,6 @@ const FINISH_COLUMNS = {
  * No threshold recovers it and nothing has to agree about where one finish
  * becomes another.
  *
- * Matte and gloss are the exception, and only because they are one thing: two
- * ends of the roughness a finisher leaves, split where a reflection stops being
- * worth naming. Both still require the column to be present, so a coating finisher
- * is neither.
- *
  * Scoped to finishers, because a color carries all three amounts at once and
  * has no single answer to which finish it is.
  */

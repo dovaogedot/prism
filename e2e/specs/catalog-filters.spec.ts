@@ -344,15 +344,15 @@ test.describe("search", () => {
   test("a finish name goes to the finishers that apply it", async ({ page }) => {
     // A finish is a thing a shopper buys, so the name of one is a shelf rather
     // than a search through the prose.
-    await searchBox(page).fill("gloss");
+    await searchBox(page).fill("roughness");
     await searchBox(page).press("Enter");
     await page.waitForLoadState("networkidle");
 
     await expect(page).toHaveURL(/category=finisher/);
-    // The name is the filter now, rather than a stretch of an axis it has to
-    // be translated into.
-    await expect(page).toHaveURL(/finish=gloss/);
-    await expect(rail(page).getByRole("radio", { name: /^Gloss/ })).toBeChecked();
+    // The name is the filter, rather than a stretch of an axis it has to be
+    // translated into.
+    await expect(page).toHaveURL(/finish=roughness/);
+    await expect(rail(page).getByRole("radio", { name: /^Roughness/ })).toBeChecked();
   });
 
   test("the family a search landed on can be cleared again", async ({ page }) => {

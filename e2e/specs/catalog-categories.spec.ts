@@ -79,7 +79,7 @@ test.describe("choosing a category", () => {
     // is bought for the one effect it produces, so its filter is the word.
     await expect(section(page, "Finish")).toBeVisible();
     await expect(section(page, "HSL")).toBeHidden();
-    for (const name of ["Matte", "Gloss", "Iridescent", "Fluorescent"]) {
+    for (const name of ["Roughness", "Iridescent", "Fluorescent"]) {
       await expect(rail(page).getByRole("radio", { name: new RegExp(`^${name}`) })).toBeVisible();
     }
     await expect(page.getByRole("slider", { name: /Roughness/ })).toHaveCount(0);

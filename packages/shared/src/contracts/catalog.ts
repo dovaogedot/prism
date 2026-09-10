@@ -24,13 +24,14 @@ export const PRODUCT_SORTS = [
 export type ProductSort = (typeof PRODUCT_SORTS)[number];
 
 /**
- * The four words people use for a surface.
+ * The three words people use for what a finish does to a surface.
  *
- * They name regions of the space the three amounts below span, so they are how
- * the catalog talks about itself. Nothing is stored as one of them.
+ * One per amount below: a grain, a coating and a glow. They name regions of
+ * the space those amounts span, so they are how the catalog talks about
+ * itself. Nothing is stored as one of them.
  */
-export const FINISHES = ["matte", "gloss", "iridescent", "fluorescent"] as const;
-/** One of the four words, as prose about a surface rather than a stored fact. */
+export const FINISHES = ["roughness", "iridescent", "fluorescent"] as const;
+/** One of the three words, as prose about a surface rather than a stored fact. */
 export type Finish = (typeof FINISHES)[number];
 
 /**
@@ -458,8 +459,7 @@ export const FINISH_AXES: Record<FinishProperty, NumericRange> = {
 
 /** How each finish is written out in the filter rail. */
 export const FINISH_LABELS: Record<Finish, string> = {
-  matte: "Matte",
-  gloss: "Gloss",
+  roughness: "Roughness",
   iridescent: "Iridescent",
   fluorescent: "Fluorescent",
 };
@@ -478,24 +478,18 @@ export type FinishBand = Readonly<{
 }>;
 
 /**
- * The amounts each of the four words picks out.
+ * The amounts each of the three words picks out.
  *
  * A finish name is a reading of the numbers rather than a value anything
- * stores, so this is where that reading is defined as something searchable:
- * a word becomes the stretch of one amount it names. Typing "gloss" is asking
- * for this band.
+ * stores, so this is where that reading is defined as something searchable: a
+ * word becomes the stretch of one amount it names. Typing "iridescent" is
+ * asking for this band. The three of them name different amounts, so they
+ * cannot overlap however wide each one is.
  */
 export const FINISH_BANDS: Record<Finish, FinishBand> = {
-  matte: {
-    property: "roughness",
-    range: { min: MATTE_FLOOR, max: ROUGHNESS_BOUNDS.max },
-  },
-  // Stops one short of the floor, so the two halves of the roughness axis
-  // partition it instead of both claiming the surface exactly on the line.
-  gloss: {
-    property: "roughness",
-    range: { min: ROUGHNESS_BOUNDS.min, max: MATTE_FLOOR - 1 },
-  },
+  // The whole axis. A grain is a grain at either end of it — a mirror and
+  // chalk are the two extremes of the same one thing being asked for.
+  roughness: { property: "roughness", range: ROUGHNESS_BOUNDS },
   iridescent: { property: "coating", range: COATING_BOUNDS },
   fluorescent: {
     property: "emission",

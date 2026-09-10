@@ -365,9 +365,10 @@ describe("facets", () => {
   });
 
   /**
-   * One finisher per finish word, which is every word there is. Seeded inside the
-   * tests that need them so the counts in the rest of this block stay about
-   * the colors.
+   * Four finishers over the three finish words, two of them on the grain, so a
+   * word that names a whole axis is seen counting more than one row. Seeded
+   * inside the tests that need them so the counts in the rest of this block
+   * stay about the colors.
    */
   const seedFinishers = async (): Promise<void> => {
     await insertProduct(harness, {
@@ -449,14 +450,13 @@ describe("facets", () => {
   };
 
   it("counts each finish over the finishers it names", async () => {
-    // The four words name finishers, not colors: a finisher is bought for the one effect
-    // it produces, so it has one answer to which finish it is. Matte and gloss
-    // are two ends of the same amount and partition it between them.
+    // The three words name finishers, not colors: a finisher is bought for the
+    // one effect it produces, so it has one answer to which finish it is, and
+    // a word counts every finisher that moves the amount it names.
     await seedFinishers();
     const counts = await finishCounts("?category=finisher");
 
-    expect(counts.get("matte")).toBe(1);
-    expect(counts.get("gloss")).toBe(1);
+    expect(counts.get("roughness")).toBe(2);
     expect(counts.get("iridescent")).toBe(1);
     expect(counts.get("fluorescent")).toBe(1);
   });
@@ -467,8 +467,7 @@ describe("facets", () => {
     await seedFinishers();
     const counts = await finishCounts("?category=finisher&finish=iridescent");
 
-    expect(counts.get("matte")).toBe(1);
-    expect(counts.get("gloss")).toBe(1);
+    expect(counts.get("roughness")).toBe(2);
     expect(counts.get("fluorescent")).toBe(1);
   });
 
@@ -484,23 +483,23 @@ describe("facets", () => {
         .map((item) => item["slug"])
         .sort();
 
-    // Each word picks out its own finisher and only its own. A finisher that lays a
-    // coating carries no roughness at all, so it is neither matte nor gloss —
-    // and asking for gloss cannot answer with the whole shelf.
-    expect(await slugsOf("gloss")).toEqual(["test-lacquer"]);
-    expect(await slugsOf("matte")).toEqual(["test-chalk"]);
+    // Each word picks out the finishers that move the amount it names and no
+    // others. A finisher that lays a coating carries no roughness at all, so
+    // asking for the grain cannot answer with the whole shelf.
+    expect(await slugsOf("roughness")).toEqual(["test-chalk", "test-lacquer"]);
     expect(await slugsOf("iridescent")).toEqual(["test-film"]);
     expect(await slugsOf("fluorescent")).toEqual(["test-lamp"]);
   });
 
-  it("leaves the four words out of the color shelf, which has no answer to them", async () => {
+  it("leaves the three words out of the color shelf, which has no answer to them", async () => {
     // A color carries all three amounts at once, so "which finish is it" has
     // no single answer for one. Colors are narrowed by the amounts instead,
     // each on its own axis, which is the test below.
     await seedFinishers();
 
-    expect(jsonOf(await get("/api/v1/products?category=color&finish=gloss"))["total"])
-      .toBe(0);
+    expect(
+      jsonOf(await get("/api/v1/products?category=color&finish=roughness"))["total"],
+    ).toBe(0);
   });
 
   it("narrows by each amount independently, and by several at once", async () => {

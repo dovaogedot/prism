@@ -91,13 +91,8 @@ export const BRANDS = [
   },
 ] as const;
 
-/** The four words, in the order the seed walks them. */
-export const FINISHES: readonly Finish[] = [
-  "matte",
-  "gloss",
-  "iridescent",
-  "fluorescent",
-];
+/** The three words, in the order the seed walks them. */
+export const FINISHES: readonly Finish[] = ["roughness", "iridescent", "fluorescent"];
 
 const CEREMONIAL = [
   "Screaming",
@@ -361,10 +356,8 @@ export const FINISHER_BRANCHES: readonly InstrumentSeed[] = [
 
 /** What the finish a finisher leaves says about it. */
 export const FINISHER_NOTES: Record<Finish, string> = {
-  matte:
-    "Leaves a surface that absorbs light and any follow-up questions. The most-returned finisher we stock, and the one we stand behind.",
-  gloss:
-    "Brings a color back to the reflectivity it had in the showroom. You will see yourself in it, which not everyone enjoys.",
+  roughness:
+    "Takes a surface to the grain on the tin, whether that is a mirror or a wall of chalk. The most-returned finisher we stock, and the one we stand behind.",
   iridescent:
     "Restores the disagreement between where you stand and what you see. Apply in a room with more than one chair.",
   fluorescent:

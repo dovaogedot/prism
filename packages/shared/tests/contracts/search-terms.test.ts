@@ -19,13 +19,13 @@ describe("singular", () => {
 
   it("leaves a singular alone", () => {
     expect(singular("gold")).toBe("gold");
-    expect(singular("matte")).toBe("matte");
+    expect(singular("iridescent")).toBe("iridescent");
   });
 
   it("does not mistake -ss for a plural", () => {
-    // The whole reason the rule checks for it: "gloss" is a finish, and
-    // "glos" is nothing at all.
-    expect(singular("gloss")).toBe("gloss");
+    // The whole reason the rule checks for it: "roughness" is a finish, and
+    // "roughnes" is nothing at all.
+    expect(singular("roughness")).toBe("roughness");
   });
 
   it("is case-insensitive", () => {
@@ -46,8 +46,14 @@ describe("resolveSearchTerm", () => {
   });
 
   it("reads a finish name as the finish filter", () => {
-    expect(resolveSearchTerm("gloss")).toEqual({ kind: "finish", finish: "gloss" });
-    expect(resolveSearchTerm("Matte")).toEqual({ kind: "finish", finish: "matte" });
+    expect(resolveSearchTerm("roughness")).toEqual({
+      kind: "finish",
+      finish: "roughness",
+    });
+    expect(resolveSearchTerm("Iridescent")).toEqual({
+      kind: "finish",
+      finish: "iridescent",
+    });
   });
 
   it("reads a direction however it is spelled", () => {

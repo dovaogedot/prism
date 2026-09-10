@@ -261,8 +261,8 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
       /**
        * One finish counted over the scope that ignores the finish filter.
        *
-       * `FILTER` rather than four statements: the four are four predicates
-       * over the same rows, so one pass answers all of them.
+       * `FILTER` rather than one statement each: they are predicates over the
+       * same rows, so one pass answers all of them.
        */
       const countWithin = (finish: Finish) =>
         sql<number>`count(*) FILTER (WHERE ${finishCondition(finish)})`.mapWith(Number);
@@ -296,8 +296,7 @@ export const createCatalogRepository = (db: Database): CatalogRepository => {
         scoped(
           db
             .select({
-              matte: countWithin("matte"),
-              gloss: countWithin("gloss"),
+              roughness: countWithin("roughness"),
               iridescent: countWithin("iridescent"),
               fluorescent: countWithin("fluorescent"),
             })
