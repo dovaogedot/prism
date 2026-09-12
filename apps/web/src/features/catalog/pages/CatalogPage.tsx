@@ -15,6 +15,7 @@ import { Api } from "../../../shared/api/client.ts";
 import { useDrawer } from "../../../shared/layout/drawer.ts";
 import { useWide } from "../../../shared/layout/use-wide.ts";
 import { Alert, Button, Skeleton } from "../../../shared/ui/index.ts";
+import { CategoryCards } from "../components/CategoryCards.tsx";
 import { Facets } from "../components/Facets.tsx";
 import { ProductCard } from "../components/ProductCard.tsx";
 import { SearchBox } from "../components/SearchBox.tsx";
@@ -66,7 +67,19 @@ export const CatalogPage = () => {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <div className="mb-8 flex gap-2 sm:gap-3">
+      <div className="mb-4">
+        {match(results.data)
+          .with(P.nullish, () => (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+              {[0, 1, 2, 3, 4, 5].map((index) => (
+                <Skeleton key={index} className="h-[3.75rem] w-full" />
+              ))}
+            </div>
+          ))
+          .otherwise((data) => <CategoryCards buckets={data.facets.categories} params={params} onChange={setParams} />)}
+      </div>
+
+      <div className="mb-8 flex gap-2">
         <SearchBox key={params.get("q") ?? ""} value={params.get("q") ?? ""} onSubmit={(text) => setParams(CatalogParams.set(params, "q", text))} />
 
         {match(wide)
@@ -76,7 +89,7 @@ export const CatalogPage = () => {
               <select
                 value={sort}
                 onChange={(event) => setParams(CatalogParams.set(params, "sort", event.target.value))}
-                className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink hover:border-line-strong"
+                className="h-[2.625rem] rounded-lg border border-line bg-surface px-3 text-sm text-ink hover:border-line-strong"
               >
                 {sortOptions}
               </select>

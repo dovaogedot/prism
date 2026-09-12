@@ -26,9 +26,9 @@ migrates and seeds the database, and prints where everything is:
 | Inbox for password-reset mail (Mailpit) | <http://localhost:8025> |
 
 The seed plants a demo shopper you can sign in as: `shopper@prism.test` with the password
-`correct horse battery staple`. It also plants categories, brands, products with
-properties, placeholder images and reviews, all drawn from a fixed random seed, so every
-fresh database holds the same shop.
+`correct horse battery staple`. It also plants categories, each with its own property
+vocabulary, plus brands, products, placeholder images and reviews, all drawn from a fixed
+random seed, so every fresh database holds the same shop.
 
 `./start.sh down` stops the stack. `./start.sh reset` also deletes the database and the
 media volume, so the next start migrates and seeds from nothing.
@@ -49,13 +49,16 @@ runs. `npm run typecheck` checks every workspace.
 
 ### Shopping
 
-The front page is the catalog. Type in the search box and product names that match appear
-as suggestions; submit to search names and descriptions. The rail beside the results offers
-every way to narrow them: one category, any number of brands, a price range, a minimum
-rating, and one group per property the matching products carry, with the number of matches
-next to each value. Counts within a group ignore that group's own choice, so picking one
-brand never hides the others. The sort menu orders by relevance, price either way, or
-rating. The filters live in the URL, so a filtered view is a link.
+The front page is the catalog. The category cards at the top pick one category; choosing it
+again clears it. Type in the search box and product names that match appear as suggestions;
+submit to search names and descriptions. The rail beside the results offers every other way
+to narrow them: any number of brands, a price range on a two-thumb slider between the
+cheapest and dearest match, a minimum rating in stars, and one group per property the
+matching products carry, with the number of matches next to each value. A group with many
+values folds behind "Show more". Counts within a group ignore that group's own choice, so
+picking one brand never hides the others. The sort menu orders by relevance, price either
+way, or rating. The filters live in the URL, so a filtered view is a link. On a narrow screen
+the rail is in the drawer behind the filter button.
 
 A product's page shows its pictures, price, stock, brand, category, rating, description,
 properties, and its weight and size in metric or imperial units.

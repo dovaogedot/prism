@@ -28,13 +28,79 @@ export type SeedReport =
   | Readonly<{ _tag: "Planted"; products: number }>
   | Readonly<{ _tag: "Present"; products: number }>;
 
+/** A placeholder category and the properties every product filed under it carries. */
+export type SeedCategory = Readonly<{ name: string; properties: Readonly<Record<string, () => string>> }>;
+
 export const Seed = {
   DEMO_EMAIL: "shopper@prism.test",
   DEMO_PASSWORD: "correct horse battery staple",
   PRODUCT_COUNT: 96,
-  CATEGORY_COUNT: 6,
   BRAND_COUNT: 8,
   REVIEWER_COUNT: 10,
+
+  /** A property whose value is drawn from a fixed list. */
+  choice:
+    (values: readonly string[]): (() => string) =>
+    () =>
+      faker.helpers.arrayElement(values),
+
+  /**
+   * The categories, each with its own property vocabulary, so the facets
+   * differ from one shelf to the next. The names are placeholder data; the
+   * shop reads whatever names the rows carry.
+   */
+  categories: (): readonly SeedCategory[] => [
+    {
+      name: "Computers",
+      properties: {
+        processor: Seed.choice(["Intel Core i5", "Intel Core i7", "AMD Ryzen 5", "AMD Ryzen 7", "Apple M3"]),
+        memory: Seed.choice(["8 GB", "16 GB", "32 GB", "64 GB"]),
+        storage: Seed.choice(["256 GB SSD", "512 GB SSD", "1 TB SSD", "2 TB SSD"]),
+        color: faker.color.human,
+      },
+    },
+    {
+      name: "Electronics",
+      properties: {
+        connectivity: Seed.choice(["Wi-Fi", "Bluetooth", "Wired", "5G"]),
+        power: Seed.choice(["Battery", "Rechargeable", "Mains"]),
+        warranty: Seed.choice(["1 year", "2 years", "3 years"]),
+        color: faker.color.human,
+      },
+    },
+    {
+      name: "Home",
+      properties: {
+        room: Seed.choice(["Kitchen", "Living room", "Bedroom", "Bathroom", "Office"]),
+        material: faker.commerce.productMaterial,
+        color: faker.color.human,
+      },
+    },
+    {
+      name: "Kids",
+      properties: {
+        age: Seed.choice(["0-2", "3-5", "6-9", "10+"]),
+        material: faker.commerce.productMaterial,
+        color: faker.color.human,
+      },
+    },
+    {
+      name: "Sports",
+      properties: {
+        sport: Seed.choice(["Running", "Cycling", "Swimming", "Football", "Yoga", "Hiking"]),
+        size: Seed.choice(["XS", "S", "M", "L", "XL"]),
+        color: faker.color.human,
+      },
+    },
+    {
+      name: "Automotive",
+      properties: {
+        vehicle: Seed.choice(["Car", "Motorcycle", "Truck", "Bicycle"]),
+        part: Seed.choice(["Interior", "Exterior", "Engine", "Wheels", "Electrical"]),
+        fit: Seed.choice(["Universal", "Model-specific"]),
+      },
+    },
+  ],
 
   /**
    * A URL-safe slug for a name, given a numeric suffix when `taken` already
@@ -80,13 +146,10 @@ export const Seed = {
       .returning({ id: users.id });
 
     const categorySlugs = new Set<string>();
+    const shelves = Seed.categories();
     const categoryRows = await db
       .insert(categories)
-      .values(
-        faker.helpers
-          .uniqueArray(faker.commerce.department, Seed.CATEGORY_COUNT)
-          .map((name) => ({ slug: Seed.slugOf(name, categorySlugs), name })),
-      )
+      .values(shelves.map((shelf) => ({ slug: Seed.slugOf(shelf.name, categorySlugs), name: shelf.name })))
       .returning({ id: categories.id });
 
     const brandSlugs = new Set<string>();
@@ -103,6 +166,10 @@ export const Seed = {
     for (let index = 1; index <= Seed.PRODUCT_COUNT; index += 1) {
       const name = faker.commerce.productName();
       const slug = Seed.slugOf(name, productSlugs);
+      const shelfIndex = faker.number.int({ min: 0, max: shelves.length - 1 });
+      const shelf = shelves[shelfIndex];
+      const category = categoryRows[shelfIndex];
+      if (shelf === undefined || category === undefined) continue;
 
       const [product] = await db
         .insert(products)
@@ -112,7 +179,7 @@ export const Seed = {
           description: faker.commerce.productDescription(),
           priceCents: Math.round(Number(faker.commerce.price({ min: 5, max: 900 })) * 100),
           stock: faker.number.int({ min: 0, max: 40 }),
-          categoryId: faker.helpers.arrayElement(categoryRows).id,
+          categoryId: category.id,
           brandId: faker.helpers.arrayElement(brandRows).id,
           weightGrams: faker.number.int({ min: 50, max: 20_000 }),
           widthMm: faker.number.int({ min: 20, max: 1200 }),
@@ -123,15 +190,13 @@ export const Seed = {
 
       if (product === undefined) continue;
 
-      // The property names are placeholder data too: whatever the rows say a
-      // product has is what the facets offer.
-      await db.insert(productProperties).values([
-        { productId: product.id, name: "color", value: faker.color.human() },
-        { productId: product.id, name: "material", value: faker.commerce.productMaterial() },
-        ...(faker.datatype.boolean()
-          ? [{ productId: product.id, name: "size", value: faker.helpers.arrayElement(["S", "M", "L", "XL"]) }]
-          : []),
-      ]);
+      await db.insert(productProperties).values(
+        Object.entries(shelf.properties).map(([propertyName, draw]) => ({
+          productId: product.id,
+          name: propertyName,
+          value: draw(),
+        })),
+      );
 
       const imageCount = faker.number.int({ min: 1, max: 3 });
       for (let position = 0; position < imageCount; position += 1) {
