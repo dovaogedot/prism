@@ -8,6 +8,7 @@
  */
 
 import {
+  Option,
   PRODUCT_SORTS,
   resolveSearchTerm,
   type Finish,
@@ -15,9 +16,13 @@ import {
   type ProductSort,
 } from "@prism/shared";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { api, toQueryString } from "../../../shared/api/client.ts";
+import { useDrawer } from "../../../shared/layout/drawer.ts";
+import { useWide } from "../../../shared/layout/use-wide.ts";
 import { Facets } from "../components/Facets.tsx";
 import { type FacetState, withoutHidden } from "../filters.ts";
 import { ProductCard, ProductCardSlot } from "../components/ProductCard.tsx";
@@ -37,9 +42,16 @@ const isSort = (value: string): value is ProductSort =>
 const splitList = (value: string): readonly string[] =>
   value.split(",").filter((entry) => entry.length > 0);
 
-/** The catalog: the search box, the filter rail, and the grid they narrow. */
+/**
+ * The catalog: the search box, the filter rail, and the grid they narrow.
+ *
+ * The rail stands beside the grid on a wide page and is in the layout's drawer
+ * on a narrow one, where a button beside the sort opens it.
+ */
 export const CatalogPage = () => {
   const [params, setParams] = useSearchParams();
+  const wide = useWide();
+  const drawer = useDrawer();
 
   const term = params.get("q") ?? "";
   const page = Number(params.get("page") ?? "1");
@@ -159,6 +171,23 @@ export const CatalogPage = () => {
     window.scrollTo({ top: 0, behavior: "instant" });
   };
 
+  const rail = match(results.data)
+    .with(P.nullish, () => (
+      <div className="space-y-3">
+        {[0, 1, 2, 3].map((index) => (
+          <Skeleton key={index} className="h-28 w-full" />
+        ))}
+      </div>
+    ))
+    .otherwise((data) => (
+      <Facets
+        facets={data.facets}
+        state={facetState}
+        onChange={(next) => update(next)}
+        onReset={() => setParams(new URLSearchParams())}
+      />
+    ));
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       <div className="mb-8 space-y-5">
@@ -175,42 +204,44 @@ export const CatalogPage = () => {
         <div className="flex flex-col gap-3 sm:flex-row">
           <SearchBox value={term} onSubmit={submitSearch} />
 
-          <label className="flex items-center gap-2 text-sm">
-            <span className="sr-only">Sort by</span>
-            <select
-              value={sort}
-              onChange={(event) => update({ sort: event.target.value })}
-              className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink hover:border-line-strong"
-            >
-              {PRODUCT_SORTS.map((option) => (
-                <option key={option} value={option}>
-                  {SORT_LABELS[option]}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="flex gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <span className="sr-only">Sort by</span>
+              <select
+                value={sort}
+                onChange={(event) => update({ sort: event.target.value })}
+                className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink hover:border-line-strong"
+              >
+                {PRODUCT_SORTS.map((option) => (
+                  <option key={option} value={option}>
+                    {SORT_LABELS[option]}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {match(wide)
+              .with(true, () => null)
+              .with(false, () => (
+                <Button tone="quiet" type="button" aria-haspopup="dialog" onClick={drawer.open}>
+                  Filters
+                </Button>
+              ))
+              .exhaustive()}
+          </div>
         </div>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[15rem_1fr]">
-        <aside>
-          {match(results.data)
-            .with(P.nullish, () => (
-              <div className="space-y-3">
-                {[0, 1, 2, 3].map((index) => (
-                  <Skeleton key={index} className="h-28 w-full" />
-                ))}
-              </div>
-            ))
-            .otherwise((data) => (
-              <Facets
-                facets={data.facets}
-                state={facetState}
-                onChange={(next) => update(next)}
-                onReset={() => setParams(new URLSearchParams())}
-              />
-            ))}
-        </aside>
+        {match(wide)
+          .with(true, () => <aside>{rail}</aside>)
+          .with(false, () =>
+            Option.match<HTMLElement, ReactNode>({
+              onSome: (slot) => createPortal(rail, slot),
+              onNone: () => null,
+            })(drawer.slot),
+          )
+          .exhaustive()}
 
         {/*
           A floor under the results, so narrowing 240 colors down to 3 does

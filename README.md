@@ -816,12 +816,12 @@ compile one. What separates the two is the size of the canvas — a card is abou
 of the pixels — and how many frames it draws.
 
 **A switch in the header decides whether any of it is drawn**, next to the light and dark
-one and working the same way. It starts where the machine is: a browser whose "GPU" is
-really the CPU is shown the stills, which is a better page than a grid that arrives two
-seconds late. Once a visitor flips it, their choice outranks the machine and is remembered,
-so a software rasterizer draws live once it is asked to. A browser with no WebGL2 has
-nothing to draw live with and is not offered the switch. Off, every stage is its still from
-the front, under the theme in force,
+one and working the same way; on a narrow page both switches are in the drawer instead. It
+starts where the machine is: a browser whose "GPU" is really the CPU is shown the stills,
+which is a better page than a grid that arrives two seconds late. Once a visitor flips it,
+their choice outranks the machine and is remembered, so a software rasterizer draws live
+once it is asked to. A browser with no WebGL2 has nothing to draw live with and is not
+offered the switch. Off, every stage is its still from the front, under the theme in force,
 and a color with no still is its hex. `prefers-reduced-motion` is a different
 question and keeps its own answer: it stops the movement, not the drawing, so a room still
 arrives and simply stands still.
@@ -1031,7 +1031,8 @@ be a worse product and no safer.
 
 *End-to-end* — Playwright against the running stack, for the things that only exist in
 a browser: that the filter rail does not reflow, that dragging the hue ring works, that the
-rail offers each category only the controls that category has, that the artwork draws and
+rail offers each category only the controls that category has, that on a phone the header
+stays on one line and the filters and switches are in a drawer, that the artwork draws and
 answers the pointer and stays inside its own stage, and that the auth routes send
 you where they should — including that signing in lands on the catalog rather than the
 account page, which depends on a redirect and a form navigation resolving in the same tick.
@@ -1204,5 +1205,9 @@ responsive, keyboard-navigable, and honors `prefers-reduced-motion` and
 blue accents in daylight, yellow after dark, and near-neutral chrome throughout so that the
 only vivid things on the page are the products. Beside it is a second toggle on the same
 pattern, over what the machine can draw rather than what the system prefers: it turns the
-live artwork off and leaves the still pictures in its place. Where effort has gone into the interface it
-has gone into showing a product honestly, which for a color means the artwork above.
+live artwork off and leaves the still pictures in its place. On a page too narrow for the
+filter rail to stand beside the results, both toggles and the catalog's filters are in a
+drawer that opens from the left, behind a button at the start of the header, and the header
+keeps the wordmark and the account links, each on one line. Where effort has gone into the
+interface it has gone into showing a product honestly, which for a color means the artwork
+above.
