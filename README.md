@@ -1034,7 +1034,8 @@ be a worse product and no safer.
 *End-to-end* — Playwright against the running stack, for the things that only exist in
 a browser: that the filter rail does not reflow, that dragging the hue ring works, that the
 rail offers each category only the controls that category has, that on a phone the header
-stays on one line, the filters and switches are in a drawer, and a finger drawn across a
+stays on one line, the drawer slides in holding the filters, the switches and signing out,
+the sort and the filters are icons beside the search box, and a finger drawn across a
 picture turns it while one drawn up the page still scrolls it, that the artwork draws and
 answers the pointer and stays inside its own stage, and that the auth routes send
 you where they should — including that signing in lands on the catalog rather than the
@@ -1210,7 +1211,9 @@ only vivid things on the page are the products. Beside it is a second toggle on 
 pattern, over what the machine can draw rather than what the system prefers: it turns the
 live artwork off and leaves the still pictures in its place. On a page too narrow for the
 filter rail to stand beside the results, both toggles and the catalog's filters are in a
-drawer that opens from the left, behind a button at the start of the header, and the header
-keeps the wordmark and the account links, each on one line. Where effort has gone into the
+drawer that slides in from the left, behind a button at the start of the header, and the
+header keeps the wordmark and the account links, each on one line. Signed in, the account
+is an icon that opens the account page, and signing out is held at the foot of the drawer.
+The sort and the filters are icons on the search box's row. Where effort has gone into the
 interface it has gone into showing a product honestly, which for a color means the artwork
 above.

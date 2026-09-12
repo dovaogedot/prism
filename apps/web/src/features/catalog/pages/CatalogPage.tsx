@@ -36,6 +36,10 @@ const SORT_LABELS: Record<ProductSort, string> = {
   rating: "Best rated",
 };
 
+/** The square a control drawn as an icon sits in, beside the search box on a narrow page. */
+const ICON_CONTROL =
+  "grid size-[2.625rem] shrink-0 place-items-center rounded-lg border border-line bg-surface text-ink-soft hover:border-line-strong";
+
 const isSort = (value: string): value is ProductSort =>
   PRODUCT_SORTS.some((sort) => sort === value);
 
@@ -171,6 +175,15 @@ export const CatalogPage = () => {
     window.scrollTo({ top: 0, behavior: "instant" });
   };
 
+  const sortOptions = PRODUCT_SORTS.map((option) => (
+    <option key={option} value={option}>
+      {SORT_LABELS[option]}
+    </option>
+  ));
+
+  /** Whether any filter narrows the shelf, which the filters' icon shows. */
+  const filtered = Object.values(facetState).some((value) => value.length > 0);
+
   const rail = match(results.data)
     .with(P.nullish, () => (
       <div className="space-y-3">
@@ -201,35 +214,80 @@ export const CatalogPage = () => {
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <SearchBox value={term} onSubmit={submitSearch} />
+        {match(wide)
+          .with(true, () => (
+            <div className="flex gap-3">
+              <SearchBox value={term} onSubmit={submitSearch} />
 
-          <div className="flex gap-3">
-            <label className="flex items-center gap-2 text-sm">
-              <span className="sr-only">Sort by</span>
-              <select
-                value={sort}
-                onChange={(event) => update({ sort: event.target.value })}
-                className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink hover:border-line-strong"
+              <label className="flex items-center gap-2 text-sm">
+                <span className="sr-only">Sort by</span>
+                <select
+                  value={sort}
+                  onChange={(event) => update({ sort: event.target.value })}
+                  className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink hover:border-line-strong"
+                >
+                  {sortOptions}
+                </select>
+              </label>
+            </div>
+          ))
+          .with(false, () => (
+            <div className="flex gap-2">
+              <SearchBox value={term} onSubmit={submitSearch} />
+
+              {/*
+                The select is laid invisibly over its icon, so a tap opens the
+                phone's own picker and the control keeps its name. The icon
+                takes the accent while anything but relevance is chosen, and
+                the filters' icon while any filter is set.
+              */}
+              <label
+                className={`${ICON_CONTROL} relative focus-within:border-accent ${sort === "relevance" ? "" : "text-accent"}`}
               >
-                {PRODUCT_SORTS.map((option) => (
-                  <option key={option} value={option}>
-                    {SORT_LABELS[option]}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <span className="sr-only">Sort by</span>
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  className="size-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M7.5 19V5M4.5 8l3-3 3 3M16.5 5v14M13.5 16l3 3 3-3" />
+                </svg>
+                <select
+                  value={sort}
+                  onChange={(event) => update({ sort: event.target.value })}
+                  className="absolute inset-0 size-full cursor-pointer opacity-0"
+                >
+                  {sortOptions}
+                </select>
+              </label>
 
-            {match(wide)
-              .with(true, () => null)
-              .with(false, () => (
-                <Button tone="quiet" type="button" aria-haspopup="dialog" onClick={drawer.open}>
-                  Filters
-                </Button>
-              ))
-              .exhaustive()}
-          </div>
-        </div>
+              <button
+                type="button"
+                aria-label="Filters"
+                aria-haspopup="dialog"
+                onClick={drawer.open}
+                className={`${ICON_CONTROL} ${filtered ? "text-accent" : ""}`}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="size-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M4 5.5h16l-6.2 7.2v5.6l-3.6 1.9v-7.5z" />
+                </svg>
+              </button>
+            </div>
+          ))
+          .exhaustive()}
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[15rem_1fr]">

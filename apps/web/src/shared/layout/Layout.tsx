@@ -127,7 +127,7 @@ const Wordmark = () => (
 
 /**
  * The header and footer every page sits between, and the drawer a narrow page
- * keeps its switches in.
+ * keeps its switches and signing out in.
  *
  * Every page under it can put its own part of the drawer in through
  * `useDrawer`. The drawer closes when the page widens past the width it is for
@@ -165,6 +165,10 @@ export const Layout = () => {
   }, []);
 
   useEffect(close, [wide, pathname, close]);
+
+  const leave = (): void => {
+    void signOut().then(() => navigate("/"));
+  };
 
   const drawer: Drawer = useMemo(() => ({ slot, open }), [slot, open]);
 
@@ -216,18 +220,33 @@ export const Layout = () => {
             {match(session)
               .with({ _tag: "Some" }, ({ value }) => (
                 <div className="flex shrink-0 items-center gap-1">
+                  {/*
+                    A narrow page has no room for the address, so the account
+                    is an icon there and signing out is in the drawer.
+                  */}
+                  <Link to="/account" aria-label="Your account" className={`${LOOKS.icon} lg:hidden`}>
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="size-5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                    >
+                      <circle cx="12" cy="8.5" r="3.8" />
+                      <path d="M4.5 20.5c1.2-3.6 4.1-5.6 7.5-5.6s6.3 2 7.5 5.6" />
+                    </svg>
+                  </Link>
                   <Link
                     to="/account"
-                    className="hidden max-w-[13rem] truncate rounded-lg px-3 py-1.5 text-sm font-medium text-ink-soft hover:bg-sunken hover:text-ink sm:block"
+                    className="hidden max-w-[13rem] truncate rounded-lg px-3 py-1.5 text-sm font-medium text-ink-soft hover:bg-sunken hover:text-ink lg:block"
                   >
                     {value.email}
                   </Link>
                   <button
                     type="button"
-                    onClick={() => {
-                      void signOut().then(() => navigate("/"));
-                    }}
-                    className="whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-medium text-ink-soft hover:bg-sunken hover:text-ink sm:px-3"
+                    onClick={leave}
+                    className="hidden whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium text-ink-soft hover:bg-sunken hover:text-ink lg:block"
                   >
                     Sign out
                   </button>
@@ -263,8 +282,8 @@ export const Layout = () => {
             if (event.target === event.currentTarget) close();
           }}
         >
-          <div className="flex h-full flex-col gap-5 overflow-y-auto p-4">
-            <div className="flex items-center justify-between">
+          <div className="flex h-full flex-col">
+            <div className="flex items-center justify-between p-4">
               <span className="text-sm font-semibold text-ink">Menu</span>
               <button
                 type="button"
@@ -285,12 +304,44 @@ export const Layout = () => {
               </button>
             </div>
 
-            <div className="space-y-1 border-b border-line pb-4">
-              <RenderToggle look="row" />
-              <ThemeToggle look="row" />
+            <div className="flex-1 space-y-5 overflow-y-auto px-4 pb-4">
+              <div className="space-y-1 border-b border-line pb-4">
+                <RenderToggle look="row" />
+                <ThemeToggle look="row" />
+              </div>
+
+              <div ref={holdSlot} />
             </div>
 
-            <div ref={holdSlot} />
+            {/* Held at the foot of the drawer, however long what is above it runs. */}
+            {match(session)
+              .with({ _tag: "Some" }, () => (
+                <div className="border-t border-line p-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      close();
+                      leave();
+                    }}
+                    className={LOOKS.row}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="size-5 shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M14.5 4.5h3a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h9.5" />
+                    </svg>
+                    <span>Sign out</span>
+                  </button>
+                </div>
+              ))
+              .with({ _tag: "None" }, () => null)
+              .exhaustive()}
           </div>
         </dialog>
 

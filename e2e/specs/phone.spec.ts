@@ -2,15 +2,17 @@
  * The shop on a phone.
  *
  * Below the width the filters stand beside the results at, the header keeps
- * the wordmark, the account links and a button that opens a drawer, and the
- * drawer holds the switches and, on the catalog, the filters. A finger drawn
- * across a picture turns it. What these cover is that nothing in the header
- * wraps or runs past its edge, that the switches and the filters are in the
- * drawer rather than on the page, that a filter set from the drawer narrows
- * the shelf, and that a finger turns a picture and still scrolls the page.
+ * the wordmark, the account and a button that opens a drawer, and the drawer
+ * slides in holding the switches, signing out and, on the catalog, the
+ * filters. The sort and the filters are icons on the search box's row, and a
+ * finger drawn across a picture turns it. What these cover is that nothing in
+ * the header wraps or runs past its edge, that each of those things is where
+ * it is meant to be and works from there, and that the drawer moves rather
+ * than appears.
  */
 
 import { devices, expect, test, type Page } from "@playwright/test";
+import { SHOPPER } from "../support/accounts.ts";
 import { DRAWN, drawn, pretendGpu, signature } from "../support/stages.ts";
 
 const PHONE = devices["Pixel 7"];
@@ -40,6 +42,16 @@ const ready = async (page: Page): Promise<void> => {
   await expect(results(page).getByRole("article").first()).toBeVisible();
 };
 
+/** Signs the shopper in, and waits for the header to show the account. */
+const signIn = async (page: Page): Promise<void> => {
+  await page.goto("/login");
+  await page.getByLabel("Email address").fill(SHOPPER.email);
+  await page.getByLabel("Password").fill(SHOPPER.password);
+  await page.getByRole("button", { name: "Sign in" }).tap();
+
+  await expect(page.getByRole("banner").getByRole("link", { name: "Your account" })).toBeVisible();
+};
+
 /**
  * How many lines each piece of text on show in the header runs to, and how
  * far the header's row runs past its own width, in CSS pixels.
@@ -66,6 +78,42 @@ const headerLayout = (page: Page) =>
 
     return { texts, overflow: row === null ? 0 : row.scrollWidth - row.clientWidth };
   });
+
+/**
+ * Where the drawer's left edge is as it starts to move and as it arrives, in
+ * CSS pixels, and what the move carries, after the menu button is pressed or
+ * the close button is. Resolves once the move is over.
+ *
+ * Both edges are read off the drawer's own transitions rather than off the
+ * clock: the first right as they begin, the second with them taken to their
+ * last millisecond. The last one rather than the end itself, because a drawer
+ * that has slid out is no longer displayed and has no edge to read.
+ */
+const slide = (page: Page, button: "Open menu" | "Close menu") =>
+  page.evaluate(async (name) => {
+    const drawer = document.querySelector<HTMLDialogElement>("dialog.drawer");
+
+    document.querySelector<HTMLButtonElement>(`button[aria-label="${name}"]`)?.click();
+
+    if (drawer === null) return { from: Number.NaN, to: Number.NaN, width: 0, moves: [] };
+
+    const moving = drawer
+      .getAnimations()
+      .filter((animation): animation is CSSTransition => animation instanceof CSSTransition);
+    const { left: from, width } = drawer.getBoundingClientRect();
+
+    for (const animation of moving) {
+      const end = animation.effect?.getComputedTiming().endTime;
+
+      if (typeof end === "number") animation.currentTime = end - 1;
+    }
+
+    const to = drawer.getBoundingClientRect().left;
+
+    await Promise.all(moving.map((animation) => animation.finished));
+
+    return { from, to, width, moves: moving.map((animation) => animation.transitionProperty) };
+  }, button);
 
 /** Sends one step of a single finger to the page, at a point in CSS pixels. */
 type Finger = (kind: "touchStart" | "touchMove" | "touchEnd", x: number, y: number) => Promise<void>;
@@ -119,6 +167,23 @@ test("keeps the switches out of the header, and in the drawer", async ({ page })
   ).toBeVisible();
 });
 
+test("slides the drawer in from the edge, and back out", async ({ page }) => {
+  await page.goto("/");
+
+  const opening = await slide(page, "Open menu");
+
+  expect(opening.moves).toContain("translate");
+  expect(opening.from).toBeLessThanOrEqual(-opening.width + 1);
+  expect(opening.to).toBeCloseTo(0, 0);
+
+  const closing = await slide(page, "Close menu");
+
+  expect(closing.moves).toContain("translate");
+  expect(closing.from).toBeCloseTo(0, 0);
+  expect(closing.to).toBeLessThanOrEqual(-closing.width + 1);
+  await expect(drawer(page)).toBeHidden();
+});
+
 test("keeps the filters in the drawer, and narrows the shelf from there", async ({ page }) => {
   await page.goto("/");
   await ready(page);
@@ -140,6 +205,89 @@ test("keeps the filters in the drawer, and narrows the shelf from there", async 
 
   await expect(drawer(page)).toBeHidden();
   await ready(page);
+});
+
+test("puts the sort and the filters as icons on the search box's row", async ({ page }) => {
+  for (const width of [NARROWEST, PHONE.viewport.width]) {
+    await page.setViewportSize({ width, height: PHONE.viewport.height });
+    await page.goto("/");
+    await ready(page);
+
+    const search = await page.getByRole("combobox", { name: "Search colors" }).boundingBox();
+    const sort = page.getByRole("combobox", { name: "Sort by" });
+    const sortBox = await sort.boundingBox();
+    const filtersBox = await page.getByRole("button", { name: "Filters", exact: true }).boundingBox();
+
+    expect([search, sortBox, filtersBox]).not.toContain(null);
+    if (search === null || sortBox === null || filtersBox === null) return;
+
+    const middle = (box: { y: number; height: number }): number => box.y + box.height / 2;
+
+    // One row: every control centered on the search box's line, left to right,
+    // and none of them past the page's edge.
+    expect(Math.abs(middle(sortBox) - middle(search))).toBeLessThanOrEqual(1);
+    expect(Math.abs(middle(filtersBox) - middle(search))).toBeLessThanOrEqual(1);
+    expect(search.x + search.width).toBeLessThanOrEqual(sortBox.x);
+    expect(sortBox.x + sortBox.width).toBeLessThanOrEqual(filtersBox.x);
+    expect(filtersBox.x + filtersBox.width).toBeLessThanOrEqual(width);
+
+    // An icon is a square, where a word would run wider than it is tall.
+    for (const box of [sortBox, filtersBox]) {
+      expect(Math.abs(box.width - box.height)).toBeLessThanOrEqual(1);
+    }
+  }
+
+  // The tap on the sort's icon lands on the select, which sorts the shelf.
+  const sort = page.getByRole("combobox", { name: "Sort by" });
+
+  await sort.tap({ trial: true });
+  await sort.selectOption("price_asc");
+  await expect(page).toHaveURL(/sort=price_asc/);
+});
+
+test.describe("signed in", () => {
+  test("puts the account in the header, and signing out at the foot of the drawer", async ({
+    page,
+  }) => {
+    await signIn(page);
+    await page.goto("/");
+    await ready(page);
+
+    const header = page.getByRole("banner");
+
+    await expect(header.getByRole("button", { name: "Sign out" })).toHaveCount(0);
+
+    await header.getByRole("link", { name: "Your account" }).tap();
+    await expect(page).toHaveURL(/\/account$/);
+
+    // Back on the catalog, where the filters run the drawer past its own
+    // height, so the foot is held there rather than reached by scrolling.
+    await page.goto("/");
+    await ready(page);
+    await header.getByRole("button", { name: "Open menu" }).tap();
+
+    const signOut = drawer(page).getByRole("button", { name: "Sign out" });
+    const box = await signOut.boundingBox();
+    const viewport = page.viewportSize();
+
+    expect(box).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    if (box === null || viewport === null) return;
+
+    const scroller = await drawer(page).evaluate((dialog) => {
+      const inside = dialog.querySelector(".overflow-y-auto");
+
+      return { runs: inside?.scrollHeight ?? 0, shows: inside?.clientHeight ?? 0 };
+    });
+
+    expect(scroller.runs).toBeGreaterThan(scroller.shows);
+    expect(viewport.height - (box.y + box.height)).toBeLessThanOrEqual(20);
+
+    await signOut.tap();
+
+    await expect(drawer(page)).toBeHidden();
+    await expect(header.getByRole("link", { name: "Sign in" })).toBeVisible();
+  });
 });
 
 test.describe("a phone that can draw", () => {
