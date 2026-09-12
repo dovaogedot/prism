@@ -117,21 +117,23 @@ export const FinisherStage = ({
   };
 
   /**
-   * A finger is not a pointer in the sense this needs: it arrives already on
-   * the stage, drags the page rather than traveling over it, and leaves
-   * without a `pointerleave` to put the room back. So a touch moves nothing.
+   * Move the room toward where the pointer or the finger is over it.
+   *
+   * A finger moves it while it is down. The stage leaves a drag up or down to
+   * the page, so a finger drawn sideways moves the room and one drawn up or
+   * down scrolls past it. Lifting the finger puts the room back, the same as
+   * a pointer leaving.
    */
   const aimAt = (event: PointerEvent<HTMLDivElement>): void => {
     const bounds = event.currentTarget.getBoundingClientRect();
 
-    moving.current =
-      still || event.pointerType === "touch"
-        ? released(moving.current)
-        : aimedAt(
-            moving.current,
-            { x: event.clientX - bounds.left, y: event.clientY - bounds.top },
-            bounds,
-          );
+    moving.current = still
+      ? released(moving.current)
+      : aimedAt(
+          moving.current,
+          { x: event.clientX - bounds.left, y: event.clientY - bounds.top },
+          bounds,
+        );
 
     startMoving();
   };
@@ -191,6 +193,7 @@ export const FinisherStage = ({
   return (
     <div
       className={`stage ${className}`}
+      onPointerDown={aimAt}
       onPointerMove={aimAt}
       onPointerLeave={() => {
         moving.current = released(moving.current);

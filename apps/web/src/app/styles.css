@@ -153,6 +153,9 @@
   .stage {
     position: relative;
     overflow: hidden;
+    /* A finger drawn sideways turns what is on the stage; one drawn up or down
+       is left to the page, which scrolls. */
+    touch-action: pan-y;
     /* Held under the canvas for the frame before the first render lands, and
        behind a flat swatch on a browser with no WebGL to render into. */
     background-color: var(--color-sunken);

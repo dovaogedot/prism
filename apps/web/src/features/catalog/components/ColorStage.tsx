@@ -103,20 +103,19 @@ export const ColorStage = ({
   };
 
   /**
-   * A finger is not a pointer in the sense this needs: it arrives already on
-   * the slab, drags the page rather than traveling over it, and leaves without
-   * a `pointerleave` to put the slab back. So a touch turns nothing.
+   * Turn the slab toward where the pointer or the finger is over it.
+   *
+   * A finger turns it while it is down. The stage leaves a drag up or down to
+   * the page, so a finger drawn sideways turns the slab and one drawn up or
+   * down scrolls past it. Lifting the finger puts the slab back, the same as a
+   * pointer leaving.
    */
   const aimAt = (event: PointerEvent<HTMLDivElement>): void => {
     const bounds = event.currentTarget.getBoundingClientRect();
 
-    target.current =
-      still || event.pointerType === "touch"
-        ? REST
-        : tiltAt(
-            { x: event.clientX - bounds.left, y: event.clientY - bounds.top },
-            bounds,
-          );
+    target.current = still
+      ? REST
+      : tiltAt({ x: event.clientX - bounds.left, y: event.clientY - bounds.top }, bounds);
 
     startMoving();
   };
@@ -166,6 +165,7 @@ export const ColorStage = ({
     .with({ _tag: "Rendered" }, () => (
       <div
         className={`stage ${className}`}
+        onPointerDown={aimAt}
         onPointerMove={aimAt}
         onPointerLeave={() => {
           target.current = REST;

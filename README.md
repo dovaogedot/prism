@@ -645,6 +645,8 @@ the environment, and `scene.ts` builds the slab's room on top of it. Those two a
 referential transparency stops, because a GPU context is a resource rather than a value. The component between them owns a canvas, turns the pointer into an angle, and
 runs the frames — none of it through React state, because re-rendering a card's subtree
 sixty times a second to move a number no React tree reads is not what React is for.
+A finger is a pointer too, for as long as it is down: drawn sideways it turns the picture,
+drawn up or down it scrolls the page, and lifted it puts the picture back.
 
 A browser with no WebGL2 gets the stills instead, and so does one whose "GPU" is really the
 CPU — a grid of stills that arrives at once is a better page than a grid of lit ones that
@@ -1032,7 +1034,8 @@ be a worse product and no safer.
 *End-to-end* — Playwright against the running stack, for the things that only exist in
 a browser: that the filter rail does not reflow, that dragging the hue ring works, that the
 rail offers each category only the controls that category has, that on a phone the header
-stays on one line and the filters and switches are in a drawer, that the artwork draws and
+stays on one line, the filters and switches are in a drawer, and a finger drawn across a
+picture turns it while one drawn up the page still scrolls it, that the artwork draws and
 answers the pointer and stays inside its own stage, and that the auth routes send
 you where they should — including that signing in lands on the catalog rather than the
 account page, which depends on a redirect and a form navigation resolving in the same tick.

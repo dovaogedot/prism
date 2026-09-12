@@ -3,13 +3,15 @@
  *
  * Below the width the filters stand beside the results at, the header keeps
  * the wordmark, the account links and a button that opens a drawer, and the
- * drawer holds the switches and, on the catalog, the filters. What these cover
- * is that nothing in the header wraps or runs past its edge, that the switches
- * and the filters are in the drawer rather than on the page, and that a filter
- * set from the drawer narrows the shelf.
+ * drawer holds the switches and, on the catalog, the filters. A finger drawn
+ * across a picture turns it. What these cover is that nothing in the header
+ * wraps or runs past its edge, that the switches and the filters are in the
+ * drawer rather than on the page, that a filter set from the drawer narrows
+ * the shelf, and that a finger turns a picture and still scrolls the page.
  */
 
 import { devices, expect, test, type Page } from "@playwright/test";
+import { DRAWN, drawn, pretendGpu, signature } from "../support/stages.ts";
 
 const PHONE = devices["Pixel 7"];
 
@@ -65,6 +67,28 @@ const headerLayout = (page: Page) =>
     return { texts, overflow: row === null ? 0 : row.scrollWidth - row.clientWidth };
   });
 
+/** Sends one step of a single finger to the page, at a point in CSS pixels. */
+type Finger = (kind: "touchStart" | "touchMove" | "touchEnd", x: number, y: number) => Promise<void>;
+
+/**
+ * A finger on the page.
+ *
+ * Driven through the browser's input rather than through script, so the page
+ * receives what a phone sends it: touch and pointer events together, with
+ * the browser deciding from the stage's touch action whether a drag is the
+ * page's to scroll.
+ */
+const fingerOn = async (page: Page): Promise<Finger> => {
+  const session = await page.context().newCDPSession(page);
+
+  return async (kind, x, y) => {
+    await session.send("Input.dispatchTouchEvent", {
+      type: kind,
+      touchPoints: kind === "touchEnd" ? [] : [{ x, y }],
+    });
+  };
+};
+
 test("keeps every word in the header on one line, inside the header", async ({ page }) => {
   for (const width of [NARROWEST, PHONE.viewport.width]) {
     await page.setViewportSize({ width, height: PHONE.viewport.height });
@@ -116,4 +140,72 @@ test("keeps the filters in the drawer, and narrows the shelf from there", async 
 
   await expect(drawer(page)).toBeHidden();
   await ready(page);
+});
+
+test.describe("a phone that can draw", () => {
+  test.beforeEach(async ({ page }) => {
+    await pretendGpu(page);
+  });
+
+  for (const [what, shelf] of [
+    ["a color", "/?category=color"],
+    ["a finisher's room", "/?category=finisher"],
+  ] as const) {
+    test(`turns ${what} under a finger drawn sideways, and puts it back when it lifts`, async ({
+      page,
+    }) => {
+      await page.goto(shelf);
+      await expect(results(page).getByRole("article").first()).toBeVisible(DRAWN);
+      await drawn(page);
+
+      const stage = page.locator("canvas.stage__canvas").first();
+
+      await stage.scrollIntoViewIfNeeded();
+
+      const box = await stage.boundingBox();
+
+      expect(box).not.toBeNull();
+      if (box === null) return;
+
+      const resting = await signature(page);
+      const finger = await fingerOn(page);
+      const y = box.y + box.height / 2;
+
+      expect(resting).not.toBe("");
+
+      await finger("touchStart", box.x + box.width * 0.5, y);
+      for (const along of [0.4, 0.3, 0.2, 0.1]) {
+        await finger("touchMove", box.x + box.width * along, y);
+      }
+
+      await expect.poll(() => signature(page), { timeout: 30_000 }).not.toBe(resting);
+
+      await finger("touchEnd", 0, 0);
+
+      await expect.poll(() => signature(page), { timeout: 30_000 }).toBe(resting);
+    });
+  }
+
+  test("scrolls the page under a finger drawn up a picture", async ({ page }) => {
+    await page.goto("/?category=color");
+    await expect(results(page).getByRole("article").first()).toBeVisible(DRAWN);
+    await drawn(page);
+
+    const box = await page.locator("canvas.stage__canvas").first().boundingBox();
+
+    expect(box).not.toBeNull();
+    if (box === null) return;
+
+    const finger = await fingerOn(page);
+    const x = box.x + box.width / 2;
+    const before = await page.evaluate(() => window.scrollY);
+
+    await finger("touchStart", x, box.y + box.height * 0.8);
+    for (const along of [0.6, 0.4, 0.2]) {
+      await finger("touchMove", x, box.y + box.height * along);
+    }
+    await finger("touchEnd", 0, 0);
+
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before);
+  });
 });
