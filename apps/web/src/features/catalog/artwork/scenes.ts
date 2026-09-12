@@ -960,14 +960,14 @@ type Paints = Readonly<{
  * the dark theme, because a room is looked at through the page it is on: a
  * wall mixed to sit inside a bright page is a lamp in a dark one. White walls
  * under the bright theme, so the far wall sits at about the page's own
- * lightness instead of reading as a gray box set into it, and a middle gray
- * floor: a white floor under that much light sits at the top of what the
- * display can show, where a shadow and the floor around it come out as the
- * same white, and a gray one keeps every shadow the lamps lay on it, and where
- * two of them overlap.
+ * lightness instead of reading as a gray box set into it, and a floor a gray
+ * a little under the walls: a white floor under that much light sits at the
+ * top of what the display can show, where a shadow and the floor around it
+ * come out as the same white, and a gray one keeps every shadow the lamps lay
+ * on it, and where two of them overlap.
  */
 const CORNER_PAINT: Readonly<Record<Theme, Paints>> = {
-  light: { walls: paint(0xffffff), floor: paint(0x787878) },
+  light: { walls: paint(0xffffff), floor: paint(0x8a8a8a) },
   dark: { walls: paint(0x3a3a3a), floor: paint(0x3a3a3a) },
 };
 
@@ -979,12 +979,13 @@ const CORNER_PAINT: Readonly<Record<Theme, Paints>> = {
  * whole of what says the light is leaving them; a floor painted as dark as the
  * shop's dark walls catches almost none of it, and the demonstration goes with
  * it. Under the bright theme its wall is white, so the haze its floor fades
- * into sits at about the page's own lightness, and its floor is a light gray
- * rather than white: a pool of colored light on a white floor that bright is
- * lost at the top of what the display can show, and on gray it stays a color.
+ * into sits at about the page's own lightness, and its floor is a shade under
+ * white: it is the paint that makes the floor light rather than more sky and
+ * bounce, which land on the glowing faces too, light every side of them alike
+ * and fade their color.
  */
 const OPEN_PAINT: Readonly<Record<Theme, Paints>> = {
-  light: { walls: paint(0xffffff), floor: paint(0xb0b0b0) },
+  light: { walls: paint(0xffffff), floor: paint(0xf4f4f4) },
   dark: { walls: paint(0x5a5a5a), floor: paint(0x5a5a5a) },
 };
 
@@ -1112,17 +1113,18 @@ const GLOW_ROOM: GlowRange = { faintest: 0.95, brightest: 0.75 };
  *
  * At night a corner has no light in it but what its own lamps put there, and
  * dark paint returns little of that to the shadowed side of anything, so its
- * lamps are turned up. By day a corner carries most of its light from
- * everywhere at once, by `CORNER_AIR`, so its lamps are turned down and the
- * shadows they lay stay open against the bright page. A glowing room burns
- * dimmer than either under both themes, and dimmer still the harder its
- * finisher glows, by `GLOW_ROOM`; the bright page's room is lit little more
- * than the dark page's, and it is `GLOW_STRENGTH` that turns the glow up far
- * enough to stand above the lit floor.
+ * lamps are turned up. By day both corners burn at one level whatever the
+ * finisher, so both sit at the page alike: at the coating's own level its
+ * floor runs into the top of what the display can show while the roughness
+ * room's is still a dark gray. A glowing room burns dimmer than either under
+ * both themes, and dimmer still the harder its finisher glows, by `GLOW_ROOM`;
+ * the bright page's room is lit little more than the dark page's, and it is
+ * `GLOW_STRENGTH` that turns the glow up far enough to stand above the lit
+ * floor.
  */
 const LAMP_LEVEL = {
-  Roughness: { light: LIT_ROOM * 0.66, dark: LIT_ROOM * 1.25 },
-  Coating: { light: BRIGHT_ROOM * 0.66, dark: BRIGHT_ROOM * 1.25 },
+  Roughness: { light: 0.9, dark: LIT_ROOM * 1.25 },
+  Coating: { light: 0.9, dark: BRIGHT_ROOM * 1.25 },
   Emission: { light: 0.5, dark: 0.6 },
 } as const satisfies Readonly<Record<RoomType, Readonly<Record<Theme, number>>>>;
 
@@ -1156,11 +1158,13 @@ type Ambience = Readonly<{ ambient: number; fill: number }>;
  * stays open against the bright page, and most of that is fill rather than
  * surroundings to reflect: a coating reflects its surroundings and spreads
  * them around the hue wheel, and brighter surroundings bury the one hue the
- * pointer turns. Fill lifts what is dim more than what is lit, so the lamps'
- * scallops on the walls are shallower by day than at night.
+ * pointer turns. Fill lands on the whole of the floor alike, so it also lifts
+ * the band of floor under the walls, which the lamps reach least. It lifts
+ * what is dim more than what is lit, so the lamps' scallops on the walls are
+ * shallower by day than at night.
  */
 const CORNER_AIR: Readonly<Record<Theme, Ambience>> = {
-  light: { ambient: 6, fill: 0.8 },
+  light: { ambient: 5.5, fill: 1.4 },
   dark: { ambient: 1, fill: 0.3 },
 };
 
@@ -1742,7 +1746,7 @@ const GLOW_BLOOM_FROM: GlowRange = { faintest: 0.7, brightest: 0.34 };
  * whole.
  */
 const OPEN_SPILL: Readonly<Record<Theme, Readonly<{ from: number; share: number }>>> = {
-  light: { from: 1.6, share: 0.35 },
+  light: { from: 1.8, share: 0.35 },
   dark: { from: 0, share: 1 },
 };
 

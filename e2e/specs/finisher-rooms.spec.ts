@@ -18,7 +18,9 @@ import {
   darkestTenths,
   DRAWN,
   drawn,
+  floorsOf,
   hueSpread,
+  lowerFloors,
   outerRings,
   peakChromas,
   pretendGpu,
@@ -176,7 +178,7 @@ test.describe("a machine that can draw", () => {
    * the bright page instead of reading as a dim box in it, and that light is
    * what lights the room's darkest tenth.
    */
-  const DAY_AMBIENT_FLOOR = 48;
+  const DAY_AMBIENT_FLOOR = 58;
 
   test("keeps the ambient light up in a glowing room by day", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "light" });
@@ -188,6 +190,29 @@ test.describe("a machine that can draw", () => {
     expect(tenths.length).toBeGreaterThan(0);
     for (const tenth of tenths) {
       expect(tenth).toBeGreaterThanOrEqual(DAY_AMBIENT_FLOOR);
+    }
+  });
+
+  /**
+   * The least lightness a glowing room's floor has to keep by day, in percent.
+   *
+   * Read as `lowerFloors` reads it. The wall behind the floor is white, and a
+   * floor far darker than it is a room of two values rather than one lit room.
+   * The floor is lit by its paint rather than by more light from everywhere at
+   * once, because that light lands on the glowing faces too and fades them.
+   */
+  const DAY_GLOW_FLOOR = 72;
+
+  test("keeps a glowing room's floor light by day", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto(shelf("fluorescent"));
+    await drawn(page);
+
+    const floors = await lowerFloors(page);
+
+    expect(floors.length).toBeGreaterThan(0);
+    for (const floor of floors) {
+      expect(floor).toBeGreaterThanOrEqual(DAY_GLOW_FLOOR);
     }
   });
 
@@ -225,7 +250,7 @@ test.describe("a machine that can draw", () => {
    * bright page. Read on the roughness shelf, whose subject is gray, so the
    * darkest tenth there is shade rather than a dark pigment.
    */
-  const DAY_CORNER_FLOOR = 50;
+  const DAY_CORNER_FLOOR = 66;
 
   test("keeps the shade in a corner open by day", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "light" });
@@ -253,7 +278,7 @@ test.describe("a machine that can draw", () => {
    * everywhere at once and that light lifts the dim part of a wall more than
    * the lit part; the wall still has to be brighter where its lamp lands.
    */
-  const CORNER_SURFACES = { overlap: 2, walls: { dark: 2, light: 1.2 } };
+  const CORNER_SURFACES = { overlap: 2, walls: { dark: 2, light: 1.15 } };
 
   /** The two corners, by the finish shown in each. */
   const CORNERS = [
@@ -285,6 +310,37 @@ test.describe("a machine that can draw", () => {
         expect(walls.right).toBeGreaterThanOrEqual(CORNER_SURFACES.walls[scheme]);
       });
     }
+  }
+
+  /**
+   * The least lightness a corner's floor has to keep by day, in percent: just
+   * under the walls, and at the front of the picture.
+   *
+   * Read as `floorsOf` reads it. The walls are white, and a floor far darker
+   * than them reads as a dark band along the crease and a room of two values
+   * rather than one lit room. The band under the walls is where the lamps
+   * reach least, so it is the part of the floor that goes dark first.
+   */
+  const DAY_FLOOR = { nearWalls: 80, front: 75 };
+
+  for (const [finish, room] of CORNERS) {
+    test(`keeps the floor light up to the walls around ${room} by day`, async ({ page }) => {
+      // The seams are found under the dark theme, as for the surfaces above.
+      await page.emulateMedia({ colorScheme: "dark" });
+      await openFirst(page, finish);
+      await drawn(page);
+
+      const seams = await seamsOf(page);
+
+      await page.emulateMedia({ colorScheme: "light" });
+      await page.reload();
+      await drawn(page);
+
+      const floor = await floorsOf(page, seams);
+
+      expect(floor.nearWalls).toBeGreaterThanOrEqual(DAY_FLOOR.nearWalls);
+      expect(floor.front).toBeGreaterThanOrEqual(DAY_FLOOR.front);
+    });
   }
 
   /**

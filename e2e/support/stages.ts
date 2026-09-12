@@ -413,6 +413,52 @@ export const darkestTenths = (page: Page): Promise<readonly number[]> =>
     }),
   );
 
+/**
+ * How light the floor in each stage is, in percent HSL lightness.
+ *
+ * The middle lightness of the gray part of the lower third of the stage. That
+ * is the floor in front of what stands on it, less the subjects and the
+ * colored pools their light lays, which are not gray.
+ */
+export const lowerFloors = (page: Page): Promise<readonly number[]> =>
+  page.evaluate(() =>
+    [
+      ...document.querySelectorAll<HTMLCanvasElement>("canvas.stage__canvas"),
+    ].map((canvas) => {
+      const context = canvas.getContext("2d");
+      if (context === null) return 0;
+
+      const top = Math.round(canvas.height * 0.67);
+      const pixels = context.getImageData(0, top, canvas.width, canvas.height - top).data;
+      // Indexed by the brightest channel plus the dimmest, which is twice the
+      // lightness in 8-bit steps and keeps its half steps whole.
+      const counts = new Array<number>(511).fill(0);
+      let counted = 0;
+
+      // Every other pixel, which is plenty for a middle.
+      for (let at = 0; at < pixels.length; at += 8) {
+        const [red, green, blue] = [pixels[at] ?? 0, pixels[at + 1] ?? 0, pixels[at + 2] ?? 0];
+        const most = Math.max(red, green, blue);
+        const least = Math.min(red, green, blue);
+
+        if (most - least >= 20) continue;
+
+        counts[most + least] = (counts[most + least] ?? 0) + 1;
+        counted += 1;
+      }
+
+      if (counted === 0) return 0;
+
+      let below = 0;
+      const doubled = counts.findIndex((count) => {
+        below += count;
+        return below >= counted / 2;
+      });
+
+      return (Math.max(0, doubled) / 2 / 255) * 100;
+    }),
+  );
+
 /** Where the colored part of one stage is, in fractions of its own edges. */
 export type ColorBox = Readonly<{
   /** The left edge of it, 0 being the left of the stage. */
@@ -671,6 +717,71 @@ export const seamsOf = (page: Page): Promise<Seams> =>
 
     return { width, height, rows };
   });
+
+/** How light a corner's floor is, in percent HSL lightness. */
+export type FloorReading = Readonly<{
+  /** Just under the seam where the walls begin, which is where the lamps reach least. */
+  nearWalls: number;
+  /** Across the bottom of the picture, nearest the eye. */
+  front: number;
+}>;
+
+/**
+ * How light the floor of the first stage on the page is.
+ *
+ * Each reading is the middle lightness of the gray pixels in its band, so a
+ * subject standing in the band counts for nothing. The band under the walls
+ * runs from just under the seam `seams` gives for each column down a twentieth
+ * of the picture. Seams found in a stage of another size are no seams, and a
+ * stage with nothing drawn on it, or no seams, reads as a black floor.
+ */
+export const floorsOf = (page: Page, seams: Seams): Promise<FloorReading> =>
+  page.evaluate((found) => {
+    const canvas = document.querySelector<HTMLCanvasElement>("canvas.stage__canvas");
+    const context = canvas?.getContext("2d") ?? null;
+
+    if (
+      canvas === null ||
+      context === null ||
+      canvas.width === 0 ||
+      canvas.width !== found.width ||
+      canvas.height !== found.height
+    ) {
+      return { nearWalls: 0, front: 0 };
+    }
+
+    const { width, height } = canvas;
+    const pixels = context.getImageData(0, 0, width, height).data;
+    const channel = (at: number, offset: number): number => pixels[at * 4 + offset] ?? 0;
+    const nearWalls: number[] = [];
+    const front: number[] = [];
+
+    const take = (into: number[], x: number, y: number): void => {
+      const at = y * width + x;
+      const most = Math.max(channel(at, 0), channel(at, 1), channel(at, 2));
+      const least = Math.min(channel(at, 0), channel(at, 1), channel(at, 2));
+
+      if (most - least < 20) into.push(((most + least) / 2 / 255) * 100);
+    };
+
+    // A little in from either side, where a column's seam can be the wall's
+    // own edge rather than where it meets the floor.
+    for (let x = Math.round(width * 0.05); x < width * 0.95; x += 2) {
+      const seam = found.rows[x] ?? 0;
+      const last = Math.min(height, seam + Math.round(height * 0.06));
+
+      for (let y = seam + Math.round(height * 0.01); y < last; y += 2) take(nearWalls, x, y);
+      for (let y = Math.round(height * 0.88); y < height; y += 2) take(front, x, y);
+    }
+
+    const middle = (values: number[]): number => {
+      values.sort((one, other) => one - other);
+
+      return values[Math.floor(values.length / 2)] ?? 0;
+    };
+
+    return { nearWalls: middle(nearWalls), front: middle(front) };
+  }, seams);
 
 /**
  * What the floor and the walls of the first stage on the page are carrying.

@@ -726,16 +726,18 @@ and fills in the unlit side the lamps leave. Measured on the dark shelf, the dar
 the faintest glow's stage sits at 2% lightness; `finisher-rooms.spec.ts` holds it under 5%.
 By day the room carries far more ambient light and its wall is white, so the haze its floor
 fades into sits at about the page's own lightness instead of reading as a dim box in it, and
-the glow is turned up to stand above the lit floor. The floor is a light gray, because a pool
-of colored light on a white floor that bright is lost at the top of what the display can
-show. The spill starts well above the room's own surfaces, so the bright wall and floor never
+the glow is turned up to stand above the lit floor. The floor is painted a shade under white,
+and it is the paint that makes it light rather than more sky and bounce, which land on the
+glowing faces too, light every side of them alike and fade their color. The spill starts
+well above the room's own surfaces, so the bright wall and floor never
 spill along with the subjects, and it is drawn weaker than at night: against a lit floor a
 full spill is a soft copy of the subject laid over the subject, which reads as the picture
 being out of focus, while a thin rim of it around each face reads as light leaving the face.
-Measured on the day shelf, the darkest tenth of every stage sits at 55% to 57% lightness, and
-the most colored fiftieth of every stage, which is its glowing faces, carries 74% to 80%
-color. `finisher-rooms.spec.ts` holds every darkest tenth at 48% or more and every glow's
-color at 70% or more.
+Measured on the day shelf, the floor in the lower third of every stage sits at 79% to 84%
+lightness and the darkest tenth of every stage at 65% to 72%, and the most colored fiftieth of
+every stage, which is its glowing faces, carries 73% to 80% color. `finisher-rooms.spec.ts`
+holds every floor at 72% or more, every darkest tenth at 58% or more and every glow's color at
+70% or more.
 
 **The two ends of the glow range have to look like two ends.** The finishers on that shelf
 sit in the top half of the range, so a spill straight in the amount separates them by the
@@ -781,22 +783,29 @@ only by lamps aimed at the floor is one flat value from edge to edge. Every lamp
 is white, so the lamps add no color of their own.
 
 Both corners are measured on the real picture, in both themes: each wall's brightest part is
-at least twice its dimmest at night and at least a fifth brighter than it by day, and at
+at least twice its dimmest at night and at least 15% brighter than it by day, and at
 least a fiftieth of the floor lies where two shadows overlap. One lamp cannot lay a shadow
 inside its own shadow, so an overlap is what says more than one lamp is casting, however
 large or dark any one shadow is.
 
-By day a corner carries far more of its light from everywhere at once and its walls are
-white, so the far wall sits at about the page's own lightness and the shaded side of its
-subject stays open against the bright page. Most of that light is sky and bounce rather than
-the surroundings a surface reflects: a coating reflects its surroundings and spreads them
-around the hue wheel, and brighter surroundings bury the one hue the pointer turns. The floor
-is a middle gray. A white floor under that much light sits at the top of what the display can
-show, where a shadow and the floor around it come out as the same white; a gray one keeps
-every shadow and every overlap. Measured on the roughness shelf by day, the darkest tenth of
-every stage sits at 57% to 58% lightness; `finisher-rooms.spec.ts` holds it at 50% or more.
-Light from everywhere at once lifts the dim part of a wall more than the lit part, so the
-scallops the wall lamps lay are shallower by day than at night.
+By day both corners are lit at one level, whatever the finisher. At the finisher's own level
+the coating room, lit brighter to give its film something to reflect, runs its floor into the
+top of what the display can show while the roughness room's floor is still a dark gray. A
+corner carries far more of its light from everywhere at once by day and its walls are white,
+so the far wall sits at about the page's own lightness and the shaded side of its subject
+stays open against the bright page. Most of that light is sky and bounce rather than the
+surroundings a surface reflects: a coating reflects its surroundings and spreads them around
+the hue wheel, and brighter surroundings bury the one hue the pointer turns. Sky and bounce
+land on the whole floor alike, so they also lift the band of floor under the walls, which the
+lamps reach least. The floor is a gray a little under the walls. A white floor under that
+much light sits at the top of what the display can show, where a shadow and the floor around
+it come out as the same white; a gray one keeps every shadow and every overlap. Measured by
+day, the floor just under the walls sits at 87% to 88% lightness in both corners and at 81%
+to 89% at the front, and the darkest tenth of every roughness stage at 74%;
+`finisher-rooms.spec.ts` holds the floor at 80% or more under the walls and 75% or more at
+the front, and that darkest tenth at 66% or more. Light from everywhere at once lifts the dim
+part of a wall more than the lit part, so the scallops the wall lamps lay are shallower by day
+than at night.
 
 **The lamps that do not cast are cones.** Both corners hang a ring of four of them around
 what is standing there, evenly spaced at one height and one radius, turned onto the bearing
@@ -859,10 +868,11 @@ arrives and simply stands still.
 [`finisher-rooms.spec.ts`](e2e/specs/finisher-rooms.spec.ts) drives all of it in a real
 browser — each finish draws a room, the pointer changes the pixels, each corner lays
 overlapping shadows and lights both its walls unevenly under both themes and keeps its shade
-open by day, a glowing room keeps its corners at night well under the faces glowing in it
+open and its floor light up to the walls by day, a glowing room keeps its corners at night
+well under the faces glowing in it
 even with the spill drawn around them, spills more off a harder glow than off a fainter one,
-keeps every glow's color at full strength by day, and keeps its ambient light low at night
-and up by day,
+keeps every glow's color at full strength and its floor light by day, and keeps its ambient
+light low at night and up by day,
 a coating room frames its near subject large and whole and shows colors nothing in it was
 painted, reduced motion draws once and stays put, the switch off leaves stills and no
 canvases across a reload, the switch on draws live even on a software rasterizer, and a

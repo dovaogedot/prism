@@ -411,6 +411,11 @@ describe("the two corners", () => {
     }
   });
 
+  it("burn at one level by day, whatever the finisher", () => {
+    expect(lights(at("light", coat(300)))).toEqual(lights(at("light", rough(50))));
+    expect(air(at("light", coat(300)))).toEqual(air(at("light", rough(50))));
+  });
+
   it("light a coating harder than a plain surface at night", () => {
     // Interference is a reflection, and a reflection needs a room to be of.
     const plain = lights(at("dark", rough(50)));
