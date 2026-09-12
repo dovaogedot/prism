@@ -816,10 +816,12 @@ compile one. What separates the two is the size of the canvas — a card is abou
 of the pixels — and how many frames it draws.
 
 **A switch in the header decides whether any of it is drawn**, next to the light and dark
-one and working the same way. It starts where the machine is: a browser with no WebGL2, or
-one whose "GPU" is really the CPU, is shown the stills, which is a better page than a grid
-that arrives two seconds late. Once a visitor flips it, their choice outranks the machine
-and is remembered. Off, every stage is its still from the front, under the theme in force,
+one and working the same way. It starts where the machine is: a browser whose "GPU" is
+really the CPU is shown the stills, which is a better page than a grid that arrives two
+seconds late. Once a visitor flips it, their choice outranks the machine and is remembered,
+so a software rasterizer draws live once it is asked to. A browser with no WebGL2 has
+nothing to draw live with and is not offered the switch. Off, every stage is its still from
+the front, under the theme in force,
 and a color with no still is its hex. `prefers-reduced-motion` is a different
 question and keeps its own answer: it stops the movement, not the drawing, so a room still
 arrives and simply stands still.
@@ -832,8 +834,9 @@ the spill drawn around them, spills more off a harder glow than off a fainter on
 themes, stands every glow well above its room by day, and keeps its ambient light low at
 night and up by day,
 a coating room frames its near subject large and whole and shows colors nothing in it was
-painted, reduced motion draws once and stays put, and the switch off leaves stills and no
-canvases across a reload.
+painted, reduced motion draws once and stays put, the switch off leaves stills and no
+canvases across a reload, the switch on draws live even on a software rasterizer, and a
+browser with no WebGL2 is offered no switch.
 
 ### Stills
 

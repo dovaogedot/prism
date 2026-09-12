@@ -132,9 +132,10 @@ const buildContext = (): Option<Context> => {
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("webgl2", { antialias: false, alpha: false });
 
-  // Neither of these is a failure to handle: they are the answer that this
-  // browser should be shown the still picture instead.
-  if (context === null || isSoftware(context)) return Option.none;
+  // Not a failure to handle: it is the answer that this browser should be
+  // shown the still picture instead. A software rasterizer is drawn on, since
+  // the switch only asks for live pictures there once a visitor chose them.
+  if (context === null) return Option.none;
 
   // Antialiasing is off on the context because nothing is drawn to it
   // directly — every pass goes through the composer's own targets.
@@ -216,24 +217,33 @@ const contextNow = (): Option<Context> => {
 /**
  * The shared surroundings, or the answer that this browser cannot draw them.
  *
- * `None` means no WebGL2 or a software rasterizer, which a caller answers by
- * showing its still picture instead.
+ * `None` means no WebGL2, which a caller answers by showing its still picture
+ * instead.
  */
 export const studio = (): Option<Studio> =>
   Option.map<Context, Studio>(({ environment }) => ({ environment }))(contextNow());
 
 /**
- * Whether this browser would draw live pictures if it were asked to.
+ * What a browser draws live pictures with.
  *
- * The switch in the header starts from this: a real GPU renders live, a
- * software rasterizer or no WebGL2 does not. Asked without building anything,
- * so a page that ends up showing stills has not paid for a context first.
+ * `hardware` is a real GPU, `software` is the CPU standing in for one, and
+ * `none` is no WebGL2, which draws nothing live at all.
  */
-export const hasGpu = (): boolean => {
+export type Machine = "hardware" | "software" | "none";
+
+/**
+ * What this browser would draw live pictures with, if it were asked to.
+ *
+ * The switch starts from this. Asked without building the renderer, so a page
+ * that ends up showing stills has not paid for one first.
+ */
+export const machineNow = (): Machine => {
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("webgl2", { antialias: false, alpha: false });
 
-  return context !== null && !isSoftware(context);
+  if (context === null) return "none";
+
+  return isSoftware(context) ? "software" : "hardware";
 };
 
 /**

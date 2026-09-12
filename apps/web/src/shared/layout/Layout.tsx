@@ -36,47 +36,51 @@ const ThemeToggle = () => {
   );
 };
 
+/** The switch between live and still pictures, where this browser can draw live ones. */
 const RenderToggle = () => {
-  const { rendering, toggle } = useRendering();
+  const { rendering, offered, toggle } = useRendering();
 
-  return (
-    <button
-      type="button"
-      onClick={toggle}
-      aria-label={`Switch to ${rendering ? "still" : "live"} pictures`}
-      className="grid size-9 place-items-center rounded-lg text-ink-soft transition-colors hover:bg-sunken hover:text-ink"
-    >
-      {match(rendering)
-        .with(true, () => (
-          <svg
-            viewBox="0 0 24 24"
-            className="size-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinejoin="round"
-          >
-            <rect x="3.2" y="5.2" width="17.6" height="13.6" rx="2.2" />
-            <circle cx="8.6" cy="10.1" r="1.5" />
-            <path d="m3.9 16.6 4.4-4.1 3.4 3 3.1-2.7 5.3 4.7" strokeLinecap="round" />
-          </svg>
-        ))
-        .with(false, () => (
-          <svg
-            viewBox="0 0 24 24"
-            className="size-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinejoin="round"
-          >
-            <path d="M12 2.4 20.6 7.2v9.6L12 21.6 3.4 16.8V7.2z" />
-            <path d="M3.4 7.2 12 12l8.6-4.8M12 12v9.6" />
-          </svg>
-        ))
-        .exhaustive()}
-    </button>
-  );
+  return match(offered)
+    .with(false, () => null)
+    .with(true, () => (
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={`Switch to ${rendering ? "still" : "live"} pictures`}
+        className="grid size-9 place-items-center rounded-lg text-ink-soft transition-colors hover:bg-sunken hover:text-ink"
+      >
+        {match(rendering)
+          .with(true, () => (
+            <svg
+              viewBox="0 0 24 24"
+              className="size-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            >
+              <rect x="3.2" y="5.2" width="17.6" height="13.6" rx="2.2" />
+              <circle cx="8.6" cy="10.1" r="1.5" />
+              <path d="m3.9 16.6 4.4-4.1 3.4 3 3.1-2.7 5.3 4.7" strokeLinecap="round" />
+            </svg>
+          ))
+          .with(false, () => (
+            <svg
+              viewBox="0 0 24 24"
+              className="size-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            >
+              <path d="M12 2.4 20.6 7.2v9.6L12 21.6 3.4 16.8V7.2z" />
+              <path d="M3.4 7.2 12 12l8.6-4.8M12 12v9.6" />
+            </svg>
+          ))
+          .exhaustive()}
+      </button>
+    ))
+    .exhaustive();
 };
 
 const Wordmark = () => (

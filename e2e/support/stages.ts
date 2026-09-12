@@ -39,6 +39,24 @@ export const pretendGpu = async (page: Page): Promise<void> => {
   }, UNMASKED_RENDERER_WEBGL);
 };
 
+/**
+ * Answer as though this browser had no WebGL2 at all.
+ *
+ * The one machine the switch is not offered on, because nothing it could
+ * choose would be drawn.
+ */
+export const refuseWebGl2 = async (page: Page): Promise<void> => {
+  await page.addInitScript(() => {
+    const real = HTMLCanvasElement.prototype.getContext;
+
+    Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
+      value(this: HTMLCanvasElement, kind: string) {
+        return kind === "webgl2" ? null : real.call(this, kind);
+      },
+    });
+  });
+};
+
 /** How many stages the page is holding, drawn or not. */
 export const stages = (page: Page): Promise<number> =>
   page.evaluate(

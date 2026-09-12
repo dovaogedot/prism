@@ -23,6 +23,7 @@ import {
   outerChromas,
   outerRings,
   pretendGpu,
+  refuseWebGl2,
   signature,
   surfacesOf,
 } from "../support/stages.ts";
@@ -419,5 +420,32 @@ test.describe("the switch in the header", () => {
     await expect(page.locator("canvas.stage__canvas")).toHaveCount(0);
     await expect(cards.first().locator("img")).toHaveCount(1);
     await expect(control(page, "live")).toBeVisible();
+  });
+
+  test("draws live on a software rasterizer once asked to", async ({ page }) => {
+    // No `pretendGpu` here either: the stills are where this machine starts,
+    // and the switch is what takes it off them.
+    await page.goto(shelf("roughness"));
+
+    const cards = results(page).getByRole("article");
+
+    await expect(cards.first()).toBeVisible(DRAWN);
+
+    await control(page, "live").click();
+
+    expect(await drawn(page)).toBe(await cards.count());
+    await expect(control(page, "still")).toBeVisible();
+  });
+
+  test("offers no switch where there is no WebGL2", async ({ page }) => {
+    await refuseWebGl2(page);
+    await page.goto(shelf("roughness"));
+
+    const cards = results(page).getByRole("article");
+
+    await expect(cards.first()).toBeVisible(DRAWN);
+    await expect(cards.first().locator("img")).toHaveCount(1);
+    await expect(control(page, "live")).toHaveCount(0);
+    await expect(control(page, "still")).toHaveCount(0);
   });
 });
