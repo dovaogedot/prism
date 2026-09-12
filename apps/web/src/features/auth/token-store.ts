@@ -4,21 +4,19 @@
  * A module-level variable, deliberately. It is never written to localStorage
  * or sessionStorage, so there is nothing for an injected script to read and
  * nothing that survives the tab closing. What survives a reload is the
- * httpOnly refresh cookie, which script cannot touch either — the app trades
+ * httpOnly refresh cookie, which script cannot touch either; the app trades
  * it for a fresh access token on boot.
  */
 
-import { Option, type SessionUser } from "@prism/shared";
+import type { SessionUser } from "@prism/shared";
 
-type Held = Readonly<{ token: string; user: SessionUser }>;
+/** The token and the person it was granted to. */
+export type Held = Readonly<{ token: string; user: SessionUser }>;
 
-let held: Option<Held> = Option.none;
-
-/** Notified on sign-in and sign-out so React can re-render. */
-const listeners = new Set<() => void>();
-
-const announce = (): void => {
-  for (const listener of listeners) listener();
+/** The one held grant and who wants to know when it changes. */
+const TokenState: { held: Held | undefined; readonly listeners: Set<() => void> } = {
+  held: undefined,
+  listeners: new Set(),
 };
 
 /**
@@ -27,34 +25,36 @@ const announce = (): void => {
  * `subscribe` and `snapshot` are shaped for `useSyncExternalStore`, so React
  * reads this store rather than a copy of it.
  */
-export const tokenStore = {
-  get: (): Option<string> =>
-    Option.map((value: Held) => value.token)(held),
+export const TokenStore = {
+  get: (): string | undefined => TokenState.held?.token,
 
-  user: (): Option<SessionUser> =>
-    Option.map((value: Held) => value.user)(held),
+  user: (): SessionUser | undefined => TokenState.held?.user,
 
   set: (token: string, user: SessionUser): void => {
-    held = Option.some({ token, user });
-    announce();
+    TokenState.held = { token, user };
+    TokenStore.announce();
   },
 
   /** Replaces the cached user without disturbing a valid token. */
   updateUser: (user: SessionUser): void => {
-    held = Option.map((value: Held) => ({ ...value, user }))(held);
-    announce();
+    if (TokenState.held !== undefined) TokenState.held = { token: TokenState.held.token, user };
+    TokenStore.announce();
   },
 
   clear: (): void => {
-    held = Option.none;
-    announce();
+    TokenState.held = undefined;
+    TokenStore.announce();
   },
 
   subscribe: (listener: () => void): (() => void) => {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
+    TokenState.listeners.add(listener);
+    return () => TokenState.listeners.delete(listener);
   },
 
-  /** `useSyncExternalStore` compares by reference, so the snapshot is stable. */
-  snapshot: (): Option<Held> => held,
+  /** `useSyncExternalStore` compares by reference, so the snapshot is the held value itself. */
+  snapshot: (): Held | undefined => TokenState.held,
+
+  announce: (): void => {
+    for (const listener of TokenState.listeners) listener();
+  },
 } as const;

@@ -1,17 +1,11 @@
 /**
- * Router and providers.
- *
- * React Router in data mode — `createBrowserRouter` over a plain array of
- * route objects. No file-system routing convention; the route table is this
- * list and nothing else.
+ * Router and providers. The route table is this list and nothing else.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router";
-import { Layout } from "../shared/layout/Layout.tsx";
-import { useSessionBootstrap } from "../features/auth/session.ts";
 import { GuestOnly } from "../features/auth/components/GuestOnly.tsx";
 import {
   AccountPage,
@@ -22,15 +16,15 @@ import {
   ResetPasswordPage,
   TwoFactorPage,
 } from "../features/auth/pages/index.ts";
+import { useSessionBootstrap } from "../features/auth/session.ts";
 import { CatalogPage } from "../features/catalog/pages/CatalogPage.tsx";
 import { ProductPage } from "../features/catalog/pages/ProductPage.tsx";
+import { Layout } from "../shared/layout/Layout.tsx";
 import "./styles.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // The catalog changes rarely and the server already caches facets;
-      // refetching on every window focus would be noise.
       staleTime: 30_000,
       refetchOnWindowFocus: false,
       retry: 1,
@@ -66,33 +60,21 @@ const router = createBrowserRouter([
         ],
       },
 
-      /*
-       * Deliberately reachable while signed in. Holding a session and having
-       * forgotten your password are not mutually exclusive, and the account
-       * page cannot help there — changing a password in place needs the
-       * current one, which is precisely what has been forgotten.
-       */
+      // Reachable while signed in: holding a session and having forgotten
+      // the password are not mutually exclusive.
       { path: "forgot-password", element: <ForgotPasswordPage /> },
       { path: "reset-password", element: <ResetPasswordPage /> },
 
-      // Unguarded because it is the page that establishes the session; a guard
-      // would race the very refresh it is waiting for.
+      // Unguarded because it is the page that establishes the session.
       { path: "oauth/complete", element: <OAuthCompletePage /> },
 
-      // The mirror image: AccountPage sends a signed-out visitor to /login.
+      // AccountPage sends a signed-out visitor to /login itself.
       { path: "account", element: <AccountPage /> },
       {
         path: "*",
         element: (
           <div className="grid min-h-[60dvh] place-items-center px-4 text-center">
-            <div>
-              <p className="text-lg font-semibold text-ink">
-                No such page
-              </p>
-              <p className="mt-1 text-sm text-ink-soft">
-                That color, category, or corridor does not exist.
-              </p>
-            </div>
+            <p className="text-lg font-semibold text-ink">No such page</p>
           </div>
         ),
       },

@@ -1,575 +1,293 @@
 /**
- * HTTP surface for authentication.
- *
- * Routes do three things: parse (the Zod schema does it), call the service,
- * and translate the `Result` into a response. No domain logic lives here.
+ * HTTP surface for authentication. Routes parse (the Zod schema does it),
+ * call the service, and translate the `Result` into a response.
  */
 
 import {
-  disableTwoFactorSchema,
-  enableTwoFactorSchema,
-  forgotPasswordSchema,
-  loginSchema,
-  oauthProviderSchema,
-  registerSchema,
-  resetPasswordSchema,
-  changePasswordSchema,
-  twoFactorLoginSchema,
-  Option,
+  ChangePasswordInput,
+  ForgotPasswordInput,
+  LoginInput,
+  OAuthProvider,
+  RegisterInput,
+  ResetPasswordInput,
+  TwoFactorCodeInput,
+  TwoFactorLoginInput,
 } from "@prism/shared";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import {
-  clearOAuthStateCookie,
-  clearTwoFactorCookie,
-  setTwoFactorCookie,
-  TWO_FACTOR_COOKIE,
-  clearRefreshCookie,
-  OAUTH_STATE_COOKIE,
-  REFRESH_COOKIE,
-  setOAuthStateCookie,
-  setRefreshCookie,
-  type CookieOptions,
-} from "../../http/cookies.ts";
-import { sendDomainError } from "../../http/errors.ts";
-import type { createGuards } from "../../http/guard.ts";
-import { issueMockAuthorizationCode } from "../../platform/oauth.ts";
+import { Cookies, type CookieOptions } from "../../http/cookies.ts";
+import { HttpErrors } from "../../http/errors.ts";
+import type { Guards } from "../../http/guard.ts";
+import { MockAuthorizationCode } from "../../platform/oauth.ts";
+import { MockConsentPage } from "./mock-consent.ts";
 import type { AuthService, IssuedSession, RequestContext } from "./service.ts";
-import { renderMockConsentPage } from "./mock-consent.ts";
 
 /** What the auth routes need beyond the service itself. */
 export type AuthRouteDependencies = Readonly<{
   service: AuthService;
-  guards: ReturnType<typeof createGuards>;
+  guards: Guards;
   cookies: CookieOptions;
-  /** Only present in mock mode — the built-in consent screen needs to sign codes. */
-  mockOAuthSecret: Option<Uint8Array>;
+  /** Present only in mock mode: the built-in consent screen signs codes with it. */
+  mockOAuthSecret?: Uint8Array;
   publicWebOrigin: string;
   /** Per-address budget for credential-guessing endpoints. */
   authRateLimitPerMinute: number;
 }>;
 
-const isIssuedSession = (
-  value: IssuedSession | { status: string },
-): value is IssuedSession => "grant" in value && "refreshToken" in value;
+export const AuthRoutes = {
+  isIssuedSession: (value: IssuedSession | { status: string }): value is IssuedSession =>
+    "grant" in value && "refreshToken" in value,
 
-/** Mounts every auth endpoint, each carrying the schema its OpenAPI entry is generated from. */
-export const registerAuthRoutes = (
-  app: FastifyInstance,
-  deps: AuthRouteDependencies,
-): void => {
-  const routes = app.withTypeProvider<ZodTypeProvider>();
-  const { service, guards, cookies } = deps;
-
-  // Anything that checks a credential is the expensive thing to brute force.
-  const STRICT_RATE_LIMIT = {
-    rateLimit: { max: deps.authRateLimitPerMinute, timeWindow: "1 minute" },
-  } as const;
-
-  // Everything else gets a looser budget — a legitimate session refreshes far
-  // more often than it signs in.
-  const MODERATE_RATE_LIMIT = {
-    rateLimit: { max: deps.authRateLimitPerMinute * 3, timeWindow: "1 minute" },
-  } as const;
-
-  const contextOf = (request: {
-    headers: Readonly<Record<string, unknown>>;
-    ip: string;
-  }): RequestContext => ({
+  contextOf: (request: { headers: Readonly<Record<string, unknown>>; ip: string }): RequestContext => ({
     userAgent:
-      typeof request.headers["user-agent"] === "string"
-        ? request.headers["user-agent"].slice(0, 400)
-        : "",
+      typeof request.headers["user-agent"] === "string" ? request.headers["user-agent"].slice(0, 400) : "",
     ipAddress: request.ip,
-  });
+  }),
 
-  /* ------------------------------------------------------------- register */
+  /** Mounts every auth endpoint. */
+  register: (app: FastifyInstance, deps: AuthRouteDependencies): void => {
+    const routes = app.withTypeProvider<ZodTypeProvider>();
+    const { service, guards, cookies } = deps;
 
-  routes.post(
-    "/register",
-    {
-      config: STRICT_RATE_LIMIT,
-      schema: {
-        tags: ["auth"],
-        summary: "Create an account with an email address and password.",
-        body: registerSchema,
-      },
-    },
-    async (request, reply) => {
-      const result = await service.register({
-        ...request.body,
-        context: contextOf(request),
-      });
+    // Anything that checks a credential is the expensive thing to brute force;
+    // a session refreshes far more often than it signs in.
+    const strict = { rateLimit: { max: deps.authRateLimitPerMinute, timeWindow: "1 minute" } };
+    const moderate = { rateLimit: { max: deps.authRateLimitPerMinute * 3, timeWindow: "1 minute" } };
 
-      if (result.isErr()) return sendDomainError(reply, result.error);
+    const providerParams = z.object({ provider: OAuthProvider.schema });
+    const callbackUriFor = (provider: string): string =>
+      `${deps.publicWebOrigin}/api/v1/auth/oauth/${provider}/callback`;
 
-      setRefreshCookie(
-        reply,
-        result.value.refreshToken,
-        result.value.refreshExpiresAt,
-        cookies,
-      );
+    routes.post("/register", { config: strict, schema: { body: RegisterInput.schema } }, async (request, reply) => {
+      const result = await service.register({ ...request.body, context: AuthRoutes.contextOf(request) });
 
+      if (result.isErr()) return HttpErrors.send(reply, result.error);
+
+      Cookies.setRefresh(reply, result.value.refreshToken, result.value.refreshExpiresAt, cookies);
       return reply.status(201).send(result.value.grant);
-    },
-  );
+    });
 
-  /* ---------------------------------------------------------------- login */
+    routes.post("/login", { config: strict, schema: { body: LoginInput.schema } }, async (request, reply) => {
+      const result = await service.login({ ...request.body, context: AuthRoutes.contextOf(request) });
 
-  routes.post(
-    "/login",
-    {
-      config: STRICT_RATE_LIMIT,
-      schema: {
-        tags: ["auth"],
-        summary: "Sign in. Answers a 2FA challenge if the account requires one.",
-        body: loginSchema,
-      },
-    },
-    async (request, reply) => {
-      const result = await service.login({
-        ...request.body,
-        context: contextOf(request),
-      });
-
-      if (result.isErr()) return sendDomainError(reply, result.error);
+      if (result.isErr()) return HttpErrors.send(reply, result.error);
 
       const outcome = result.value;
+      if (!AuthRoutes.isIssuedSession(outcome)) return reply.status(200).send(outcome);
 
-      // Sign-in has two shapes. Only one of them sets a refresh cookie.
-      if (!isIssuedSession(outcome)) return reply.status(200).send(outcome);
+      Cookies.setRefresh(reply, outcome.refreshToken, outcome.refreshExpiresAt, cookies);
+      return reply.status(200).send({ status: "authenticated", grant: outcome.grant });
+    });
 
-      setRefreshCookie(reply, outcome.refreshToken, outcome.refreshExpiresAt, cookies);
+    routes.post(
+      "/login/2fa",
+      { config: strict, schema: { body: TwoFactorLoginInput.schema } },
+      async (request, reply) => {
+        // The body's token wins; the cookie is what the OAuth redirect leaves behind.
+        const challengeToken = request.body.challengeToken ?? request.cookies[Cookies.TWO_FACTOR];
 
-      return reply
-        .status(200)
-        .send({ status: "authenticated", grant: outcome.grant });
-    },
-  );
+        if (challengeToken === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
-  routes.post(
-    "/login/2fa",
-    {
-      config: STRICT_RATE_LIMIT,
-      schema: {
-        tags: ["auth"],
-        summary: "Complete a sign-in that requires a second factor.",
-        body: twoFactorLoginSchema,
+        const result = await service.completeTwoFactorLogin({
+          challengeToken,
+          code: request.body.code,
+          context: AuthRoutes.contextOf(request),
+        });
+
+        if (result.isErr()) return HttpErrors.send(reply, result.error);
+
+        Cookies.clearTwoFactor(reply, cookies);
+        Cookies.setRefresh(reply, result.value.refreshToken, result.value.refreshExpiresAt, cookies);
+        return reply.status(200).send({ status: "authenticated", grant: result.value.grant });
       },
-    },
-    async (request, reply) => {
-      /*
-       * The body's token wins; the cookie is the fallback the OAuth redirect
-       * leaves behind. Neither means this page was opened cold.
-       */
-      const challengeToken = Option.orElse(() =>
-        Option.fromNullable(request.cookies[TWO_FACTOR_COOKIE]),
-      )(Option.fromNullable(request.body.challengeToken));
+    );
 
-      if (Option.isNone(challengeToken)) {
-        return sendDomainError(reply, { _tag: "Unauthenticated" });
-      }
+    routes.post("/refresh", { config: moderate }, async (request, reply) => {
+      const presented = request.cookies[Cookies.REFRESH];
 
-      const result = await service.completeTwoFactorLogin({
-        challengeToken: challengeToken.value,
-        code: request.body.code,
-        context: contextOf(request),
-      });
+      if (presented === undefined) return HttpErrors.send(reply, { _tag: "RefreshTokenInvalid" });
 
-      if (result.isErr()) return sendDomainError(reply, result.error);
-
-      clearTwoFactorCookie(reply, cookies);
-      setRefreshCookie(
-        reply,
-        result.value.refreshToken,
-        result.value.refreshExpiresAt,
-        cookies,
-      );
-
-      return reply
-        .status(200)
-        .send({ status: "authenticated", grant: result.value.grant });
-    },
-  );
-
-  /* -------------------------------------------------------------- refresh */
-
-  routes.post(
-    "/refresh",
-    {
-      config: MODERATE_RATE_LIMIT,
-      schema: {
-        tags: ["auth"],
-        summary:
-          "Exchange the refresh cookie for a new access token. Single-use: the old token is invalidated and reuse revokes the session.",
-      },
-    },
-    async (request, reply) => {
-      const presented = Option.fromNullable(request.cookies[REFRESH_COOKIE]);
-
-      if (Option.isNone(presented)) {
-        return sendDomainError(reply, { _tag: "RefreshTokenInvalid" });
-      }
-
-      const result = await service.refresh(presented.value);
+      const result = await service.refresh(presented);
 
       if (result.isErr()) {
-        // The cookie is spent either way — leaving it in place only produces
-        // a second failure on the next attempt.
-        clearRefreshCookie(reply, cookies);
-        return sendDomainError(reply, result.error);
+        // The cookie is spent either way.
+        Cookies.clearRefresh(reply, cookies);
+        return HttpErrors.send(reply, result.error);
       }
 
-      setRefreshCookie(
-        reply,
-        result.value.refreshToken,
-        result.value.refreshExpiresAt,
-        cookies,
-      );
-
+      Cookies.setRefresh(reply, result.value.refreshToken, result.value.refreshExpiresAt, cookies);
       return reply.status(200).send(result.value.grant);
-    },
-  );
+    });
 
-  routes.post(
-    "/logout",
-    {
-      preHandler: guards.requireUser,
-      schema: { tags: ["auth"], summary: "Revoke the current session." },
-    },
-    async (request, reply) => {
-      const user = request.authenticated;
+    routes.post("/logout", { preHandler: guards.requireUser }, async (request, reply) => {
+      if (request.authenticated !== undefined) await service.logout(request.authenticated.sessionId);
 
-      if (Option.isSome(user)) await service.logout(user.value.sessionId);
-
-      clearRefreshCookie(reply, cookies);
+      Cookies.clearRefresh(reply, cookies);
       return reply.status(204).send();
-    },
-  );
+    });
 
-  routes.get(
-    "/me",
-    {
-      preHandler: guards.requireUser,
-      schema: { tags: ["auth"], summary: "The signed-in user." },
-    },
-    async (request, reply) => {
-      const user = request.authenticated;
+    routes.get("/me", { preHandler: guards.requireUser }, async (request, reply) => {
+      if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
-      if (Option.isNone(user)) {
-        return sendDomainError(reply, { _tag: "Unauthenticated" });
-      }
+      const result = await service.currentUser(request.authenticated.id);
+      return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(200).send(result.value);
+    });
 
-      const result = await service.currentUser(user.value.id);
-
-      return result.isErr()
-        ? sendDomainError(reply, result.error)
-        : reply.status(200).send(result.value);
-    },
-  );
-
-  /* ----------------------------------------------------- password recovery */
-
-  routes.post(
-    "/password/forgot",
-    {
-      config: STRICT_RATE_LIMIT,
-      schema: {
-        tags: ["auth"],
-        summary:
-          "Send a reset link. Always answers 204, whether or not the address is registered.",
-        body: forgotPasswordSchema,
+    routes.post(
+      "/password/forgot",
+      { config: strict, schema: { body: ForgotPasswordInput.schema } },
+      async (request, reply) => {
+        await service.requestPasswordReset(request.body.email);
+        return reply.status(204).send();
       },
-    },
-    async (request, reply) => {
-      await service.requestPasswordReset(request.body.email);
-      return reply.status(204).send();
-    },
-  );
+    );
 
-  routes.post(
-    "/password/reset",
-    {
-      config: STRICT_RATE_LIMIT,
-      schema: {
-        tags: ["auth"],
-        summary: "Set a new password using a reset token. Ends every session.",
-        body: resetPasswordSchema,
+    routes.post(
+      "/password/reset",
+      { config: strict, schema: { body: ResetPasswordInput.schema } },
+      async (request, reply) => {
+        const result = await service.resetPassword(request.body);
+
+        if (result.isErr()) return HttpErrors.send(reply, result.error);
+
+        Cookies.clearRefresh(reply, cookies);
+        return reply.status(204).send();
       },
-    },
-    async (request, reply) => {
-      const result = await service.resetPassword(request.body);
+    );
 
-      if (result.isErr()) return sendDomainError(reply, result.error);
+    routes.post(
+      "/password",
+      { preHandler: guards.requireUser, config: strict, schema: { body: ChangePasswordInput.schema } },
+      async (request, reply) => {
+        if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
-      clearRefreshCookie(reply, cookies);
-      return reply.status(204).send();
-    },
-  );
-
-  /* ------------------------------------------------------ two-factor setup */
-
-  routes.post(
-    "/2fa/setup",
-    {
-      preHandler: guards.requireUser,
-      config: MODERATE_RATE_LIMIT,
-      schema: {
-        tags: ["auth"],
-        summary: "Start 2FA enrollment. Returns an otpauth URI and a QR code.",
+        const { currentPassword, password } = request.body;
+        const result = await service.changePassword({
+          userId: request.authenticated.id,
+          ...(currentPassword === undefined ? {} : { currentPassword }),
+          password,
+        });
+        return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(200).send(result.value);
       },
-    },
-    async (request, reply) => {
-      const user = request.authenticated;
-      if (Option.isNone(user)) {
-        return sendDomainError(reply, { _tag: "Unauthenticated" });
-      }
+    );
 
-      const result = await service.beginTwoFactorSetup(user.value.id);
+    routes.post("/2fa/setup", { preHandler: guards.requireUser, config: moderate }, async (request, reply) => {
+      if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
-      return result.isErr()
-        ? sendDomainError(reply, result.error)
-        : reply.status(200).send(result.value);
-    },
-  );
+      const result = await service.beginTwoFactorSetup(request.authenticated.id);
+      return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(200).send(result.value);
+    });
 
-  routes.post(
-    "/password",
-    {
-      preHandler: guards.requireUser,
-      config: STRICT_RATE_LIMIT,
-      schema: {
-        tags: ["auth"],
-        summary: "Change the password, or set the first one on a provider account.",
-        body: changePasswordSchema,
+    routes.post(
+      "/2fa/enable",
+      { preHandler: guards.requireUser, config: strict, schema: { body: TwoFactorCodeInput.schema } },
+      async (request, reply) => {
+        if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
+
+        const result = await service.enableTwoFactor({ userId: request.authenticated.id, code: request.body.code });
+        return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(200).send(result.value);
       },
-    },
-    async (request, reply) => {
-      const user = request.authenticated;
-      if (Option.isNone(user)) {
-        return sendDomainError(reply, { _tag: "Unauthenticated" });
-      }
+    );
 
-      const result = await service.changePassword({
-        userId: user.value.id,
-        currentPassword: Option.fromNullable(request.body.currentPassword),
-        password: request.body.password,
-      });
+    routes.post(
+      "/2fa/disable",
+      { preHandler: guards.requireUser, config: strict, schema: { body: TwoFactorCodeInput.schema } },
+      async (request, reply) => {
+        if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
-      return result.isErr()
-        ? sendDomainError(reply, result.error)
-        : reply.status(200).send(result.value);
-    },
-  );
-
-  routes.post(
-    "/2fa/enable",
-    {
-      preHandler: guards.requireUser,
-      config: STRICT_RATE_LIMIT,
-      schema: {
-        tags: ["auth"],
-        summary: "Confirm enrollment by proving one live code.",
-        body: enableTwoFactorSchema,
+        const result = await service.disableTwoFactor({ userId: request.authenticated.id, code: request.body.code });
+        return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(200).send(result.value);
       },
-    },
-    async (request, reply) => {
-      const user = request.authenticated;
-      if (Option.isNone(user)) {
-        return sendDomainError(reply, { _tag: "Unauthenticated" });
-      }
+    );
 
-      const result = await service.enableTwoFactor({
-        userId: user.value.id,
-        code: request.body.code,
-      });
+    routes.get("/oauth/providers", async (_request, reply) => reply.send(service.availableProviders()));
 
-      return result.isErr()
-        ? sendDomainError(reply, result.error)
-        : reply.status(200).send(result.value);
-    },
-  );
+    // Each provider gets its own callback URI, so a code issued by one cannot
+    // be presented as if it came from another.
+    routes.get(
+      "/oauth/:provider",
+      { config: moderate, schema: { params: providerParams } },
+      async (request, reply) => {
+        const result = await service.oauthAuthorizationUrl({
+          provider: request.params.provider,
+          redirectUri: callbackUriFor(request.params.provider),
+        });
 
-  routes.post(
-    "/2fa/disable",
-    {
-      preHandler: guards.requireUser,
-      config: STRICT_RATE_LIMIT,
-      schema: {
-        tags: ["auth"],
-        summary: "Turn 2FA off. Requires a live code, not just a session.",
-        body: disableTwoFactorSchema,
+        if (result.isErr()) return HttpErrors.send(reply, result.error);
+
+        Cookies.setOAuthState(reply, result.value.state, cookies);
+        return reply.redirect(result.value.url, 302);
       },
-    },
-    async (request, reply) => {
-      const user = request.authenticated;
-      if (Option.isNone(user)) {
-        return sendDomainError(reply, { _tag: "Unauthenticated" });
-      }
+    );
 
-      const result = await service.disableTwoFactor({
-        userId: user.value.id,
-        code: request.body.code,
-      });
-
-      return result.isErr()
-        ? sendDomainError(reply, result.error)
-        : reply.status(200).send(result.value);
-    },
-  );
-
-  /* ------------------------------------------------------------------ OAuth */
-
-  /**
-   * Each provider gets its own callback URI. Sharing one and switching on a
-   * query parameter would mean a code issued by one provider could be
-   * presented as if it came from another.
-   */
-  const callbackUriFor = (provider: string): string =>
-    `${deps.publicWebOrigin}/api/v1/auth/oauth/${provider}/callback`;
-
-  const providerParamsSchema = z.object({ provider: oauthProviderSchema });
-
-  routes.get(
-    "/oauth/providers",
-    {
-      schema: {
-        tags: ["auth"],
-        summary:
-          "Which third-party sign-ins this instance can complete, so the UI shows only live buttons.",
+    routes.get(
+      "/oauth/:provider/callback",
+      {
+        config: moderate,
+        schema: {
+          params: providerParams,
+          querystring: z.object({ code: z.string().min(1).max(2048), state: z.string().min(1).max(512) }),
+        },
       },
-    },
-    async (_request, reply) => reply.send(service.availableProviders()),
-  );
+      async (request, reply) => {
+        const expected = request.cookies[Cookies.OAUTH_STATE];
 
-  routes.get(
-    "/oauth/:provider",
-    {
-      config: MODERATE_RATE_LIMIT,
-      schema: {
-        tags: ["auth"],
-        summary: "Begin sign-in with a third-party provider.",
-        params: providerParamsSchema,
+        Cookies.clearOAuthState(reply, cookies);
+
+        if (expected === undefined || expected !== request.query.state) {
+          return HttpErrors.send(reply, { _tag: "OAuthStateInvalid" });
+        }
+
+        const result = await service.completeOAuthLogin({
+          provider: request.params.provider,
+          code: request.query.code,
+          redirectUri: callbackUriFor(request.params.provider),
+          context: AuthRoutes.contextOf(request),
+        });
+
+        if (result.isErr()) {
+          return reply.redirect(`${deps.publicWebOrigin}/login?error=${result.error._tag}`, 302);
+        }
+
+        if ("status" in result.value) {
+          Cookies.setTwoFactor(reply, result.value.challengeToken, cookies);
+          return reply.redirect(`${deps.publicWebOrigin}/login/2fa`, 302);
+        }
+
+        Cookies.setRefresh(reply, result.value.refreshToken, result.value.refreshExpiresAt, cookies);
+        // The access token stays out of the URL; the page calls /refresh on arrival.
+        return reply.redirect(`${deps.publicWebOrigin}/oauth/complete`, 302);
       },
-    },
-    async (request, reply) => {
-      const result = await service.oauthAuthorizationUrl({
-        provider: request.params.provider,
-        redirectUri: callbackUriFor(request.params.provider),
-      });
+    );
 
-      if (result.isErr()) return sendDomainError(reply, result.error);
-
-      // State is remembered in an httpOnly cookie and compared on return, so a
-      // callback this browser did not initiate cannot sign anyone in.
-      setOAuthStateCookie(reply, result.value.state, cookies);
-
-      return reply.redirect(result.value.url, 302);
-    },
-  );
-
-  routes.get(
-    "/oauth/:provider/callback",
-    {
-      config: MODERATE_RATE_LIMIT,
-      schema: {
-        tags: ["auth"],
-        summary: "The provider redirects here with an authorization code.",
-        params: providerParamsSchema,
-        querystring: z.object({
-          code: z.string().min(1).max(2048),
-          state: z.string().min(1).max(512),
-        }),
-      },
-    },
-    async (request, reply) => {
-      const expected = Option.fromNullable(request.cookies[OAUTH_STATE_COOKIE]);
-
-      clearOAuthStateCookie(reply, cookies);
-
-      if (Option.isNone(expected) || expected.value !== request.query.state) {
-        return sendDomainError(reply, { _tag: "OAuthStateInvalid" });
-      }
-
-      const result = await service.completeOAuthLogin({
-        provider: request.params.provider,
-        code: request.query.code,
-        redirectUri: callbackUriFor(request.params.provider),
-        context: contextOf(request),
-      });
-
-      if (result.isErr()) {
-        return reply.redirect(
-          `${deps.publicWebOrigin}/login?error=${result.error._tag}`,
-          302,
-        );
-      }
-
-      /*
-       * A provider proves who owns the third-party account, not that the
-       * second factor this account asked for was satisfied. When one is
-       * enabled the flow lands on the same challenge page password sign-in
-       * uses, with the token in a cookie rather than the URL.
-       */
-      if ("status" in result.value) {
-        setTwoFactorCookie(reply, result.value.challengeToken, cookies);
-        return reply.redirect(`${deps.publicWebOrigin}/login/2fa`, 302);
-      }
-
-      setRefreshCookie(
-        reply,
-        result.value.refreshToken,
-        result.value.refreshExpiresAt,
-        cookies,
-      );
-
-      // The access token is deliberately not in this URL — it would land in
-      // browser history and any referrer header. The SPA calls /refresh on
-      // arrival and gets one from the cookie that was just set.
-      return reply.redirect(`${deps.publicWebOrigin}/oauth/complete`, 302);
-    },
-  );
-
-  /* ------------------------------------------------- the offline mock IdP */
-
-  if (Option.isSome(deps.mockOAuthSecret)) {
-    const secret = deps.mockOAuthSecret.value;
+    const secret = deps.mockOAuthSecret;
+    if (secret === undefined) return;
 
     routes.get(
       "/oauth/:provider/consent",
       {
         schema: {
-          tags: ["auth"],
-          summary:
-            "Stand-in consent screen used when no provider credentials are configured, so the flow works with no third-party account.",
-          params: providerParamsSchema,
-          querystring: z.object({
-            state: z.string().min(1).max(512),
-            redirect_uri: z.string().min(1).max(2048),
-          }),
+          params: providerParams,
+          querystring: z.object({ state: z.string().min(1).max(512), redirect_uri: z.string().min(1).max(2048) }),
         },
       },
       async (request, reply) =>
-        reply
-          .type("text/html; charset=utf-8")
-          .send(
-            renderMockConsentPage({
-              provider: request.params.provider,
-              state: request.query.state,
-              redirectUri: request.query.redirect_uri,
-            }),
-          ),
+        reply.type("text/html; charset=utf-8").send(
+          MockConsentPage.render({
+            provider: request.params.provider,
+            state: request.query.state,
+            redirectUri: request.query.redirect_uri,
+          }),
+        ),
     );
 
     routes.post(
       "/oauth/:provider/consent",
       {
-        config: MODERATE_RATE_LIMIT,
+        config: moderate,
         schema: {
-          tags: ["auth"],
-          summary: "The mock consent screen posts here, then redirects back.",
-          params: providerParamsSchema,
+          params: providerParams,
           body: z.object({
             email: z.string().trim().toLowerCase().pipe(z.email().max(254)),
             state: z.string().min(1).max(512),
@@ -578,15 +296,11 @@ export const registerAuthRoutes = (
         },
       },
       async (request, reply) => {
-        const code = issueMockAuthorizationCode(
-          request.params.provider,
-          request.body.email,
-          secret,
-        );
+        const code = MockAuthorizationCode.issue(request.params.provider, request.body.email, secret);
         const params = new URLSearchParams({ code, state: request.body.state });
 
         return reply.redirect(`${request.body.redirect_uri}?${params}`, 302);
       },
     );
-  }
-};
+  },
+} as const;

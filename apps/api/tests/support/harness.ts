@@ -1,49 +1,46 @@
 /**
- * Integration test harness.
- *
- * Starts a real Postgres in a container, applies the real migrations, and
- * builds the real application — same `buildApp` the container runs. Only the
- * pieces that would reach the outside world are substituted: the clock (so
- * expiry is controllable), the mailer (so messages can be asserted on), and
- * the hasher (so argon2 does not dominate the runtime).
- *
- * Requests go through `app.inject`, which exercises the full Fastify pipeline
- * — routing, schema validation, guards, serialization — without a socket.
+ * Integration test harness: a real Postgres in a container, the real
+ * migrations, and the real application. Only the pieces that would reach
+ * the outside world are substituted: the clock, the mailer and the hasher.
+ * Requests go through `app.inject`, which runs the whole Fastify pipeline
+ * without a socket.
  */
 
-import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import postgres from "postgres";
-import { match } from "ts-pattern";
-import type { FinishApplication, FinisherSpec } from "@prism/shared";
-import { generateSync } from "otplib";
+import { PostgreSqlContainer } from "@testcontainers/postgresql";
+import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { buildApp } from "../../src/app.ts";
-import { toConfig, type Config } from "../../src/config.ts";
-import { createDatabase, type DatabaseHandle } from "../../src/db/client.ts";
-import { runMigrations } from "../../src/db/migrate.ts";
-import { mutableClock, type MutableClock } from "../../src/platform/clock.ts";
-import { createMemoryMailer } from "../../src/platform/mailer.ts";
-import type { MemoryMailer } from "../../src/platform/mailer.ts";
+import { generateSync } from "otplib";
+import { App } from "../../src/app.ts";
+import { Config } from "../../src/config.ts";
+import { Database, type DatabaseHandle } from "../../src/db/client.ts";
+import { Migrations } from "../../src/db/migrate.ts";
+import {
+  brands,
+  categories,
+  productImages,
+  productProperties,
+  productReviews,
+  products,
+  users,
+} from "../../src/db/schema.ts";
+import { Clock, type MutableClock } from "../../src/platform/clock.ts";
 import type { Hasher } from "../../src/platform/hasher.ts";
+import { Mailer, type MemoryMailer } from "../../src/platform/mailer.ts";
+import { TotpService } from "../../src/platform/totp.ts";
 
-/** Where the harness clock starts, so every expiry in the suite is reasoned from one instant. */
+/** Where the harness clock starts, so every expiry is reasoned from one instant. */
 export const TEST_START = new Date("2026-08-07T12:00:00.000Z");
 
-/** Matches `PERIOD_SECONDS` in the TOTP adapter. */
-const TOTP_PERIOD_SECONDS = 30;
+/** A password that satisfies the policy, for tests that are not about the policy. */
+export const VALID_PASSWORD = "correct horse battery staple";
 
-/**
- * Argon2 at production parameters costs ~50 ms per call, which across a full
- * suite is minutes of nothing useful. This keeps the *shape* — same hash on
- * the same input, verification that can fail — at no cost.
- */
-const fastHasher: Hasher = {
+/** Argon2 costs ~50 ms per call; this keeps the shape at no cost. */
+export const fastHasher: Hasher = {
   hash: async (plaintext) => `fake:${Buffer.from(plaintext).toString("base64")}`,
-  verify: async (storedHash, plaintext) =>
-    storedHash === `fake:${Buffer.from(plaintext).toString("base64")}`,
+  verify: async (storedHash, plaintext) => storedHash === `fake:${Buffer.from(plaintext).toString("base64")}`,
   fakeVerify: async () => undefined,
 };
 
@@ -62,47 +59,38 @@ export type Harness = Readonly<{
 }>;
 
 /** An environment the config parser accepts, pointed at a throwaway database. */
-export const testEnvironment = (
-  databaseUrl: string,
-  mediaDirectory: string,
-  authRateLimitPerMinute = 1_000_000,
-) => ({
-  NODE_ENV: "test" as const,
-  LOG_LEVEL: "fatal" as const,
-  HOST: "127.0.0.1",
-  PORT: 0,
-  DATABASE_URL: databaseUrl,
-  DATABASE_POOL_SIZE: 5,
-  PUBLIC_WEB_URL: "http://localhost:3000",
-  JWT_SECRET: "test-secret-that-is-at-least-32-characters-long",
-  JWT_ISSUER: "prism",
-  ACCESS_TOKEN_TTL_SECONDS: 900,
-  REFRESH_TOKEN_TTL_SECONDS: 604800,
-  TWO_FACTOR_CHALLENGE_TTL_SECONDS: 300,
-  PASSWORD_RESET_TTL_SECONDS: 1800,
-  SMTP_HOST: "unused",
-  SMTP_PORT: 1025,
-  SMTP_USER: "",
-  SMTP_PASSWORD: "",
-  SMTP_SECURE: false,
-  MAIL_FROM: "Prism <noreply@prism.test>",
-  RECAPTCHA_SECRET_KEY: "",
-  GOOGLE_CLIENT_ID: "",
-  GOOGLE_CLIENT_SECRET: "",
-  GITHUB_CLIENT_ID: "",
-  GITHUB_CLIENT_SECRET: "",
-  // Effectively off by default. The limiter keys on the client address and
-  // has no idea a new test started, so a realistic budget would exhaust
-  // itself a few tests in and turn every later assertion into a 429. The
-  // tests that exercise throttling build their own app with a low budget.
-  AUTH_RATE_LIMIT_PER_MINUTE: authRateLimitPerMinute,
-  MEDIA_DIR: mediaDirectory,
-  MEDIA_MAX_BYTES: 2 * 1024 * 1024,
-  FACET_CACHE_TTL_SECONDS: 60,
-  PRODUCT_CACHE_TTL_SECONDS: 60,
-});
+export const testEnvironment = (databaseUrl: string, mediaDirectory: string, authRateLimitPerMinute = 1_000_000) =>
+  ({
+    LOG_LEVEL: "fatal" as const,
+    HOST: "127.0.0.1",
+    PORT: 0,
+    DATABASE_URL: databaseUrl,
+    DATABASE_POOL_SIZE: 5,
+    PUBLIC_WEB_URL: "http://localhost:3000",
+    JWT_SECRET: "test-secret-that-is-at-least-32-characters-long",
+    JWT_ISSUER: "prism",
+    ACCESS_TOKEN_TTL_SECONDS: 900,
+    REFRESH_TOKEN_TTL_SECONDS: 604800,
+    TWO_FACTOR_CHALLENGE_TTL_SECONDS: 300,
+    PASSWORD_RESET_TTL_SECONDS: 1800,
+    SMTP_HOST: "unused",
+    SMTP_PORT: 1025,
+    SMTP_USER: "",
+    SMTP_PASSWORD: "",
+    SMTP_SECURE: false,
+    MAIL_FROM: "Prism <noreply@prism.test>",
+    RECAPTCHA_SECRET_KEY: "",
+    GOOGLE_CLIENT_ID: "",
+    GOOGLE_CLIENT_SECRET: "",
+    GITHUB_CLIENT_ID: "",
+    GITHUB_CLIENT_SECRET: "",
+    // Effectively off: the limiter keys on the client address and cannot tell
+    // one test from the next. The throttling tests build their own app.
+    AUTH_RATE_LIMIT_PER_MINUTE: authRateLimitPerMinute,
+    MEDIA_DIR: mediaDirectory,
+  }) as const;
 
-/** Every table the tests write to, in an order that respects the FKs. */
+/** Every table the tests write to, in an order that respects the foreign keys. */
 const MUTABLE_TABLES = [
   "refresh_token",
   "password_reset_token",
@@ -110,53 +98,30 @@ const MUTABLE_TABLES = [
   "oauth_identity",
   "product_review",
   "product_image",
-  "color",
-  "finisher",
-  "shifter",
+  "product_property",
   "product",
   "brand",
+  "category",
   "app_user",
 ];
 
 /**
  * Starts a Postgres container, migrates it, and builds the app against it.
- *
- * `reset` empties the tables between tests and returns the clock to
- * `TEST_START`; `stop` takes the container down.
+ * `reset` empties the tables and moves the clock an hour on; `stop` takes
+ * the container down.
  */
 export const startHarness = async (): Promise<Harness> => {
-  const container: StartedPostgreSqlContainer = await new PostgreSqlContainer(
-    "postgres:18-alpine",
-  ).start();
+  const container = await new PostgreSqlContainer("postgres:18-alpine").start();
+  const mediaDirectory = await mkdtemp(join(tmpdir(), "prism-media-"));
 
-  const databaseUrl = container.getConnectionUri();
-  const mediaDirectory = await mkdtemp(join(tmpdir(), "hue-media-"));
+  const config = Config.fromEnvironment(testEnvironment(container.getConnectionUri(), mediaDirectory));
+  const database = Database.open(config.database.url, config.database.poolSize);
+  await Migrations.apply(database.db);
 
-  const migrator = postgres(databaseUrl, { max: 1, onnotice: () => {} });
-  const migrated = await runMigrations(migrator);
-  await migrator.end();
+  const clock = Clock.mutable(TEST_START);
+  const mailer = Mailer.memory();
+  const app = await App.build({ config, database, overrides: { clock, mailer, hasher: fastHasher } });
 
-  // A fresh container records nothing, so a refusal here is a fault in the
-  // runner rather than in the database.
-  if (migrated._tag === "Refused") {
-    throw new Error(`The migrations refused an empty database: ${JSON.stringify(migrated.mismatches)}`);
-  }
-
-  const config = toConfig(testEnvironment(databaseUrl, mediaDirectory));
-  const database = createDatabase(config.database.url, config.database.poolSize);
-
-  const clock = mutableClock(TEST_START);
-  const mailer = createMemoryMailer();
-
-  const app = await buildApp({
-    config,
-    database,
-    overrides: { clock, mailer, hasher: fastHasher },
-  });
-
-  // Each reset starts an hour after the last, so cached responses from an
-  // earlier test are always past their TTL. Resetting to a fixed instant
-  // would leave them live and hand the next test stale data.
   let epoch = TEST_START.getTime();
 
   return {
@@ -167,20 +132,16 @@ export const startHarness = async (): Promise<Harness> => {
     config,
     mediaDirectory,
 
-    // Truncate rather than re-migrate: it is far quicker, and RESTART IDENTITY
-    // plus CASCADE leaves the schema exactly as the migrations built it.
     totpCodeFor: (secret) =>
       generateSync({
         secret,
-        period: TOTP_PERIOD_SECONDS,
+        period: TotpService.PERIOD_SECONDS,
         digits: 6,
         epoch: Math.floor(clock.now().getTime() / 1000),
       }),
 
     reset: async () => {
-      await database.sql.unsafe(
-        `TRUNCATE ${MUTABLE_TABLES.join(", ")} RESTART IDENTITY CASCADE`,
-      );
+      await database.sql.unsafe(`TRUNCATE ${MUTABLE_TABLES.join(", ")} RESTART IDENTITY CASCADE`);
       epoch += 60 * 60 * 1000;
       clock.set(new Date(epoch));
       mailer.clear();
@@ -195,16 +156,10 @@ export const startHarness = async (): Promise<Harness> => {
   };
 };
 
-/* ----------------------------------------------------------------- helpers */
-
-export const jsonOf = (response: { body: string }): Record<string, unknown> =>
-  JSON.parse(response.body);
+export const jsonOf = (response: { body: string }): Record<string, unknown> => JSON.parse(response.body);
 
 /** Reads a Set-Cookie value by name from an inject response. */
-export const cookieValue = (
-  response: { cookies: readonly unknown[] },
-  name: string,
-): string => {
+export const cookieValue = (response: { cookies: readonly unknown[] }, name: string): string => {
   for (const cookie of response.cookies) {
     if (
       typeof cookie === "object" &&
@@ -221,15 +176,8 @@ export const cookieValue = (
   return "";
 };
 
-/** A password that satisfies the policy, for tests that are not about the policy. */
-export const VALID_PASSWORD = "correct horse battery staple";
-
 /** Opens an account and hands back the response along with the token it granted. */
-export const registerUser = async (
-  harness: Harness,
-  email: string,
-  password: string = VALID_PASSWORD,
-) => {
+export const registerUser = async (harness: Harness, email: string, password: string = VALID_PASSWORD) => {
   const response = await harness.app.inject({
     method: "POST",
     url: "/api/v1/auth/register",
@@ -241,188 +189,82 @@ export const registerUser = async (
   return {
     response,
     accessToken: typeof body["accessToken"] === "string" ? body["accessToken"] : "",
-    refreshToken: cookieValue(response, "hue_refresh"),
+    refreshToken: cookieValue(response, "prism_refresh"),
   };
 };
 
-/** Seeds a minimal catalog: one brand, and the given colors. */
-export const seedCatalog = async (
-  harness: Harness,
-  colors: readonly Readonly<{
-    slug: string;
-    name: string;
-    hex: string;
-    priceCents: number;
-    /** Defaulted, so a test names only the amounts it cares about. */
-    roughness?: number;
-    coatingNanometers?: number;
-    emission?: number;
-  }>[],
-): Promise<void> => {
-  const { sql } = harness.database;
-
-  await sql`INSERT INTO brand (slug, name) VALUES ('chroma-labs', 'Chroma Labs')`;
-
-  for (const color of colors) {
-    await sql`
-      INSERT INTO product (
-        slug, name, description, price_cents, stock_quantity, brand_id, kind
-      )
-      SELECT ${color.slug}, ${color.name}, ${`${color.name} description`},
-             ${color.priceCents}, 10, b.id, 'color'
-      FROM brand b WHERE b.slug = 'chroma-labs'
-    `;
-    await sql`
-      INSERT INTO color (product_id, hex, roughness, coating_nanometers, emission)
-      SELECT p.id, ${color.hex},
-             ${color.roughness ?? (color.coatingNanometers ? 20 : 88)}::smallint,
-             ${color.coatingNanometers ?? 0}::smallint,
-             ${color.emission ?? 0}::smallint
-      FROM product p WHERE p.slug = ${color.slug}
-    `;
-  }
-};
-
-/** The variant values a product of each kind is built from. */
-export type Variant =
-  | Readonly<{
-      kind: "color";
-      hex: string;
-      roughness?: number;
-      coatingNanometers?: number;
-      emission?: number;
-    }>
-  | FinisherSpec
-  | Readonly<{ kind: "shifter"; direction: "cw" | "ccw"; arcDegrees: number }>;
-
-/** A finisher's row: the one amount it carries, and the two columns it leaves empty. */
-type FinisherColumns = Readonly<{
-  roughness: number | null;
-  coatingNanometers: number | null;
-  emission: number | null;
+/** One product as a test describes it; everything but the name and price has a default. */
+export type ProductSeed = Readonly<{
+  slug: string;
+  name: string;
+  description?: string;
+  priceCents: number;
+  stock?: number;
+  category?: string;
+  brand?: string;
+  properties?: Readonly<Record<string, string>>;
+  images?: readonly string[];
+  /** One review per star value listed, each from its own reviewer. */
+  ratings?: readonly number[];
 }>;
 
-/**
- * Which column a finisher writes, from what it does.
- *
- * The table refuses a row with more or fewer than one of the three, so the
- * two a finisher does not use are absent rather than zero.
- */
-const finisherColumns = (application: FinishApplication): FinisherColumns =>
-  match(application)
-    .with({ applies: "roughness" }, ({ roughness }) => ({
-      roughness,
-      coatingNanometers: null,
-      emission: null,
-    }))
-    .with({ applies: "coating" }, ({ coatingNanometers }) => ({
-      roughness: null,
-      coatingNanometers,
-      emission: null,
-    }))
-    .with({ applies: "emission" }, ({ emission }) => ({
-      roughness: null,
-      coatingNanometers: null,
-      emission,
-    }))
-    .exhaustive();
+/** A slug for a name a test writes in words. */
+const slugOf = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
-/**
- * Inserts one product and the variant row that goes with it.
- *
- * The brand defaults to the one `seedCatalog` creates, so a test that only
- * needs a product to exist names a slug, a price and what it is.
- */
-export const insertProduct = async (
-  harness: Harness,
-  product: Readonly<{
-    slug: string;
-    name: string;
-    description?: string;
-    priceCents: number;
-    stockQuantity?: number;
-    brandSlug?: string;
-  }> &
-    Variant,
-): Promise<void> => {
-  const { sql } = harness.database;
+/** Plants the given products, creating whatever categories, brands and reviewers they name. */
+export const seedCatalog = async (harness: Harness, seeds: readonly ProductSeed[]): Promise<void> => {
+  const { db } = harness.database;
 
-  await sql`
-    INSERT INTO product (
-      slug, name, description, price_cents, stock_quantity, brand_id, kind
-    )
-    SELECT ${product.slug}, ${product.name},
-           ${product.description ?? `${product.name} description`},
-           ${product.priceCents}, ${product.stockQuantity ?? 10}, b.id,
-           ${product.kind}::product_kind
-    FROM brand b WHERE b.slug = ${product.brandSlug ?? "chroma-labs"}
-  `;
+  for (const seed of seeds) {
+    const categoryName = seed.category ?? "Things";
+    const brandName = seed.brand ?? "Acme";
 
-  if (product.kind === "color") {
-    await sql`
-      INSERT INTO color (product_id, hex, roughness, coating_nanometers, emission)
-      SELECT p.id, ${product.hex},
-             ${product.roughness ?? (product.coatingNanometers ? 20 : 88)}::smallint,
-             ${product.coatingNanometers ?? 0}::smallint,
-             ${product.emission ?? 0}::smallint
-      FROM product p WHERE p.slug = ${product.slug}
-    `;
-    return;
+    await db.insert(categories).values({ slug: slugOf(categoryName), name: categoryName }).onConflictDoNothing();
+    await db.insert(brands).values({ slug: slugOf(brandName), name: brandName }).onConflictDoNothing();
+
+    const [category] = await db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(eq(categories.slug, slugOf(categoryName)));
+    const [brand] = await db.select({ id: brands.id }).from(brands).where(eq(brands.slug, slugOf(brandName)));
+    if (category === undefined || brand === undefined) throw new Error("seed lookup failed");
+
+    const [product] = await db
+      .insert(products)
+      .values({
+        slug: seed.slug,
+        name: seed.name,
+        description: seed.description ?? `${seed.name} description`,
+        priceCents: seed.priceCents,
+        stock: seed.stock ?? 10,
+        categoryId: category.id,
+        brandId: brand.id,
+        weightGrams: 1000,
+        widthMm: 254,
+        heightMm: 127,
+        depthMm: 25,
+      })
+      .returning({ id: products.id });
+    if (product === undefined) throw new Error("product insert returned no row");
+
+    const properties = Object.entries(seed.properties ?? {});
+    if (properties.length > 0) {
+      await db.insert(productProperties).values(properties.map(([name, value]) => ({ productId: product.id, name, value })));
+    }
+
+    const images = seed.images ?? [];
+    if (images.length > 0) {
+      await db.insert(productImages).values(images.map((file, position) => ({ productId: product.id, file, alt: seed.name, position })));
+    }
+
+    for (const [index, rating] of (seed.ratings ?? []).entries()) {
+      const [reviewer] = await db
+        .insert(users)
+        .values({ email: `reviewer-${seed.slug}-${index}@example.com` })
+        .returning({ id: users.id });
+      if (reviewer === undefined) throw new Error("reviewer insert returned no row");
+
+      await db.insert(productReviews).values({ productId: product.id, userId: reviewer.id, rating });
+    }
   }
-
-  if (product.kind === "finisher") {
-    const columns = finisherColumns(product);
-
-    await sql`
-      INSERT INTO finisher (product_id, roughness, coating_nanometers, emission)
-      SELECT p.id, ${columns.roughness}::smallint,
-             ${columns.coatingNanometers}::smallint,
-             ${columns.emission}::smallint
-      FROM product p WHERE p.slug = ${product.slug}
-    `;
-    return;
-  }
-
-  await sql`
-    INSERT INTO shifter (product_id, direction, arc_degrees)
-    SELECT p.id, ${product.direction}::shift_direction, ${product.arcDegrees}::smallint
-    FROM product p WHERE p.slug = ${product.slug}
-  `;
-};
-
-/**
- * Adds a finisher and a shifter to a catalog already seeded by `seedCatalog`.
- *
- * Everything about them but the price is fixed: these exist so that tests which
- * care about the other two kinds have one of each to find, not so that they can
- * vary.
- */
-export const seedInstruments = async (harness: Harness): Promise<void> => {
-  const { sql } = harness.database;
-
-  await sql`
-    INSERT INTO product (
-      slug, name, description, price_cents, stock_quantity, brand_id, kind
-    )
-    SELECT 'test-applicator', 'Test Applicator', 'Puts gloss back on.',
-           4200, 10, b.id, 'finisher'
-    FROM brand b WHERE b.slug = 'chroma-labs'
-  `;
-  await sql`
-    INSERT INTO finisher (product_id, roughness)
-    SELECT p.id, 18 FROM product p WHERE p.slug = 'test-applicator'
-  `;
-
-  await sql`
-    INSERT INTO product (
-      slug, name, description, price_cents, stock_quantity, brand_id, kind
-    )
-    SELECT 'test-swing', 'Test Swing', 'Turns a color right round.',
-           6900, 10, b.id, 'shifter'
-    FROM brand b WHERE b.slug = 'chroma-labs'
-  `;
-  await sql`
-    INSERT INTO shifter (product_id, direction, arc_degrees)
-    SELECT p.id, 'ccw', 120 FROM product p WHERE p.slug = 'test-swing'
-  `;
 };

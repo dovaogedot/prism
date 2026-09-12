@@ -1,102 +1,81 @@
 /**
  * The account page: the password, the second factor, and how sign-in happens.
  *
- * Enrollment is two steps on purpose: the secret is stored when setup begins,
- * but 2FA is not active until a live code proves the secret actually reached
- * an authenticator app. Otherwise a mistyped scan would lock the account out.
+ * Enrollment is two steps: the secret is stored when setup begins, but 2FA is
+ * not active until a live code proves the secret reached an authenticator
+ * app. Otherwise a mistyped scan would lock the account out.
  */
 
-import {
-  enableTwoFactorSchema,
-  messageOf,
-  Option,
-  changePasswordFormSchema,
-  setPasswordFormSchema,
-  type SessionUser,
-  type TwoFactorSetup,
-} from "@prism/shared";
+import { PasswordForm, TwoFactorCodeInput, type SessionUser, type TwoFactorSetup } from "@prism/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { Navigate } from "react-router";
-import { match } from "ts-pattern";
-import { api, toApiFailure } from "../../../shared/api/client.ts";
-import { useSession } from "../session.ts";
-import { tokenStore } from "../token-store.ts";
+import { match, P } from "ts-pattern";
+import { Api } from "../../../shared/api/client.ts";
 import { Alert, Button, Card, Field } from "../../../shared/ui/index.ts";
-
-const describe = (reason: unknown): string =>
-  match(toApiFailure(reason))
-    .with({ _tag: "Some" }, ({ value }) => messageOf(value.error))
-    .with({ _tag: "None" }, () => "We could not reach the server.")
-    .exhaustive();
+import { Failure } from "../components/failure.tsx";
+import { useSession } from "../session.ts";
+import { TokenStore } from "../token-store.ts";
 
 const TwoFactorSetupFlow = ({ onDone }: Readonly<{ onDone: () => void }>) => {
-  const [setup, setSetup] = useState<Option<TwoFactorSetup>>(Option.none);
-  const [failure, setFailure] = useState<Option<string>>(Option.none);
+  const [setup, setSetup] = useState<TwoFactorSetup | undefined>(undefined);
+  const [failure, setFailure] = useState<string | undefined>(undefined);
   const [starting, setStarting] = useState(false);
 
   const form = useForm({
-    resolver: zodResolver(enableTwoFactorSchema),
+    resolver: zodResolver(TwoFactorCodeInput.schema),
     defaultValues: { code: "" },
   });
 
   const begin = async (): Promise<void> => {
     setStarting(true);
-    setFailure(Option.none);
+    setFailure(undefined);
 
-    await api
-      .post<TwoFactorSetup>("/auth/2fa/setup")
-      .then((result) => setSetup(Option.some(result)))
-      .catch((reason: unknown) => setFailure(Option.some(describe(reason))))
+    await Api.post<TwoFactorSetup>("/auth/2fa/setup")
+      .then((result) => setSetup(result))
+      .catch((reason: unknown) => setFailure(Failure.message(reason)))
       .finally(() => setStarting(false));
   };
 
   const confirm = form.handleSubmit(async (values) => {
-    setFailure(Option.none);
+    setFailure(undefined);
 
-    await api
-      .post<SessionUser>("/auth/2fa/enable", values)
+    await Api.post<SessionUser>("/auth/2fa/enable", values)
       .then((user) => {
-        tokenStore.updateUser(user);
+        TokenStore.updateUser(user);
         onDone();
       })
-      .catch((reason: unknown) => setFailure(Option.some(describe(reason))));
+      .catch((reason: unknown) => setFailure(Failure.message(reason)));
   });
 
   return (
     <div className="space-y-4">
       {match(failure)
-        .with({ _tag: "Some" }, ({ value }) => <Alert>{value}</Alert>)
-        .with({ _tag: "None" }, () => null)
-        .exhaustive()}
+        .with(P.nullish, () => null)
+        .otherwise((message) => <Alert>{message}</Alert>)}
 
       {match(setup)
-        .with({ _tag: "None" }, () => (
+        .with(P.nullish, () => (
           <>
             <p className="text-sm text-ink-soft">
-              Adds a six-digit code from your phone to every sign-in. Works with
-              Google Authenticator, Authy, 1Password, or anything else that
-              speaks TOTP.
+              Adds a six-digit code from an authenticator app to every sign-in.
             </p>
             <Button busy={starting} onClick={() => void begin()}>
               Set up two-factor authentication
             </Button>
           </>
         ))
-        .with({ _tag: "Some" }, ({ value }) => (
+        .otherwise((value) => (
           <div className="space-y-4">
             <p className="text-sm text-ink-soft">
-              Scan this with your authenticator app, then type the code it shows
-              to confirm it worked.
+              Scan this with your authenticator app, then type the code it shows to confirm it worked.
             </p>
 
             <div className="flex flex-col items-start gap-4 sm:flex-row">
               <div
                 className="qr w-40 shrink-0 rounded-lg border border-line bg-white p-3"
-                // Server-generated SVG with a transparent background, black
-                // paths, on white — see the note in styles.css. It contains no
-                // user input.
+                // Server-generated SVG with no user input in it.
                 dangerouslySetInnerHTML={{ __html: value.qrCodeSvg }}
               />
 
@@ -125,42 +104,38 @@ const TwoFactorSetupFlow = ({ onDone }: Readonly<{ onDone: () => void }>) => {
               </Button>
             </form>
           </div>
-        ))
-        .exhaustive()}
+        ))}
     </div>
   );
 };
 
 const TwoFactorDisableFlow = ({ onDone }: Readonly<{ onDone: () => void }>) => {
-  const [failure, setFailure] = useState<Option<string>>(Option.none);
+  const [failure, setFailure] = useState<string | undefined>(undefined);
 
   const form = useForm({
-    resolver: zodResolver(enableTwoFactorSchema),
+    resolver: zodResolver(TwoFactorCodeInput.schema),
     defaultValues: { code: "" },
   });
 
   const submit = form.handleSubmit(async (values) => {
-    setFailure(Option.none);
+    setFailure(undefined);
 
-    await api
-      .post<SessionUser>("/auth/2fa/disable", values)
+    await Api.post<SessionUser>("/auth/2fa/disable", values)
       .then((user) => {
-        tokenStore.updateUser(user);
+        TokenStore.updateUser(user);
         onDone();
       })
-      .catch((reason: unknown) => setFailure(Option.some(describe(reason))));
+      .catch((reason: unknown) => setFailure(Failure.message(reason)));
   });
 
   return (
     <form onSubmit={(event) => void submit(event)} className="space-y-3" noValidate>
       {match(failure)
-        .with({ _tag: "Some" }, ({ value }) => <Alert>{value}</Alert>)
-        .with({ _tag: "None" }, () => null)
-        .exhaustive()}
+        .with(P.nullish, () => null)
+        .otherwise((message) => <Alert>{message}</Alert>)}
 
       <p className="text-sm text-ink-soft">
-        Turning this off needs a current code — a stolen session should not be
-        able to remove your second factor.
+        Turning this off needs a current code, so a stolen session cannot remove your second factor.
       </p>
 
       <Field
@@ -181,27 +156,20 @@ const TwoFactorDisableFlow = ({ onDone }: Readonly<{ onDone: () => void }>) => {
 };
 
 /**
- * Changing the password, or setting the first one.
- *
- * The current-password field appears only when there is a current password —
- * an account created through a provider has nothing to confirm. The server
- * decides which case applies regardless of what this form sends.
+ * Changing the password, or setting the first one. The current-password
+ * field appears only when there is a current password; an account created
+ * through a provider has nothing to confirm.
  */
-const PasswordFlow = ({
-  hasPassword,
-  onDone,
-}: Readonly<{ hasPassword: boolean; onDone: () => void }>) => {
-  const [failure, setFailure] = useState<Option<string>>(Option.none);
+const PasswordFlow = ({ hasPassword, onDone }: Readonly<{ hasPassword: boolean; onDone: () => void }>) => {
+  const [failure, setFailure] = useState<string | undefined>(undefined);
 
   const form = useForm({
-    resolver: zodResolver(
-      hasPassword ? changePasswordFormSchema : setPasswordFormSchema,
-    ),
+    resolver: zodResolver(hasPassword ? PasswordForm.change : PasswordForm.set),
     defaultValues: { currentPassword: "", password: "", confirmPassword: "" },
   });
 
   const submit = form.handleSubmit(async (values) => {
-    setFailure(Option.none);
+    setFailure(undefined);
 
     // The confirmation never leaves the browser, and neither does an empty
     // current password on an account that has none.
@@ -209,35 +177,28 @@ const PasswordFlow = ({
       ? { currentPassword: values.currentPassword, password: values.password }
       : { password: values.password };
 
-    await api
-      .post<SessionUser>("/auth/password", body)
+    await Api.post<SessionUser>("/auth/password", body)
       .then((user) => {
-        tokenStore.updateUser(user);
+        TokenStore.updateUser(user);
         form.reset();
         onDone();
       })
-      .catch((reason: unknown) => setFailure(Option.some(describe(reason))));
+      .catch((reason: unknown) => setFailure(Failure.message(reason)));
   });
 
   return (
     <form onSubmit={(event) => void submit(event)} className="space-y-3" noValidate>
       {match(failure)
-        .with({ _tag: "Some" }, ({ value }) => <Alert>{value}</Alert>)
-        .with({ _tag: "None" }, () => null)
-        .exhaustive()}
+        .with(P.nullish, () => null)
+        .otherwise((message) => <Alert>{message}</Alert>)}
 
       {match(hasPassword)
         .with(false, () => (
           <p className="text-sm text-ink-soft">
-            You signed up through a provider, so this account has no password.
-            Add one and you can sign in with your email as well — the provider
-            keeps working either way.
+            You signed up through a provider, so this account has no password. Add one and you can
+            sign in with your email as well.
           </p>
         ))
-        .with(true, () => null)
-        .exhaustive()}
-
-      {match(hasPassword)
         .with(true, () => (
           <Field
             label="Current password"
@@ -247,7 +208,6 @@ const PasswordFlow = ({
             {...form.register("currentPassword")}
           />
         ))
-        .with(false, () => null)
         .exhaustive()}
 
       <Field
@@ -276,105 +236,71 @@ const PasswordFlow = ({
 /** The signed-in account's own page. */
 export const AccountPage = () => {
   const session = useSession();
-  const [notice, setNotice] = useState<Option<ReactNode>>(Option.none);
+  const [notice, setNotice] = useState<ReactNode | undefined>(undefined);
 
   return match(session)
-    .with({ _tag: "None" }, () => <Navigate to="/login" replace />)
-    .with({ _tag: "Some" }, ({ value }) => (
+    .with(P.nullish, () => <Navigate to="/login" replace />)
+    .otherwise((user) => (
       <div className="mx-auto max-w-2xl space-y-6 px-4 py-10 sm:px-6">
         <header className="space-y-1.5">
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">
-            Your account
-          </h1>
-          <p className="text-sm text-ink-soft">{value.email}</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">Your account</h1>
+          <p className="text-sm text-ink-soft">{user.email}</p>
         </header>
 
         {match(notice)
-          .with({ _tag: "Some" }, ({ value: message }) => (
-            <Alert tone="accent">{message}</Alert>
-          ))
-          .with({ _tag: "None" }, () => null)
-          .exhaustive()}
+          .with(P.nullish, () => null)
+          .otherwise((message) => <Alert tone="accent">{message}</Alert>)}
 
         <Card className="p-5">
           <div className="mb-3 flex items-center justify-between gap-4">
             <h2 className="font-semibold text-ink">Two-factor authentication</h2>
             <span
               className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                value.twoFactorEnabled
-                  ? "bg-accent-wash text-ink"
-                  : "bg-sunken text-ink-faint"
+                user.twoFactorEnabled ? "bg-accent-wash text-ink" : "bg-sunken text-ink-faint"
               }`}
             >
-              {value.twoFactorEnabled ? "On" : "Off"}
+              {user.twoFactorEnabled ? "On" : "Off"}
             </span>
           </div>
 
-          {match(value.twoFactorEnabled)
+          {match(user.twoFactorEnabled)
             .with(false, () => (
-              <TwoFactorSetupFlow
-                onDone={() =>
-                  setNotice(
-                    Option.some("Two-factor authentication is now on."),
-                  )
-                }
-              />
+              <TwoFactorSetupFlow onDone={() => setNotice("Two-factor authentication is now on.")} />
             ))
             .with(true, () => (
-              <TwoFactorDisableFlow
-                onDone={() =>
-                  setNotice(Option.some("Two-factor authentication is now off."))
-                }
-              />
+              <TwoFactorDisableFlow onDone={() => setNotice("Two-factor authentication is now off.")} />
             ))
             .exhaustive()}
         </Card>
 
         <Card className="p-5">
-          <h2 className="mb-2 font-semibold text-ink">Sign-in method</h2>
-          {/*
-            Both halves are read from the account rather than assumed, so the
-            list names whichever providers this account actually carries.
-          */}
+          <h2 className="mb-2 font-semibold text-ink">Sign-in methods</h2>
           <ul className="space-y-1 text-sm text-ink-soft">
-            {match(value.hasPassword)
+            {match(user.hasPassword)
               .with(true, () => <li>Email and password.</li>)
               .with(false, () => null)
               .exhaustive()}
 
-            {value.providers.map((provider) => (
+            {user.providers.map((provider) => (
               <li key={provider} className="capitalize">
                 {provider}.
               </li>
             ))}
-
-            {/* An account always has at least one way in; say so when neither
-                branch above fired rather than rendering an empty box. */}
-            {match(value.hasPassword === false && value.providers.length === 0)
-              .with(true, () => <li>No sign-in method on record.</li>)
-              .with(false, () => null)
-              .exhaustive()}
           </ul>
-
         </Card>
 
         <Card className="p-5">
           <h2 className="mb-3 font-semibold text-ink">Password</h2>
 
           <PasswordFlow
-            hasPassword={value.hasPassword}
+            hasPassword={user.hasPassword}
             onDone={() =>
               setNotice(
-                Option.some(
-                  value.hasPassword
-                    ? "Password changed."
-                    : "Password set. You can now sign in with your email.",
-                ),
+                user.hasPassword ? "Password changed." : "Password set. You can now sign in with your email.",
               )
             }
           />
         </Card>
       </div>
-    ))
-    .exhaustive();
+    ));
 };

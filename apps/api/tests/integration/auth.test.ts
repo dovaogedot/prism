@@ -50,7 +50,6 @@ describe("POST /auth/register", () => {
     expect(accessToken.split(".")).toHaveLength(3);
     expect(jsonOf(response)["user"]).toMatchObject({
       email: "a@example.com",
-      role: "customer",
       twoFactorEnabled: false,
       hasPassword: true,
     });
@@ -60,12 +59,11 @@ describe("POST /auth/register", () => {
     await registerUser(harness, "a@example.com");
 
     const rows = await harness.database.sql<
-      { email: string; password_hash: string; role: string }[]
-    >`SELECT email, password_hash, role FROM app_user`;
+      { email: string; password_hash: string }[]
+    >`SELECT email, password_hash FROM app_user`;
 
     expect(rows).toHaveLength(1);
     expect(rows[0]?.email).toBe("a@example.com");
-    expect(rows[0]?.role).toBe("customer");
     expect(rows[0]?.password_hash).not.toBe(VALID_PASSWORD);
   });
 
@@ -83,7 +81,7 @@ describe("POST /auth/register", () => {
 
   it("sets the refresh token in a scoped httpOnly cookie", async () => {
     const { response } = await registerUser(harness, "a@example.com");
-    const cookie = response.cookies.find((entry) => entry.name === "hue_refresh");
+    const cookie = response.cookies.find((entry) => entry.name === "prism_refresh");
 
     expect(cookie).toMatchObject({
       httpOnly: true,
@@ -194,12 +192,12 @@ describe("POST /auth/refresh — rotation and reuse", () => {
     const response = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
-      cookies: { hue_refresh: refreshToken },
+      cookies: { prism_refresh: refreshToken },
     });
 
     expect(response.statusCode).toBe(200);
 
-    const rotated = cookieValue(response, "hue_refresh");
+    const rotated = cookieValue(response, "prism_refresh");
     expect(rotated).not.toBe(refreshToken);
     expect(rotated).not.toBe("");
 
@@ -216,13 +214,13 @@ describe("POST /auth/refresh — rotation and reuse", () => {
     await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
-      cookies: { hue_refresh: refreshToken },
+      cookies: { prism_refresh: refreshToken },
     });
 
     const replay = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
-      cookies: { hue_refresh: refreshToken },
+      cookies: { prism_refresh: refreshToken },
     });
 
     expect(replay.statusCode).toBe(401);
@@ -235,22 +233,22 @@ describe("POST /auth/refresh — rotation and reuse", () => {
     const rotation = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
-      cookies: { hue_refresh: refreshToken },
+      cookies: { prism_refresh: refreshToken },
     });
-    const goodToken = cookieValue(rotation, "hue_refresh");
+    const goodToken = cookieValue(rotation, "prism_refresh");
 
     // The attacker replays the stolen, already-used token…
     await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
-      cookies: { hue_refresh: refreshToken },
+      cookies: { prism_refresh: refreshToken },
     });
 
     // …which must also lock out the legitimate holder of the current token.
     const legitimate = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
-      cookies: { hue_refresh: goodToken },
+      cookies: { prism_refresh: goodToken },
     });
 
     expect(legitimate.statusCode).toBe(401);
@@ -265,7 +263,7 @@ describe("POST /auth/refresh — rotation and reuse", () => {
     const response = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
-      cookies: { hue_refresh: "not-a-real-token" },
+      cookies: { prism_refresh: "not-a-real-token" },
     });
 
     expect(response.statusCode).toBe(401);
@@ -289,7 +287,7 @@ describe("POST /auth/refresh — rotation and reuse", () => {
     const response = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
-      cookies: { hue_refresh: refreshToken },
+      cookies: { prism_refresh: refreshToken },
     });
 
     expect(response.statusCode).toBe(401);

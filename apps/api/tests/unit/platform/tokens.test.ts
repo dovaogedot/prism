@@ -7,14 +7,8 @@
 
 import { describe, expect, it } from "vitest";
 import { decodeJwt, decodeProtectedHeader, SignJWT } from "jose";
-import { mutableClock } from "../../../src/platform/clock.ts";
-import {
-  createOpaqueToken,
-  createTokenService,
-  digestsMatch,
-  digestToken,
-  type TokenService,
-} from "../../../src/platform/tokens.ts";
+import { Clock } from "../../../src/platform/clock.ts";
+import { OpaqueToken, TokenService } from "../../../src/platform/tokens.ts";
 
 const SECRET = new TextEncoder().encode("a".repeat(64));
 const OTHER_SECRET = new TextEncoder().encode("b".repeat(64));
@@ -24,13 +18,13 @@ const ACCESS_TTL = 900;
 
 const build = (): Readonly<{
   tokens: TokenService;
-  clock: ReturnType<typeof mutableClock>;
+  clock: ReturnType<typeof Clock.mutable>;
 }> => {
-  const clock = mutableClock(START);
+  const clock = Clock.mutable(START);
 
   return {
     clock,
-    tokens: createTokenService({
+    tokens: TokenService.create({
       secret: SECRET,
       issuer: "prism",
       accessTtlSeconds: ACCESS_TTL,
@@ -43,7 +37,6 @@ const build = (): Readonly<{
 const claims = {
   subject: "11111111-1111-4111-8111-111111111111",
   sessionId: "22222222-2222-4222-8222-222222222222",
-  role: "customer",
   tokenId: "33333333-3333-4333-8333-333333333333",
 } as const;
 
@@ -70,7 +63,6 @@ describe("access token generation", () => {
     expect(decodeJwt(token)).toMatchObject({
       sub: claims.subject,
       sid: claims.sessionId,
-      role: "customer",
       jti: claims.tokenId,
     });
   });
@@ -90,7 +82,7 @@ describe("access token generation", () => {
 
     // A JWT is signed, not encrypted — anyone holding it can read the payload.
     expect(Object.keys(decodeJwt(token)).sort()).toEqual(
-      ["aud", "exp", "iat", "iss", "jti", "nbf", "role", "sid", "sub"].sort(),
+      ["aud", "exp", "iat", "iss", "jti", "nbf", "sid", "sub"].sort(),
     );
   });
 });
@@ -109,7 +101,7 @@ describe("access token validation", () => {
   it("rejects a token signed with a different secret", async () => {
     const { tokens } = build();
 
-    const forged = await new SignJWT({ sub: "x", sid: "y", role: "admin", jti: "z" })
+    const forged = await new SignJWT({ sub: "x", sid: "y", jti: "z" })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuer("prism")
       .setAudience("access")
@@ -129,7 +121,7 @@ describe("access token validation", () => {
       "base64url",
     );
     const payload = Buffer.from(
-      JSON.stringify({ sub: "x", sid: "y", role: "admin", jti: "z" }),
+      JSON.stringify({ sub: "x", sid: "y", jti: "z" }),
     ).toString("base64url");
 
     const verified = await tokens.verifyAccessToken(`${header}.${payload}.`);
@@ -143,7 +135,7 @@ describe("access token validation", () => {
 
     const [header, , signature] = token.split(".");
     const escalated = Buffer.from(
-      JSON.stringify({ ...decodeJwt(token), role: "admin" }),
+      JSON.stringify({ ...decodeJwt(token), sub: "somebody-else" }),
     ).toString("base64url");
 
     const verified = await tokens.verifyAccessToken(
@@ -160,19 +152,6 @@ describe("access token validation", () => {
       const verified = await tokens.verifyAccessToken(candidate);
       expect(verified.isErr(), candidate).toBe(true);
     }
-  });
-
-  it("rejects a token whose role is not a real role", async () => {
-    const { tokens } = build();
-
-    const odd = await new SignJWT({ sub: "x", sid: "y", role: "superuser", jti: "z" })
-      .setProtectedHeader({ alg: "HS256" })
-      .setIssuer("prism")
-      .setAudience("access")
-      .setExpirationTime("1h")
-      .sign(SECRET);
-
-    expect((await tokens.verifyAccessToken(odd)).isErr()).toBe(true);
   });
 });
 
@@ -252,49 +231,34 @@ describe("audience separation", () => {
 
 describe("opaque tokens", () => {
   it("returns a plaintext and its digest, which differ", () => {
-    const token = createOpaqueToken();
+    const token = OpaqueToken.create();
 
     expect(token.plaintext).not.toBe(token.digest);
-    expect(token.digest).toBe(digestToken(token.plaintext));
+    expect(token.digest).toBe(OpaqueToken.digest(token.plaintext));
   });
 
   it("is URL-safe, so it survives an email client", () => {
     for (let attempt = 0; attempt < 50; attempt += 1) {
-      expect(createOpaqueToken().plaintext).toMatch(/^[A-Za-z0-9_-]+$/);
+      expect(OpaqueToken.create().plaintext).toMatch(/^[A-Za-z0-9_-]+$/);
     }
   });
 
   it("carries at least 256 bits of entropy", () => {
     // 32 bytes in base64url is 43 characters.
-    expect(createOpaqueToken().plaintext.length).toBeGreaterThanOrEqual(43);
+    expect(OpaqueToken.create().plaintext.length).toBeGreaterThanOrEqual(43);
   });
 
   it("never repeats", () => {
     const seen = new Set(
-      Array.from({ length: 500 }, () => createOpaqueToken().plaintext),
+      Array.from({ length: 500 }, () => OpaqueToken.create().plaintext),
     );
 
     expect(seen.size).toBe(500);
   });
 
   it("digests deterministically as 64 hex characters", () => {
-    expect(digestToken("hello")).toBe(digestToken("hello"));
-    expect(digestToken("hello")).toMatch(/^[a-f0-9]{64}$/);
-    expect(digestToken("hello")).not.toBe(digestToken("hellp"));
-  });
-});
-
-describe("digestsMatch", () => {
-  it("matches identical digests", () => {
-    expect(digestsMatch(digestToken("x"), digestToken("x"))).toBe(true);
-  });
-
-  it("rejects different digests", () => {
-    expect(digestsMatch(digestToken("x"), digestToken("y"))).toBe(false);
-  });
-
-  it("rejects different lengths without throwing", () => {
-    expect(digestsMatch("abc", "abcdef")).toBe(false);
-    expect(digestsMatch("", "a")).toBe(false);
+    expect(OpaqueToken.digest("hello")).toBe(OpaqueToken.digest("hello"));
+    expect(OpaqueToken.digest("hello")).toMatch(/^[a-f0-9]{64}$/);
+    expect(OpaqueToken.digest("hello")).not.toBe(OpaqueToken.digest("hellp"));
   });
 });

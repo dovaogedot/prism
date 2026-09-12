@@ -1,55 +1,56 @@
-import { registerFormSchema, Option, type AccessGrant } from "@prism/shared";
+import { Password, RegisterForm, type AccessGrant } from "@prism/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router";
-import { match } from "ts-pattern";
-import { api } from "../../../shared/api/client.ts";
+import { match, P } from "ts-pattern";
+import { Api } from "../../../shared/api/client.ts";
 import { useTheme } from "../../../shared/theme/use-theme.ts";
 import { Alert, Button, Field } from "../../../shared/ui/index.ts";
 import { AuthShell } from "../components/AuthShell.tsx";
 import { Captcha } from "../components/Captcha.tsx";
-import { describeFailure } from "../components/error-message.tsx";
+import { Failure } from "../components/failure.tsx";
 import { ProviderButtons } from "../components/ProviderButtons.tsx";
-import { tokenStore } from "../token-store.ts";
+import { TokenStore } from "../token-store.ts";
 
 /** Opening an account, which signs in on success. */
 export const RegisterPage = () => {
   const navigate = useNavigate();
   const { theme } = useTheme();
-  const [captchaToken, setCaptchaToken] = useState("");
-  const [failure, setFailure] = useState<Option<ReactNode>>(Option.none);
+  const [failure, setFailure] = useState<ReactNode | undefined>(undefined);
 
   const form = useForm({
-    resolver: zodResolver(registerFormSchema),
+    resolver: zodResolver(RegisterForm.schema),
     defaultValues: { email: "", password: "", confirmPassword: "", captchaToken: "" },
   });
 
   const submit = form.handleSubmit(async (values) => {
-    setFailure(Option.none);
+    setFailure(undefined);
 
-    await api
-      // `confirmPassword` is a browser-side guard against a typo; the server
-      // has no use for it.
-      .postWithoutRetry<AccessGrant>("/auth/register", {
-        email: values.email,
-        password: values.password,
-        captchaToken,
-      })
+    // `confirmPassword` is a browser-side guard against a typo; the server
+    // has no use for it.
+    await Api.postWithoutRetry<AccessGrant>("/auth/register", {
+      email: values.email,
+      password: values.password,
+      captchaToken: values.captchaToken,
+    })
       .then((grant) => {
-        tokenStore.set(grant.accessToken, grant.user);
+        TokenStore.set(grant.accessToken, grant.user);
         void navigate("/");
       })
-      .catch((reason: unknown) => setFailure(Option.some(describeFailure(reason))));
+      .catch((reason: unknown) => setFailure(Failure.describe(reason)));
   });
 
   return (
     <AuthShell
       title="Create an account"
-      lede="One address, one password, and a promise you are a person."
+      lede="An email address, a password, and a check that you are a person."
       footer={
         <>
-          Already have one? <Link to="/login" className="font-medium text-accent hover:underline">Sign in</Link>
+          Already have one?{" "}
+          <Link to="/login" className="font-medium text-accent hover:underline">
+            Sign in
+          </Link>
         </>
       }
     >
@@ -57,9 +58,8 @@ export const RegisterPage = () => {
 
       <form onSubmit={(event) => void submit(event)} className="space-y-4" noValidate>
         {match(failure)
-          .with({ _tag: "Some" }, ({ value }) => <Alert>{value}</Alert>)
-          .with({ _tag: "None" }, () => null)
-          .exhaustive()}
+          .with(P.nullish, () => null)
+          .otherwise((message) => <Alert>{message}</Alert>)}
 
         <Field
           label="Email address"
@@ -73,7 +73,7 @@ export const RegisterPage = () => {
           label="Password"
           type="password"
           autoComplete="new-password"
-          hint="At least 12 characters. Length beats punctuation."
+          hint={`At least ${Password.MIN_LENGTH} characters.`}
           error={form.formState.errors.password?.message}
           {...form.register("password")}
         />
@@ -88,11 +88,16 @@ export const RegisterPage = () => {
 
         <Captcha
           dark={theme === "dark"}
-          onToken={(token) => {
-            setCaptchaToken(token);
-            form.setValue("captchaToken", token, { shouldValidate: true });
-          }}
+          onToken={(token) => form.setValue("captchaToken", token, { shouldValidate: true })}
         />
+
+        {match(form.formState.errors.captchaToken?.message)
+          .with(P.string.select(), (message) => (
+            <p role="alert" className="text-sm text-danger">
+              {message}
+            </p>
+          ))
+          .otherwise(() => null)}
 
         <Button type="submit" busy={form.formState.isSubmitting} className="w-full">
           Create account
@@ -101,5 +106,3 @@ export const RegisterPage = () => {
     </AuthShell>
   );
 };
-
-/* ------------------------------------------------------------------ login */

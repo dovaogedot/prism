@@ -1,94 +1,88 @@
 /**
- * Outbound email.
- *
- * Delivery is deliberately fire-and-forget from the caller's perspective:
- * `POST /auth/password/forgot` answers 204 whether or not the address exists,
- * and whether or not the SMTP server is reachable. Any other behavior turns
- * the endpoint into an account-enumeration oracle.
+ * Outbound email. Delivery is fire-and-forget from the caller's view:
+ * `POST /auth/password/forgot` answers 204 whether or not the address exists
+ * and whether or not the SMTP server is reachable, so the endpoint is not an
+ * account-enumeration oracle.
  */
 
-import { Option } from "@prism/shared";
-import { createTransport, type Transporter } from "nodemailer";
+import { createTransport } from "nodemailer";
 
 /** One message, carrying both bodies so a client can take either. */
-export type Email = Readonly<{
+export type OutboundEmail = Readonly<{
   to: string;
   subject: string;
   text: string;
   html: string;
 }>;
 
-/** Sending a message. Answers whether it went, and never raises. */
+/** Sending a message. Answers whether it went, and never rejects. */
 export type Mailer = Readonly<{
-  send: (email: Email) => Promise<boolean>;
+  send: (email: OutboundEmail) => Promise<boolean>;
 }>;
 
-/** What an SMTP server asks for before it will relay. */
+/** What an SMTP server asks for before it relays. */
 export type SmtpCredentials = Readonly<{ user: string; password: string }>;
 
 /** Which server to hand messages to, and who they come from. */
 export type MailerOptions = Readonly<{
   host: string;
   port: number;
-  /** TLS from the first byte — port 465. STARTTLS on 587 is negotiated. */
+  /** TLS from the first byte, as on port 465. STARTTLS on 587 is negotiated. */
   secure: boolean;
-  /** Absent for a local relay like Mailpit, which accepts anything. */
-  credentials: Option<SmtpCredentials>;
+  /** Left out for a local relay like Mailpit, which accepts anything. */
+  credentials?: SmtpCredentials;
   from: string;
   onFailure: (reason: unknown) => void;
 }>;
 
-/** Hands messages to an SMTP server. A failure is reported and swallowed. */
-export const createSmtpMailer = (options: MailerOptions): Mailer => {
-  const transport: Transporter = createTransport({
-    host: options.host,
-    port: options.port,
-    secure: options.secure,
-    // Mailpit speaks plain SMTP on 1025 with no certificate and no login. A
-    // real provider supplies both, and then TLS is not optional.
-    ignoreTLS: Option.isNone(options.credentials) && !options.secure,
-    ...Option.match<SmtpCredentials, object>({
-      onSome: ({ user, password }) => ({ auth: { user, pass: password } }),
-      onNone: () => ({}),
-    })(options.credentials),
-  });
-
-  return {
-    send: (email) =>
-      transport
-        .sendMail({
-          from: options.from,
-          to: email.to,
-          subject: email.subject,
-          text: email.text,
-          html: email.html,
-        })
-        .then(() => true)
-        .catch((reason: unknown) => {
-          options.onFailure(reason);
-          return false;
-        }),
-  };
-};
-
 /** A mailer that keeps what it was given, in the order it was given. */
-export type MemoryMailer = Mailer &
-  Readonly<{ sent: readonly Email[]; clear: () => void }>;
+export type MemoryMailer = Mailer & Readonly<{ sent: readonly OutboundEmail[]; clear: () => void }>;
 
-/** Collects messages in memory so tests can assert on what was sent. */
-export const createMemoryMailer = (): MemoryMailer => {
-  const sent: Email[] = [];
+export const Mailer = {
+  /** Hands messages to an SMTP server. A failure is reported and swallowed. */
+  smtp: (options: MailerOptions): Mailer => {
+    const transport = createTransport({
+      host: options.host,
+      port: options.port,
+      secure: options.secure,
+      // Mailpit speaks plain SMTP with no certificate and no login.
+      ignoreTLS: options.credentials === undefined && !options.secure,
+      ...(options.credentials === undefined
+        ? {}
+        : { auth: { user: options.credentials.user, pass: options.credentials.password } }),
+    });
 
-  return {
-    sent,
-    send: async (email) => {
-      sent.push(email);
-      return true;
-    },
-    // Without this the inbox accumulates across tests, and "the first email
-    // sent" stops meaning "the email this test caused".
-    clear: () => {
-      sent.length = 0;
-    },
-  };
-};
+    return {
+      send: (email) =>
+        transport
+          .sendMail({
+            from: options.from,
+            to: email.to,
+            subject: email.subject,
+            text: email.text,
+            html: email.html,
+          })
+          .then(() => true)
+          .catch((reason: unknown) => {
+            options.onFailure(reason);
+            return false;
+          }),
+    };
+  },
+
+  /** Collects messages in memory so tests can assert on what was sent. */
+  memory: (): MemoryMailer => {
+    const sent: OutboundEmail[] = [];
+
+    return {
+      sent,
+      send: async (email) => {
+        sent.push(email);
+        return true;
+      },
+      clear: () => {
+        sent.length = 0;
+      },
+    };
+  },
+} as const;

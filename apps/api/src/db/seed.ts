@@ -1,268 +1,178 @@
 /**
- * Builds a catalog worth browsing: two demo accounts, a shelf of foundries,
- * the colors, finishers and gears `plan.ts` plans, the stills of every
- * color's and every finisher's scene, and enough reviews that sorting by
- * rating means something.
- *
- * Plants the catalog only into a database that holds no products, so `docker
- * compose up` on an existing volume does not double the shop. The stills are
- * the exception: they belong to `apps/api/stills` rather than to the database,
- * so every run replaces whichever of them differ from the files there.
- *
- * Note what is never written: hue, saturation, lightness, temperature, reach,
- * grain, weight and every rating. Postgres derives the first seven from the
- * hex and the three amounts, and `product_listing` derives the ratings from
- * `product_review`.
+ * Fills an empty database with placeholder data: one demo account, a shelf
+ * of reviewers, and a catalog drawn from faker under a fixed seed, so two
+ * runs against an empty database plant the same shop. A database that
+ * already holds products is left alone. Run as a script it seeds the
+ * database named by `DATABASE_URL` and writes images under `MEDIA_DIR`.
  */
 
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { faker } from "@faker-js/faker";
 import { count } from "drizzle-orm";
-import argon2 from "argon2";
-import { match } from "ts-pattern";
-import { createDatabase, type Database } from "./client.ts";
+import { Database, type Database as Db } from "./client.ts";
 import {
   brands,
-  colors,
-  finishers,
+  categories,
+  productImages,
+  productProperties,
   productReviews,
   products,
-  shifters,
   users,
 } from "./schema.ts";
-import { createRandom, type Random } from "./palette.ts";
-import { planCatalog, SEED, type PlannedProduct } from "./plan.ts";
-import { BRANDS, REVIEW_BODIES } from "./seed-data.ts";
-import { refreshStills, stillJobs, type StillDirectories } from "./stills.ts";
-
-const DEMO_PASSWORD = "colors are not paint";
-
-const DEMO_ACCOUNTS = [
-  { email: "admin@prism.test", role: "admin" as const },
-  { email: "shopper@prism.test", role: "customer" as const },
-];
-
-/** Extra reviewers so ratings are not all from the same two people. */
-const REVIEWER_EMAILS = [
-  "iris@prism.test",
-  "hex@prism.test",
-  "sable@prism.test",
-  "ocher@prism.test",
-  "indigo@prism.test",
-  "cerise@prism.test",
-];
-
-const seedUsers = async (db: Database): Promise<readonly string[]> => {
-  const passwordHash = await argon2.hash(DEMO_PASSWORD, {
-    type: argon2.argon2id,
-    memoryCost: 19_456,
-    timeCost: 2,
-    parallelism: 1,
-  });
-
-  const everyone = [
-    ...DEMO_ACCOUNTS,
-    ...REVIEWER_EMAILS.map((email) => ({ email, role: "customer" as const })),
-  ];
-
-  await db
-    .insert(users)
-    .values(everyone.map((account) => ({ ...account, passwordHash })))
-    .onConflictDoNothing();
-
-  const rows = await db.select({ id: users.id, email: users.email }).from(users);
-
-  return rows
-    .filter((row) => REVIEWER_EMAILS.includes(row.email))
-    .map((row) => row.id);
-};
-
-/**
- * Writes the row that holds whatever this kind of product is made of.
- *
- * The base row is already in; this puts its variant beside it, in the one
- * table that has columns for it.
- */
-const insertVariant = (
-  db: Database,
-  productId: string,
-  planned: PlannedProduct,
-): Promise<unknown> =>
-  match(planned)
-    .with({ kind: "color" }, ({ hex, roughness, coatingNanometers, emission }) =>
-      db.insert(colors).values({ productId, hex, roughness, coatingNanometers, emission }),
-    )
-    // Exactly the one column the finisher is sold for; the other two stay absent.
-    .with({ kind: "finisher", applies: "roughness" }, ({ roughness }) =>
-      db.insert(finishers).values({ productId, roughness }),
-    )
-    .with({ kind: "finisher", applies: "coating" }, ({ coatingNanometers }) =>
-      db.insert(finishers).values({ productId, coatingNanometers }),
-    )
-    .with({ kind: "finisher", applies: "emission" }, ({ emission }) =>
-      db.insert(finishers).values({ productId, emission }),
-    )
-    .with({ kind: "shifter" }, ({ direction, arcDegrees }) =>
-      db.insert(shifters).values({ productId, direction, arcDegrees }),
-    )
-    .exhaustive();
-
-/**
- * Plants every planned product, in the order of the plan, each under a brand
- * drawn from `random`.
- */
-const seedCatalog = async (
-  db: Database,
-  plan: readonly PlannedProduct[],
-  random: Random,
-): Promise<void> => {
-  await db
-    .insert(brands)
-    .values(BRANDS.map((brand) => ({ ...brand })))
-    .onConflictDoNothing();
-
-  const brandRows = await db.select({ id: brands.id }).from(brands);
-  const brandIds = brandRows.map((row) => row.id);
-
-  for (const planned of plan) {
-    const brandId = brandIds[random.between(0, brandIds.length - 1)];
-    if (brandId === undefined) throw new Error("no brands seeded");
-
-    const [inserted] = await db
-      .insert(products)
-      .values({
-        slug: planned.slug,
-        name: planned.name,
-        description: planned.description,
-        priceCents: planned.priceCents,
-        stockQuantity: planned.stockQuantity,
-        brandId,
-        kind: planned.kind,
-      })
-      .onConflictDoNothing()
-      .returning({ id: products.id });
-
-    if (inserted === undefined) continue;
-
-    await insertVariant(db, inserted.id, planned);
-  }
-};
-
-const seedReviews = async (
-  db: Database,
-  reviewerIds: readonly string[],
-): Promise<void> => {
-  if (reviewerIds.length === 0) return;
-
-  const random = createRandom(SEED + 1);
-  const productRows = await db.select({ id: products.id }).from(products);
-
-  const rows = productRows.flatMap((product) => {
-    const reviewCount = random.between(0, reviewerIds.length);
-
-    // Sample distinct reviewers; the unique index forbids two per person.
-    const chosen = [...reviewerIds]
-      .map((id) => ({ id, order: random.next() }))
-      .sort((left, right) => left.order - right.order)
-      .slice(0, reviewCount);
-
-    return chosen.map((reviewer) => ({
-      productId: product.id,
-      userId: reviewer.id,
-      // Skewed high, like every real review distribution.
-      rating: random.pick([3, 4, 4, 5, 5, 5, 2]),
-      body: random.pick(REVIEW_BODIES),
-    }));
-  });
-
-  for (let index = 0; index < rows.length; index += 500) {
-    await db
-      .insert(productReviews)
-      .values(rows.slice(index, index + 500))
-      .onConflictDoNothing();
-  }
-};
-
-/** What the seed found the catalog to be. */
-export type CatalogReport =
-  | Readonly<{ _tag: "Planted"; products: number; reviews: number }>
-  | Readonly<{ _tag: "Present"; products: number }>;
+import { Hasher } from "../platform/hasher.ts";
 
 /** What one run of the seed did. */
-export type SeedReport = Readonly<{
-  catalog: CatalogReport;
-  /** How many products had their stills replaced. */
-  refreshed: number;
-}>;
+export type SeedReport =
+  | Readonly<{ _tag: "Planted"; products: number }>
+  | Readonly<{ _tag: "Present"; products: number }>;
 
-const plant = async (
-  db: Database,
-  plan: readonly PlannedProduct[],
-  random: Random,
-): Promise<CatalogReport> => {
-  const reviewerIds = await seedUsers(db);
-  await seedCatalog(db, plan, random);
-  await seedReviews(db, reviewerIds);
+export const Seed = {
+  DEMO_EMAIL: "shopper@prism.test",
+  DEMO_PASSWORD: "correct horse battery staple",
+  PRODUCT_COUNT: 96,
+  CATEGORY_COUNT: 6,
+  BRAND_COUNT: 8,
+  REVIEWER_COUNT: 10,
 
-  const [productTotal] = await db.select({ total: count() }).from(products);
-  const [reviewTotal] = await db.select({ total: count() }).from(productReviews);
+  /**
+   * A URL-safe slug for a name, given a numeric suffix when `taken` already
+   * holds it. The result is added to `taken`.
+   */
+  slugOf: (name: string, taken: Set<string>): string => {
+    const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "item";
+    let slug = base;
 
-  return {
-    _tag: "Planted",
-    products: productTotal?.total ?? 0,
-    reviews: reviewTotal?.total ?? 0,
-  };
-};
+    for (let suffix = 2; taken.has(slug); suffix += 1) slug = `${base}-${suffix}`;
 
-/**
- * Plants the catalog into an empty database, and brings every product's
- * stills up to date with the files in `directories.stills`.
- *
- * Safe to run on every start: a database that already holds products keeps
- * them, and only stills whose files differ are replaced. Every
- * value is drawn from a seeded generator, so two runs against an empty
- * database plant the same catalog. Rejects if a still of a planted product is
- * missing from `directories.stills`.
- */
-export const seed = async (
-  db: Database,
-  directories: StillDirectories,
-): Promise<SeedReport> => {
-  const random = createRandom(SEED);
-  const plan = planCatalog(random);
+    taken.add(slug);
+    return slug;
+  },
 
-  const [existing] = await db.select({ total: count() }).from(products);
-  const present = existing?.total ?? 0;
+  /** A flat-color placeholder picture with the product's name on it. */
+  imageSvg: (name: string, color: string): string =>
+    `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480">
+  <rect width="640" height="480" fill="${color}"/>
+  <text x="320" y="250" font-family="sans-serif" font-size="32" fill="#ffffff" text-anchor="middle">${name.replace(/[<>&"]/g, "")}</text>
+</svg>
+`,
 
-  const catalog: CatalogReport =
-    present > 0 ? { _tag: "Present", products: present } : await plant(db, plan, random);
+  /** Plants everything unless products already exist. */
+  run: async (db: Db, mediaDirectory: string): Promise<SeedReport> => {
+    const [existing] = await db.select({ total: count() }).from(products);
+    if (existing !== undefined && existing.total > 0) return { _tag: "Present", products: existing.total };
 
-  return { catalog, refreshed: await refreshStills(db, directories, stillJobs(plan)) };
-};
+    faker.seed(42);
+    await mkdir(mediaDirectory, { recursive: true });
 
-const isEntrypoint = process.argv[1] === fileURLToPath(import.meta.url);
+    const passwordHash = await Hasher.argon2().hash(Seed.DEMO_PASSWORD);
+    const reviewers = await db
+      .insert(users)
+      .values([
+        { email: Seed.DEMO_EMAIL, passwordHash },
+        ...Array.from({ length: Seed.REVIEWER_COUNT }, () => ({
+          email: faker.internet.email().toLowerCase(),
+          passwordHash,
+        })),
+      ])
+      .onConflictDoNothing()
+      .returning({ id: users.id });
 
-if (isEntrypoint) {
+    const categorySlugs = new Set<string>();
+    const categoryRows = await db
+      .insert(categories)
+      .values(
+        faker.helpers
+          .uniqueArray(faker.commerce.department, Seed.CATEGORY_COUNT)
+          .map((name) => ({ slug: Seed.slugOf(name, categorySlugs), name })),
+      )
+      .returning({ id: categories.id });
+
+    const brandSlugs = new Set<string>();
+    const brandRows = await db
+      .insert(brands)
+      .values(
+        faker.helpers
+          .uniqueArray(faker.company.name, Seed.BRAND_COUNT)
+          .map((name) => ({ slug: Seed.slugOf(name, brandSlugs), name })),
+      )
+      .returning({ id: brands.id });
+
+    const productSlugs = new Set<string>();
+    for (let index = 1; index <= Seed.PRODUCT_COUNT; index += 1) {
+      const name = faker.commerce.productName();
+      const slug = Seed.slugOf(name, productSlugs);
+
+      const [product] = await db
+        .insert(products)
+        .values({
+          slug,
+          name,
+          description: faker.commerce.productDescription(),
+          priceCents: Math.round(Number(faker.commerce.price({ min: 5, max: 900 })) * 100),
+          stock: faker.number.int({ min: 0, max: 40 }),
+          categoryId: faker.helpers.arrayElement(categoryRows).id,
+          brandId: faker.helpers.arrayElement(brandRows).id,
+          weightGrams: faker.number.int({ min: 50, max: 20_000 }),
+          widthMm: faker.number.int({ min: 20, max: 1200 }),
+          heightMm: faker.number.int({ min: 20, max: 1200 }),
+          depthMm: faker.number.int({ min: 10, max: 800 }),
+        })
+        .returning({ id: products.id });
+
+      if (product === undefined) continue;
+
+      // The property names are placeholder data too: whatever the rows say a
+      // product has is what the facets offer.
+      await db.insert(productProperties).values([
+        { productId: product.id, name: "color", value: faker.color.human() },
+        { productId: product.id, name: "material", value: faker.commerce.productMaterial() },
+        ...(faker.datatype.boolean()
+          ? [{ productId: product.id, name: "size", value: faker.helpers.arrayElement(["S", "M", "L", "XL"]) }]
+          : []),
+      ]);
+
+      const imageCount = faker.number.int({ min: 1, max: 3 });
+      for (let position = 0; position < imageCount; position += 1) {
+        const file = `${slug}-${position + 1}.svg`;
+        await writeFile(join(mediaDirectory, file), Seed.imageSvg(name, faker.color.rgb()));
+        await db.insert(productImages).values({ productId: product.id, file, alt: name, position });
+      }
+
+      // Skewed high, like every real review distribution.
+      const reviewerSample = faker.helpers.arrayElements(reviewers, { min: 0, max: reviewers.length });
+      if (reviewerSample.length > 0) {
+        await db.insert(productReviews).values(
+          reviewerSample.map((reviewer) => ({
+            productId: product.id,
+            userId: reviewer.id,
+            rating: faker.helpers.arrayElement([2, 3, 4, 4, 5, 5, 5]),
+          })),
+        );
+      }
+    }
+
+    return { _tag: "Planted", products: Seed.PRODUCT_COUNT };
+  },
+} as const;
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const url = process.env["DATABASE_URL"];
   const media = process.env["MEDIA_DIR"] ?? "/srv/media";
-  // Rendered by `npm run stills` and committed, so it travels with this file.
-  const stills = fileURLToPath(new URL("../../stills", import.meta.url));
 
   if (url === undefined || url.length === 0) {
     process.stderr.write("DATABASE_URL is required.\n");
     process.exit(1);
   }
 
-  const database = createDatabase(url, 4);
-  const report = await seed(database.db, { stills, media });
+  const database = Database.open(url, 2);
+  const report = await Seed.run(database.db, media);
   await database.close();
 
-  const catalog = match(report.catalog)
-    .with(
-      { _tag: "Planted" },
-      ({ products: planted, reviews }) => `Seeded ${planted} products and ${reviews} reviews.`,
-    )
-    .with({ _tag: "Present" }, ({ products: present }) => `Catalog already seeded (${present} products).`)
-    .exhaustive();
-
-  process.stdout.write(`${catalog} Stored new stills for ${report.refreshed} products.\n`);
+  process.stdout.write(
+    report._tag === "Planted"
+      ? `Seeded ${report.products} products.\n`
+      : `Catalog already seeded (${report.products} products).\n`,
+  );
 }

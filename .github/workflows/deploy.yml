@@ -24,10 +24,10 @@ on:
   workflow_dispatch:
     inputs:
       # The way on from a refused migration, and the server's `./start.sh
-      # reset`: the database and the uploaded media are deleted, and the start
+      # reset`: the database and the media volume are deleted, and the start
       # builds both again from the migrations and the seed.
       rebuild_database:
-        description: Rebuild the database from the migrations and the seed, deleting every account, order and upload
+        description: Rebuild the database from the migrations and the seed, deleting every account and review
         type: boolean
         default: false
 
@@ -63,9 +63,9 @@ jobs:
 
       - run: npm run typecheck
 
-      # Unit tests only. The integration suite needs Testcontainers and the
-      # end-to-end suite needs the whole stack; neither belongs in the gate
-      # that decides whether a deploy proceeds.
+      # Unit tests only. The integration and security suites need
+      # Testcontainers, which does not belong in the gate that decides
+      # whether a deploy proceeds.
       - run: npm run test:unit
 
   build:

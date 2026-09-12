@@ -9,10 +9,9 @@
 import type { FastifyInstance } from "fastify";
 import { SignJWT } from "jose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { buildApp } from "../../src/app.ts";
-import { toConfig } from "../../src/config.ts";
+import { App } from "../../src/app.ts";
+import { Config } from "../../src/config.ts";
 import {
-  insertProduct,
   jsonOf,
   registerUser,
   seedCatalog,
@@ -45,7 +44,7 @@ const SQL_PAYLOADS = [
   "1; DELETE FROM app_user",
   "' UNION SELECT password_hash FROM app_user --",
   "admin'--",
-  "'; UPDATE app_user SET role='admin'; --",
+  "'; UPDATE app_user SET password_hash=''; --",
   "\\'; DROP TABLE product; --",
   "%27%20OR%20%271%27%3D%271",
 ];
@@ -61,13 +60,13 @@ const XSS_PAYLOADS = [
 describe("SQL injection through catalog filters", () => {
   beforeEach(async () => {
     await seedCatalog(harness, [
-      { slug: "screaming-pumpkin", name: "Screaming Pumpkin", hex: "#ff8800", priceCents: 1899 },
+      { slug: "desk-lamp", name: "Desk Lamp", priceCents: 1899, properties: { color: "red" } },
     ]);
   });
 
   it("rejects payloads in slug-shaped parameters", async () => {
     for (const payload of SQL_PAYLOADS) {
-      for (const parameter of ["category", "brands", "family", "direction"]) {
+      for (const parameter of ["category", "brand"]) {
         const response = await get(
           `/api/v1/products?${parameter}=${encodeURIComponent(payload)}`,
         );
@@ -78,7 +77,7 @@ describe("SQL injection through catalog filters", () => {
   });
 
   it("rejects payloads in numeric parameters", async () => {
-    for (const parameter of ["priceMin", "priceMax", "hueMin", "page", "perPage"]) {
+    for (const parameter of ["priceMin", "priceMax", "rating", "page", "perPage"]) {
       const response = await get(
         `/api/v1/products?${parameter}=${encodeURIComponent("1; DROP TABLE product")}`,
       );
@@ -103,6 +102,18 @@ describe("SQL injection through catalog filters", () => {
       expect(response.statusCode, payload).toBe(200);
       expect(jsonOf(response)["total"]).toBe(0);
     }
+  });
+
+  it("treats a payload in a property filter as a value to look for", async () => {
+    for (const payload of SQL_PAYLOADS) {
+      const response = await get(`/api/v1/products?p.color=${encodeURIComponent(payload)}`);
+
+      expect(response.statusCode, payload).toBe(200);
+      expect(jsonOf(response)["total"]).toBe(0);
+    }
+
+    const matching = await get("/api/v1/products?p.color=red");
+    expect(jsonOf(matching)["total"]).toBe(1);
   });
 
   it("leaves every table standing afterwards", async () => {
@@ -156,20 +167,16 @@ describe("SQL injection through authentication", () => {
 
 describe("cross-site scripting", () => {
   it("stores and returns markup as inert text, never as HTML", async () => {
-    const { sql } = harness.database;
-
-    await sql`INSERT INTO brand (slug, name) VALUES ('chroma-labs', 'Chroma Labs')`;
-
-    for (const [index, payload] of XSS_PAYLOADS.entries()) {
-      await insertProduct(harness, {
-        kind: "color",
+    await seedCatalog(
+      harness,
+      XSS_PAYLOADS.map((payload, index) => ({
         slug: `xss-${index}`,
         name: payload,
         description: payload,
         priceCents: 1000,
-        hex: "#ff0000",
-      });
-    }
+        properties: { note: payload },
+      })),
+    );
 
     const response = await get("/api/v1/products/xss-0");
 
@@ -203,7 +210,7 @@ describe("JWT tampering", () => {
     });
 
   it("refuses a token signed with the wrong key", async () => {
-    const forged = await new SignJWT({ sub: "x", sid: "y", role: "admin", jti: "z" })
+    const forged = await new SignJWT({ sub: "x", sid: "y", jti: "z" })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuer("prism")
       .setAudience("access")
@@ -218,7 +225,7 @@ describe("JWT tampering", () => {
       "base64url",
     );
     const payload = Buffer.from(
-      JSON.stringify({ sub: "x", sid: "y", role: "admin", jti: "z", exp: 4102444800 }),
+      JSON.stringify({ sub: "x", sid: "y", jti: "z", exp: 4102444800 }),
     ).toString("base64url");
 
     expect((await attempt(`${header}.${payload}.`)).statusCode).toBe(401);
@@ -230,7 +237,6 @@ describe("JWT tampering", () => {
     const invented = await new SignJWT({
       sub: "00000000-0000-4000-8000-000000000000",
       sid: "11111111-1111-4111-8111-111111111111",
-      role: "admin",
       jti: "22222222-2222-4222-8222-222222222222",
     })
       .setProtectedHeader({ alg: "HS256" })
@@ -243,7 +249,7 @@ describe("JWT tampering", () => {
   });
 
   it("refuses a token with the wrong issuer", async () => {
-    const wrongIssuer = await new SignJWT({ sub: "x", sid: "y", role: "customer", jti: "z" })
+    const wrongIssuer = await new SignJWT({ sub: "x", sid: "y", jti: "z" })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuer("somebody-else")
       .setAudience("access")
@@ -254,8 +260,8 @@ describe("JWT tampering", () => {
   });
 });
 
-describe("privilege escalation", () => {
-  it("ignores a role supplied at registration", async () => {
+describe("mass assignment", () => {
+  it("drops fields the registration schema does not declare", async () => {
     const response = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/register",
@@ -264,36 +270,13 @@ describe("privilege escalation", () => {
         password: VALID_PASSWORD,
         captchaToken: "t",
         role: "admin",
+        id: "00000000-0000-4000-8000-000000000000",
       },
     });
 
     expect(response.statusCode).toBe(201);
-
-    const rows = await harness.database
-      .sql<{ role: string }[]>`SELECT role FROM app_user WHERE email = 'sneaky@example.com'`;
-
-    expect(rows[0]?.role).toBe("customer");
-  });
-
-  it("refuses an admin endpoint to a customer", async () => {
-    const { accessToken } = await registerUser(harness, "customer@example.com");
-
-    const response = await harness.app.inject({
-      method: "POST",
-      url: "/api/v1/admin/products/anything/images",
-      headers: { authorization: `Bearer ${accessToken}` },
-    });
-
-    expect(response.statusCode).toBe(403);
-  });
-
-  it("refuses an admin endpoint to an anonymous caller", async () => {
-    const response = await harness.app.inject({
-      method: "POST",
-      url: "/api/v1/admin/products/anything/images",
-    });
-
-    expect(response.statusCode).toBe(401);
+    expect(jsonOf(response)["user"]).not.toHaveProperty("role");
+    expect(jsonOf(response)["user"]).not.toMatchObject({ id: "00000000-0000-4000-8000-000000000000" });
   });
 });
 
@@ -363,20 +346,20 @@ describe("malformed input", () => {
 });
 
 describe("path traversal in media", () => {
-  it("refuses any filename that is not a content hash", async () => {
+  it("serves nothing outside the media directory", async () => {
     const attempts = [
       "..%2f..%2fetc%2fpasswd",
       "%2e%2e%2f%2e%2e%2fetc%2fpasswd",
       "....%2f%2f....%2f%2fetc%2fpasswd",
-      "abc.png",
-      `${"a".repeat(64)}.exe`,
-      `${"z".repeat(64)}.png`,
       "..%00.png",
+      ".env",
+      "missing.svg",
     ];
 
     for (const attempt of attempts) {
       const response = await get(`/media/${attempt}`);
-      expect([400, 404, 422], attempt).toContain(response.statusCode);
+      expect([400, 403, 404, 422], attempt).toContain(response.statusCode);
+      expect(response.body).not.toContain("root:");
     }
   });
 });
@@ -391,14 +374,8 @@ describe("rate limiting", () => {
   let throttled: FastifyInstance;
 
   beforeAll(async () => {
-    throttled = await buildApp({
-      config: toConfig(
-        testEnvironment(
-          harness.config.database.url,
-          harness.mediaDirectory,
-          LIMIT,
-        ),
-      ),
+    throttled = await App.build({
+      config: Config.fromEnvironment(testEnvironment(harness.config.database.url, harness.mediaDirectory, LIMIT)),
       database: harness.database,
       overrides: { clock: harness.clock, mailer: harness.mailer },
     });

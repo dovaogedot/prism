@@ -5,8 +5,8 @@
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { OAUTH_PROVIDERS } from "@prism/shared";
-import { issueMockAuthorizationCode } from "../../src/platform/oauth.ts";
+import { OAuthProvider } from "@prism/shared";
+import { MockAuthorizationCode } from "../../src/platform/oauth.ts";
 import {
   cookieValue,
   jsonOf,
@@ -30,7 +30,7 @@ beforeEach(async () => {
   await harness.reset();
 });
 
-const OAUTH_STATE_COOKIE = "hue_oauth_state";
+const OAUTH_STATE_COOKIE = "prism_oauth_state";
 
 /** Walks a provider's flow from the button to a usable refresh cookie. */
 const signInWith = async (provider: string, email: string) => {
@@ -41,7 +41,7 @@ const signInWith = async (provider: string, email: string) => {
 
   const state = cookieValue(begin, OAUTH_STATE_COOKIE);
 
-  const code = issueMockAuthorizationCode(
+  const code = MockAuthorizationCode.issue(
     provider === "github" ? "github" : "google",
     email,
     harness.config.tokens.secret,
@@ -53,7 +53,7 @@ const signInWith = async (provider: string, email: string) => {
     cookies: { [OAUTH_STATE_COOKIE]: state },
   });
 
-  return { begin, state, callback, refreshToken: cookieValue(callback, "hue_refresh") };
+  return { begin, state, callback, refreshToken: cookieValue(callback, "prism_refresh") };
 };
 
 describe("GET /auth/oauth/providers", () => {
@@ -64,11 +64,11 @@ describe("GET /auth/oauth/providers", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(jsonOf(response)).toEqual({ providers: [...OAUTH_PROVIDERS], mock: true });
+    expect(jsonOf(response)).toEqual({ providers: [...OAuthProvider.NAMES], mock: true });
   });
 });
 
-describe.each(OAUTH_PROVIDERS)("signing in with %s", (provider) => {
+describe.each(OAuthProvider.NAMES)("signing in with %s", (provider) => {
   it("redirects to the provider and remembers the state", async () => {
     const begin = await harness.app.inject({
       method: "GET",
@@ -93,13 +93,12 @@ describe.each(OAUTH_PROVIDERS)("signing in with %s", (provider) => {
     const grant = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
-      cookies: { hue_refresh: refreshToken },
+      cookies: { prism_refresh: refreshToken },
     });
 
     expect(jsonOf(grant)["user"]).toMatchObject({
       email: `${provider}-newcomer@example.com`,
       hasPassword: false,
-      role: "customer",
     });
   });
 
@@ -160,7 +159,7 @@ describe.each(OAUTH_PROVIDERS)("signing in with %s", (provider) => {
     const grant = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
-      cookies: { hue_refresh: refreshToken },
+      cookies: { prism_refresh: refreshToken },
     });
 
     expect(jsonOf(grant)["user"]).toMatchObject({
@@ -179,7 +178,7 @@ describe.each(OAUTH_PROVIDERS)("signing in with %s", (provider) => {
     const grant = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
-      cookies: { hue_refresh: refreshToken },
+      cookies: { prism_refresh: refreshToken },
     });
 
     expect(jsonOf(grant)["user"]).toMatchObject({
@@ -189,7 +188,7 @@ describe.each(OAUTH_PROVIDERS)("signing in with %s", (provider) => {
   });
 
   it("rejects a callback whose state does not match the cookie", async () => {
-    const code = issueMockAuthorizationCode(
+    const code = MockAuthorizationCode.issue(
       provider === "github" ? "github" : "google",
       "forged@example.com",
       harness.config.tokens.secret,
@@ -230,7 +229,7 @@ describe("an account with more than one provider", () => {
     const grant = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
-      cookies: { hue_refresh: refreshToken },
+      cookies: { prism_refresh: refreshToken },
     });
 
     expect(users).toHaveLength(1);
@@ -262,7 +261,7 @@ describe("adding a password to a provider account", () => {
     const grant = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
-      cookies: { hue_refresh: refreshToken },
+      cookies: { prism_refresh: refreshToken },
     });
     return String(jsonOf(grant)["accessToken"]);
   };
@@ -380,7 +379,7 @@ describe("a provider sign-in into an account with two-factor", () => {
     const grant = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
-      cookies: { hue_refresh: refreshToken },
+      cookies: { prism_refresh: refreshToken },
     });
     return String(jsonOf(grant)["accessToken"]);
   };
@@ -395,8 +394,8 @@ describe("a provider sign-in into an account with two-factor", () => {
 
     expect(callback.statusCode).toBe(302);
     expect(callback.headers["location"]).toContain("/login/2fa");
-    expect(cookieValue(callback, "hue_refresh")).toBe("");
-    expect(cookieValue(callback, "hue_2fa_challenge")).not.toBe("");
+    expect(cookieValue(callback, "prism_refresh")).toBe("");
+    expect(cookieValue(callback, "prism_2fa_challenge")).not.toBe("");
   });
 
   it("keeps the challenge out of the redirect URL", async () => {
@@ -424,20 +423,20 @@ describe("a provider sign-in into an account with two-factor", () => {
     });
 
     const { callback } = await signInWith("google", "finishes@example.com");
-    const challenge = cookieValue(callback, "hue_2fa_challenge");
+    const challenge = cookieValue(callback, "prism_2fa_challenge");
 
     // No challenge token in the body: the page that collects the code cannot
     // read an httpOnly cookie, so the server finds it.
     const done = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/login/2fa",
-      cookies: { hue_2fa_challenge: challenge },
+      cookies: { prism_2fa_challenge: challenge },
       payload: { code: harness.totpCodeFor(secret) },
     });
 
     expect(done.statusCode).toBe(200);
     expect(jsonOf(done)["status"]).toBe("authenticated");
-    expect(cookieValue(done, "hue_refresh")).not.toBe("");
+    expect(cookieValue(done, "prism_refresh")).not.toBe("");
   });
 
   it("refuses a code with no challenge anywhere", async () => {
@@ -460,7 +459,7 @@ describe("provider isolation", () => {
     const state = cookieValue(begin, OAUTH_STATE_COOKIE);
 
     // Signed for GitHub, presented at Google's callback.
-    const code = issueMockAuthorizationCode(
+    const code = MockAuthorizationCode.issue(
       "github",
       "crossover@example.com",
       harness.config.tokens.secret,

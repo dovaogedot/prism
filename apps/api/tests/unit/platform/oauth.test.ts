@@ -3,24 +3,21 @@
  * the registry, the offline mock's code signing, and GitHub's email selection.
  */
 
-import { Option } from "@prism/shared";
 import { describe, expect, it } from "vitest";
 import {
-  createGitHubOAuthProvider,
-  createGoogleOAuthProvider,
-  createMockOAuthProvider,
-  createOAuthRegistry,
-  issueMockAuthorizationCode,
-  selectGitHubEmail,
+  GitHubEmails,
+  IdentityProvider,
+  IdentityProviders,
+  MockAuthorizationCode,
 } from "../../../src/platform/oauth.ts";
 
 const SECRET = new TextEncoder().encode("a".repeat(48));
 
 describe("the registry", () => {
-  const registry = createOAuthRegistry(
+  const registry = IdentityProviders.of(
     [
-      createMockOAuthProvider("google", SECRET),
-      createMockOAuthProvider("github", SECRET),
+      IdentityProvider.mock("google", SECRET),
+      IdentityProvider.mock("github", SECRET),
     ],
     true,
   );
@@ -30,31 +27,30 @@ describe("the registry", () => {
   });
 
   it("finds a provider by name", () => {
-    const found = registry.find("github");
-    expect(Option.isSome(found)).toBe(true);
+    expect(registry.find("github")?.name).toBe("github");
   });
 
-  it("returns None for anything it does not hold", () => {
+  it("returns undefined for anything it does not hold", () => {
     for (const name of ["facebook", "GITHUB", "", "../google", "google "]) {
-      expect(registry.find(name), name).toEqual(Option.none);
+      expect(registry.find(name), name).toBeUndefined();
     }
   });
 
   it("offers only the providers it was built with", () => {
-    const githubOnly = createOAuthRegistry(
-      [createGitHubOAuthProvider("id", "secret")],
+    const githubOnly = IdentityProviders.of(
+      [IdentityProvider.github("id", "secret")],
       false,
     );
 
     expect(githubOnly.names).toEqual(["github"]);
-    expect(githubOnly.find("google")).toEqual(Option.none);
+    expect(githubOnly.find("google")).toBeUndefined();
     expect(githubOnly.isMock).toBe(false);
   });
 });
 
 describe("authorization URLs", () => {
   it("sends GitHub the scopes needed to read a private email", () => {
-    const url = createGitHubOAuthProvider("client-123", "secret").authorizationUrl(
+    const url = IdentityProvider.github("client-123", "secret").authorizationUrl(
       "state-abc",
       "http://localhost:3000/cb",
     );
@@ -71,7 +67,7 @@ describe("authorization URLs", () => {
   });
 
   it("never puts the client secret in the URL", () => {
-    const url = createGitHubOAuthProvider("client-123", "super-secret").authorizationUrl(
+    const url = IdentityProvider.github("client-123", "super-secret").authorizationUrl(
       "state",
       "http://localhost:3000/cb",
     );
@@ -80,7 +76,7 @@ describe("authorization URLs", () => {
   });
 
   it("asks Google for the openid email scope", () => {
-    const url = createGoogleOAuthProvider("client-123", "secret").authorizationUrl(
+    const url = IdentityProvider.google("client-123", "secret").authorizationUrl(
       "state",
       "http://localhost:3000/cb",
     );
@@ -89,7 +85,7 @@ describe("authorization URLs", () => {
   });
 
   it("points the mock at a consent screen served by this API", () => {
-    const url = createMockOAuthProvider("github", SECRET).authorizationUrl(
+    const url = IdentityProvider.mock("github", SECRET).authorizationUrl(
       "state",
       "http://localhost:3000/cb",
     );
@@ -99,11 +95,11 @@ describe("authorization URLs", () => {
 });
 
 describe("the mock provider", () => {
-  const google = createMockOAuthProvider("google", SECRET);
-  const github = createMockOAuthProvider("github", SECRET);
+  const google = IdentityProvider.mock("google", SECRET);
+  const github = IdentityProvider.mock("github", SECRET);
 
   it("accepts a code it issued", async () => {
-    const code = issueMockAuthorizationCode("github", "someone@example.com", SECRET);
+    const code = MockAuthorizationCode.issue("github", "someone@example.com", SECRET);
     const result = await github.exchange(code, "http://localhost:3000/cb");
 
     expect(result.isOk()).toBe(true);
@@ -114,7 +110,7 @@ describe("the mock provider", () => {
   });
 
   it("rejects a code it did not issue", async () => {
-    const forged = issueMockAuthorizationCode(
+    const forged = MockAuthorizationCode.issue(
       "github",
       "someone@example.com",
       new TextEncoder().encode("b".repeat(48)),
@@ -127,7 +123,7 @@ describe("the mock provider", () => {
     // The provider is part of what gets signed, so a GitHub code presented at
     // the Google callback fails — the isolation two real providers get from
     // not sharing a client secret.
-    const githubCode = issueMockAuthorizationCode("github", "a@example.com", SECRET);
+    const githubCode = MockAuthorizationCode.issue("github", "a@example.com", SECRET);
 
     expect((await google.exchange(githubCode, "cb")).isErr()).toBe(true);
   });
@@ -139,7 +135,7 @@ describe("the mock provider", () => {
   });
 
   it("gives the same address a stable subject", async () => {
-    const code = issueMockAuthorizationCode("github", "a@example.com", SECRET);
+    const code = MockAuthorizationCode.issue("github", "a@example.com", SECRET);
 
     const first = await github.exchange(code, "cb");
     const second = await github.exchange(code, "cb");
@@ -148,8 +144,8 @@ describe("the mock provider", () => {
   });
 
   it("treats the same address on two providers as two identities", async () => {
-    const forGoogle = issueMockAuthorizationCode("google", "a@example.com", SECRET);
-    const forGithub = issueMockAuthorizationCode("github", "a@example.com", SECRET);
+    const forGoogle = MockAuthorizationCode.issue("google", "a@example.com", SECRET);
+    const forGithub = MockAuthorizationCode.issue("github", "a@example.com", SECRET);
 
     const googleProfile = await google.exchange(forGoogle, "cb");
     const githubProfile = await github.exchange(forGithub, "cb");
@@ -160,7 +156,7 @@ describe("the mock provider", () => {
   });
 });
 
-describe("selectGitHubEmail", () => {
+describe("GitHubEmails.select", () => {
   const entry = (
     email: string,
     primary: boolean,
@@ -169,58 +165,56 @@ describe("selectGitHubEmail", () => {
 
   it("prefers the primary verified address", () => {
     expect(
-      selectGitHubEmail([
+      GitHubEmails.select([
         entry("secondary@example.com", false, true),
         entry("primary@example.com", true, true),
       ]),
-    ).toEqual(Option.some("primary@example.com"));
+    ).toBe("primary@example.com");
   });
 
   it("falls back to any verified address when none is primary", () => {
     expect(
-      selectGitHubEmail([entry("only@example.com", false, true)]),
-    ).toEqual(Option.some("only@example.com"));
+      GitHubEmails.select([entry("only@example.com", false, true)]),
+    ).toBe("only@example.com");
   });
 
   it("refuses an unverified address even when it is primary", () => {
     // Accepting one would let anybody who types a victim's address into
     // GitHub link themselves to that account here.
     expect(
-      selectGitHubEmail([entry("unverified@example.com", true, false)]),
-    ).toEqual(Option.none);
+      GitHubEmails.select([entry("unverified@example.com", true, false)]),
+    ).toBeUndefined();
   });
 
   it("skips an unverified primary in favor of a verified one", () => {
     expect(
-      selectGitHubEmail([
+      GitHubEmails.select([
         entry("unverified@example.com", true, false),
         entry("verified@example.com", false, true),
       ]),
-    ).toEqual(Option.some("verified@example.com"));
+    ).toBe("verified@example.com");
   });
 
   it("lowercases the address so one person is one account", () => {
-    expect(selectGitHubEmail([entry("Someone@Example.COM", true, true)])).toEqual(
-      Option.some("someone@example.com"),
-    );
+    expect(GitHubEmails.select([entry("Someone@Example.COM", true, true)])).toBe("someone@example.com");
   });
 
-  it("returns None for an empty list", () => {
-    expect(selectGitHubEmail([])).toEqual(Option.none);
+  it("returns undefined for an empty list", () => {
+    expect(GitHubEmails.select([])).toBeUndefined();
   });
 
-  it("returns None for anything that is not a list of addresses", () => {
+  it("returns undefined for anything that is not a list of addresses", () => {
     for (const payload of [null, undefined, {}, "nope", 42, [{ nope: true }]]) {
-      expect(selectGitHubEmail(payload)).toEqual(Option.none);
+      expect(GitHubEmails.select(payload)).toBeUndefined();
     }
   });
 
   it("ignores malformed entries mixed in with good ones", () => {
     expect(
-      selectGitHubEmail([
+      GitHubEmails.select([
         { garbage: true },
         entry("good@example.com", true, true),
       ]),
-    ).toEqual(Option.some("good@example.com"));
+    ).toBe("good@example.com");
   });
 });

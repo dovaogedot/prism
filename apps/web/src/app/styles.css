@@ -7,11 +7,6 @@
  */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/*
- * A shop that sells colors must not compete with its own stock. The chrome is
- * near-neutral end to end, and exactly one accent carries interaction: blue in
- * daylight, yellow after dark. Everything vivid on the page is merchandise.
- */
 @theme {
   --font-sans: "Inter var", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Code", monospace;
@@ -33,13 +28,10 @@
   --color-danger: oklch(55% 0.203 25);
   --color-danger-wash: oklch(95.5% 0.03 25);
 
-  /* Between "in stock" and "out of stock". Amber, at the same lightness as
-     danger so the two read as one scale rather than two decisions. */
+  /* Between "in stock" and "out of stock". */
   --color-warn: oklch(58% 0.14 62);
 
   --radius-card: 0.875rem;
-
-  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .dark {
@@ -52,8 +44,7 @@
   --color-ink-soft: oklch(72% 0.011 265);
   --color-ink-faint: oklch(58% 0.012 265);
 
-  /* Yellow after dark. Dark ink on top of it, because yellow is far too
-     luminous to carry white text at any accessible contrast. */
+  /* Dark ink on the accent, because yellow is too luminous to carry white text. */
   --color-accent: oklch(85.5% 0.168 92);
   --color-accent-hover: oklch(79% 0.161 88);
   --color-accent-ink: oklch(18% 0.02 80);
@@ -67,21 +58,12 @@
 
 @layer base {
   html {
-    scroll-behavior: smooth;
-
-    /*
-     * Reserves the scrollbar's width whether or not one is showing. Filtering
-     * changes how many results there are, which changes whether the page
-     * overflows — without this, the whole layout jumps sideways by the
-     * scrollbar's width every time that flips.
-     */
+    /* Filtering changes whether the page overflows; a reserved gutter keeps
+       the layout from jumping sideways when that flips. */
     scrollbar-gutter: stable;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    html {
-      scroll-behavior: auto;
-    }
     *,
     *::before,
     *::after {
@@ -97,26 +79,18 @@
     text-rendering: optimizeLegibility;
   }
 
-  /* One focus treatment everywhere, visible against both themes. */
   :focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
     border-radius: 2px;
   }
 
-  /*
-   * A button is as clickable as a link, but the browser only gives the link a
-   * hand cursor. One rule rather than a `cursor-pointer` sprinkled on every
-   * button, which is how half of them ended up without it.
-   */
   button:not(:disabled),
-  [role="button"]:not(:disabled),
   label:has(> input:not(:disabled)) {
     cursor: pointer;
   }
 
-  button:disabled,
-  [role="button"][aria-disabled="true"] {
+  button:disabled {
     cursor: not-allowed;
   }
 
@@ -125,7 +99,7 @@
     color: var(--color-accent-ink);
   }
 
-  /* Native controls follow the theme instead of staying stubbornly light. */
+  /* Native controls follow the theme instead of staying light. */
   input,
   select,
   textarea,
@@ -143,76 +117,12 @@
 
 @layer components {
   /*
-   * The stage a product is sold on.
-   *
-   * There is almost nothing here, and that is the point: the picture is a
-   * render, not a stack of gradients. `features/catalog/artwork` builds the
-   * room and what stands in it, and this only decides how much of the card the
-   * canvas gets and where the placard sits.
-   */
-  .stage {
-    position: relative;
-    overflow: hidden;
-    /* A finger drawn sideways turns what is on the stage; one drawn up or down
-       is left to the page, which scrolls. */
-    touch-action: pan-y;
-    /* Held under the canvas for the frame before the first render lands, and
-       behind a flat swatch on a browser with no WebGL to render into. */
-    background-color: var(--color-sunken);
-  }
-
-  .stage__canvas,
-  .stage__flat {
-    display: block;
-    width: 100%;
-    height: 100%;
-  }
-
-  .stage__flat {
-    object-fit: cover;
-  }
-
-  /*
-   * The photograph a stage stands behind until its room is built.
-   *
-   * Over the canvas rather than in place of it, so the canvas is already the
-   * size it will be when the first frame lands and the card does not resize
-   * around it. Opaque, because what is under it is a canvas with nothing on it.
-   */
-  .stage__still {
-    position: absolute;
-    inset: 0;
-  }
-
-  /*
-   * The hex, on the wall beside the work rather than printed on it.
-   *
-   * Frosted like the card's badge and tags, so it stays legible whichever
-   * corner of the room it happens to sit on.
-   */
-  .stage__placard {
-    position: absolute;
-    top: 0.5rem;
-    left: 0.5rem;
-    border-radius: 9999px;
-    padding: 0.125rem 0.375rem;
-    background-color: color-mix(in oklab, var(--color-surface) 75%, transparent);
-    backdrop-filter: blur(4px);
-    font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--color-ink-soft);
-  }
-
-  /*
-   * The drawer a narrow page keeps its filters and switches in.
-   *
-   * A modal dialog held against the left edge at full height, so the browser
-   * gives it focus, Escape and a backdrop. It slides in from the edge and back
-   * out, and the backdrop darkens and clears with it. It slides out while it is
-   * still open, marked `data-closing`, and is closed once it is out, so it
-   * stays on screen the whole way in every browser.
+   * The drawer a narrow page keeps its filters and its theme switch in: a
+   * modal dialog held against the left edge at full height, so the browser
+   * gives it focus, Escape and a backdrop. It slides in from the edge and
+   * back out. On the way out it is marked `data-closing` while still open,
+   * and closed once the slide has finished, so it stays on screen the whole
+   * way in every browser.
    */
   .drawer {
     position: fixed;
@@ -276,11 +186,7 @@
     display: block;
   }
 
-  /*
-   * Not themed. A scanner expects dark modules on a light ground, and plenty
-   * of them refuse an inverted code outright — so this one stays black on
-   * white in dark mode too.
-   */
+  /* A scanner expects dark modules on light paper, in dark mode too. */
   .qr svg path {
     fill: #000;
   }

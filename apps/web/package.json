@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p scripts/tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },
@@ -19,7 +19,6 @@
     "react-dom": "^19.2.8",
     "react-hook-form": "^7.84.0",
     "react-router": "^8.3.0",
-    "three": "^0.185.1",
     "ts-pattern": "^5.9.0",
     "zod": "^4.4.3"
   },
@@ -27,9 +26,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
-    "@types/three": "^0.185.4",
     "@vitejs/plugin-react": "^6.0.5",
-    "playwright": "^1.62.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.2.1",

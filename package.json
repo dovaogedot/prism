@@ -3,11 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "A B2C storefront that sells colors.",
+  "description": "A small B2C shop: accounts, a searchable catalog, and nothing it does not need.",
   "workspaces": [
     "packages/*",
-    "apps/*",
-    "e2e"
+    "apps/*"
   ],
   "engines": {
     "node": ">=25.0.0"
@@ -16,9 +15,7 @@
     "build": "npm run build --workspace @prism/shared",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run build && npm run test --workspaces --if-present",
-    "test:unit": "npm run build && npm run test:unit --workspaces --if-present",
-    "test:e2e": "npm run e2e --workspace @prism/e2e",
-    "stills": "npm run build && rm -rf apps/api/stills && node apps/api/src/db/stills.ts | node apps/web/scripts/render-stills.ts - apps/api/stills"
+    "test:unit": "npm run build && npm run test:unit --workspaces --if-present"
   },
   "devDependencies": {
     "typescript": "^7.0.2"

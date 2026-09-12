@@ -71,11 +71,9 @@ cat <<BANNER
   Prism is up.
 
     Storefront      http://localhost:${web_port}
-    API docs        http://localhost:${web_port}/api/docs
     Inbox (Mailpit) http://localhost:8025
 
-  Seeded admin      admin@prism.test / colors are not paint
-  Seeded shopper    shopper@prism.test / colors are not paint
+  Seeded shopper    shopper@prism.test / correct horse battery staple
 
   Logs   docker compose logs -f
   Stop   ./start.sh down

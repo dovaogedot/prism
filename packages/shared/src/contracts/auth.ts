@@ -1,210 +1,179 @@
 /**
- * One schema per request shape, used three times: Fastify validates with it,
- * the OpenAPI document is generated from it, and react-hook-form checks the
- * same rules in the browser. "Validation on both client and server" without
- * two definitions that can drift apart.
+ * One schema per request shape, used twice: Fastify validates with it, and
+ * react-hook-form checks the same rules in the browser. Validation on both
+ * sides without two definitions that can drift apart.
  */
 
 import { z } from "zod";
 
-/** The longest address RFC 5321 allows, which is what the column is sized for. */
-export const EMAIL_MAX_LENGTH = 254;
-/** The shortest password accepted, in characters. */
-export const PASSWORD_MIN_LENGTH = 12;
-/** The longest password accepted, in characters. */
-export const PASSWORD_MAX_LENGTH = 128;
+/** An email address, trimmed and lowercased so equality is string equality. */
+export const Email = {
+  /** The longest address RFC 5321 allows. */
+  MAX_LENGTH: 254,
+  schema: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .pipe(z.email("Enter a valid email address.").max(254)),
+} as const;
 
 /**
- * NIST SP 800-63B: length and a breach check beat composition rules, which
- * mostly teach people to write `Password1!`. A denylist stands in for the
- * breach corpus at this scale.
+ * A password a new account is allowed to have: long enough, and not a guess.
+ * NIST SP 800-63B: length and a breach check beat composition rules. A short
+ * denylist stands in for the breach corpus at this scale.
  */
-const COMMON_PASSWORDS: ReadonlySet<string> = new Set([
-  "password123",
-  "123456789012",
-  "qwertyuiop12",
-  "iloveshopping",
-  "letmeinplease",
-  "administrator",
-]);
-
-/** An email address, trimmed and lowercased so equality is string equality. */
-export const emailSchema = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .pipe(z.email("Enter a valid email address.").max(EMAIL_MAX_LENGTH));
-
-/** A password a new account is allowed to have: long enough, and not a guess. */
-export const passwordSchema = z
-  .string()
-  .min(PASSWORD_MIN_LENGTH, `Use at least ${PASSWORD_MIN_LENGTH} characters.`)
-  .max(PASSWORD_MAX_LENGTH, `Use at most ${PASSWORD_MAX_LENGTH} characters.`)
-  .refine(
-    (password) => !COMMON_PASSWORDS.has(password.toLowerCase()),
-    "That password is too easy to guess.",
-  );
+export const Password = {
+  MIN_LENGTH: 12,
+  MAX_LENGTH: 128,
+  COMMON: new Set([
+    "password123",
+    "123456789012",
+    "qwertyuiop12",
+    "iloveshopping",
+    "letmeinplease",
+    "administrator",
+  ]),
+  schema: z
+    .string()
+    .min(12, "Use at least 12 characters.")
+    .max(128, "Use at most 128 characters.")
+    .refine(
+      (password: string): boolean => !Password.COMMON.has(password.toLowerCase()),
+      "That password is too easy to guess.",
+    ),
+  /** The browser-only confirmation field and the check that it matches. */
+  confirmation: z.string().min(1, "Repeat the password."),
+  matches: (values: Readonly<{ password: string; confirmPassword: string }>) =>
+    values.password === values.confirmPassword,
+  mismatch: { message: "The two passwords do not match.", path: ["confirmPassword"] },
+};
 
 /** A six-digit authenticator code. */
-export const totpCodeSchema = z
-  .string()
-  .trim()
-  .regex(/^\d{6}$/, "Enter the 6-digit code from your authenticator app.");
-
-/** The body of `POST /auth/register`. */
-export const registerSchema = z.object({
-  email: emailSchema,
-  password: passwordSchema,
-  captchaToken: z.string().min(1, "Complete the CAPTCHA to continue."),
-});
-
-/**
- * The body of `POST /auth/login`.
- *
- * The password is checked for presence only. Sign-in must not tell an attacker
- * that a stored password would have been rejected by the registration rules.
- */
-export const loginSchema = z.object({
-  email: emailSchema,
-  password: z.string().min(1, "Enter your password."),
-});
-
-/**
- * The challenge may arrive in the body or in a short-lived httpOnly cookie.
- *
- * Password sign-in hands the token to the SPA, which carries it in navigation
- * state. The OAuth callback has no SPA to hand it to — it is a redirect — so it
- * leaves the token in a cookie instead of putting it in the URL, where it would
- * land in history and in referrer headers.
- */
-export const twoFactorLoginSchema = z.object({
-  challengeToken: z.string().min(1).optional(),
-  code: totpCodeSchema,
-});
-
-/** The body of `POST /auth/forgot-password`. */
-export const forgotPasswordSchema = z.object({
-  email: emailSchema,
-});
-
-/** The body of `POST /auth/reset-password`. */
-export const resetPasswordSchema = z.object({
-  token: z.string().min(1),
-  password: passwordSchema,
-});
-
-/**
- * Changing the password from the account page.
- *
- * `currentPassword` is required of an account that has one and meaningless to
- * an account that does not — one created through a provider has nothing to
- * confirm, and the authenticated session is the proof. The server decides
- * which case applies; it does not take the client's word for it.
- */
-export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1).optional(),
-  password: passwordSchema,
-});
-
-/**
- * The confirmation field never leaves the browser — it guards against a typo
- * in a value nobody can read back. Written out per form rather than through a
- * generic wrapper, which erases the shape and makes `values.password` an index
- * lookup.
- */
-const confirmField = z.string().min(1, "Repeat the password.");
-
-/** Zod wants a mutable `path`, so this is not `as const`. */
-const MISMATCH = {
-  message: "The two passwords do not match.",
-  path: ["confirmPassword"],
-};
-
-const matches = (values: Readonly<{ password: string; confirmPassword: string }>) =>
-  values.password === values.confirmPassword;
-
-/** The register form: the request body plus the browser-only confirmation. */
-export const registerFormSchema = registerSchema
-  .extend({ confirmPassword: confirmField })
-  .refine(matches, MISMATCH);
-
-/** The reset form: the request body plus the browser-only confirmation. */
-export const resetPasswordFormSchema = resetPasswordSchema
-  .extend({ confirmPassword: confirmField })
-  .refine(matches, MISMATCH);
-
-/** The change-password form, for an account that has a password to confirm. */
-export const changePasswordFormSchema = changePasswordSchema
-  .extend({
-    currentPassword: z.string().min(1, "Enter your current password."),
-    confirmPassword: confirmField,
-  })
-  .refine(matches, MISMATCH);
-
-/**
- * No current password to confirm: the account signed up through a provider.
- *
- * The field is still in the shape, unvalidated, so both password forms infer
- * the same values type and one component can serve either.
- */
-export const setPasswordFormSchema = changePasswordSchema
-  .extend({ currentPassword: z.string(), confirmPassword: confirmField })
-  .refine(matches, MISMATCH);
-
-/** The body that confirms enrollment by proving the secret was scanned. */
-export const enableTwoFactorSchema = z.object({
-  code: totpCodeSchema,
-});
-
-/** The body that turns two-factor off, which needs a live code like enabling does. */
-export const disableTwoFactorSchema = z.object({
-  code: totpCodeSchema,
-});
+export const TotpCode = {
+  schema: z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit code from your authenticator app."),
+} as const;
 
 /** A validated `POST /auth/register` body. */
-export type RegisterInput = z.infer<typeof registerSchema>;
-/** A validated `POST /auth/login` body. */
-export type LoginInput = z.infer<typeof loginSchema>;
-/** A validated second-factor body. */
-export type TwoFactorLoginInput = z.infer<typeof twoFactorLoginSchema>;
-/** A validated `POST /auth/forgot-password` body. */
-export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
-/** A validated `POST /auth/reset-password` body. */
-export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
-/** A validated change-password body. */
-export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
-/** A validated enable-two-factor body. */
-export type EnableTwoFactorInput = z.infer<typeof enableTwoFactorSchema>;
-/** A validated disable-two-factor body. */
-export type DisableTwoFactorInput = z.infer<typeof disableTwoFactorSchema>;
-
-/** Every role an account can hold. */
-export const USER_ROLES = ["customer", "admin"] as const;
-/** What an account is allowed to reach. */
-export type UserRole = (typeof USER_ROLES)[number];
+export type RegisterInput = z.infer<typeof RegisterInput.schema>;
+export const RegisterInput = {
+  schema: z.object({
+    email: Email.schema,
+    password: Password.schema,
+    captchaToken: z.string().min(1, "Complete the CAPTCHA to continue."),
+  }),
+} as const;
 
 /**
- * Every third-party sign-in this platform speaks. Adding one means adding it
- * here, writing an adapter, and nothing else — the routes, the mock provider
- * and the sign-in buttons are all driven off this list.
+ * A validated `POST /auth/login` body. The password is checked for presence
+ * only: sign-in must not reveal that a stored password would fail today's
+ * registration rules.
  */
-export const OAUTH_PROVIDERS = ["google", "github"] as const;
-/** One third-party sign-in, named the way its routes and columns name it. */
-export type OAuthProviderName = (typeof OAUTH_PROVIDERS)[number];
+export type LoginInput = z.infer<typeof LoginInput.schema>;
+export const LoginInput = {
+  schema: z.object({
+    email: Email.schema,
+    password: z.string().min(1, "Enter your password."),
+  }),
+} as const;
 
-/** A provider name arriving from a client, which may be anything at all. */
-export const oauthProviderSchema = z.enum(OAUTH_PROVIDERS);
+/**
+ * A validated second-factor body. The challenge arrives in the body after a
+ * password sign-in, and in a short-lived httpOnly cookie after an OAuth
+ * redirect, which has no page to hand it to.
+ */
+export type TwoFactorLoginInput = z.infer<typeof TwoFactorLoginInput.schema>;
+export const TwoFactorLoginInput = {
+  schema: z.object({
+    challengeToken: z.string().min(1).optional(),
+    code: TotpCode.schema,
+  }),
+} as const;
 
-/** How each provider spells its own name on a button. */
-export const OAUTH_PROVIDER_LABELS: Record<OAuthProviderName, string> = {
-  google: "Google",
-  github: "GitHub",
-};
+/** A validated `POST /auth/password/forgot` body. */
+export type ForgotPasswordInput = z.infer<typeof ForgotPasswordInput.schema>;
+export const ForgotPasswordInput = {
+  schema: z.object({ email: Email.schema }),
+} as const;
+
+/** A validated `POST /auth/password/reset` body. */
+export type ResetPasswordInput = z.infer<typeof ResetPasswordInput.schema>;
+export const ResetPasswordInput = {
+  schema: z.object({ token: z.string().min(1), password: Password.schema }),
+} as const;
+
+/**
+ * A validated change-password body. `currentPassword` is required of an
+ * account that has one; an account created through a provider has nothing to
+ * confirm. The server decides which case applies.
+ */
+export type ChangePasswordInput = z.infer<typeof ChangePasswordInput.schema>;
+export const ChangePasswordInput = {
+  schema: z.object({
+    currentPassword: z.string().min(1).optional(),
+    password: Password.schema,
+  }),
+} as const;
+
+/** A validated body that proves the enrolled secret was scanned, or turns it off. */
+export type TwoFactorCodeInput = z.infer<typeof TwoFactorCodeInput.schema>;
+export const TwoFactorCodeInput = {
+  schema: z.object({ code: TotpCode.schema }),
+} as const;
+
+/** The register form: the request body plus the browser-only confirmation. */
+export type RegisterForm = z.infer<typeof RegisterForm.schema>;
+export const RegisterForm = {
+  schema: RegisterInput.schema
+    .extend({ confirmPassword: Password.confirmation })
+    .refine(Password.matches, Password.mismatch),
+} as const;
+
+/** The reset form: the request body plus the browser-only confirmation. */
+export type ResetPasswordForm = z.infer<typeof ResetPasswordForm.schema>;
+export const ResetPasswordForm = {
+  schema: ResetPasswordInput.schema
+    .extend({ confirmPassword: Password.confirmation })
+    .refine(Password.matches, Password.mismatch),
+} as const;
+
+/**
+ * The password form on the account page. `change` confirms the current
+ * password; `set` serves an account that has none. Both infer one values
+ * type, so one component serves either.
+ */
+export type PasswordForm = z.infer<typeof PasswordForm.change>;
+export const PasswordForm = {
+  change: ChangePasswordInput.schema
+    .extend({
+      currentPassword: z.string().min(1, "Enter your current password."),
+      confirmPassword: Password.confirmation,
+    })
+    .refine(Password.matches, Password.mismatch),
+  set: ChangePasswordInput.schema
+    .extend({ currentPassword: z.string(), confirmPassword: Password.confirmation })
+    .refine(Password.matches, Password.mismatch),
+} as const;
+
+/**
+ * One third-party sign-in, named the way its routes and columns name it. The
+ * routes, the mock provider and the sign-in buttons are all driven off `NAMES`.
+ */
+export type OAuthProvider = (typeof OAuthProvider.NAMES)[number];
+export const OAuthProvider = {
+  NAMES: ["google", "github"] as const,
+  /** A provider name arriving from a client, which may be anything at all. */
+  schema: z.enum(["google", "github"]),
+  /** How each provider spells its own name on a button. */
+  label: { google: "Google", github: "GitHub" } as const satisfies Record<
+    "google" | "github",
+    string
+  >,
+} as const;
 
 /** What `GET /auth/oauth/providers` answers, so the UI shows only live buttons. */
 export type AvailableProviders = Readonly<{
-  providers: readonly OAuthProviderName[];
-  /** True when the built-in offline stand-in is answering instead of the real thing. */
+  providers: readonly OAuthProvider[];
+  /** True when the built-in offline stand-in answers instead of the real provider. */
   mock: boolean;
 }>;
 
@@ -212,20 +181,16 @@ export type AvailableProviders = Readonly<{
 export type SessionUser = Readonly<{
   id: string;
   email: string;
-  role: UserRole;
   twoFactorEnabled: boolean;
-  /** Whether a password is set — OAuth-only accounts cannot use password login. */
+  /** Whether a password is set; an account without one signs in through a provider. */
   hasPassword: boolean;
-  /**
-   * Linked OAuth providers, alphabetically. An account can have several: two
-   * providers reporting the same verified address land on the same user.
-   */
+  /** Linked providers, alphabetically. */
   providers: readonly string[];
 }>;
 
 /**
- * The access token never touches storage. It lives in a module variable in the
- * SPA and dies with the tab; the refresh cookie is what survives a reload.
+ * The access token never touches storage: it lives in a module variable in
+ * the browser and dies with the tab. The refresh cookie survives a reload.
  */
 export type AccessGrant = Readonly<{
   accessToken: string;
@@ -233,16 +198,13 @@ export type AccessGrant = Readonly<{
   user: SessionUser;
 }>;
 
-/** Named on its own because the OAuth flow returns this variant and no other. */
+/** The sign-in outcome that asks for a second factor before granting anything. */
 export type TwoFactorChallenge = Readonly<{
   status: "two_factor_required";
   challengeToken: string;
 }>;
 
-/**
- * Sign-in is not one outcome but two, so it is a tagged union rather than a
- * response with half its fields optional.
- */
+/** Sign-in is two outcomes, so it is a tagged union rather than optional fields. */
 export type LoginOutcome =
   | Readonly<{ status: "authenticated"; grant: AccessGrant }>
   | TwoFactorChallenge;
@@ -251,6 +213,6 @@ export type LoginOutcome =
 export type TwoFactorSetup = Readonly<{
   /** `otpauth://` URI for manual entry. */
   uri: string;
-  /** The same URI as an inline SVG QR code, ready to render. */
+  /** The same URI as an inline SVG QR code. */
   qrCodeSvg: string;
 }>;

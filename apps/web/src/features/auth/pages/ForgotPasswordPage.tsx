@@ -1,27 +1,24 @@
+import { ForgotPasswordInput } from "@prism/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link } from "react-router";
 import { match } from "ts-pattern";
-import { z } from "zod";
-import { api } from "../../../shared/api/client.ts";
+import { Api } from "../../../shared/api/client.ts";
 import { Alert, Button, Field } from "../../../shared/ui/index.ts";
 import { AuthShell } from "../components/AuthShell.tsx";
-
-const forgotSchema = z.object({ email: z.string().min(1) });
 
 /** Asks for an address to send a reset link to, and says the same thing either way. */
 export const ForgotPasswordPage = () => {
   const [sent, setSent] = useState(false);
   const form = useForm({
-    resolver: zodResolver(forgotSchema),
+    resolver: zodResolver(ForgotPasswordInput.schema),
     defaultValues: { email: "" },
   });
 
   const submit = form.handleSubmit(async (values) => {
-    // Always reports success. Whether the address exists is not this
-    // endpoint's business to reveal.
-    await api.postEmpty("/auth/password/forgot", values).catch(() => undefined);
+    // Always reports success: whether the address exists is not revealed.
+    await Api.postEmpty("/auth/password/forgot", values).catch(() => undefined);
     setSent(true);
   });
 
@@ -38,8 +35,7 @@ export const ForgotPasswordPage = () => {
       {match(sent)
         .with(true, () => (
           <Alert tone="accent" title="Check your inbox">
-            If that address has an account, a reset link is on its way. It expires
-            in 30 minutes.
+            If that address has an account, a reset link is on its way.
           </Alert>
         ))
         .with(false, () => (

@@ -1,541 +1,262 @@
 /**
- * Every database statement the catalog makes.
- *
- * Reads go through the `product_listing` view rather than the `product` table,
- * so a rating shown to a shopper is always the aggregate of the reviews that
- * exist at that moment. There is no cached rating column that could disagree.
+ * Every database statement the catalog makes. Facets are counted against
+ * the products that match every other active filter, so a choice within one
+ * facet never hides its siblings.
  */
 
 import type {
-  Finish,
+  FacetBucket,
   ProductDetail,
   ProductFacets,
   ProductImage,
-  ProductKind,
   ProductQuery,
-  ProductReview,
-  ProductSpec,
+  ProductSearchResult,
   ProductSummary,
-  ShiftDirection,
+  PropertyFacet,
   Suggestion,
 } from "@prism/shared";
-import {
-  FINISHES,
-  FINISH_LABELS,
-  KIND_LABELS,
-  Option,
-  PRODUCT_KINDS,
-} from "@prism/shared";
-import { asc, count, desc, eq, inArray, min, max, sql, type SQL } from "drizzle-orm";
+import { Dimensions, Weight } from "@prism/shared";
+import { asc, count, eq, ilike, max, min, sql } from "drizzle-orm";
 import type { Database } from "../../db/client.ts";
-import {
-  brands,
-  productImages,
-  productListing,
-  productReviews,
-  products,
-  users,
-} from "../../db/schema.ts";
-import {
-  buildConditions,
-  buildOrderBy,
-  combineConditions,
-  type FacetDimension,
-  finishCondition,
-  RATING_THRESHOLDS,
-  ratingFacetLabel,
-  toOffset,
-} from "./search.ts";
-import { toMeasurements, toProductSpec } from "./spec.ts";
+import { brands, categories, productProperties, productReviews, products } from "../../db/schema.ts";
+import { ProductSearch, type LiftedFacet } from "./search.ts";
 
-type ListingRow = Readonly<{
-  id: string;
-  slug: string;
-  name: string;
-  description: string;
-  priceCents: number;
-  stockQuantity: number;
-  kind: ProductKind;
-  hex: string | null;
-  roughness: number | null;
-  coatingNanometers: number | null;
-  emission: number | null;
-  hue: number | null;
-  saturation: number | null;
-  lightness: number | null;
-  family: string | null;
-  arcDegrees: number | null;
-  direction: ShiftDirection | null;
-  temperatureKelvin: number | null;
-  reachCentimeters: number | null;
-  grainMicrometers: number | null;
-  finisherReachCentimeters: number | null;
-  torqueMillinewtonMeters: number | null;
-  backlashMicrometers: number | null;
-  weightGrams: number;
-  brandSlug: string;
-  brandName: string;
-  ratingAverage: number;
-  ratingCount: number;
-}>;
-
-const LISTING_COLUMNS = {
-  id: productListing.id,
-  slug: productListing.slug,
-  name: productListing.name,
-  description: productListing.description,
-  priceCents: productListing.priceCents,
-  stockQuantity: productListing.stockQuantity,
-  kind: productListing.kind,
-  hex: productListing.hex,
-  roughness: productListing.roughness,
-  coatingNanometers: productListing.coatingNanometers,
-  emission: productListing.emission,
-  hue: productListing.hue,
-  saturation: productListing.saturation,
-  lightness: productListing.lightness,
-  family: productListing.family,
-  arcDegrees: productListing.arcDegrees,
-  direction: productListing.direction,
-  temperatureKelvin: productListing.temperatureKelvin,
-  reachCentimeters: productListing.reachCentimeters,
-  grainMicrometers: productListing.grainMicrometers,
-  finisherReachCentimeters: productListing.finisherReachCentimeters,
-  torqueMillinewtonMeters: productListing.torqueMillinewtonMeters,
-  backlashMicrometers: productListing.backlashMicrometers,
-  weightGrams: productListing.weightGrams,
-  brandSlug: productListing.brandSlug,
-  brandName: productListing.brandName,
-  ratingAverage: productListing.ratingAverage,
-  ratingCount: productListing.ratingCount,
-} as const;
-
-const mediaUrl = (filename: string): string => `/media/${filename}`;
-
-/**
- * The order a product's images are shown in: its stills first, in the order
- * of their angles, then whatever an admin uploaded, in the order it arrived.
- * The first of them is the primary image.
- */
-const GALLERY_ORDER = [asc(productImages.uploaded), asc(productImages.position)] as const;
-
-const toSummary = (
-  row: ListingRow,
-  spec: ProductSpec,
-  primaryImage: Option<ProductImage>,
-): ProductSummary => ({
-  id: row.id,
-  slug: row.slug,
-  name: row.name,
-  spec,
-  // Read off the spec rather than the row, so it is the same value by
-  // construction and not merely by both being right.
-  category: spec.kind,
-  priceCents: row.priceCents,
-  stockQuantity: row.stockQuantity,
-  brand: { slug: row.brandSlug, name: row.brandName },
-  rating: { average: Number(row.ratingAverage), count: row.ratingCount },
-  primaryImage,
-});
-
-/** One page of results, and how many there are in total behind it. */
-export type SearchPage = Readonly<{
-  items: readonly ProductSummary[];
-  total: number;
-}>;
-
-/** Every read and write the catalog module makes against the database. */
+/** Every read the catalog makes. */
 export type CatalogRepository = Readonly<{
-  search: (query: ProductQuery) => Promise<SearchPage>;
-  facets: (query: ProductQuery) => Promise<ProductFacets>;
-  findBySlug: (slug: string) => Promise<Option<ProductDetail>>;
-  suggest: (term: string, limit: number) => Promise<readonly Suggestion[]>;
-  findProductIdBySlug: (slug: string) => Promise<Option<string>>;
-  addImage: (input: {
-    productId: string;
-    filename: string;
-    alt: string;
-  }) => Promise<ProductImage>;
+  search: (query: ProductQuery) => Promise<ProductSearchResult>;
+  suggest: (text: string, limit: number) => Promise<readonly Suggestion[]>;
+  findBySlug: (slug: string) => Promise<ProductDetail | undefined>;
 }>;
 
-/**
- * The repository over a real database.
- *
- * Reads go through the `product_listing` view, so a product arrives with its
- * rating and its measurements already computed.
- */
-export const createCatalogRepository = (db: Database): CatalogRepository => {
-  /** One extra query for all images on the page, rather than one per product. */
-  const primaryImagesFor = async (
-    productIds: readonly string[],
-  ): Promise<ReadonlyMap<string, ProductImage>> => {
-    if (productIds.length === 0) return new Map();
+export const CatalogRepository = {
+  /** Where a stored image file is served from. */
+  imageUrl: (file: string): string => `/media/${file}`,
 
-    const rows = await db
+  create: (db: Database): CatalogRepository => {
+    // One row per reviewed product; a product without reviews joins to nothing.
+    const rating = db
       .select({
-        productId: productImages.productId,
-        filename: productImages.filename,
-        darkFilename: productImages.darkFilename,
-        alt: productImages.alt,
-        position: productImages.position,
+        productId: productReviews.productId,
+        average: sql<number>`avg(${productReviews.rating})::float`.as("average"),
+        count: sql<number>`count(*)::int`.as("count"),
       })
-      .from(productImages)
-      .where(inArray(productImages.productId, [...productIds]))
-      .orderBy(...GALLERY_ORDER);
+      .from(productReviews)
+      .groupBy(productReviews.productId)
+      .as("rating");
 
-    const byProduct = new Map<string, ProductImage>();
+    const ratingColumns = {
+      average: sql`COALESCE(${rating.average}, 0)`,
+      count: sql`COALESCE(${rating.count}, 0)`,
+    };
 
-    for (const row of rows) {
-      if (byProduct.has(row.productId)) continue;
-      byProduct.set(row.productId, {
-        url: mediaUrl(row.filename),
-        darkUrl: mediaUrl(row.darkFilename),
-        alt: row.alt,
-        position: row.position,
-      });
-    }
+    const summaryColumns = {
+      id: products.id,
+      slug: products.slug,
+      name: products.name,
+      priceCents: products.priceCents,
+      stock: products.stock,
+      categorySlug: categories.slug,
+      categoryName: categories.name,
+      brandSlug: brands.slug,
+      brandName: brands.name,
+      images: sql<ProductImage[]>`COALESCE(
+        (SELECT json_agg(json_build_object('url', '/media/' || i.file, 'alt', i.alt) ORDER BY i.position)
+         FROM product_image i WHERE i.product_id = ${products.id}),
+        '[]'::json
+      )`,
+      average: sql<number>`COALESCE(${rating.average}, 0)`,
+      count: sql<number>`COALESCE(${rating.count}, 0)`,
+    };
 
-    return byProduct;
-  };
+    type SummaryRow = Readonly<{
+      id: string;
+      slug: string;
+      name: string;
+      priceCents: number;
+      stock: number;
+      categorySlug: string;
+      categoryName: string;
+      brandSlug: string;
+      brandName: string;
+      images: readonly ProductImage[];
+      average: number;
+      count: number;
+    }>;
 
-  const countWhere = async (where: Option<SQL>): Promise<number> => {
-    const rows = Option.isSome(where)
-      ? await db.select({ total: count() }).from(productListing).where(where.value)
-      : await db.select({ total: count() }).from(productListing);
+    const toSummary = (row: SummaryRow): ProductSummary => ({
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      priceCents: row.priceCents,
+      stock: row.stock,
+      category: { slug: row.categorySlug, name: row.categoryName },
+      brand: { slug: row.brandSlug, name: row.brandName },
+      images: row.images,
+      rating: { average: Math.round(row.average * 10) / 10, count: row.count },
+    });
 
-    return rows[0]?.total ?? 0;
-  };
+    const conditions = (query: ProductQuery, lifted: LiftedFacet) =>
+      ProductSearch.where(ProductSearch.conditions(query, ratingColumns, lifted));
 
-  return {
-    search: async (query) => {
-      const where = combineConditions(buildConditions(query));
-      const orderBy = buildOrderBy(query.sort, query.text);
+    // The same three joins open every query below; drizzle's chain types do
+    // not survive a generic helper, so they are spelled out each time.
+    const bucketsOf = async (query: ProductQuery, lifted: "category" | "brand"): Promise<readonly FacetBucket[]> => {
+      const named = lifted === "category" ? categories : brands;
 
-      const base = db.select(LISTING_COLUMNS).from(productListing);
-      const filtered = Option.isSome(where) ? base.where(where.value) : base;
-
-      const rows = await filtered
-        .orderBy(...orderBy)
-        .limit(query.perPage)
-        .offset(toOffset(query.page, query.perPage));
-
-      const images = await primaryImagesFor(rows.map((row) => row.id));
-
-      // `flatMap` over the spec, so a row the variant constraint could not have
-      // produced is left out rather than shipped half-built. See `spec.ts`.
-      const items = rows.flatMap((row) => {
-        const spec = toProductSpec(row);
-
-        return Option.isSome(spec)
-          ? [toSummary(row, spec.value, Option.fromNullable(images.get(row.id)))]
-          : [];
-      });
-
-      return { items, total: await countWhere(where) };
-    },
-
-    /**
-     * Every dimension is counted against the filters from every *other*
-     * dimension, so ticking a second brand widens the result rather than
-     * emptying it.
-     *
-     * Counts are produced by joining *out* from the dimension's own table with
-     * the filters in the ON clause, so a brand that matches nothing still comes
-     * back with a count of zero. Putting them in a WHERE would drop the row
-     * entirely and the filter rail would reflow every time a box was ticked.
-     */
-    facets: async (query) => {
-      const whereExcept = (dimension: FacetDimension): Option<SQL> =>
-        combineConditions(buildConditions(query, Option.some(dimension)));
-
-      /** Applies a WHERE only when there is one, since Drizzle has no no-op. */
-      const scoped = <A extends { where: (condition: SQL) => A }>(
-        builder: A,
-        where: Option<SQL>,
-      ): A => (Option.isSome(where) ? builder.where(where.value) : builder);
-
-      /** Matching rows only, so `count()` over the join yields 0, not 1. */
-      const joinOn = (link: SQL, where: Option<SQL>): SQL =>
-        Option.match<SQL, SQL>({
-          onSome: (condition) => sql`${link} AND ${condition}`,
-          onNone: () => link,
-        })(where);
-
-      /** The rating dimension's scope as a fragment usable inside FILTER. */
-      const ratingScope: SQL = Option.match<SQL, SQL>({
-        onSome: (condition) => condition,
-        onNone: () => sql`TRUE`,
-      })(whereExcept("rating"));
-
-      /**
-       * One finish counted over the scope that lifts the finishes asked for,
-       * within the range on its own amount.
-       *
-       * `FILTER` rather than one statement each: they are predicates over the
-       * same rows, so one pass answers all of them.
-       */
-      const countWithin = (finish: Finish) =>
-        sql<number>`count(*) FILTER (WHERE ${finishCondition(finish, query)})`.mapWith(Number);
-
-      const [kindRows, brandRows, finishRow, summaryRows] = await Promise.all([
-        scoped(
-          db
-            .select({ value: productListing.kind, total: count() })
-            .from(productListing)
-            .$dynamic(),
-          whereExcept("kind"),
-        ).groupBy(productListing.kind),
-
-        db
-          .select({
-            value: brands.slug,
-            label: brands.name,
-            total: count(productListing.id),
-          })
-          .from(brands)
-          .leftJoin(
-            productListing,
-            joinOn(
-              sql`${productListing.brandId} = ${brands.id}`,
-              whereExcept("brand"),
-            ),
-          )
-          .groupBy(brands.slug, brands.name)
-          .orderBy(asc(brands.name)),
-
-        scoped(
-          db
-            .select({
-              roughness: countWithin("roughness"),
-              iridescent: countWithin("iridescent"),
-              fluorescent: countWithin("fluorescent"),
-            })
-            .from(productListing)
-            .$dynamic(),
-          whereExcept("finish"),
-        ),
-
-        // Price extents and the cumulative rating tiers in one pass.
-        //
-        // The two want different scopes, which is why the rating filter is
-        // interpolated into the FILTER clauses rather than applied as a WHERE:
-        // price extents describe the whole catalog, so the slider's
-        // endpoints stay put while it is dragged, while the rating tiers
-        // describe the set narrowed by every *other* filter.
-        //
-        // `ratingScope` is a Drizzle SQL fragment, so its values are bound
-        // parameters here exactly as they are in a WHERE — nothing is spliced
-        // in as text.
-        db
-          .select({
-            lowest: min(productListing.priceCents),
-            highest: max(productListing.priceCents),
-            atLeast5: sql<number>`count(*) FILTER (WHERE ${productListing.ratingAverage} >= 5 AND ${ratingScope})`,
-            atLeast4: sql<number>`count(*) FILTER (WHERE ${productListing.ratingAverage} >= 4 AND ${ratingScope})`,
-            atLeast3: sql<number>`count(*) FILTER (WHERE ${productListing.ratingAverage} >= 3 AND ${ratingScope})`,
-            atLeast2: sql<number>`count(*) FILTER (WHERE ${productListing.ratingAverage} >= 2 AND ${ratingScope})`,
-            atLeast1: sql<number>`count(*) FILTER (WHERE ${productListing.ratingAverage} >= 1 AND ${ratingScope})`,
-          })
-          .from(productListing),
-      ]);
-
-      const summary = summaryRows[0];
-
-      const cumulativeByThreshold: Record<(typeof RATING_THRESHOLDS)[number], number> = {
-        5: Number(summary?.atLeast5 ?? 0),
-        4: Number(summary?.atLeast4 ?? 0),
-        3: Number(summary?.atLeast3 ?? 0),
-        2: Number(summary?.atLeast2 ?? 0),
-        1: Number(summary?.atLeast1 ?? 0),
-      };
-
-      // Every tier is returned, including empty ones — the rail must not
-      // reflow as filters change.
-      const ratings = RATING_THRESHOLDS.map((threshold) => ({
-        value: String(threshold),
-        label: ratingFacetLabel(threshold),
-        count: cumulativeByThreshold[threshold],
-      }));
-
-      // Same for the categories: the universe is the enum, not whatever
-      // matched.
-      const kindCounts = new Map(
-        kindRows.map((row) => [row.value, Number(row.total)]),
-      );
-
-      return {
-        categories: PRODUCT_KINDS.map((kind) => ({
-          value: kind,
-          label: KIND_LABELS[kind],
-          count: kindCounts.get(kind) ?? 0,
-        })),
-        brands: brandRows.map((row) => ({
-          value: row.value,
-          label: row.label,
-          count: Number(row.total),
-        })),
-        finishes: FINISHES.map((finish) => ({
-          value: finish,
-          label: FINISH_LABELS[finish],
-          count: finishRow[0]?.[finish] ?? 0,
-        })),
-        ratings,
-        priceCents: {
-          min: Number(summary?.lowest ?? 0),
-          max: Number(summary?.highest ?? 0),
-        },
-      };
-    },
-
-    findBySlug: async (slug) => {
-      const rows = await db
-        .select(LISTING_COLUMNS)
-        .from(productListing)
-        .where(eq(productListing.slug, slug))
-        .limit(1);
-
-      const row = rows[0];
-      if (row === undefined) return Option.none;
-
-      const spec = toProductSpec(row);
-      const measurements = toMeasurements(row);
-      if (Option.isNone(spec) || Option.isNone(measurements)) return Option.none;
-
-      const [imageRows, reviewRows] = await Promise.all([
-        db
-          .select({
-            filename: productImages.filename,
-            darkFilename: productImages.darkFilename,
-            alt: productImages.alt,
-            position: productImages.position,
-          })
-          .from(productImages)
-          .where(eq(productImages.productId, row.id))
-          .orderBy(...GALLERY_ORDER),
-        db
-          .select({
-            id: productReviews.id,
-            rating: productReviews.rating,
-            body: productReviews.body,
-            email: users.email,
-            createdAt: productReviews.createdAt,
-          })
-          .from(productReviews)
-          .innerJoin(users, eq(users.id, productReviews.userId))
-          .where(eq(productReviews.productId, row.id))
-          .orderBy(desc(productReviews.createdAt))
-          .limit(20),
-      ]);
-
-      const images: readonly ProductImage[] = imageRows.map((image) => ({
-        url: mediaUrl(image.filename),
-        darkUrl: mediaUrl(image.darkFilename),
-        alt: image.alt,
-        position: image.position,
-      }));
-
-      const reviews: readonly ProductReview[] = reviewRows.map((review) => ({
-        id: review.id,
-        rating: review.rating,
-        body: review.body,
-        // Reviews are public; the reviewer's address is not.
-        authorInitial: review.email.slice(0, 1).toUpperCase(),
-        createdAt: review.createdAt.toISOString(),
-      }));
-
-      const detail: ProductDetail = {
-        ...toSummary(row, spec.value, Option.fromNullable(images[0])),
-        description: row.description,
-        measurements: measurements.value,
-        images,
-        reviews,
-      };
-
-      return Option.some(detail);
-    },
-
-    /**
-     * Typeahead. Trigram similarity rather than full-text search, because a
-     * shopper three letters into "screa…" has not yet typed a whole word and
-     * `to_tsquery` has nothing to match on.
-     */
-    suggest: async (term, limit) => {
-      const pattern = `%${term}%`;
-
-      const [productRows, brandRows] = await Promise.all([
-        db
-          .select({
-            slug: productListing.slug,
-            label: productListing.name,
-            hex: productListing.hex,
-          })
-          .from(productListing)
-          .where(sql`${productListing.name} ILIKE ${pattern}`)
-          .orderBy(
-            desc(sql`similarity(${productListing.name}, ${term})`),
-            asc(productListing.name),
-          )
-          .limit(limit),
-        db
-          .selectDistinct({
-            slug: productListing.brandSlug,
-            label: productListing.brandName,
-          })
-          .from(productListing)
-          .where(sql`${productListing.brandName} ILIKE ${pattern}`)
-          .limit(3),
-      ]);
-
-      const suggestions: Suggestion[] = [
-        ...productRows.map(
-          (row): Suggestion => ({
-            kind: "product",
-            label: row.label,
-            slug: row.slug,
-            // A finisher or a shifter has no swatch to preview.
-            hex: Option.fromNullable(row.hex),
-          }),
-        ),
-        ...brandRows.map(
-          (row): Suggestion => ({
-            kind: "brand",
-            label: row.label,
-            slug: row.slug,
-            hex: Option.none,
-          }),
-        ),
-      ];
-
-      return suggestions.slice(0, limit);
-    },
-
-    findProductIdBySlug: async (slug) => {
-      const rows = await db
-        .select({ id: products.id })
+      return db
+        .select({ value: named.slug, label: named.name, count: count() })
         .from(products)
-        .where(eq(products.slug, slug))
-        .limit(1);
+        .innerJoin(categories, eq(products.categoryId, categories.id))
+        .innerJoin(brands, eq(products.brandId, brands.id))
+        .leftJoin(rating, eq(rating.productId, products.id))
+        .where(conditions(query, lifted))
+        .groupBy(named.slug, named.name)
+        .orderBy(asc(named.name));
+    };
 
-      return Option.map((row: { id: string }) => row.id)(
-        Option.fromNullable(rows[0]),
-      );
-    },
+    const priceOf = async (query: ProductQuery) => {
+      const [row] = await db
+        .select({ min: min(products.priceCents), max: max(products.priceCents) })
+        .from(products)
+        .innerJoin(categories, eq(products.categoryId, categories.id))
+        .innerJoin(brands, eq(products.brandId, brands.id))
+        .leftJoin(rating, eq(rating.productId, products.id))
+        .where(conditions(query, "price"));
 
-    addImage: async ({ productId, filename, alt }) => {
-      const existing = await db
-        .select({ total: count() })
-        .from(productImages)
-        .where(eq(productImages.productId, productId));
+      return { minCents: row?.min ?? 0, maxCents: row?.max ?? 0 };
+    };
 
-      const position = existing[0]?.total ?? 0;
+    const ratingsOf = async (query: ProductQuery): Promise<readonly FacetBucket[]> => {
+      const rows = await db
+        .select({ average: summaryColumns.average, matching: count() })
+        .from(products)
+        .innerJoin(categories, eq(products.categoryId, categories.id))
+        .innerJoin(brands, eq(products.brandId, brands.id))
+        .leftJoin(rating, eq(rating.productId, products.id))
+        .where(conditions(query, "rating"))
+        .groupBy(rating.average);
 
-      // A photograph reads the same under either theme, so it names its one
-      // file for both.
-      await db
-        .insert(productImages)
-        .values({ productId, filename, darkFilename: filename, alt, position, uploaded: true });
+      // Cumulative: a product rated 4.5 counts toward "4 stars & up" and below.
+      return ProductSearch.RATING_THRESHOLDS.map((threshold) => ({
+        value: String(threshold),
+        label: ProductSearch.ratingLabel(threshold),
+        count: rows.reduce((sum, row) => (row.average >= threshold ? sum + row.matching : sum), 0),
+      }));
+    };
 
-      return { url: mediaUrl(filename), darkUrl: mediaUrl(filename), alt, position };
-    },
-  };
-};
+    const propertiesOf = async (query: ProductQuery): Promise<readonly PropertyFacet[]> => {
+      const rows = await db
+        .select({ name: productProperties.name, value: productProperties.value, count: count() })
+        .from(productProperties)
+        .innerJoin(products, eq(productProperties.productId, products.id))
+        .innerJoin(categories, eq(products.categoryId, categories.id))
+        .innerJoin(brands, eq(products.brandId, brands.id))
+        .leftJoin(rating, eq(rating.productId, products.id))
+        .where(conditions(query, "property"))
+        .groupBy(productProperties.name, productProperties.value)
+        .orderBy(asc(productProperties.name), asc(productProperties.value));
+
+      const facets: PropertyFacet[] = [];
+
+      for (const row of rows) {
+        const bucket = { value: row.value, label: row.value, count: row.count };
+        const last = facets[facets.length - 1];
+
+        if (last !== undefined && last.name === row.name) {
+          facets[facets.length - 1] = { name: last.name, buckets: [...last.buckets, bucket] };
+        } else {
+          facets.push({ name: row.name, buckets: [bucket] });
+        }
+      }
+
+      return facets;
+    };
+
+    return {
+      search: async (query) => {
+        const [rows, categoryBuckets, brandBuckets, price, ratings, properties] = await Promise.all([
+          db
+            .select({ ...summaryColumns, total: sql<number>`(count(*) OVER ())::int` })
+            .from(products)
+            .innerJoin(categories, eq(products.categoryId, categories.id))
+            .innerJoin(brands, eq(products.brandId, brands.id))
+            .leftJoin(rating, eq(rating.productId, products.id))
+            .where(conditions(query, "none"))
+            .orderBy(...ProductSearch.orderBy(query, ratingColumns))
+            .limit(query.perPage)
+            .offset(ProductSearch.offset(query)),
+          bucketsOf(query, "category"),
+          bucketsOf(query, "brand"),
+          priceOf(query),
+          ratingsOf(query),
+          propertiesOf(query),
+        ]);
+
+        const total = rows[0]?.total ?? 0;
+        const facets: ProductFacets = {
+          categories: categoryBuckets,
+          brands: brandBuckets,
+          ratings,
+          price,
+          properties,
+        };
+
+        return {
+          items: rows.map(toSummary),
+          facets,
+          total,
+          page: query.page,
+          perPage: query.perPage,
+          totalPages: ProductSearch.totalPages(total, query.perPage),
+        };
+      },
+
+      suggest: (text, limit) =>
+        db
+          .select({ slug: products.slug, name: products.name })
+          .from(products)
+          .where(ilike(products.name, ProductSearch.likePattern(text)))
+          .orderBy(...ProductSearch.suggestionOrder(text))
+          .limit(limit),
+
+      findBySlug: async (slug) => {
+        const [row] = await db
+          .select({ ...summaryColumns, description: products.description })
+          .from(products)
+          .innerJoin(categories, eq(products.categoryId, categories.id))
+          .innerJoin(brands, eq(products.brandId, brands.id))
+          .leftJoin(rating, eq(rating.productId, products.id))
+          .where(eq(products.slug, slug))
+          .limit(1);
+
+        if (row === undefined) return undefined;
+
+        const [measures, properties] = await Promise.all([
+          db.query.products.findFirst({
+            columns: { weightGrams: true, widthMm: true, heightMm: true, depthMm: true },
+            where: eq(products.id, row.id),
+          }),
+          db.query.productProperties.findMany({
+            columns: { name: true, value: true },
+            where: eq(productProperties.productId, row.id),
+            orderBy: asc(productProperties.name),
+          }),
+        ]);
+
+        if (measures === undefined) return undefined;
+
+        return {
+          ...toSummary(row),
+          description: row.description,
+          properties,
+          weight: Weight.fromGrams(measures.weightGrams),
+          dimensions: Dimensions.fromMillimeters({
+            width: measures.widthMm,
+            height: measures.heightMm,
+            depth: measures.depthMm,
+          }),
+        };
+      },
+    };
+  },
+} as const;

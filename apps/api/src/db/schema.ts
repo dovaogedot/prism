@@ -1,20 +1,23 @@
 /**
- * The Drizzle schema is the query surface — it gives every column a compile-time
- * type. The DDL itself lives in hand-written SQL under `migrations/`, because
- * this database needs extensions, IMMUTABLE functions, generated columns built
- * on those functions, GIN indexes and a view. Generating that and then editing
- * it by hand would be two sources of truth; the SQL is the one.
+ * The database schema, and the one source the DDL is generated from.
+ *
+ * `drizzle-kit generate` turns this file into the SQL under `drizzle/`, and
+ * the migrator applies that SQL at start. Tables, enums and relations are
+ * top-level exports because drizzle-kit reads the module's exports.
+ *
+ * Nothing here knows what the shop sells. A product is a name, a price,
+ * stock, a category, a brand, its measurements and a bag of named
+ * properties; every filter is derived from those rows.
  */
 
-import { sql } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
-  boolean,
+  check,
   customType,
   index,
   integer,
-  pgEnum,
   pgTable,
-  pgView,
+  primaryKey,
   smallint,
   text,
   timestamp,
@@ -22,69 +25,52 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-/** Postgres full-text search vectors. Drizzle has no built-in for these. */
+/** Postgres full-text search vectors, which drizzle has no built-in for. */
 const tsvector = customType<{ data: string; driverData: string }>({
   dataType: () => "tsvector",
 });
 
-/** Aggregates arrive from the driver as strings; the mapper turns them into numbers. */
-const numericAsNumber = customType<{ data: number; driverData: string }>({
-  dataType: () => "numeric",
-  fromDriver: (value) => Number(value),
-});
+/* ----------------------------------------------------------------- identity */
 
-const primaryId = () => uuid("id").primaryKey().defaultRandom();
-const createdAt = () =>
-  timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
-
-/** What an account is allowed to reach. */
-export const userRole = pgEnum("user_role", ["customer", "admin"]);
-/** The discriminant of the product union; also the slug of its category. */
-export const productKind = pgEnum("product_kind", [
-  "color",
-  "finisher",
-  "shifter",
-]);
-/** Which way round the wheel a shifter turns. */
-export const shiftDirection = pgEnum("shift_direction", ["cw", "ccw"]);
-
-/* ------------------------------------------------------------------ identity */
-
-/** `user` is reserved in Postgres, hence `app_user`. */
+/** Accounts. `user` is reserved in Postgres, hence `app_user`. */
 export const users = pgTable(
   "app_user",
   {
-    id: primaryId(),
+    id: uuid("id").primaryKey().defaultRandom(),
     email: text("email").notNull(),
-    /** Absent for accounts that only ever signed in with Google. */
+    /** Null for an account that only ever signed in through a provider. */
     passwordHash: text("password_hash"),
-    role: userRole("role").notNull().default("customer"),
     /** Present once setup begins; confirmed only when `totpEnabledAt` is set. */
     totpSecret: text("totp_secret"),
     totpEnabledAt: timestamp("totp_enabled_at", { withTimezone: true }),
-    createdAt: createdAt(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [uniqueIndex("app_user_email_key").on(table.email)],
+  (table) => [
+    uniqueIndex("app_user_email_key").on(table.email),
+    check("app_user_email_lowercase", sql`${table.email} = lower(${table.email})`),
+    check("app_user_email_shape", sql`${table.email} LIKE '%_@_%'`),
+    check(
+      "app_user_totp_needs_secret",
+      sql`${table.totpEnabledAt} IS NULL OR ${table.totpSecret} IS NOT NULL`,
+    ),
+  ],
 );
 
 /** One provider account linked to one user. A user may have several. */
 export const oauthIdentities = pgTable(
   "oauth_identity",
   {
-    id: primaryId(),
+    id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     provider: text("provider").notNull(),
-    /** The provider's immutable user identifier — never the email. */
+    /** The provider's immutable user identifier, never the email. */
     subject: text("subject").notNull(),
-    createdAt: createdAt(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex("oauth_identity_provider_subject_key").on(
-      table.provider,
-      table.subject,
-    ),
+    uniqueIndex("oauth_identity_provider_subject_key").on(table.provider, table.subject),
     index("oauth_identity_user_idx").on(table.userId),
   ],
 );
@@ -97,19 +83,27 @@ export const oauthIdentities = pgTable(
 export const sessions = pgTable(
   "session",
   {
-    id: primaryId(),
+    id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    createdAt: createdAt(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
-    /** `logout` | `token_reuse` | `password_reset` — why the session ended. */
+    /** `logout` | `token_reuse` | `password_reset`: why the session ended. */
     revokedReason: text("revoked_reason"),
     userAgent: text("user_agent").notNull().default(""),
     ipAddress: text("ip_address").notNull().default(""),
   },
-  (table) => [index("session_user_idx").on(table.userId)],
+  (table) => [
+    index("session_user_idx").on(table.userId),
+    // The guard's hot path: is this session live right now?
+    index("session_live_idx").on(table.id).where(sql`${table.revokedAt} IS NULL`),
+    check(
+      "session_revocation_has_reason",
+      sql`(${table.revokedAt} IS NULL) = (${table.revokedReason} IS NULL)`,
+    ),
+  ],
 );
 
 /**
@@ -119,13 +113,13 @@ export const sessions = pgTable(
 export const refreshTokens = pgTable(
   "refresh_token",
   {
-    id: primaryId(),
+    id: uuid("id").primaryKey().defaultRandom(),
     sessionId: uuid("session_id")
       .notNull()
       .references(() => sessions.id, { onDelete: "cascade" }),
     /** SHA-256 of the token. A database leak must not yield usable tokens. */
     tokenHash: text("token_hash").notNull(),
-    createdAt: createdAt(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     usedAt: timestamp("used_at", { withTimezone: true }),
   },
@@ -139,12 +133,12 @@ export const refreshTokens = pgTable(
 export const passwordResetTokens = pgTable(
   "password_reset_token",
   {
-    id: primaryId(),
+    id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     tokenHash: text("token_hash").notNull(),
-    createdAt: createdAt(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     usedAt: timestamp("used_at", { withTimezone: true }),
   },
@@ -154,281 +148,168 @@ export const passwordResetTokens = pgTable(
   ],
 );
 
-/* ----------------------------------------------------------------- catalog */
+/* ------------------------------------------------------------------ catalog */
 
-/** The pigment foundries products are sold under. */
+/** Where a product is filed. */
+export const categories = pgTable(
+  "category",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+  },
+  (table) => [uniqueIndex("category_slug_key").on(table.slug)],
+);
+
+/** Who makes a product. */
 export const brands = pgTable(
   "brand",
   {
-    id: primaryId(),
+    id: uuid("id").primaryKey().defaultRandom(),
     slug: text("slug").notNull(),
     name: text("name").notNull(),
-    description: text("description").notNull().default(""),
-    searchVector: tsvector("search_vector")
-      .notNull()
-      .generatedAlwaysAs(sql`to_tsvector('english', name || ' ' || description)`),
   },
   (table) => [uniqueIndex("brand_slug_key").on(table.slug)],
 );
 
-/**
- * What every product has, whichever of the three it is.
- *
- * `kind` is the discriminant and nothing else here varies by it, so there is no
- * nullable column and no CHECK deciding which ones apply. What varies lives in
- * `colors`, `finishers` and `shifters`, one row each, keyed back to this one.
- */
+/** Anything the shop sells. Measurements are metric; the API derives imperial. */
 export const products = pgTable(
   "product",
   {
-    id: primaryId(),
+    id: uuid("id").primaryKey().defaultRandom(),
     slug: text("slug").notNull(),
     name: text("name").notNull(),
     description: text("description").notNull(),
     priceCents: integer("price_cents").notNull(),
-    stockQuantity: integer("stock_quantity").notNull().default(0),
+    stock: integer("stock").notNull().default(0),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => categories.id, { onDelete: "restrict" }),
     brandId: uuid("brand_id")
       .notNull()
       .references(() => brands.id, { onDelete: "restrict" }),
-    /** Which of the three this is, and which sub-table therefore holds its rest. */
-    kind: productKind("kind").notNull(),
-    searchVector: tsvector("search_vector")
+    weightGrams: integer("weight_grams").notNull(),
+    widthMm: integer("width_mm").notNull(),
+    heightMm: integer("height_mm").notNull(),
+    depthMm: integer("depth_mm").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** What full-text search matches: the name weighted above the description. */
+    search: tsvector("search")
       .notNull()
       .generatedAlwaysAs(
         sql`setweight(to_tsvector('english', name), 'A') || setweight(to_tsvector('english', description), 'C')`,
       ),
-    createdAt: createdAt(),
   },
   (table) => [
     uniqueIndex("product_slug_key").on(table.slug),
+    index("product_category_idx").on(table.categoryId),
     index("product_brand_idx").on(table.brandId),
     index("product_price_idx").on(table.priceCents),
-    index("product_kind_idx").on(table.kind),
+    index("product_search_idx").using("gin", table.search),
+    check("product_price_not_negative", sql`${table.priceCents} >= 0`),
+    check("product_stock_not_negative", sql`${table.stock} >= 0`),
+    check(
+      "product_measures_positive",
+      sql`${table.weightGrams} > 0 AND ${table.widthMm} > 0 AND ${table.heightMm} > 0 AND ${table.depthMm} > 0`,
+    ),
   ],
 );
 
 /**
- * A color: one hex, and the three amounts of finish its surface carries.
- *
- * Everything else about it — where it sits in HSL, which family it belongs to,
- * how hot it burns, how far it reads, what it weighs — is generated from those
- * four, so the application can write none of it.
+ * One named fact about one product. The names are data: whatever the rows
+ * say a product has is what the facets offer.
  */
-export const colors = pgTable("color", {
-  productId: uuid("product_id").primaryKey(),
-  /** Always `color`; it is half of the key back to a product of that kind. */
-  kind: productKind("kind").notNull().default("color"),
-
-  hex: text("hex").notNull(),
-  /** 5 is a mirror, 95 is chalk. */
-  roughness: smallint("roughness").notNull(),
-  /**
-   * Nanometers of interference coating. Zero is bare paint.
-   *
-   * Which colors it shows follows from the thickness and the refractive index
-   * of the material, so neither they nor the arc they walk is stored.
-   */
-  coatingNanometers: smallint("coating_nanometers").notNull(),
-  /** How hard the pigment gives off its own light. Zero for most colors. */
-  emission: smallint("emission").notNull(),
-
-  hue: smallint("hue").generatedAlwaysAs(sql`hex_to_hue(hex)`),
-  saturation: smallint("saturation").generatedAlwaysAs(sql`hex_to_saturation(hex)`),
-  lightness: smallint("lightness").generatedAlwaysAs(sql`hex_to_lightness(hex)`),
-  /** The nearest landmark in RGB space, which is what a family name is. */
-  family: text("family").generatedAlwaysAs(sql`color_family(hex)`),
-
-  temperatureKelvin: smallint("temperature_kelvin").generatedAlwaysAs(
-    sql`hex_to_temperature(hex)`,
-  ),
-  reachCentimeters: integer("reach_centimeters").generatedAlwaysAs(
-    sql`color_reach(hex, roughness, emission)`,
-  ),
-  weightGrams: integer("weight_grams").generatedAlwaysAs(sql`hex_to_weight(hex)`),
-});
-
-/**
- * A finisher: the one thing it does, in the column that says which.
- *
- * Exactly one of the three amounts is present and the other two are absent, so
- * what a finisher is needs no threshold to recover and no extra column to declare —
- * `finisher_does_one_thing` in the database counts them. Its dimension follows
- * the same column, since a finisher that changes no texture has no grain to quote.
- */
-export const finishers = pgTable("finisher", {
-  productId: uuid("product_id").primaryKey(),
-  /** Always `finisher`; it is half of the key back to a product of that kind. */
-  kind: productKind("kind").notNull().default("finisher"),
-
-  /** 5 is a mirror, 95 is chalk. Present on a finisher sold for the surface it leaves. */
-  roughness: smallint("roughness"),
-  /** Nanometers of interference coating it lays down. */
-  coatingNanometers: smallint("coating_nanometers"),
-  /** How hard it makes a pigment give off its own light. */
-  emission: smallint("emission"),
-
-  grainMicrometers: smallint("grain_micrometers").generatedAlwaysAs(
-    sql`finish_grain(roughness)`,
-  ),
-  reachCentimeters: integer("reach_centimeters").generatedAlwaysAs(
-    sql`emission_reach(emission)`,
-  ),
-  weightGrams: integer("weight_grams").generatedAlwaysAs(
-    sql`finisher_weight(roughness, coating_nanometers, emission)`,
-  ),
-});
-
-/** A shifter: which way round the wheel it turns a color, and how far. */
-export const shifters = pgTable("shifter", {
-  productId: uuid("product_id").primaryKey(),
-  /** Always `shifter`; it is half of the key back to a product of that kind. */
-  kind: productKind("kind").notNull().default("shifter"),
-
-  direction: shiftDirection("direction").notNull(),
-  arcDegrees: smallint("arc_degrees").notNull(),
-
-  torqueMillinewtonMeters: integer("torque_millinewton_meters").generatedAlwaysAs(
-    sql`shift_torque(arc_degrees)`,
-  ),
-  backlashMicrometers: integer("backlash_micrometers").generatedAlwaysAs(
-    sql`shift_backlash(direction, arc_degrees)`,
-  ),
-  weightGrams: integer("weight_grams").generatedAlwaysAs(
-    sql`shift_weight(direction, arc_degrees)`,
-  ),
-});
-
-/** The images of a product, in the order they are shown. */
-export const productImages = pgTable(
-  "product_image",
+export const productProperties = pgTable(
+  "product_property",
   {
-    id: primaryId(),
     productId: uuid("product_id")
       .notNull()
       .references(() => products.id, { onDelete: "cascade" }),
-    /**
-     * The picture under the light theme, and under both where it does not
-     * change with the theme. Content-addressed, on the media volume.
-     */
-    filename: text("filename").notNull(),
-    /**
-     * The same picture under the dark theme.
-     *
-     * A still of a product's scene is rendered once per theme. A photograph
-     * reads the same under both, and names the file in `filename` here too.
-     */
-    darkFilename: text("dark_filename").notNull(),
+    name: text("name").notNull(),
+    value: text("value").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.productId, table.name] }),
+    index("product_property_name_value_idx").on(table.name, table.value),
+  ],
+);
+
+/** The pictures of a product, in the order they are shown. */
+export const productImages = pgTable(
+  "product_image",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    /** The file's name under the media directory. */
+    file: text("file").notNull(),
     alt: text("alt").notNull().default(""),
     position: integer("position").notNull().default(0),
-    /**
-     * Whether an admin uploaded the picture.
-     *
-     * Every other image of a product is one of its stills, which the seed
-     * replaces whenever its file in `apps/api/stills` changes.
-     */
-    uploaded: boolean("uploaded").notNull().default(false),
-    createdAt: createdAt(),
   },
-  (table) => [index("product_image_product_idx").on(table.productId)],
+  (table) => [uniqueIndex("product_image_position_key").on(table.productId, table.position)],
 );
 
 /** What shoppers said. One review per person per product. */
 export const productReviews = pgTable(
   "product_review",
   {
-    id: primaryId(),
+    id: uuid("id").primaryKey().defaultRandom(),
     productId: uuid("product_id")
       .notNull()
       .references(() => products.id, { onDelete: "cascade" }),
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    /** Whole stars, 1 to 5. */
     rating: smallint("rating").notNull(),
-    body: text("body").notNull().default(""),
-    createdAt: createdAt(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     uniqueIndex("product_review_one_per_user_key").on(table.productId, table.userId),
     index("product_review_product_idx").on(table.productId),
+    check("product_review_rating_range", sql`${table.rating} BETWEEN 1 AND 5`),
   ],
 );
 
-/**
- * A product with its variant, its foundry and its rating already joined, so a
- * search reads one relation instead of four.
- *
- * Ratings are aggregated here rather than stored on `product`, so a rating can
- * never disagree with the reviews it came from. The three finish amounts are
- * COALESCEd across the two kinds that carry them, so a filter on roughness
- * finds it wherever it lives. If this ever needs to be fast, `MATERIALIZED` is
- * the only word that changes — no application code moves.
- */
-export const productListing = pgView("product_listing", {
-  id: uuid("id").notNull(),
-  slug: text("slug").notNull(),
-  name: text("name").notNull(),
-  description: text("description").notNull(),
-  priceCents: integer("price_cents").notNull(),
-  stockQuantity: integer("stock_quantity").notNull(),
-  kind: productKind("kind").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
-  searchVector: tsvector("search_vector").notNull(),
+/* ---------------------------------------------------------------- relations */
 
-  hex: text("hex"),
-  hue: smallint("hue"),
-  saturation: smallint("saturation"),
-  lightness: smallint("lightness"),
-  family: text("family"),
-  temperatureKelvin: smallint("temperature_kelvin"),
-  reachCentimeters: integer("reach_centimeters"),
+/** What `db.query.products` can join in one call. */
+export const productRelations = relations(products, ({ one, many }) => ({
+  category: one(categories, { fields: [products.categoryId], references: [categories.id] }),
+  brand: one(brands, { fields: [products.brandId], references: [brands.id] }),
+  images: many(productImages),
+  properties: many(productProperties),
+  reviews: many(productReviews),
+}));
 
-  roughness: smallint("roughness"),
-  coatingNanometers: smallint("coating_nanometers"),
-  emission: smallint("emission"),
-  grainMicrometers: smallint("grain_micrometers"),
-  finisherReachCentimeters: integer("finisher_reach_centimeters"),
+export const productImageRelations = relations(productImages, ({ one }) => ({
+  product: one(products, { fields: [productImages.productId], references: [products.id] }),
+}));
 
-  direction: shiftDirection("direction"),
-  arcDegrees: smallint("arc_degrees"),
-  torqueMillinewtonMeters: integer("torque_millinewton_meters"),
-  backlashMicrometers: integer("backlash_micrometers"),
+export const productPropertyRelations = relations(productProperties, ({ one }) => ({
+  product: one(products, { fields: [productProperties.productId], references: [products.id] }),
+}));
 
-  weightGrams: integer("weight_grams").notNull(),
+export const productReviewRelations = relations(productReviews, ({ one }) => ({
+  product: one(products, { fields: [productReviews.productId], references: [products.id] }),
+}));
 
-  brandId: uuid("brand_id").notNull(),
-  brandSlug: text("brand_slug").notNull(),
-  brandName: text("brand_name").notNull(),
-  brandSearchVector: tsvector("brand_search_vector").notNull(),
-
-  ratingAverage: numericAsNumber("rating_average").notNull(),
-  ratingCount: integer("rating_count").notNull(),
-}).existing();
-
-/** Which schema files have run, so a rerun applies only what is new. */
-export const schemaMigrations = pgTable("schema_migration", {
-  name: text("name").primaryKey(),
-  appliedAt: createdAt(),
-  /** SHA-256 of the file as it ran, as lowercase hex; a rerun refuses a file that reads differently. */
-  checksum: text("checksum"),
-});
-
-/** Every table and view, as the query builder is typed against. */
+/** Every table and relation, as the query builder is typed against. */
 export const schema = {
   users,
   oauthIdentities,
   sessions,
   refreshTokens,
   passwordResetTokens,
+  categories,
   brands,
   products,
-  colors,
-  finishers,
-  shifters,
+  productProperties,
   productImages,
   productReviews,
-  productListing,
-  schemaMigrations,
+  productRelations,
+  productImageRelations,
+  productPropertyRelations,
+  productReviewRelations,
 };
-
-/** Re-exported so query files can build raw fragments without another import. */
-export { sql };

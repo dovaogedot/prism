@@ -1,14 +1,7 @@
 /**
- * CAPTCHA verification for registration.
- *
- * Google publishes a site/secret key pair that always verifies successfully,
- * intended for exactly this situation: the widget in the browser is the real
- * reCAPTCHA widget, and the check here is the real check, but neither needs an
- * account to exist. `test` mode short-circuits the network call and accepts any
- * non-empty response, which is what Google's test secret does anyway.
- *
- * Supply RECAPTCHA_SECRET_KEY and the same code path verifies for real. There
- * is no mode to set beside it: the key's presence is the mode.
+ * CAPTCHA verification for registration. Google publishes a site/secret key
+ * pair that always verifies, so the widget and the check are real with no
+ * account; supply a secret key and the same code path verifies for real.
  */
 
 import type { DomainError } from "@prism/shared";
@@ -19,45 +12,42 @@ export type CaptchaVerifier = Readonly<{
   verify: (response: string, remoteIp: string) => ResultAsync<true, DomainError>;
 }>;
 
-/** Google's documented always-pass test secret, which accepts every response. */
-export const RECAPTCHA_TEST_SECRET_KEY = "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe";
+export const CaptchaVerifier = {
+  /** Google's documented always-pass test secret, which accepts every response. */
+  TEST_SECRET_KEY: "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe",
+  SITEVERIFY_URL: "https://www.google.com/recaptcha/api/siteverify",
+  rejected: { _tag: "CaptchaRejected" } as DomainError,
 
-const SITEVERIFY_URL = "https://www.google.com/recaptcha/api/siteverify";
+  /** Accepts any non-empty response without a network call. */
+  test: (): CaptchaVerifier => ({
+    verify: (response) =>
+      response.trim().length > 0 ? okAsync(true) : errAsync(CaptchaVerifier.rejected),
+  }),
 
-const rejected: DomainError = { _tag: "CaptchaRejected" };
+  /** Asks Google about the response. A verification that cannot be made is a rejection. */
+  google: (secretKey: string): CaptchaVerifier => ({
+    verify: (response, remoteIp) => {
+      if (response.trim().length === 0) return errAsync(CaptchaVerifier.rejected);
 
-/** Accepts any non-empty response without a network call. */
-export const createTestCaptchaVerifier = (): CaptchaVerifier => ({
-  verify: (response) =>
-    response.trim().length > 0 ? okAsync(true) : errAsync(rejected),
-});
+      const body = new URLSearchParams({ secret: secretKey, response });
+      if (remoteIp.length > 0) body.set("remoteip", remoteIp);
 
-const isSuccessfulVerification = (payload: unknown): boolean =>
-  typeof payload === "object" &&
-  payload !== null &&
-  "success" in payload &&
-  payload.success === true;
-
-/** Asks Google about the response. A verification that cannot be made is a rejection. */
-export const createGoogleCaptchaVerifier = (
-  secretKey: string,
-): CaptchaVerifier => ({
-  verify: (response, remoteIp) => {
-    if (response.trim().length === 0) return errAsync(rejected);
-
-    const body = new URLSearchParams({ secret: secretKey, response });
-    if (remoteIp.length > 0) body.set("remoteip", remoteIp);
-
-    return ResultAsync.fromPromise(
-      fetch(SITEVERIFY_URL, {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body,
-        signal: AbortSignal.timeout(5000),
-      }).then((httpResponse) => httpResponse.json()),
-      () => rejected,
-    ).andThen((payload) =>
-      isSuccessfulVerification(payload) ? okAsync(true as const) : errAsync(rejected),
-    );
-  },
-});
+      return ResultAsync.fromPromise(
+        fetch(CaptchaVerifier.SITEVERIFY_URL, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body,
+          signal: AbortSignal.timeout(5000),
+        }).then((httpResponse): Promise<unknown> => httpResponse.json()),
+        () => CaptchaVerifier.rejected,
+      ).andThen((payload) =>
+        typeof payload === "object" &&
+        payload !== null &&
+        "success" in payload &&
+        payload.success === true
+          ? okAsync(true as const)
+          : errAsync(CaptchaVerifier.rejected),
+      );
+    },
+  }),
+} as const;

@@ -1,223 +1,153 @@
 /**
  * The HTTP client.
  *
- * Two things make it more than a `fetch` wrapper:
- *
- * 1. Every non-2xx response is decoded into the same `DomainError` the server
- *    produced, so the UI matches on a tag rather than parsing prose.
- * 2. A 401 triggers exactly one refresh attempt, and concurrent 401s share it.
- *    Without the sharing, a page that fires five queries at once would rotate
- *    the refresh token five times — and since rotation is single-use, four of
- *    those would look like a replay and revoke the session.
+ * Every non-2xx response is decoded into the `ErrorResponse` the server
+ * produced, so the UI reads a code and a sentence rather than parsing prose.
+ * A 401 triggers exactly one refresh attempt, and concurrent 401s share it:
+ * rotation is single-use, so several refreshes at once would look like a
+ * replay and revoke the session.
  */
 
-import {
-  httpStatusByTag,
-  Option,
-  TAGLESS_ERRORS,
-  type AccessGrant,
-  type DomainError,
-  type TaglessDomainErrorTag,
-  type ValidationIssue,
-} from "@prism/shared";
-import { tokenStore } from "../../features/auth/token-store.ts";
+import type { AccessGrant, ErrorResponse } from "@prism/shared";
+import { TokenStore } from "../../features/auth/token-store.ts";
 
-const BASE = "/api/v1";
-
-/** A request the API refused, and what it refused it with. */
-export type ApiFailure = Readonly<{
-  error: DomainError;
-  status: number;
-}>;
-
-/** The failure as something `throw` accepts, since that is what fetch callers catch. */
+/** A request the API refused, as something `throw` accepts. */
 export class ApiError extends Error {
-  readonly failure: ApiFailure;
+  readonly status: number;
+  readonly failure: ErrorResponse["error"];
 
-  constructor(failure: ApiFailure) {
-    super(failure.error._tag);
+  constructor(status: number, failure: ErrorResponse["error"]) {
+    super(failure.message);
     this.name = "ApiError";
+    this.status = status;
     this.failure = failure;
   }
 }
 
-const isErrorEnvelope = (
-  payload: unknown,
-): payload is Readonly<{
-  error: { code: string; message: string; issues?: readonly ValidationIssue[] };
-}> =>
+/** What a request may carry beyond its path. */
+export type RequestOptions = Readonly<{
+  method?: string;
+  body?: unknown;
+  /** False for endpoints where a 401 is the answer, like sign-in. */
+  retryOnUnauthorized?: boolean;
+  signal?: AbortSignal;
+}>;
+
+/** The one refresh in flight, shared by every 401 that arrives while it runs. */
+const Refresh: { inFlight: Promise<boolean> | undefined } = { inFlight: undefined };
+
+/** The response body of a refusal, when the server produced one. */
+const isErrorResponse = (payload: unknown): payload is ErrorResponse =>
   typeof payload === "object" &&
   payload !== null &&
   "error" in payload &&
   typeof payload.error === "object" &&
   payload.error !== null &&
   "code" in payload.error &&
-  typeof payload.error.code === "string";
+  typeof payload.error.code === "string" &&
+  "message" in payload.error &&
+  typeof payload.error.message === "string" &&
+  "issues" in payload.error &&
+  Array.isArray(payload.error.issues);
 
-/**
- * `ValidationFailed` is the one variant carrying data, so it is excluded here
- * and handled separately. Every remaining variant is `{ _tag }` alone, which
- * is what lets `{ _tag: code }` typecheck against the union without a cast.
- *
- * The status table's keys are precisely the set of valid tags, so it doubles
- * as the runtime guard — an unrecognized code from a newer server degrades to
- * a generic failure rather than a bogus tag.
- */
-const isTaglessErrorTag = (code: string): code is TaglessDomainErrorTag =>
-  code !== "ValidationFailed" && Object.hasOwn(httpStatusByTag, code);
+export const Api = {
+  BASE: "/api/v1",
 
-const toDomainError = (payload: unknown): DomainError => {
-  if (!isErrorEnvelope(payload)) return { _tag: "Conflict" };
+  /** What a refusal without a readable body is reported as. */
+  UNREADABLE: {
+    code: "InternalError",
+    message: "Something went wrong at our end.",
+    issues: [],
+  } satisfies ErrorResponse["error"],
 
-  const code = payload.error.code;
+  /** Sends one request with the bearer token, if any. */
+  send: async (path: string, options: RequestOptions): Promise<Response> => {
+    const token = TokenStore.get();
+    const headers: Record<string, string> = {};
 
-  // ValidationFailed is the one variant carrying data, so it is rebuilt
-  // rather than just re-tagged.
-  if (code === "ValidationFailed") {
-    return { _tag: "ValidationFailed", issues: payload.error.issues ?? [] };
-  }
+    if (options.body !== undefined) headers["content-type"] = "application/json";
+    if (token !== undefined) headers["authorization"] = `Bearer ${token}`;
 
-  return isTaglessErrorTag(code) ? TAGLESS_ERRORS[code] : TAGLESS_ERRORS.Conflict;
-};
+    return fetch(`${Api.BASE}${path}`, {
+      method: options.method ?? "GET",
+      headers,
+      // The refresh cookie is same-origin; Caddy puts the API behind /api.
+      credentials: "same-origin",
+      body: options.body === undefined ? null : JSON.stringify(options.body),
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
+    });
+  },
 
-/** In flight while a refresh is happening; every 401 waits on this one promise. */
-let refreshInFlight: Option<Promise<boolean>> = Option.none;
+  /**
+   * Trades the refresh cookie for a fresh access token. Concurrent callers
+   * share one attempt.
+   */
+  refresh: (): Promise<boolean> => {
+    if (Refresh.inFlight !== undefined) return Refresh.inFlight;
 
-const performRefresh = async (): Promise<boolean> => {
-  const response = await fetch(`${BASE}/auth/refresh`, {
-    method: "POST",
-    credentials: "same-origin",
-  });
+    const attempt = fetch(`${Api.BASE}/auth/refresh`, { method: "POST", credentials: "same-origin" })
+      .then(async (response) => {
+        if (!response.ok) {
+          TokenStore.clear();
+          return false;
+        }
 
-  if (!response.ok) {
-    tokenStore.clear();
-    return false;
-  }
+        const grant: AccessGrant = await response.json();
+        TokenStore.set(grant.accessToken, grant.user);
+        return true;
+      })
+      .finally(() => {
+        Refresh.inFlight = undefined;
+      });
 
-  const grant: AccessGrant = await response.json();
-  tokenStore.set(grant.accessToken, grant.user);
-  return true;
-};
+    Refresh.inFlight = attempt;
+    return attempt;
+  },
 
-/**
- * Trades the refresh cookie for a fresh access token.
- *
- * Concurrent callers share one attempt, because several refreshes at once are
- * several replays of a single-use token.
- */
-export const refreshSession = (): Promise<boolean> => {
-  if (Option.isSome(refreshInFlight)) return refreshInFlight.value;
+  /** Sends, retries once on 401, and throws an `ApiError` on any refusal. */
+  exchange: async (path: string, options: RequestOptions): Promise<Response> => {
+    let response = await Api.send(path, options);
 
-  const attempt = performRefresh().finally(() => {
-    refreshInFlight = Option.none;
-  });
+    if (response.status === 401 && options.retryOnUnauthorized !== false) {
+      const refreshed = await Api.refresh();
+      if (refreshed) response = await Api.send(path, options);
+    }
 
-  refreshInFlight = Option.some(attempt);
-  return attempt;
-};
+    if (!response.ok) {
+      const payload: unknown = await response.json().catch(() => null);
+      throw new ApiError(response.status, isErrorResponse(payload) ? payload.error : Api.UNREADABLE);
+    }
 
-type RequestOptions = Readonly<{
-  method?: string;
-  body?: unknown;
-  /** Set for endpoints that must not silently retry, like sign-in. */
-  retryOnUnauthorized?: boolean;
-  signal?: AbortSignal;
-}>;
+    return response;
+  },
 
-const send = async (path: string, options: RequestOptions): Promise<Response> => {
-  const token = tokenStore.get();
+  /** A request whose body is decoded as JSON. */
+  request: async <A>(path: string, options: RequestOptions = {}): Promise<A> => {
+    const response = await Api.exchange(path, options);
+    return response.json();
+  },
 
-  const headers: Record<string, string> = {};
-  if (options.body !== undefined) headers["content-type"] = "application/json";
-  if (Option.isSome(token)) headers["authorization"] = `Bearer ${token.value}`;
+  /** A request whose 204 has no body to decode. */
+  requestEmpty: async (path: string, options: RequestOptions = {}): Promise<void> => {
+    await Api.exchange(path, options);
+  },
 
-  return fetch(`${BASE}${path}`, {
-    method: options.method ?? "GET",
-    headers,
-    // The refresh cookie is same-origin; Caddy puts the API behind /api.
-    credentials: "same-origin",
-    body: options.body === undefined ? null : JSON.stringify(options.body),
-    ...(options.signal === undefined ? {} : { signal: options.signal }),
-  });
-};
-
-/** Sends, retries once on 401, and throws an `ApiError` on any other failure. */
-const exchange = async (
-  path: string,
-  options: RequestOptions,
-): Promise<Response> => {
-  let response = await send(path, options);
-
-  if (response.status === 401 && options.retryOnUnauthorized !== false) {
-    const refreshed = await refreshSession();
-    if (refreshed) response = await send(path, options);
-  }
-
-  if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    throw new ApiError({ error: toDomainError(payload), status: response.status });
-  }
-
-  return response;
-};
-
-/** A request whose body is decoded as JSON. Raises `ApiError` on a refusal. */
-export const request = async <A>(
-  path: string,
-  options: RequestOptions = {},
-): Promise<A> => {
-  const response = await exchange(path, options);
-  return response.json();
-};
-
-/**
- * Separate from `request` because a 204 has no body to decode. Folding both
- * into one function would mean claiming to return an `A` that does not exist.
- */
-export const requestEmpty = async (
-  path: string,
-  options: RequestOptions = {},
-): Promise<void> => {
-  await exchange(path, options);
-};
-
-/** The verbs, each saying whether a 401 is worth one silent refresh and retry. */
-export const api = {
   get: <A>(path: string, signal?: AbortSignal): Promise<A> =>
-    request<A>(path, signal === undefined ? {} : { signal }),
+    Api.request<A>(path, signal === undefined ? {} : { signal }),
 
-  post: <A>(path: string, body?: unknown): Promise<A> =>
-    request<A>(path, { method: "POST", body }),
+  post: <A>(path: string, body?: unknown): Promise<A> => Api.request<A>(path, { method: "POST", body }),
 
   postEmpty: (path: string, body?: unknown): Promise<void> =>
-    requestEmpty(path, { method: "POST", body }),
+    Api.requestEmpty(path, { method: "POST", body }),
 
   /** For sign-in and registration, where a 401 is the answer, not a hint to retry. */
   postWithoutRetry: <A>(path: string, body?: unknown): Promise<A> =>
-    request<A>(path, { method: "POST", body, retryOnUnauthorized: false }),
+    Api.request<A>(path, { method: "POST", body, retryOnUnauthorized: false }),
 
   postEmptyWithoutRetry: (path: string, body?: unknown): Promise<void> =>
-    requestEmpty(path, { method: "POST", body, retryOnUnauthorized: false }),
+    Api.requestEmpty(path, { method: "POST", body, retryOnUnauthorized: false }),
+
+  /** The failure inside a caught value, or `undefined` if it did not come from the API. */
+  failureOf: (reason: unknown): ErrorResponse["error"] | undefined =>
+    reason instanceof ApiError ? reason.failure : undefined,
 } as const;
-
-/** The failure inside a caught value, or `None` if it did not come from the API. */
-export const toApiFailure = (reason: unknown): Option<ApiFailure> =>
-  reason instanceof ApiError ? Option.some(reason.failure) : Option.none;
-
-/**
- * Builds a query string from the catalog filter state, omitting anything
- * empty so the URL stays legible and the server's cache key stays stable.
- */
-export const toQueryString = (
-  params: Readonly<Record<string, string | number | readonly string[]>>,
-): string => {
-  const search = new URLSearchParams();
-
-  for (const [key, value] of Object.entries(params)) {
-    const encoded = Array.isArray(value) ? value.join(",") : String(value);
-    if (encoded.length > 0) search.set(key, encoded);
-  }
-
-  const query = search.toString();
-  return query.length === 0 ? "" : `?${query}`;
-};

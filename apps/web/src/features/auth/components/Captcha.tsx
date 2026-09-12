@@ -1,81 +1,94 @@
 /**
  * reCAPTCHA, loaded on demand.
  *
- * In `test` mode this renders Google's real widget using their published
- * always-pass test site key — the challenge is genuine, it simply always
- * succeeds, which is what lets a reviewer register without anyone owning a
- * Google Cloud account. Point the env at your own keys and nothing here
- * changes except which key is used.
+ * Without a configured site key this renders Google's real widget with their
+ * published always-pass test key, so a reviewer registers without anyone
+ * owning a Google Cloud account. Point the env at your own keys and nothing
+ * here changes except which key is used.
  *
- * If the script cannot load at all — offline, blocked — the component reports
- * a static token so registration is still reachable. The server is the one
- * that decides whether that token is acceptable, and in `google` mode it
- * will not be.
+ * If the script cannot load at all, the component reports a static token so
+ * registration is still reachable. The server decides whether that token is
+ * acceptable.
  */
 
-import { Option } from "@prism/shared";
 import { useEffect, useRef, useState } from "react";
 import { match } from "ts-pattern";
 
-const TEST_SITE_KEY = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
-const SCRIPT_ID = "recaptcha-script";
-const SCRIPT_SRC = "https://www.google.com/recaptcha/api.js?render=explicit";
-
-const siteKey = (): string => {
-  const configured = import.meta.env["VITE_RECAPTCHA_SITE_KEY"];
-  return typeof configured === "string" && configured.length > 0
-    ? configured
-    : TEST_SITE_KEY;
-};
-
+/** The part of the `grecaptcha` global this component uses. */
 type Grecaptcha = Readonly<{
   render: (
     container: HTMLElement,
-    options: Readonly<{ sitekey: string; callback: (token: string) => void; "expired-callback": () => void; theme: string }>,
+    options: Readonly<{
+      sitekey: string;
+      callback: (token: string) => void;
+      "expired-callback": () => void;
+      theme: string;
+    }>,
   ) => number;
   reset: (widgetId: number) => void;
 }>;
 
-/**
- * A type predicate rather than a cast: the global is genuinely unknown until
- * a third-party script defines it, and this is where that gets checked.
- */
-const isGrecaptcha = (value: unknown): value is Grecaptcha =>
-  typeof value === "object" &&
-  value !== null &&
-  "render" in value &&
-  typeof value.render === "function" &&
-  "reset" in value &&
-  typeof value.reset === "function";
+const Recaptcha = {
+  /** Google's public always-pass site key. */
+  TEST_SITE_KEY: "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI",
+  SCRIPT_ID: "recaptcha-script",
+  SCRIPT_SRC: "https://www.google.com/recaptcha/api.js?render=explicit",
+  /** The token reported when the widget cannot load. */
+  UNAVAILABLE_TOKEN: "captcha-unavailable",
 
-const readGrecaptcha = (): Option<Grecaptcha> => {
-  const candidate = Reflect.get(window, "grecaptcha");
-  return isGrecaptcha(candidate) ? Option.some(candidate) : Option.none;
-};
+  siteKey: (): string => {
+    const configured = import.meta.env["VITE_RECAPTCHA_SITE_KEY"];
+    return typeof configured === "string" && configured.length > 0 ? configured : Recaptcha.TEST_SITE_KEY;
+  },
 
-const loadScript = (): Promise<void> =>
-  new Promise((resolve, reject) => {
-    if (document.getElementById(SCRIPT_ID) !== null) {
-      resolve();
-      return;
+  /** The global is unknown until a third-party script defines it, so it is checked, not cast. */
+  isGrecaptcha: (value: unknown): value is Grecaptcha =>
+    typeof value === "object" &&
+    value !== null &&
+    "render" in value &&
+    typeof value.render === "function" &&
+    "reset" in value &&
+    typeof value.reset === "function",
+
+  read: (): Grecaptcha | undefined => {
+    const candidate = Reflect.get(window, "grecaptcha");
+    return Recaptcha.isGrecaptcha(candidate) ? candidate : undefined;
+  },
+
+  load: (): Promise<void> =>
+    new Promise((resolve, reject) => {
+      if (document.getElementById(Recaptcha.SCRIPT_ID) !== null) {
+        resolve();
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.id = Recaptcha.SCRIPT_ID;
+      script.src = Recaptcha.SCRIPT_SRC;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("recaptcha script failed to load"));
+
+      document.head.appendChild(script);
+    }),
+
+  /** The global, once the script has defined it. */
+  ready: async (): Promise<Grecaptcha | undefined> => {
+    await Recaptcha.load();
+
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const found = Recaptcha.read();
+      if (found !== undefined) return found;
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
 
-    const script = document.createElement("script");
-    script.id = SCRIPT_ID;
-    script.src = SCRIPT_SRC;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("recaptcha script failed to load"));
-
-    document.head.appendChild(script);
-  });
+    return undefined;
+  },
+} as const;
 
 /** Where a solved challenge goes, and which of reCAPTCHA's two themes to render. */
-export type CaptchaProps = Readonly<{
-  onToken: (token: string) => void;
-  dark: boolean;
-}>;
+export type CaptchaProps = Readonly<{ onToken: (token: string) => void; dark: boolean }>;
 
 /** The reCAPTCHA widget. Says so plainly when the script cannot be reached. */
 export const Captcha = ({ onToken, dark }: CaptchaProps) => {
@@ -85,44 +98,32 @@ export const Captcha = ({ onToken, dark }: CaptchaProps) => {
   useEffect(() => {
     let canceled = false;
 
-    const start = async (): Promise<void> => {
-      await loadScript();
+    void Recaptcha.ready()
+      .then((grecaptcha) => {
+        const container = containerRef.current;
 
-      // The script defines grecaptcha shortly after load resolves.
-      for (let attempt = 0; attempt < 60; attempt += 1) {
+        if (canceled || grecaptcha === undefined || container === null) return;
+        if (container.childElementCount > 0) return;
+
+        grecaptcha.render(container, {
+          sitekey: Recaptcha.siteKey(),
+          callback: onToken,
+          "expired-callback": () => onToken(""),
+          theme: dark ? "dark" : "light",
+        });
+
+        setState("ready");
+      })
+      .catch(() => {
         if (canceled) return;
-        if (Option.isSome(readGrecaptcha())) break;
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      }
-
-      const grecaptcha = readGrecaptcha();
-      const container = containerRef.current;
-
-      if (canceled || Option.isNone(grecaptcha) || container === null) return;
-      if (container.childElementCount > 0) return;
-
-      grecaptcha.value.render(container, {
-        sitekey: siteKey(),
-        callback: onToken,
-        "expired-callback": () => onToken(""),
-        theme: dark ? "dark" : "light",
+        setState("unavailable");
+        onToken(Recaptcha.UNAVAILABLE_TOKEN);
       });
-
-      setState("ready");
-    };
-
-    void start().catch(() => {
-      if (canceled) return;
-      setState("unavailable");
-      // Let the server reject it if it wants to; do not block the form here.
-      onToken("captcha-unavailable");
-    });
 
     return () => {
       canceled = true;
     };
-    // Deliberately mounts once: re-rendering the widget would reset a
-    // challenge the visitor may already have solved.
+    // Mounts once: re-rendering the widget would reset a solved challenge.
   }, []);
 
   return (
@@ -130,13 +131,10 @@ export const Captcha = ({ onToken, dark }: CaptchaProps) => {
       <div ref={containerRef} />
 
       {match(state)
-        .with("loading", () => (
-          <p className="text-sm text-ink-faint">Loading the human check…</p>
-        ))
+        .with("loading", () => <p className="text-sm text-ink-faint">Loading the human check…</p>)
         .with("unavailable", () => (
           <p className="text-sm text-ink-faint">
-            The CAPTCHA could not load. Registration will still be checked by the
-            server.
+            The CAPTCHA could not load. Registration will still be checked by the server.
           </p>
         ))
         .with("ready", () => null)
