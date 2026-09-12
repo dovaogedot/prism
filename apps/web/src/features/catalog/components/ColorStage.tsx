@@ -1,8 +1,9 @@
 /**
  * A color, rendered as an object standing in a room.
  *
- * The picture itself is `../artwork/scene.ts` — one WebGL context that every
- * stage on the page shares. What is left here is the part that is genuinely a
+ * The picture itself is `../artwork/scenes.ts`, drawn by `../artwork/render.ts`
+ * through one WebGL context that every stage on the page shares. What is left
+ * here is the part that is genuinely a
  * component: owning a canvas, turning the pointer or the phone's tilt into an
  * angle, and running the frames between the angle the slab is at and the
  * angle it is wanted at.
@@ -18,7 +19,7 @@ import { match } from "ts-pattern";
 import { usePrefersStillness } from "../../../shared/motion/use-stillness.ts";
 import { askForTilt, followTilt, tilting } from "../artwork/gyro.ts";
 import { pointAt } from "../artwork/pointer.ts";
-import { openStage, type Stage } from "../artwork/scene.ts";
+import { openSlab, type SlabStage } from "../artwork/render.ts";
 import type { Finishing } from "../artwork/surfaces.ts";
 import { approach, REST, settled, tiltAt, type Tilt } from "../artwork/tilt.ts";
 import { AT_REST } from "../artwork/viewpoint.ts";
@@ -63,7 +64,7 @@ export const ColorStage = ({
 
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const stage = useRef<Option<Stage>>(Option.none);
+  const stage = useRef<Option<SlabStage>>(Option.none);
 
   /** Read inside the frame loop, which outlives the render that started it. */
   const paint = useRef({ hex, finishing });
@@ -74,8 +75,8 @@ export const ColorStage = ({
   const lastFrameAt = useRef(0);
 
   const drawAt = (tilt: Tilt): void =>
-    Option.match<Stage, void>({
-      onSome: (open) => open.draw({ ...paint.current, tilt, viewpoint: AT_REST }),
+    Option.match<SlabStage, void>({
+      onSome: (open) => open.draw({ _tag: "Color", ...paint.current, tilt, viewpoint: AT_REST }),
       onNone: () => undefined,
     })(stage.current);
 
@@ -166,11 +167,12 @@ export const ColorStage = ({
   }, [still, showing]);
 
   useEffect(() => {
-    const opened = Option.flatMap(openStage)(Option.fromNullable(canvasRef.current));
+    const opened = Option.flatMap(openSlab)(Option.fromNullable(canvasRef.current));
     stage.current = opened;
 
-    Option.match<Stage, void>({
-      onSome: (open) => open.draw({ hex, finishing, tilt: REST, viewpoint: AT_REST }),
+    Option.match<SlabStage, void>({
+      onSome: (open) =>
+        open.draw({ _tag: "Color", hex, finishing, tilt: REST, viewpoint: AT_REST }),
       onNone: () => setShowing(FLAT),
     })(opened);
 
@@ -181,7 +183,7 @@ export const ColorStage = ({
       })(frame.current);
       frame.current = Option.none;
 
-      Option.match<Stage, void>({
+      Option.match<SlabStage, void>({
         onSome: (open) => open.close(),
         onNone: () => undefined,
       })(opened);

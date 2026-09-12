@@ -13,9 +13,9 @@
  * one render pass at it. That is what lets a color slab and a finisher's room
  * stand side by side in one grid on one context.
  *
- * This and the two scene modules are the only files in the feature that are
- * not referentially transparent, because a GPU context is a resource rather
- * than a value.
+ * This and `render.ts` are the only files in the feature that are not
+ * referentially transparent, because a GPU context is a resource rather than
+ * a value.
  */
 
 import { Option } from "@prism/shared";
@@ -353,13 +353,14 @@ const paint = (
  * Start painting a canvas, if there is anything to paint with.
  *
  * `frameFor` runs immediately before every render, so a caller that shares one
- * scene between stages does its own pointing and painting inside it. The view
- * it was last called with is remembered, so this stage can be repainted when
- * the theme or the canvas size changes under it.
+ * scene between stages does its own pointing and painting inside it; a `None`
+ * from it leaves the canvas showing whatever was last drawn on it. The view it
+ * was last called with is remembered, so this stage can be repainted when the
+ * theme or the canvas size changes under it.
  */
 export const openStage = <View>(
   canvas: HTMLCanvasElement,
-  frameFor: (view: View) => Frame,
+  frameFor: (view: View) => Option<Frame>,
 ): Option<Stage<View>> =>
   Option.match<Context, Option<Stage<View>>>({
     onNone: () => Option.none,
@@ -372,7 +373,11 @@ export const openStage = <View>(
 
       const repaint = (): void =>
         Option.match<View, void>({
-          onSome: (view) => paint(context, canvas, target, frameFor(view)),
+          onSome: (view) =>
+            Option.match<Frame, void>({
+              onSome: (frame) => paint(context, canvas, target, frame),
+              onNone: () => undefined,
+            })(frameFor(view)),
           onNone: () => undefined,
         })(last);
 

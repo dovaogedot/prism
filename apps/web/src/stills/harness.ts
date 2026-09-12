@@ -9,16 +9,14 @@
 
 import { Option, type StillSubject } from "@prism/shared";
 import { match } from "ts-pattern";
-import {
-  openStage as openRoom,
-  type Stage as RoomStage,
-} from "../features/catalog/artwork/finisher-scene.ts";
 import { whenMesh } from "../features/catalog/artwork/mesh.ts";
 import { atRest, viewOf } from "../features/catalog/artwork/movement.ts";
 import {
-  openStage as openSlab,
-  type Stage as SlabStage,
-} from "../features/catalog/artwork/scene.ts";
+  openRoom,
+  openSlab,
+  type RoomStage,
+  type SlabStage,
+} from "../features/catalog/artwork/render.ts";
 import { REST } from "../features/catalog/artwork/tilt.ts";
 import { viewpointOf, type Viewpoint } from "../features/catalog/artwork/viewpoint.ts";
 import type { StillRequest } from "./bridge.ts";
@@ -46,6 +44,7 @@ const drawOn = (
       Option.match<SlabStage, boolean>({
         onSome: (stage) => {
           stage.draw({
+            _tag: "Color",
             hex,
             finishing: { roughness, coatingNanometers, emission },
             tilt: REST,

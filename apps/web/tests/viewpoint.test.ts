@@ -10,27 +10,27 @@
  * rather than going past where it ends.
  */
 
-import { STILL_ANGLES, type StillAngle } from "@prism/shared";
+import { Option, STILL_ANGLES, type StillAngle } from "@prism/shared";
+import { match } from "ts-pattern";
 import { describe, expect, it } from "vitest";
-import { MESH_REACH, STANDING_IN } from "../src/features/catalog/artwork/arrangement.ts";
-import { eyeAt, REST_ORBIT, type Eye } from "../src/features/catalog/artwork/orbit.ts";
+import { MESH_REACH } from "../src/features/catalog/artwork/arrangement.ts";
+import { LAGS, restingAt } from "../src/features/catalog/artwork/lightring.ts";
+import { type Eye, REST_ORBIT } from "../src/features/catalog/artwork/orbit.ts";
 import {
-  CORNER_GAZE,
-  EYE_RADIUS,
-  FIELD_OF_VIEW,
-  GLOW_TARGET,
-  hazeAt,
+  camera,
+  type Camera,
+  type Fog,
+  fog,
+  LAMP_RADIUS,
   OPEN_FOG,
-  OPEN_ROOM,
-  ROOM_EXTENT,
-  WALL_AT,
-} from "../src/features/catalog/artwork/rooms.ts";
-import {
-  FIELD_OF_VIEW as SLAB_FIELD_OF_VIEW,
-  SLAB_GAZE,
-  WALL_DISTANCE,
-  WALL_SIZE,
-} from "../src/features/catalog/artwork/slab-framing.ts";
+  RING_AT_REST,
+  type SceneInput,
+  shell,
+  type ShellForm,
+  STANDING_IN,
+  type View,
+} from "../src/features/catalog/artwork/scenes.ts";
+import { REST } from "../src/features/catalog/artwork/tilt.ts";
 import {
   AT_REST,
   distanceAt,
@@ -79,7 +79,7 @@ const seenAt = (look: Look, point: Eye): Readonly<{ right: number; up: number }>
 
 const LENS = 40;
 const TARGET = { x: 0, y: 0.4, z: 0 };
-const REST = { x: 1.2, y: 1.1, z: 2.5 };
+const RESTING = { x: 1.2, y: 1.1, z: 2.5 };
 
 /**
  * A gaze that walks around what it looks at, and one that walks around
@@ -87,8 +87,8 @@ const REST = { x: 1.2, y: 1.1, z: 2.5 };
  * the eye, on the upright plane through both.
  */
 const GAZES: readonly Gaze[] = [
-  { eye: REST, target: TARGET, pivot: TARGET },
-  { eye: REST, target: TARGET, pivot: { x: 0.48, y: 0.4, z: 1 } },
+  { eye: RESTING, target: TARGET, pivot: TARGET },
+  { eye: RESTING, target: TARGET, pivot: { x: 0.48, y: 0.4, z: 1 } },
 ];
 
 const turnedBy = (around: number, up: number): Viewpoint => ({ ...AT_REST, around, up });
@@ -328,115 +328,137 @@ const meets = (eye: Eye, ray: Eye, panel: Panel): boolean => {
   );
 };
 
-const SLAB_WALL: readonly Panel[] = [
-  {
-    axis: "z",
-    at: -WALL_DISTANCE,
-    bounds: [
-      ["x", -WALL_SIZE / 2, WALL_SIZE / 2],
-      ["y", -WALL_SIZE / 2, WALL_SIZE / 2],
-    ],
-  },
-];
+const panel = (axis: Panel["axis"], at: number, bounds: Panel["bounds"]): Panel => ({
+  axis,
+  at,
+  bounds,
+});
 
-/** How far the floor and walls of a corner run from its middle. */
-const CORNER_REACH = (WALL_AT * ROOM_EXTENT) / 2;
+/** The flat surfaces of a shell, for the shells made of flat surfaces. */
+const panelsOf = (form: ShellForm): readonly Panel[] =>
+  match(form)
+    .with({ _tag: "Backdrop" }, ({ size, distance }) => [
+      panel("z", -distance, [
+        ["x", -size / 2, size / 2],
+        ["y", -size / 2, size / 2],
+      ]),
+    ])
+    .with({ _tag: "Corner" }, ({ wallAt, extent }) => {
+      // The floor and walls run `extent` across, centered on the middle of
+      // the room, so they reach half that in every direction.
+      const reach = extent / 2;
 
-const CORNER: readonly Panel[] = [
-  {
-    axis: "y",
-    at: 0,
-    bounds: [
-      ["x", -CORNER_REACH, CORNER_REACH],
-      ["z", -CORNER_REACH, CORNER_REACH],
-    ],
-  },
-  {
-    axis: "z",
-    at: -WALL_AT,
-    bounds: [
-      ["x", -CORNER_REACH, CORNER_REACH],
-      ["y", 0, CORNER_REACH * 2],
-    ],
-  },
-  {
-    axis: "x",
-    at: -WALL_AT,
-    bounds: [
-      ["z", -CORNER_REACH, CORNER_REACH],
-      ["y", 0, CORNER_REACH * 2],
-    ],
-  },
-];
+      return [
+        panel("y", 0, [
+          ["x", -reach, reach],
+          ["z", -reach, reach],
+        ]),
+        panel("z", -wallAt, [
+          ["x", -reach, reach],
+          ["y", 0, extent],
+        ]),
+        panel("x", -wallAt, [
+          ["z", -reach, reach],
+          ["y", 0, extent],
+        ]),
+      ];
+    })
+    .with({ _tag: "Drum" }, () => [])
+    .exhaustive();
 
-/** Where a ray from inside the open room meets it: on its floor, or on the circle its wall stands on. */
+/** A round floor with one wall all the way around it. */
+type Drum = Readonly<{ radius: number; height: number }>;
+
+/** Where a ray from inside a drum meets it: on its floor, or on the circle its wall stands on. */
 type DrumHit = Readonly<{ on: "floor" | "wall"; along: number; height: number }>;
 
-const inDrum = (eye: Eye, ray: Eye): DrumHit => {
+const inDrum = (drum: Drum, eye: Eye, ray: Eye): DrumHit => {
   const floor = -eye.y / ray.y;
   const onFloor = plus(eye, scaled(ray, floor));
 
-  if (floor > 0 && Math.hypot(onFloor.x, onFloor.z) <= OPEN_ROOM.radius) {
+  if (floor > 0 && Math.hypot(onFloor.x, onFloor.z) <= drum.radius) {
     return { on: "floor", along: floor, height: 0 };
   }
 
   // The far root of the ray against the wall's circle: the eye is inside it.
   const a = ray.x ** 2 + ray.z ** 2;
   const b = 2 * (eye.x * ray.x + eye.z * ray.z);
-  const c = eye.x ** 2 + eye.z ** 2 - OPEN_ROOM.radius ** 2;
+  const c = eye.x ** 2 + eye.z ** 2 - drum.radius ** 2;
   const wall = (-b + Math.sqrt(b ** 2 - 4 * a * c)) / (2 * a);
 
   return { on: "wall", along: wall, height: eye.y + wall * ray.y };
 };
 
-/** Whether a ray from inside the open room lands on its floor or below the top of its wall. */
-const landsInDrum = (eye: Eye, ray: Eye): boolean => {
-  const hit = inDrum(eye, ray);
+/** Whether a ray from inside a shell lands on it rather than going past where it ends. */
+const landsIn =
+  (form: ShellForm) =>
+  (eye: Eye, ray: Eye): boolean =>
+    match(form)
+      .with({ _tag: "Drum" }, (drum) => {
+        const hit = inDrum(drum, eye, ray);
 
-  return hit.on === "floor" || (hit.height >= 0 && hit.height <= OPEN_ROOM.height);
-};
+        return hit.on === "floor" || (hit.height >= 0 && hit.height <= drum.height);
+      })
+      .otherwise((walled) => panelsOf(walled).some((flat) => meets(eye, ray, flat)));
 
-const glowing = eyeAt(REST_ORBIT, EYE_RADIUS);
+const glowingFrom = (viewpoint: Viewpoint): View => ({
+  _tag: "Emission",
+  emission: 50,
+  orbit: REST_ORBIT,
+  viewpoint,
+});
 
-/** Every scene a still is taken of, how its eye rests, and what closes it. */
-const SCENES = [
-  {
-    name: "a color's slab",
-    gaze: SLAB_GAZE,
-    fieldOfView: SLAB_FIELD_OF_VIEW,
-    lands: (eye: Eye, ray: Eye) => SLAB_WALL.some((panel) => meets(eye, ray, panel)),
-  },
-  {
-    name: "a roughness corner",
-    gaze: CORNER_GAZE.roughness,
-    fieldOfView: FIELD_OF_VIEW.roughness,
-    lands: (eye: Eye, ray: Eye) => CORNER.some((panel) => meets(eye, ray, panel)),
-  },
-  {
-    name: "a coating corner",
-    gaze: CORNER_GAZE.coating,
-    fieldOfView: FIELD_OF_VIEW.coating,
-    lands: (eye: Eye, ray: Eye) => CORNER.some((panel) => meets(eye, ray, panel)),
-  },
-  {
-    name: "a glowing room",
-    gaze: {
-      eye: { x: glowing.x, y: GLOW_TARGET.y + glowing.y, z: glowing.z },
-      target: GLOW_TARGET,
-      pivot: GLOW_TARGET,
+const coatedFrom = (viewpoint: Viewpoint): View => ({
+  _tag: "Coating",
+  coatingNanometers: 300,
+  hueOffset: 0,
+  viewpoint,
+});
+
+/** Every scene a still is taken of, seen from a viewpoint. */
+const SCENES: readonly Readonly<{ name: string; viewFrom: (viewpoint: Viewpoint) => View }>[] =
+  [
+    {
+      name: "a color's slab",
+      viewFrom: (viewpoint) => ({
+        _tag: "Color",
+        hex: "#808080",
+        finishing: { roughness: 50, coatingNanometers: 0, emission: 0 },
+        tilt: REST,
+        viewpoint,
+      }),
     },
-    fieldOfView: FIELD_OF_VIEW.emission,
-    lands: landsInDrum,
-  },
-] as const;
+    {
+      name: "a roughness corner",
+      viewFrom: (viewpoint) => ({
+        _tag: "Roughness",
+        roughness: 50,
+        lamps: restingAt(LAGS, RING_AT_REST, LAMP_RADIUS),
+        viewpoint,
+      }),
+    },
+    { name: "a coating corner", viewFrom: coatedFrom },
+    { name: "a glowing room", viewFrom: glowingFrom },
+  ];
+
+/** A scene's input from a viewpoint; the theme moves neither its eye nor its shell. */
+const seenFrom = (viewFrom: (viewpoint: Viewpoint) => View, viewpoint: Viewpoint): SceneInput => ({
+  theme: "light",
+  view: viewFrom(viewpoint),
+});
+
+/** The eye of a scene, and the lens it sees through, as a look. */
+const lookOf = (eye: Camera): Look => ({ eye: eye.eye, target: eye.target });
 
 describe("every scene a still is taken of", () => {
   for (const scene of SCENES) {
     it(`stays closed around ${scene.name}, from every viewpoint a still can stray to`, () => {
       const open = STILL_VIEWPOINTS.flatMap(({ angle, viewpoint }) => {
-        const look = lookFrom(scene.gaze, viewpoint, scene.fieldOfView);
-        const rays = edgeRays(look, fieldOfViewAt(scene.fieldOfView, viewpoint));
-        const escaping = rays.filter((ray) => !scene.lands(look.eye, ray)).length;
+        const input = seenFrom(scene.viewFrom, viewpoint);
+        const eye = camera(input);
+        const lands = landsIn(shell(input).form);
+        const rays = edgeRays(lookOf(eye), eye.fieldOfView);
+        const escaping = rays.filter((ray) => !lands(eye.eye, ray)).length;
 
         return escaping === 0
           ? []
@@ -451,20 +473,20 @@ describe("every scene a still is taken of", () => {
     // The ball that would hold the whole mesh, which the head lying inside it
     // is a good deal smaller than. Its edge in the picture is its middle's
     // tangent off the line of sight plus the tangent of the angle it spans.
-    const near = STANDING_IN.coating.reduce((front, at) =>
+    const near = STANDING_IN.Coating.reduce((front, at) =>
       at.x + at.z > front.x + front.z ? at : front,
     );
-    const middle = { x: near.x, y: CORNER_GAZE.coating.target.y, z: near.z };
     const reach = MESH_REACH * near.scale;
+    // The height the room looks at, which is the middle of this subject.
+    const middle = { x: near.x, y: camera(seenFrom(coatedFrom, AT_REST)).target.y, z: near.z };
 
     const cut = STILL_VIEWPOINTS.flatMap(({ angle, viewpoint }) => {
-      const look = lookFrom(CORNER_GAZE.coating, viewpoint, FIELD_OF_VIEW.coating);
-      const seen = seenAt(look, middle);
-      const away = distance(look.eye, middle);
+      const eye = camera(seenFrom(coatedFrom, viewpoint));
+      const seen = seenAt(lookOf(eye), middle);
+      const away = distance(eye.eye, middle);
       const spans = reach / Math.sqrt(away ** 2 - reach ** 2);
       const edge =
-        (Math.max(Math.abs(seen.right), Math.abs(seen.up)) + spans) /
-        tanHalf(fieldOfViewAt(FIELD_OF_VIEW.coating, viewpoint));
+        (Math.max(Math.abs(seen.right), Math.abs(seen.up)) + spans) / tanHalf(eye.fieldOfView);
 
       return edge <= 1 ? [] : [`${angle} ${JSON.stringify(viewpoint)}: ${edge.toFixed(3)}`];
     });
@@ -478,13 +500,23 @@ describe("every scene a still is taken of", () => {
     // the line of sight, so that is what each hit is measured in.
     const steps = 40;
     const grid = Array.from({ length: steps + 1 }, (_, step) => -1 + (2 * step) / steps);
-    const glowingRoom = SCENES[3];
 
     const seen = STILL_VIEWPOINTS.flatMap(({ angle, viewpoint }) => {
-      const look = lookFrom(glowingRoom.gaze, viewpoint, glowingRoom.fieldOfView);
-      const { forward, right, up } = axesOf(look);
-      const reach = tanHalf(fieldOfViewAt(glowingRoom.fieldOfView, viewpoint));
-      const closed = hazeAt(viewpoint).far;
+      const input = seenFrom(glowingFrom, viewpoint);
+      const eye = camera(input);
+      const drum = match(shell(input).form)
+        .with({ _tag: "Drum" }, (form): Drum => form)
+        .otherwise(() => {
+          throw new Error("not a drum");
+        });
+      const { forward, right, up } = axesOf(lookOf(eye));
+      const reach = tanHalf(eye.fieldOfView);
+      const closed = Option.match<Fog, number>({
+        onSome: (haze) => haze.far,
+        onNone: () => {
+          throw new Error("no haze");
+        },
+      })(fog(input));
       const showing = grid
         .flatMap((aside) =>
           grid.map((down) =>
@@ -492,7 +524,7 @@ describe("every scene a still is taken of", () => {
           ),
         )
         .filter((ray) => {
-          const hit = inDrum(look.eye, ray);
+          const hit = inDrum(drum, eye.eye, ray);
 
           return hit.on === "wall" && hit.along * dot(ray, forward) < closed;
         }).length;
@@ -504,6 +536,20 @@ describe("every scene a still is taken of", () => {
   });
 
   it("leaves the open room's haze where it rests, at rest", () => {
-    expect(hazeAt(AT_REST)).toEqual({ near: OPEN_FOG.near, far: OPEN_FOG.far });
+    expect(fog(seenFrom(glowingFrom, AT_REST))).toEqual(Option.some(OPEN_FOG));
+  });
+
+  it("takes the haze back with an eye that stands back, both ends of it alike", () => {
+    // A haze is measured from the eye, so an eye that stands back takes both
+    // ends of it back with it by as far as it stepped.
+    const stepped = Option.match<Fog, Fog>({
+      onSome: (haze) => haze,
+      onNone: () => {
+        throw new Error("no haze");
+      },
+    })(fog(seenFrom(glowingFrom, { ...AT_REST, lens: 0.8 })));
+
+    expect(stepped.near).toBeGreaterThan(OPEN_FOG.near);
+    expect(stepped.far - OPEN_FOG.far).toBeCloseTo(stepped.near - OPEN_FOG.near, 12);
   });
 });

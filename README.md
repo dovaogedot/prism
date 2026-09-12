@@ -640,11 +640,18 @@ the reflection and a bright pigment's own color is louder than it.
 
 
 The split is the same one the rest of the codebase uses.
-[`tilt.ts`](apps/web/src/features/catalog/artwork/tilt.ts), `lean.ts` and `surfaces.ts` are arithmetic,
-pure and unit-tested and unaware that a GPU exists;
+[`tilt.ts`](apps/web/src/features/catalog/artwork/tilt.ts), `lean.ts`, `surfaces.ts` and
+[`scenes.ts`](apps/web/src/features/catalog/artwork/scenes.ts) are arithmetic, pure and
+unit-tested and unaware that a GPU exists. `scenes.ts` is the one place every picture is
+described: the shell it is drawn in, the subjects standing in it and the paint on them, the
+lamps and where they hang, the eye and its lens, the haze, the spill and the light in the
+air, each a pure function of the theme the page is in and what is being shown. Every number
+that decides how a picture looks is there, and nowhere else.
 [`gl.ts`](apps/web/src/features/catalog/artwork/gl.ts) holds the renderer, the composer and
-the environment, and `scene.ts` builds the slab's room on top of it. Those two are where
-referential transparency stops, because a GPU context is a resource rather than a value. The component between them owns a canvas, turns the pointer into an angle, and
+the environment, and [`render.ts`](apps/web/src/features/catalog/artwork/render.ts) builds
+whatever `scenes.ts` describes out of three.js objects and keeps them matched to it, carrying
+no number of its own. Those two are where referential transparency stops, because a GPU
+context is a resource rather than a value. The component between them owns a canvas, turns the pointer into an angle, and
 runs the frames — none of it through React state, because re-rendering a card's subtree
 sixty times a second to move a number no React tree reads is not what React is for.
 A phone that reports how it is held turns the picture by being tilted. What the picture
@@ -673,10 +680,10 @@ walls and floor they stand in are plain diffuse gray, so nothing in the room com
 what is being demonstrated on it.
 
 Every number in a room comes out of
-[`roomFor`](apps/web/src/features/catalog/artwork/finishers.ts), which is handed the
-finisher's one amount and nothing else — the same rule the slab follows, applied to a room
-instead of a face. Two finishers a point apart are lit and painted a point apart, and
-nothing anywhere branches on a finish's *name*:
+[`scenes.ts`](apps/web/src/features/catalog/artwork/scenes.ts), which is handed the theme,
+the finisher's one amount and where the pointer has moved things, and nothing else — the same
+rule the slab follows, applied to a room instead of a face. Two finishers a point apart are
+lit and painted a point apart, and nothing anywhere branches on a finish's *name*:
 
 | The finisher does | The room | What the pointer does |
 | --- | --- | --- |
@@ -806,10 +813,11 @@ reads as the light in the room; a second, weaker one stands lower and across the
 and lays a softer shadow the other way. The second is also what opens the side of a subject the
 first is turned away from, so a face has a dark side rather than a black one.
 
-**Every room is dressed twice.** A room is looked at through a page that is either bright or
-dark, and a wall mixed to sit inside a bright page is a lamp in a dark one. So each room keeps
-two sets of wall paint, floor paint, light level, ambient share, fill share, spill threshold
-and spill strength, and picks by the theme in force when it is drawn. Under both themes the
+**Every room is described twice.** A room is looked at through a page that is either bright
+or dark, and a wall mixed to sit inside a bright page is a lamp in a dark one. So everything
+that dresses a room — its paint, how bright its lamps burn, how much of its light arrives from
+everywhere at once, how far its spill starts above the room's own surfaces and how strongly it
+is drawn — is set per theme, and the theme in force when the room is drawn picks. Under both themes the
 far wall of every room, a color's included, sits near the page's own lightness, so a stage
 reads as the product standing in the shop rather than as a box cut into the page. Measured on
 every shelf, the top of every stage is within 3 points of lightness of the page by day, and

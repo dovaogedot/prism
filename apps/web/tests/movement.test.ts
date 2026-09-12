@@ -11,7 +11,6 @@
 import type { FinishApplication } from "@prism/shared";
 import { match } from "ts-pattern";
 import { describe, expect, it } from "vitest";
-import type { FinisherView } from "../src/features/catalog/artwork/finisher-scene.ts";
 import {
   advanced,
   aimedAt,
@@ -22,6 +21,7 @@ import {
   viewOf,
   type Movement,
 } from "../src/features/catalog/artwork/movement.ts";
+import type { FinisherView } from "../src/features/catalog/artwork/scenes.ts";
 
 const STAGE = { width: 200, height: 200 };
 const LEFT = { x: 0, y: 100 };
@@ -44,16 +44,16 @@ const travelled = (application: FinishApplication): Movement =>
 /** Every number one picture is made of, in the order the picture holds them. */
 const numbersIn = (view: FinisherView): readonly number[] =>
   match(view)
-    .with({ applies: "roughness" }, ({ roughness, lamps }) => [
+    .with({ _tag: "Roughness" }, ({ roughness, lamps }) => [
       roughness,
       ...lamps.flatMap(({ at, lag }) => [at.x, at.y, at.z, lag]),
     ])
-    .with({ applies: "emission" }, ({ emission, orbit }) => [
+    .with({ _tag: "Emission" }, ({ emission, orbit }) => [
       emission,
       orbit.azimuth,
       orbit.elevation,
     ])
-    .with({ applies: "coating" }, ({ coatingNanometers, hueOffset }) => [
+    .with({ _tag: "Coating" }, ({ coatingNanometers, hueOffset }) => [
       coatingNanometers,
       hueOffset,
     ])
@@ -190,10 +190,10 @@ describe("stopped", () => {
 
 describe("viewOf", () => {
   it("draws the room it was given, carrying the amount that room demonstrates", () => {
-    expect(viewOf(atRest(ROUGH))).toMatchObject({ applies: "roughness", roughness: 30 });
-    expect(viewOf(atRest(GLOW))).toMatchObject({ applies: "emission", emission: 70 });
+    expect(viewOf(atRest(ROUGH))).toMatchObject({ _tag: "Roughness", roughness: 30 });
+    expect(viewOf(atRest(GLOW))).toMatchObject({ _tag: "Emission", emission: 70 });
     expect(viewOf(atRest(COAT))).toMatchObject({
-      applies: "coating",
+      _tag: "Coating",
       coatingNanometers: 420,
     });
   });

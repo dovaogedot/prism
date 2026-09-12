@@ -1,141 +1,143 @@
 /**
- * Where the subjects of a finisher's room stand, and what they are painted.
+ * How the mesh sits, and how a place on the floor of a walled room is written.
  *
- * The arrangements are written by hand and are not allowed to be arbitrary:
- * they have to fit on the floor and they have to leave the subjects clear of
- * each other, whichever way any of them is lying. The hues are written by hand
- * too, and every room has to have one for everybody standing in it.
+ * The facts about the mesh are measured off the vendored file rather than
+ * trusted: how far it reaches, how far it drops below its own middle once it
+ * is lying back, and how high its middle then stands. The placement
+ * arithmetic has to say which subject is in front and how much floor an
+ * arrangement takes, for any arrangement at all.
  */
 
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import {
-  COATED_HUES,
+  CORNER_BEARING,
   frontOf,
-  GLOWING_HUES,
   MESH_REACH,
+  type Placement,
   reachOf,
   RESTING_TILT,
-  restingOf,
-  STANDING_IN,
+  seenFrom,
+  STANDING_DROP,
+  STANDING_MIDDLE,
   towardOf,
-  type Placement,
 } from "../src/features/catalog/artwork/arrangement.ts";
 
-const ROOMS = [
-  STANDING_IN.roughness,
-  STANDING_IN.emission,
-  STANDING_IN.coating,
-] as const;
+/* --------------------------------------------------------------- the mesh */
 
-/** How much floor one subject covers, whichever way it is lying. */
-const spread = (placement: Placement): number => MESH_REACH * placement.scale;
+/** The parts of a glTF that say where its first mesh's positions are. */
+const GLTF = z.object({
+  meshes: z.array(
+    z.object({
+      primitives: z.array(z.object({ attributes: z.object({ POSITION: z.number() }) })),
+    }),
+  ),
+  accessors: z.array(
+    z.object({
+      bufferView: z.number(),
+      byteOffset: z.number().optional(),
+      componentType: z.number(),
+      count: z.number(),
+    }),
+  ),
+  bufferViews: z.array(z.object({ byteOffset: z.number().optional() })),
+});
 
-const between = (one: Placement, other: Placement): number =>
-  Math.hypot(one.x - other.x, one.z - other.z);
+/** glTF's code for a 32-bit float. */
+const FLOAT = 5126;
 
-describe("STANDING_IN", () => {
-  it("stands somebody in every room", () => {
-    for (const room of ROOMS) expect(room.length).toBeGreaterThan(0);
+/** The vertex positions of the first mesh in a binary glTF, as triples. */
+const positionsOf = (bytes: Buffer): Float32Array => {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const jsonLength = view.getUint32(12, true);
+  const json = GLTF.parse(
+    JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + jsonLength))),
+  );
+  const primitive = json.meshes[0]?.primitives[0];
+
+  if (primitive === undefined) throw new Error("no mesh");
+
+  const accessor = json.accessors[primitive.attributes.POSITION];
+
+  if (accessor === undefined) throw new Error("no positions");
+
+  const bufferView = json.bufferViews[accessor.bufferView];
+
+  if (bufferView === undefined) throw new Error("no buffer");
+
+  expect(accessor.componentType).toBe(FLOAT);
+
+  // The binary chunk follows the JSON chunk and its own eight-byte header.
+  const start =
+    bytes.byteOffset +
+    20 +
+    jsonLength +
+    8 +
+    (bufferView.byteOffset ?? 0) +
+    (accessor.byteOffset ?? 0);
+
+  return new Float32Array(bytes.buffer.slice(start, start + accessor.count * 3 * 4));
+};
+
+/** How the vendored mesh sits, measured off its file. */
+const measured = (positions: Float32Array, tilt: number) => {
+  const cosine = Math.cos(tilt);
+  const sine = Math.sin(tilt);
+  let reach = 0;
+  let lowest = 0;
+  let highest = 0;
+
+  for (let index = 0; index + 2 < positions.length; index += 3) {
+    const x = positions[index] ?? 0;
+    const y = positions[index + 1] ?? 0;
+    const z = positions[index + 2] ?? 0;
+    // Turned about the left-right axis, which leaves x where it was and
+    // swaps height for depth.
+    const lifted = y * cosine - z * sine;
+
+    reach = Math.max(reach, Math.hypot(x, y, z));
+    lowest = Math.min(lowest, lifted);
+    highest = Math.max(highest, lifted);
+  }
+
+  return { reach, drop: -lowest, middle: (highest - lowest) / 2 };
+};
+
+describe("the mesh", () => {
+  const positions = positionsOf(
+    readFileSync(new URL("../public/suzanne.glb", import.meta.url)),
+  );
+  const sits = measured(positions, RESTING_TILT);
+
+  it("has vertices to measure", () => {
+    expect(positions.length).toBeGreaterThan(0);
   });
 
-  it("keeps every subject on the floor its own room lays", () => {
-    for (const room of ROOMS) {
-      for (const placement of room) {
-        const corner = Math.hypot(placement.x, placement.z) + spread(placement);
+  it("reaches no further than MESH_REACH says, and not much less", () => {
+    expect(MESH_REACH).toBeGreaterThanOrEqual(sits.reach);
+    expect(MESH_REACH - sits.reach).toBeLessThan(0.001);
+  });
 
-        expect(corner).toBeLessThanOrEqual(reachOf(room));
-      }
+  it("drops STANDING_DROP below its middle, lying at RESTING_TILT", () => {
+    expect(STANDING_DROP).toBeCloseTo(sits.drop, 12);
+  });
+
+  it("stands its middle STANDING_MIDDLE high, lying at RESTING_TILT", () => {
+    expect(STANDING_MIDDLE).toBeCloseTo(sits.middle, 4);
+  });
+
+  it("lies rather than leans at RESTING_TILT, on two points at once", () => {
+    // Two points level with each other is where the lowest of them is
+    // highest: tilted a little less it stands on one of them and a little
+    // more it rolls onto the other, and either way that point goes lower.
+    for (const nearby of [RESTING_TILT - 0.05, RESTING_TILT + 0.05]) {
+      expect(measured(positions, nearby).drop).toBeGreaterThan(sits.drop);
     }
-  });
-
-  it("never lets two subjects touch", () => {
-    for (const room of ROOMS) {
-      for (let one = 0; one < room.length; one += 1) {
-        for (let other = one + 1; other < room.length; other += 1) {
-          const first = room[one];
-          const second = room[other];
-
-          if (first === undefined || second === undefined) throw new Error("short");
-
-          expect(between(first, second)).toBeGreaterThan(spread(first) + spread(second));
-        }
-      }
-    }
-  });
-
-  it("keeps every subject smaller than the mesh's own size and larger than none", () => {
-    for (const room of ROOMS) {
-      for (const placement of room) {
-        expect(placement.scale).toBeGreaterThan(0);
-        expect(placement.scale).toBeLessThanOrEqual(1);
-      }
-    }
-  });
-
-  it("stands the lone subject of a roughness room in the middle of the floor", () => {
-    const [only] = STANDING_IN.roughness;
-
-    if (only === undefined) throw new Error("short");
-
-    expect(only.x).toBeCloseTo(0, 12);
-    expect(only.z).toBeCloseTo(0, 12);
-  });
-
-  it("puts one coated subject in front of the eye and the other behind it", () => {
-    const [near, far] = STANDING_IN.coating;
-
-    if (near === undefined || far === undefined) throw new Error("short");
-
-    expect(towardOf(near)).toBeGreaterThan(0);
-    expect(towardOf(far)).toBeLessThan(0);
-    // The near one is the bigger of the two as well as the closer, so what is
-    // in front reads as in front rather than as merely large.
-    expect(near.scale).toBeGreaterThan(far.scale);
-  });
-
-  it("stands one coated subject well off the line the other is on", () => {
-    // The far one is meant to be behind the near one, but two of them on one
-    // line are one subject with a halo, so they are apart by more than half of
-    // what the near one covers.
-    const [near, far] = STANDING_IN.coating;
-
-    if (near === undefined || far === undefined) throw new Error("short");
-
-    const aside = (at: Placement): number => (at.x - at.z) * Math.SQRT1_2;
-
-    expect(Math.abs(aside(near) - aside(far))).toBeGreaterThan(
-      (MESH_REACH * near.scale) / 2,
-    );
   });
 });
 
-describe("the hues each room is painted", () => {
-  it("gives every subject in a room a hue of its own", () => {
-    expect(GLOWING_HUES.length).toBeGreaterThanOrEqual(STANDING_IN.emission.length);
-    expect(COATED_HUES.length).toBeGreaterThanOrEqual(STANDING_IN.coating.length);
-  });
-
-  it("paints every subject somewhere on the wheel", () => {
-    for (const hue of [...GLOWING_HUES, ...COATED_HUES]) {
-      expect(hue).toBeGreaterThanOrEqual(0);
-      expect(hue).toBeLessThan(360);
-    }
-  });
-
-  it("keeps the subjects of a room out of each other's part of the wheel", () => {
-    // Three subjects in one family of the wheel read as a mistake rather than
-    // as a choice, and two hues a shopper cannot tell apart demonstrate one.
-    for (const hues of [GLOWING_HUES, COATED_HUES]) {
-      for (let one = 0; one < hues.length; one += 1) {
-        for (let other = one + 1; other < hues.length; other += 1) {
-          const apart = Math.abs((hues[one] ?? 0) - (hues[other] ?? 0));
-
-          expect(Math.min(apart, 360 - apart)).toBeGreaterThan(40);
-        }
-      }
-    }
-  });
-});
+/* ---------------------------------------------------------- the placement */
 
 describe("towardOf", () => {
   it("stands a subject on the eye's own line as far in front as it is out", () => {
@@ -150,6 +152,31 @@ describe("towardOf", () => {
 
   it("answers negative for a subject behind the middle", () => {
     expect(towardOf({ x: -1, z: -1, scale: 0.5, turn: 0 })).toBeLessThan(0);
+  });
+});
+
+describe("seenFrom", () => {
+  const aside = (placement: Placement): number => (placement.x - placement.z) * Math.SQRT1_2;
+
+  it("stands a subject as far in front of the middle as asked", () => {
+    for (const toward of [-1.2, 0, 0.85]) {
+      expect(towardOf(seenFrom(toward, 0.3, 0.5, 0))).toBeCloseTo(toward, 12);
+    }
+  });
+
+  it("stands it as far to the right of the eye's line as asked", () => {
+    for (const to of [-0.7, 0, 0.4]) {
+      expect(aside(seenFrom(0.5, to, 0.5, 0))).toBeCloseTo(to, 12);
+    }
+  });
+
+  it("turns it to face the eye, and away from that by `facing`", () => {
+    expect(seenFrom(0, 0, 0.5, 0).turn).toBe(CORNER_BEARING);
+    expect(seenFrom(0, 0, 0.5, 0.24).turn).toBeCloseTo(CORNER_BEARING + 0.24, 12);
+  });
+
+  it("keeps the size it was given", () => {
+    expect(seenFrom(0.85, 0.02, 0.52, 0.5).scale).toBe(0.52);
   });
 });
 
@@ -178,12 +205,16 @@ describe("frontOf", () => {
     });
   });
 
-  it("reaches around the near subject of the room it is asked about", () => {
-    const front = frontOf(STANDING_IN.coating);
+  it("reaches no further than the whole arrangement does", () => {
+    const standing: readonly Placement[] = [
+      seenFrom(0.85, 0.02, 0.52, 0.5),
+      seenFrom(-0.75, 0.7, 0.46, -0.95),
+    ];
+    const front = frontOf(standing);
 
     expect(front.toward).toBeGreaterThan(0);
     expect(front.reach).toBeGreaterThan(0);
-    expect(front.reach).toBeLessThanOrEqual(reachOf(STANDING_IN.coating));
+    expect(front.reach).toBeLessThanOrEqual(reachOf(standing));
   });
 });
 
@@ -204,46 +235,5 @@ describe("reachOf", () => {
     const far: Placement = { x: 0, z: 2, scale: 0.2, turn: 0 };
 
     expect(reachOf([near, far])).toBe(reachOf([far]));
-  });
-});
-
-describe("restingOf", () => {
-  /** A shape with a point one above the middle, one below, and one in front. */
-  const SHAPE = [0, 1, 0, 0, -1, 0, 0.5, 0, 1];
-
-  it("leaves an untilted shape standing on its own lowest point", () => {
-    const resting = restingOf(SHAPE, 0);
-
-    expect(resting.drop).toBeCloseTo(1, 12);
-    expect(resting.reach).toBeCloseTo(Math.hypot(0.5, 1), 12);
-  });
-
-  it("swaps a shape's height for its depth when it is laid flat", () => {
-    const resting = restingOf(SHAPE, -Math.PI / 2);
-
-    // What was above the middle is now behind it and what was below is now in
-    // front, so nothing is left underneath and the depth it reaches is the
-    // height it had.
-    expect(resting.drop).toBeCloseTo(0, 12);
-    expect(resting.reach).toBeCloseTo(1, 12);
-  });
-
-  it("never sinks a shape into the floor", () => {
-    // Nothing below its own middle, so there is nothing to lift it off.
-    expect(restingOf([0, 1, 0, 0, 2, 0], 0).drop).toBe(0);
-  });
-
-  it("ignores a trailing point it was handed only part of", () => {
-    expect(restingOf([0, 1, 0, 0, -1], 0)).toEqual(restingOf([0, 1, 0], 0));
-  });
-
-  it("lays a shape onto its back without turning it over", () => {
-    // The point in front of the middle comes up off the floor and the point
-    // behind it goes down onto it, which is what lying back means. The point
-    // above the middle stays above it, which is what stops a shape from going
-    // over onto its own face.
-    expect(restingOf([0, 0, 1], RESTING_TILT).drop).toBe(0);
-    expect(restingOf([0, 0, -1], RESTING_TILT).drop).toBeGreaterThan(0);
-    expect(restingOf([0, 1, 0], RESTING_TILT).drop).toBe(0);
   });
 });

@@ -1,11 +1,12 @@
 /**
  * A finisher, rendered as a room with its effect demonstrated in it.
  *
- * The picture is `../artwork/finisher-scene.ts` and the movement is
- * `../artwork/movement.ts`. What is left here is the part that is genuinely a
- * component: owning a canvas, turning the pointer or the phone's tilt into
- * whatever this room reads, and running the frames between where the room is
- * and where it is wanted. Which of the three rooms it is never appears in here.
+ * The picture is `../artwork/scenes.ts`, drawn by `../artwork/render.ts`, and
+ * the movement is `../artwork/movement.ts`. What is left here is the part
+ * that is genuinely a component: owning a canvas, turning the pointer or the
+ * phone's tilt into whatever this room reads, and running the frames between
+ * where the room is and where it is wanted. Which of the three rooms it is
+ * never appears in here.
  *
  * The mesh the rooms are built around arrives over the network, so a stage can
  * open before there is anything to stand in it. Until then it shows the
@@ -22,7 +23,6 @@ import { Option, type FinishApplication, type ProductImage } from "@prism/shared
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { match } from "ts-pattern";
 import { usePrefersStillness } from "../../../shared/motion/use-stillness.ts";
-import { openStage, type Stage } from "../artwork/finisher-scene.ts";
 import { studio } from "../artwork/gl.ts";
 import { askForTilt, followTilt, tilting } from "../artwork/gyro.ts";
 import { meshNow, whenMesh } from "../artwork/mesh.ts";
@@ -37,6 +37,7 @@ import {
   type Movement,
 } from "../artwork/movement.ts";
 import { pointAt } from "../artwork/pointer.ts";
+import { openRoom, type RoomStage } from "../artwork/render.ts";
 import { Photograph } from "./Photograph.tsx";
 
 /**
@@ -78,7 +79,7 @@ export const FinisherStage = ({
 
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const stage = useRef<Option<Stage>>(Option.none);
+  const stage = useRef<Option<RoomStage>>(Option.none);
 
   /** Read inside the frame loop, which outlives the render that started it. */
   const moving = useRef<Movement>(atRest(application));
@@ -87,7 +88,7 @@ export const FinisherStage = ({
   const lastFrameAt = useRef(0);
 
   const drawNow = (): void =>
-    Option.match<Stage, void>({
+    Option.match<RoomStage, void>({
       onSome: (open) => open.draw(viewOf(moving.current)),
       onNone: () => undefined,
     })(stage.current);
@@ -197,14 +198,14 @@ export const FinisherStage = ({
      * with the mesh in hand is one that never will be, and gives up.
      */
     const attempt = (): void =>
-      Option.match<Stage, void>({
+      Option.match<RoomStage, void>({
         onSome: (open) => {
           stage.current = Option.some(open);
           open.draw(viewOf(moving.current));
           setShowing(RENDERED);
         },
         onNone: () => setShowing(Option.isSome(meshNow()) ? STILL : WAITING),
-      })(Option.flatMap(openStage)(Option.fromNullable(canvasRef.current)));
+      })(Option.flatMap(openRoom)(Option.fromNullable(canvasRef.current)));
 
     attempt();
     const forget = whenMesh(attempt);
@@ -218,7 +219,7 @@ export const FinisherStage = ({
       })(frame.current);
       frame.current = Option.none;
 
-      Option.match<Stage, void>({
+      Option.match<RoomStage, void>({
         onSome: (open) => open.close(),
         onNone: () => undefined,
       })(stage.current);

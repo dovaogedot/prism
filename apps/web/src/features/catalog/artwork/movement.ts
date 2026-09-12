@@ -17,7 +17,6 @@ import type { FinishApplication } from "@prism/shared";
 import { match } from "ts-pattern";
 import { CORNER_BEARING } from "./arrangement.ts";
 import { arrived, SETTLE_SECONDS, toward } from "./ease.ts";
-import type { FinisherView } from "./finisher-scene.ts";
 import { hueOffsetAt, SETTLED_DEGREES, unturned } from "./hueshift.ts";
 import { formed, lagged, LAGS, restingAt, type Lamp } from "./lightring.ts";
 import {
@@ -29,7 +28,7 @@ import {
   type Orbit,
 } from "./orbit.ts";
 import type { Point, Size } from "./pointer.ts";
-import { LAMP_RADIUS, RING_AT_REST } from "./rooms.ts";
+import { type FinisherView, LAMP_RADIUS, RING_AT_REST } from "./scenes.ts";
 import { AT_REST } from "./viewpoint.ts";
 
 /**
@@ -194,19 +193,19 @@ export const stopped = (movement: Movement): Movement =>
 export const viewOf = (movement: Movement): FinisherView =>
   match(movement)
     .with({ applies: "roughness" }, ({ roughness, lamps }) => ({
-      applies: "roughness" as const,
+      _tag: "Roughness" as const,
       roughness,
       lamps,
       viewpoint: AT_REST,
     }))
     .with({ applies: "emission" }, ({ emission, orbit }) => ({
-      applies: "emission" as const,
+      _tag: "Emission" as const,
       emission,
       orbit,
       viewpoint: AT_REST,
     }))
     .with({ applies: "coating" }, ({ coatingNanometers, hueOffset }) => ({
-      applies: "coating" as const,
+      _tag: "Coating" as const,
       coatingNanometers,
       hueOffset,
       viewpoint: AT_REST,
