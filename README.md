@@ -703,7 +703,10 @@ light leaving the face and the rest is left to the paint, because light leaves a
 same strength wherever on it it leaves from — a face drawn from its glow alone carries one
 value over the whole of itself, which is a patch of color with a head-shaped edge. The room
 has lamps of its own for the same reason, so there is a lit side and an unlit one to read
-the shape off.
+the shape off. At night the room keeps its ambient light, the light that arrives from
+everywhere at once, well under those lamps, because ambient light lights every side alike
+and fills in the unlit side the lamps leave. Measured on the dark shelf, the darkest tenth of
+the faintest glow's stage sits at 2% lightness; `finisher-rooms.spec.ts` holds it under 5%.
 
 **The two ends of the glow range have to look like two ends.** The finishers on that shelf
 sit in the top half of the range, so a spill straight in the amount separates them by the
@@ -711,9 +714,9 @@ same fraction they differ by, which is a difference nobody sees. Three things mo
 instead: the room dims, the light leaving the face rises, and the height a pixel has to
 reach before it spills comes down — from over what a lit face reaches, where nothing spills
 at all, to under its shaded side, where the whole subject does. Measured on the shelf, in the
-dark theme a glow is dressed for: the outer fifth of a stage carries a seventh of full
-lightness at the faintest finisher on it, and close to twice that at the hardest.
-`finisher-rooms.spec.ts` holds the ratio at seven tenths.
+dark theme a glow is dressed for: the outer fifth of a stage carries a tenth of full
+lightness at the faintest finisher on it, and over two and a half times that at the hardest.
+`finisher-rooms.spec.ts` holds the ratio at 1.7 or more.
 
 **A coated room is framed on the near subject**, not on the floor it stands on: the eye
 stands where that one subject fills most of the frame, and low enough to see across its
@@ -770,8 +773,8 @@ first is turned away from, so a face has a dark side rather than a black one.
 
 **Every room is dressed twice.** A room is looked at through a page that is either bright or
 dark, and a wall mixed to sit inside a bright page is a lamp in a dark one. So each room keeps
-two sets of paint, light level, fill share and spill threshold, and picks by the theme in force
-when it is drawn.
+two sets of paint, light level, ambient share, fill share and spill threshold, and picks by the
+theme in force when it is drawn.
 
 **A room is the same room for every finisher shown in it.** How many subjects there are,
 where they stand, how big they are, which way they face and what they are painted is written
@@ -805,7 +808,8 @@ arrives and simply stands still.
 [`finisher-rooms.spec.ts`](e2e/specs/finisher-rooms.spec.ts) drives all of it in a real
 browser — each finish draws a room, the pointer changes the pixels, each corner lays
 overlapping shadows and lights both its walls unevenly under both themes, a glowing room
-keeps its corners well under the faces glowing in it even with the spill drawn around them,
+keeps its corners well under the faces glowing in it even with the spill drawn around them
+and keeps its ambient light low at night,
 a coating room frames its near subject large and whole and shows colors nothing in it was
 painted, reduced motion draws once and stays put, and the switch off leaves stills and no
 canvases across a reload.

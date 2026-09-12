@@ -238,6 +238,53 @@ export const outerRings = (page: Page): Promise<readonly number[]> =>
     }),
   );
 
+/**
+ * How light the darkest tenth of each stage is, in percent lightness.
+ *
+ * That tenth is the part of the room no lamp and no glow reaches, so what
+ * lights it is only the light that arrives from everywhere at once. A peak or
+ * a mean would answer with the lamps and the spill instead, which cover the
+ * rest of the stage.
+ */
+export const darkestTenths = (page: Page): Promise<readonly number[]> =>
+  page.evaluate(() =>
+    [
+      ...document.querySelectorAll<HTMLCanvasElement>("canvas.stage__canvas"),
+    ].map((canvas) => {
+      const context = canvas.getContext("2d");
+      if (context === null) return 0;
+
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      // Indexed by the brightest channel plus the dimmest, which is twice the
+      // lightness in 8-bit steps and keeps its half steps whole.
+      const counts = new Array<number>(511).fill(0);
+      let counted = 0;
+
+      for (let y = 0; y < canvas.height; y += 2) {
+        for (let x = 0; x < canvas.width; x += 2) {
+          const at = (y * canvas.width + x) * 4;
+          const [red, green, blue] = [
+            pixels[at] ?? 0,
+            pixels[at + 1] ?? 0,
+            pixels[at + 2] ?? 0,
+          ];
+          const doubled = Math.max(red, green, blue) + Math.min(red, green, blue);
+
+          counts[doubled] = (counts[doubled] ?? 0) + 1;
+          counted += 1;
+        }
+      }
+
+      let below = 0;
+      const doubled = counts.findIndex((count) => {
+        below += count;
+        return below >= counted / 10;
+      });
+
+      return (Math.max(0, doubled) / 2 / 255) * 100;
+    }),
+  );
+
 /** Where the colored part of one stage is, in fractions of its own edges. */
 export type ColorBox = Readonly<{
   /** The left edge of it, 0 being the left of the stage. */

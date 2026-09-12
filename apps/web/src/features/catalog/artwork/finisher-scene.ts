@@ -105,8 +105,17 @@ type Dressing = Readonly<{
   paint: number;
   /** What the room's own light level is worth here, as a multiple of it. */
   light: number;
-  /** How much of that light level is sky and bounce rather than lamps. */
+  /** How much sky and bounce the ambient light carries, as a multiple of `ambient`. */
   fill: number;
+  /**
+   * How much of the room's light level arrives from everywhere at once, as a
+   * multiple of it.
+   *
+   * That is the surroundings every surface reflects, the sky and bounce that
+   * `fill` sets, and the paint the room fades into beyond its lamps. The
+   * lamps are not part of it.
+   */
+  ambient: number;
   /**
    * How high the room's own surfaces sit, in linear light.
    *
@@ -139,9 +148,10 @@ const CORNER_DRESSING: Dressings = {
     paint: CORNER_PAINT.light,
     light: 0.66,
     fill: 0.25,
+    ambient: 1,
     spillFrom: 0.6,
   },
-  dark: { paint: CORNER_PAINT.dark, light: 1.25, fill: 0.3, spillFrom: 0.15 },
+  dark: { paint: CORNER_PAINT.dark, light: 1.25, fill: 0.3, ambient: 1, spillFrom: 0.15 },
 };
 
 /**
@@ -154,10 +164,16 @@ const CORNER_DRESSING: Dressings = {
  * demonstration goes with it. The dark room is the dimmer of the two all the
  * same: a page that is already dark asks less of a room for its glow to be the
  * brightest thing on it.
+ *
+ * The dark room holds its ambient well under its lamps. Light arriving from
+ * everywhere at once lights every side of a subject alike, and a subject lit
+ * on every side reads as a painted object that also glows rather than as a
+ * light in a dark room. The lamps still shade the subjects, and the glow still
+ * lays its pools on the floor.
  */
 const OPEN_DRESSING: Dressings = {
-  light: { paint: 0xb0b0b0, light: 0.95, fill: 0.8, spillFrom: 0.55 },
-  dark: { paint: 0x5a5a5a, light: 0.6, fill: 0.5, spillFrom: 0 },
+  light: { paint: 0xb0b0b0, light: 0.95, fill: 0.8, ambient: 1, spillFrom: 0.55 },
+  dark: { paint: 0x5a5a5a, light: 0.6, fill: 0.5, ambient: 0.35, spillFrom: 0 },
 };
 
 /** How many lamps hang on a corner's ring. */
@@ -464,13 +480,14 @@ type Dressed = Readonly<{
 const dressRoom = (room: Room, finish: FinisherRoom): Dressed => {
   const dressing = room.dressings[themeNow()];
   const light = finish.light * dressing.light;
+  const ambient = dressing.ambient * light;
 
   room.paint.color.setHex(dressing.paint, SRGBColorSpace);
-  room.scene.environmentIntensity = light;
-  room.fill.intensity = dressing.fill * light;
+  room.scene.environmentIntensity = ambient;
+  room.fill.intensity = dressing.fill * ambient;
   // What is beyond the room is the room's own paint with no lamp on it, so a
   // dim room fades into the dark instead of ending against a lit wall.
-  room.clear.setHex(dressing.paint, SRGBColorSpace).multiplyScalar(Math.min(1, light));
+  room.clear.setHex(dressing.paint, SRGBColorSpace).multiplyScalar(Math.min(1, ambient));
 
   return { light, spillFrom: dressing.spillFrom };
 };

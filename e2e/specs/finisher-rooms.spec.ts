@@ -15,6 +15,7 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   colorBoxes,
   corners,
+  darkestTenths,
   DRAWN,
   drawn,
   hueSpread,
@@ -136,6 +137,28 @@ test.describe("a machine that can draw", () => {
 
     expect(rings.length).toBeGreaterThan(1);
     expect(Math.max(...rings)).toBeGreaterThanOrEqual(Math.min(...rings) * GLOW_SPREAD);
+  });
+
+  /**
+   * The most lightness the darkest tenth of a glowing room may reach at night,
+   * as a percentage.
+   *
+   * That tenth is lit only by the light that arrives from everywhere at once,
+   * and the dark room keeps that low so its glow is what lights the subjects.
+   * It is read on the faintest glow on the shelf, because a harder glow spills
+   * far enough to reach into its own darkest tenth.
+   */
+  const NIGHT_AMBIENT_CEILING = 5;
+
+  test("keeps the ambient light low in a glowing room at night", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.goto(shelf("fluorescent"));
+    await drawn(page);
+
+    const tenths = await darkestTenths(page);
+
+    expect(tenths.length).toBeGreaterThan(0);
+    expect(Math.min(...tenths)).toBeLessThanOrEqual(NIGHT_AMBIENT_CEILING);
   });
 
   /**
