@@ -32,6 +32,12 @@ const clampUnit = (value: number): number => Math.max(-1, Math.min(1, value));
  */
 const unsigned = (value: number): number => (value === 0 ? 0 : value);
 
+/** The same offset held inside the stage: each axis from -1 to 1, and never minus zero. */
+export const withinStage = (offset: Offset): Offset => ({
+  across: unsigned(clampUnit(offset.across)),
+  down: unsigned(clampUnit(offset.down)),
+});
+
 /**
  * Where the pointer is inside the stage.
  *
@@ -46,8 +52,20 @@ export const offsetIn = (pointer: Point, stage: Size): Offset => {
 
   if (halfWidth <= 0 || halfHeight <= 0) return MIDDLE;
 
-  return {
-    across: unsigned(clampUnit((pointer.x - halfWidth) / halfWidth)),
-    down: unsigned(clampUnit((pointer.y - halfHeight) / halfHeight)),
-  };
+  return withinStage({
+    across: (pointer.x - halfWidth) / halfWidth,
+    down: (pointer.y - halfHeight) / halfHeight,
+  });
 };
+
+/**
+ * The place inside the stage an offset reads as.
+ *
+ * The way back from `offsetIn`, for anything that reads as a place on the
+ * stage without being a pointer over it: `offsetIn` of the place is the
+ * offset again, for any offset inside the stage.
+ */
+export const pointAt = (offset: Offset, stage: Size): Point => ({
+  x: ((offset.across + 1) * stage.width) / 2,
+  y: ((offset.down + 1) * stage.height) / 2,
+});

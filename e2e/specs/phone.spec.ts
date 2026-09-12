@@ -4,11 +4,11 @@
  * Below the width the filters stand beside the results at, the header keeps
  * the wordmark, the account and a button that opens a drawer, and the drawer
  * slides in holding the switches, signing out and, on the catalog, the
- * filters. The sort and the filters are icons on the search box's row, and a
- * finger drawn across a picture turns it. What these cover is that nothing in
- * the header wraps or runs past its edge, that each of those things is where
- * it is meant to be and works from there, and that the drawer moves rather
- * than appears.
+ * filters. The sort and the filters are icons on the search box's row. Tilting
+ * the phone turns the pictures, and where the phone reports no tilt, a finger
+ * drawn across a picture does. What these cover is that nothing in the header
+ * wraps or runs past its edge, that each of those things is where it is meant
+ * to be and works from there, and that the drawer moves rather than appears.
  */
 
 import { devices, expect, test, type Page } from "@playwright/test";
@@ -114,6 +114,44 @@ const slide = (page: Page, button: "Open menu" | "Close menu") =>
 
     return { from, to, width, moves: moving.map((animation) => animation.transitionProperty) };
   }, button);
+
+/** A shelf of each kind of picture a finger or a tilt moves, and what to call it. */
+const DRAWING = [
+  ["a color", "/?category=color"],
+  ["a finisher's room", "/?category=finisher"],
+] as const;
+
+/** Reports a tilt to the page the way a phone does, in degrees. */
+const tiltTo = (page: Page, beta: number, gamma: number): Promise<void> =>
+  page.evaluate(
+    ([front, side]) => {
+      window.dispatchEvent(
+        new DeviceOrientationEvent("deviceorientation", { alpha: 0, beta: front, gamma: side }),
+      );
+    },
+    [beta, gamma] as const,
+  );
+
+/**
+ * Waits while the page draws this many frames.
+ *
+ * Counted in frames rather than on the clock, because a stage moves on the
+ * frames it is given; one that was going to move has moved well inside a
+ * second's worth.
+ */
+const framesPass = (page: Page, count: number): Promise<void> =>
+  page.evaluate(
+    (left) =>
+      new Promise<void>((done) => {
+        const tick = (remaining: number): void => {
+          if (remaining <= 0) done();
+          else requestAnimationFrame(() => tick(remaining - 1));
+        };
+
+        tick(left);
+      }),
+    count,
+  );
 
 /** Sends one step of a single finger to the page, at a point in CSS pixels. */
 type Finger = (kind: "touchStart" | "touchMove" | "touchEnd", x: number, y: number) => Promise<void>;
@@ -295,10 +333,7 @@ test.describe("a phone that can draw", () => {
     await pretendGpu(page);
   });
 
-  for (const [what, shelf] of [
-    ["a color", "/?category=color"],
-    ["a finisher's room", "/?category=finisher"],
-  ] as const) {
+  for (const [what, shelf] of DRAWING) {
     test(`turns ${what} under a finger drawn sideways, and puts it back when it lifts`, async ({
       page,
     }) => {
@@ -355,5 +390,56 @@ test.describe("a phone that can draw", () => {
     await finger("touchEnd", 0, 0);
 
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before);
+  });
+
+  for (const [what, shelf] of DRAWING) {
+    test(`turns ${what} as the phone tilts`, async ({ page }) => {
+      await page.goto(shelf);
+      await expect(results(page).getByRole("article").first()).toBeVisible(DRAWN);
+      await drawn(page);
+
+      const resting = await signature(page);
+
+      expect(resting).not.toBe("");
+
+      // The first reading is how the phone is held, which reads as the middle;
+      // the second brings its right edge up.
+      await tiltTo(page, 45, 0);
+      await tiltTo(page, 45, -15);
+
+      await expect.poll(() => signature(page), { timeout: 30_000 }).not.toBe(resting);
+    });
+  }
+
+  test("leaves a finger to the page once the phone tilts", async ({ page }) => {
+    await page.goto("/?category=color");
+    await expect(results(page).getByRole("article").first()).toBeVisible(DRAWN);
+    await drawn(page);
+
+    const stage = page.locator("canvas.stage__canvas").first();
+
+    await stage.scrollIntoViewIfNeeded();
+
+    const box = await stage.boundingBox();
+
+    expect(box).not.toBeNull();
+    if (box === null) return;
+
+    const resting = await signature(page);
+    const finger = await fingerOn(page);
+    const y = box.y + box.height / 2;
+
+    // Held the way it is held, so the tilt keeps the picture where it is.
+    await tiltTo(page, 45, 0);
+
+    await finger("touchStart", box.x + box.width * 0.5, y);
+    for (const along of [0.4, 0.3, 0.2, 0.1]) {
+      await finger("touchMove", box.x + box.width * along, y);
+    }
+    await framesPass(page, 90);
+
+    expect(await signature(page)).toBe(resting);
+
+    await finger("touchEnd", 0, 0);
   });
 });

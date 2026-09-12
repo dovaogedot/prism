@@ -564,7 +564,8 @@ document, so there is exactly one renderer, one scene, one slab and one material
 every shader feature it can use switched on permanently at a value near zero, because
 three's program key is built from which of them are above zero and a material that turned
 one off between two colors would compile a second shader mid-scroll. Only one stage is ever
-under the pointer; the others are still pictures holding whatever was last drawn on them.
+under the pointer, and a tilted phone turns only the stages on screen; the others are still
+pictures holding whatever was last drawn on them.
 
 **The room is a room.** A gloss face is a picture of its surroundings, so a scene with
 lights and nothing to reflect renders as plastic. `PMREMGenerator` convolves a small scene
@@ -638,15 +639,21 @@ the reflection and a bright pigment's own color is louder than it.
 
 
 The split is the same one the rest of the codebase uses.
-[`tilt.ts`](apps/web/src/features/catalog/artwork/tilt.ts) and `surfaces.ts` are arithmetic,
+[`tilt.ts`](apps/web/src/features/catalog/artwork/tilt.ts), `lean.ts` and `surfaces.ts` are arithmetic,
 pure and unit-tested and unaware that a GPU exists;
 [`gl.ts`](apps/web/src/features/catalog/artwork/gl.ts) holds the renderer, the composer and
 the environment, and `scene.ts` builds the slab's room on top of it. Those two are where
 referential transparency stops, because a GPU context is a resource rather than a value. The component between them owns a canvas, turns the pointer into an angle, and
 runs the frames — none of it through React state, because re-rendering a card's subtree
 sixty times a second to move a number no React tree reads is not what React is for.
-A finger is a pointer too, for as long as it is down: drawn sideways it turns the picture,
-drawn up or down it scrolls the page, and lifted it puts the picture back.
+A phone that reports how it is held turns the picture by being tilted. What the picture
+follows is how far the phone has leaned from the way it has been held over the last moment,
+so a phone held still at any angle lets the picture settle back, and the edge that comes up
+is the one the picture turns toward, whichever way the screen is turned. iOS asks the visitor
+before it reports a tilt, and the first tap on a picture is what asks. A phone that reports
+no tilt falls back to the finger, which is a pointer too for as long as it is down: drawn
+sideways it turns the picture, drawn up or down it scrolls the page, and lifted it puts the
+picture back. Once the tilt is reporting, a finger is left to the page.
 
 A browser with no WebGL2 gets the stills instead, and so does one whose "GPU" is really the
 CPU — a grid of stills that arrives at once is a better page than a grid of lit ones that
@@ -1001,7 +1008,9 @@ and bound parameters; which products get stills and the words each still is read
 the product table's nullable columns become a discriminated union, including every shape
 the variant constraint forbids; and the arithmetic and tables behind the artwork, pinned by
 their relationships rather than by their tuned constants — the pointer turns the slab away
-from the finger and gets there at the same speed whatever the framerate; a lacquer thins as
+from the finger and gets there at the same speed whatever the framerate; a tilt turns it
+toward the edge that comes up, whichever way the screen is turned, and the posture a tilt is
+measured from catches up at the same speed whatever the framerate; a lacquer thins as
 the pigment under it coarsens and is gone by chalk; the arc a color is sold with is the arc
 its coating actually shows; the grain tile wraps, because a slab with a seam down its
 face is a slab with a mistake on it; a finisher's room stands its subjects clear of each
@@ -1035,9 +1044,10 @@ be a worse product and no safer.
 a browser: that the filter rail does not reflow, that dragging the hue ring works, that the
 rail offers each category only the controls that category has, that on a phone the header
 stays on one line, the drawer slides in holding the filters, the switches and signing out,
-the sort and the filters are icons beside the search box, and a finger drawn across a
-picture turns it while one drawn up the page still scrolls it, that the artwork draws and
-answers the pointer and stays inside its own stage, and that the auth routes send
+the sort and the filters are icons beside the search box, a picture turns as the phone
+tilts and a finger is then left to the page, and on a phone that reports no tilt a finger
+drawn across a picture turns it while one drawn up the page still scrolls it, that the
+artwork draws and answers the pointer and stays inside its own stage, and that the auth routes send
 you where they should — including that signing in lands on the catalog rather than the
 account page, which depends on a redirect and a form navigation resolving in the same tick.
 

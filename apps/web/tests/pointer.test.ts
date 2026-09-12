@@ -7,7 +7,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { MIDDLE, offsetIn } from "../src/features/catalog/artwork/pointer.ts";
+import {
+  MIDDLE,
+  offsetIn,
+  pointAt,
+  withinStage,
+} from "../src/features/catalog/artwork/pointer.ts";
 
 const STAGE = { width: 200, height: 100 };
 
@@ -46,5 +51,39 @@ describe("offsetIn", () => {
   it("never reports the negative zero", () => {
     expect(Object.is(at(100, 50).across, 0)).toBe(true);
     expect(Object.is(at(100, 50).down, 0)).toBe(true);
+  });
+});
+
+describe("withinStage", () => {
+  it("leaves an offset inside the stage as it is", () => {
+    expect(withinStage({ across: 0.25, down: -0.75 })).toEqual({ across: 0.25, down: -0.75 });
+  });
+
+  it("stops each axis at the edge", () => {
+    expect(withinStage({ across: 3, down: -3 })).toEqual({ across: 1, down: -1 });
+  });
+
+  it("never hands back the negative zero", () => {
+    expect(Object.is(withinStage({ across: -0, down: -0 }).across, 0)).toBe(true);
+    expect(Object.is(withinStage({ across: -0, down: -0 }).down, 0)).toBe(true);
+  });
+});
+
+describe("pointAt", () => {
+  it("puts the middle in the middle", () => {
+    expect(pointAt(MIDDLE, STAGE)).toEqual({ x: 100, y: 50 });
+  });
+
+  it("is the way back from offsetIn", () => {
+    for (const offset of [
+      { across: -1, down: -1 },
+      { across: 0.5, down: -0.25 },
+      { across: 1, down: 1 },
+    ]) {
+      const back = offsetIn(pointAt(offset, STAGE), STAGE);
+
+      expect(back.across).toBeCloseTo(offset.across, 10);
+      expect(back.down).toBeCloseTo(offset.down, 10);
+    }
   });
 });

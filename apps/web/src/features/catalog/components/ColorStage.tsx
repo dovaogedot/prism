@@ -3,8 +3,9 @@
  *
  * The picture itself is `../artwork/scene.ts` — one WebGL context that every
  * stage on the page shares. What is left here is the part that is genuinely a
- * component: owning a canvas, turning the pointer into an angle, and running
- * the frames between the angle the slab is at and the angle it is wanted at.
+ * component: owning a canvas, turning the pointer or the phone's tilt into an
+ * angle, and running the frames between the angle the slab is at and the
+ * angle it is wanted at.
  *
  * None of that goes through React state. A dozen of these are on screen and
  * only one is ever moving, and re-rendering a card's subtree sixty times a
@@ -15,6 +16,8 @@ import { Option, type ProductImage } from "@prism/shared";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { match } from "ts-pattern";
 import { usePrefersStillness } from "../../../shared/motion/use-stillness.ts";
+import { askForTilt, followTilt, tilting } from "../artwork/gyro.ts";
+import { pointAt } from "../artwork/pointer.ts";
 import { openStage, type Stage } from "../artwork/scene.ts";
 import type { Finishing } from "../artwork/surfaces.ts";
 import { approach, REST, settled, tiltAt, type Tilt } from "../artwork/tilt.ts";
@@ -58,6 +61,7 @@ export const ColorStage = ({
   const still = usePrefersStillness();
   const [showing, setShowing] = useState<Showing>(RENDERED);
 
+  const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stage = useRef<Option<Stage>>(Option.none);
 
@@ -105,12 +109,15 @@ export const ColorStage = ({
   /**
    * Turn the slab toward where the pointer or the finger is over it.
    *
-   * A finger turns it while it is down. The stage leaves a drag up or down to
-   * the page, so a finger drawn sideways turns the slab and one drawn up or
-   * down scrolls past it. Lifting the finger puts the slab back, the same as a
-   * pointer leaving.
+   * A finger turns it while it is down, on a phone that reports no tilt; where
+   * one does, the tilt turns it and a finger is left to the page. The stage
+   * leaves a drag up or down to the page, so a finger drawn sideways turns the
+   * slab and one drawn up or down scrolls past it. Lifting the finger puts the
+   * slab back, the same as a pointer leaving.
    */
   const aimAt = (event: PointerEvent<HTMLDivElement>): void => {
+    if (event.pointerType === "touch" && tilting()) return;
+
     const bounds = event.currentTarget.getBoundingClientRect();
 
     target.current = still
@@ -119,6 +126,44 @@ export const ColorStage = ({
 
     startMoving();
   };
+
+  /** Put the slab back as the pointer leaves, unless the tilt is what turns it. */
+  const letGo = (event: PointerEvent<HTMLDivElement>): void => {
+    if (event.pointerType === "touch" && tilting()) return;
+
+    target.current = REST;
+    startMoving();
+  };
+
+  // Turned by the phone's tilt while the stage is on screen. Off screen it
+  // follows nothing, so a tilt redraws only the stages somebody can see.
+  useEffect(() => {
+    const element = stageRef.current;
+
+    if (still || element === null) return undefined;
+
+    let forget = (): void => undefined;
+
+    const observer = new IntersectionObserver((entries) => {
+      forget();
+      forget =
+        entries.at(-1)?.isIntersecting === true
+          ? followTilt((lean) => {
+              const bounds = element.getBoundingClientRect();
+
+              target.current = tiltAt(pointAt(lean, bounds), bounds);
+              startMoving();
+            })
+          : () => undefined;
+    });
+
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+      forget();
+    };
+  }, [still, showing]);
 
   useEffect(() => {
     const opened = Option.flatMap(openStage)(Option.fromNullable(canvasRef.current));
@@ -164,12 +209,15 @@ export const ColorStage = ({
     ))
     .with({ _tag: "Rendered" }, () => (
       <div
+        ref={stageRef}
         className={`stage ${className}`}
         onPointerDown={aimAt}
         onPointerMove={aimAt}
-        onPointerLeave={() => {
-          target.current = REST;
-          startMoving();
+        onPointerLeave={letGo}
+        // A finger lifting is something the visitor did, which is when a
+        // browser that asks before reporting a tilt lets the page ask.
+        onPointerUp={(event) => {
+          if (event.pointerType !== "mouse") askForTilt();
         }}
       >
         <canvas

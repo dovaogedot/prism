@@ -3,9 +3,9 @@
  *
  * The picture is `../artwork/finisher-scene.ts` and the movement is
  * `../artwork/movement.ts`. What is left here is the part that is genuinely a
- * component: owning a canvas, turning the pointer into whatever this room
- * reads, and running the frames between where the room is and where it is
- * wanted. Which of the three rooms it is never appears in here.
+ * component: owning a canvas, turning the pointer or the phone's tilt into
+ * whatever this room reads, and running the frames between where the room is
+ * and where it is wanted. Which of the three rooms it is never appears in here.
  *
  * The mesh the rooms are built around arrives over the network, so a stage can
  * open before there is anything to stand in it. Until then it shows the
@@ -24,6 +24,7 @@ import { match } from "ts-pattern";
 import { usePrefersStillness } from "../../../shared/motion/use-stillness.ts";
 import { openStage, type Stage } from "../artwork/finisher-scene.ts";
 import { studio } from "../artwork/gl.ts";
+import { askForTilt, followTilt, tilting } from "../artwork/gyro.ts";
 import { meshNow, whenMesh } from "../artwork/mesh.ts";
 import {
   advanced,
@@ -35,6 +36,7 @@ import {
   viewOf,
   type Movement,
 } from "../artwork/movement.ts";
+import { pointAt } from "../artwork/pointer.ts";
 import { Photograph } from "./Photograph.tsx";
 
 /**
@@ -74,6 +76,7 @@ export const FinisherStage = ({
   const still = usePrefersStillness();
   const [showing, setShowing] = useState<Showing>(WAITING);
 
+  const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stage = useRef<Option<Stage>>(Option.none);
 
@@ -119,12 +122,15 @@ export const FinisherStage = ({
   /**
    * Move the room toward where the pointer or the finger is over it.
    *
-   * A finger moves it while it is down. The stage leaves a drag up or down to
-   * the page, so a finger drawn sideways moves the room and one drawn up or
-   * down scrolls past it. Lifting the finger puts the room back, the same as
-   * a pointer leaving.
+   * A finger moves it while it is down, on a phone that reports no tilt; where
+   * one does, the tilt moves it and a finger is left to the page. The stage
+   * leaves a drag up or down to the page, so a finger drawn sideways moves the
+   * room and one drawn up or down scrolls past it. Lifting the finger puts the
+   * room back, the same as a pointer leaving.
    */
   const aimAt = (event: PointerEvent<HTMLDivElement>): void => {
+    if (event.pointerType === "touch" && tilting()) return;
+
     const bounds = event.currentTarget.getBoundingClientRect();
 
     moving.current = still
@@ -137,6 +143,44 @@ export const FinisherStage = ({
 
     startMoving();
   };
+
+  /** Put the room back as the pointer leaves, unless the tilt is what moves it. */
+  const letGo = (event: PointerEvent<HTMLDivElement>): void => {
+    if (event.pointerType === "touch" && tilting()) return;
+
+    moving.current = released(moving.current);
+    startMoving();
+  };
+
+  // Moved by the phone's tilt while the stage is on screen. Off screen it
+  // follows nothing, so a tilt redraws only the stages somebody can see.
+  useEffect(() => {
+    const element = stageRef.current;
+
+    if (still || element === null) return undefined;
+
+    let forget = (): void => undefined;
+
+    const observer = new IntersectionObserver((entries) => {
+      forget();
+      forget =
+        entries.at(-1)?.isIntersecting === true
+          ? followTilt((lean) => {
+              const bounds = element.getBoundingClientRect();
+
+              moving.current = aimedAt(moving.current, pointAt(lean, bounds), bounds);
+              startMoving();
+            })
+          : () => undefined;
+    });
+
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+      forget();
+    };
+  }, [still]);
 
   useEffect(() => {
     // Asked before the canvas is, because it is the cheap half of the answer:
@@ -192,12 +236,15 @@ export const FinisherStage = ({
 
   return (
     <div
+      ref={stageRef}
       className={`stage ${className}`}
       onPointerDown={aimAt}
       onPointerMove={aimAt}
-      onPointerLeave={() => {
-        moving.current = released(moving.current);
-        startMoving();
+      onPointerLeave={letGo}
+      // A finger lifting is something the visitor did, which is when a browser
+      // that asks before reporting a tilt lets the page ask.
+      onPointerUp={(event) => {
+        if (event.pointerType !== "mouse") askForTilt();
       }}
     >
       {match(showing)
