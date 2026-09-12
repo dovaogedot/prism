@@ -210,9 +210,9 @@
    *
    * A modal dialog held against the left edge at full height, so the browser
    * gives it focus, Escape and a backdrop. It slides in from the edge and back
-   * out, and the backdrop darkens and clears with it. `display` and `overlay`
-   * are carried through the transition so the dialog stays on screen until it
-   * has slid out.
+   * out, and the backdrop darkens and clears with it. It slides out while it is
+   * still open, marked `data-closing`, and is closed once it is out, so it
+   * stays on screen the whole way in every browser.
    */
   .drawer {
     position: fixed;
@@ -228,14 +228,15 @@
     background-color: var(--color-canvas);
     color: var(--color-ink);
     translate: -100% 0;
-    transition:
-      translate 240ms cubic-bezier(0.25, 1, 0.5, 1),
-      overlay 240ms allow-discrete,
-      display 240ms allow-discrete;
+    transition: translate 240ms cubic-bezier(0.25, 1, 0.5, 1);
   }
 
   .drawer[open] {
     translate: 0 0;
+  }
+
+  .drawer[open][data-closing] {
+    translate: -100% 0;
   }
 
   @starting-style {
@@ -246,14 +247,15 @@
 
   .drawer::backdrop {
     background-color: oklch(0% 0 0 / 0);
-    transition:
-      background-color 240ms cubic-bezier(0.25, 1, 0.5, 1),
-      overlay 240ms allow-discrete,
-      display 240ms allow-discrete;
+    transition: background-color 240ms cubic-bezier(0.25, 1, 0.5, 1);
   }
 
   .drawer[open]::backdrop {
     background-color: oklch(0% 0 0 / 0.4);
+  }
+
+  .drawer[open][data-closing]::backdrop {
+    background-color: oklch(0% 0 0 / 0);
   }
 
   @starting-style {

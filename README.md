@@ -1056,7 +1056,8 @@ be a worse product and no safer.
 *End-to-end* — Playwright against the running stack, for the things that only exist in
 a browser: that the filter rail does not reflow, that dragging the hue ring works, that the
 rail offers each category only the controls that category has, that on a phone the header
-stays on one line, the drawer slides in holding the filters, the switches and signing out,
+stays on one line, the drawer slides in holding the filters, the switches and signing out
+and slides back out still open, on a button or on Escape,
 the sort and the filters are icons beside the search box, a picture turns as the phone
 tilts and a finger is then left to the page, and on a phone that reports no tilt a finger
 drawn across a picture turns it while one drawn up the page still scrolls it, that the
@@ -1235,7 +1236,7 @@ only vivid things on the page are the products. Beside it is a second toggle on 
 pattern, over what the machine can draw rather than what the system prefers: it turns the
 live artwork off and leaves the still pictures in its place. On a page too narrow for the
 filter rail to stand beside the results, both toggles and the catalog's filters are in a
-drawer that slides in from the left, behind a button at the start of the header, and the
+drawer that slides in from the left and back out, behind a button at the start of the header, and the
 header keeps the wordmark and the account links, each on one line. Signed in, the account
 is an icon that opens the account page, and signing out is held at the foot of the drawer.
 The sort and the filters are icons on the search box's row. Where effort has gone into the

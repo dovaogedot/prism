@@ -81,8 +81,9 @@ const headerLayout = (page: Page) =>
 
 /**
  * Where the drawer's left edge is as it starts to move and as it arrives, in
- * CSS pixels, and what the move carries, after the menu button is pressed or
- * the close button is. Resolves once the move is over.
+ * CSS pixels, what the move carries, and whether the drawer is open as it
+ * arrives, after the menu button is pressed or the close button is. Resolves
+ * once the move is over.
  *
  * Both edges are read off the drawer's own transitions rather than off the
  * clock: the first right as they begin, the second with them taken to their
@@ -95,7 +96,9 @@ const slide = (page: Page, button: "Open menu" | "Close menu") =>
 
     document.querySelector<HTMLButtonElement>(`button[aria-label="${name}"]`)?.click();
 
-    if (drawer === null) return { from: Number.NaN, to: Number.NaN, width: 0, moves: [] };
+    if (drawer === null) {
+      return { from: Number.NaN, to: Number.NaN, width: 0, moves: [], open: false };
+    }
 
     const moving = drawer
       .getAnimations()
@@ -109,10 +112,17 @@ const slide = (page: Page, button: "Open menu" | "Close menu") =>
     }
 
     const to = drawer.getBoundingClientRect().left;
+    const { open } = drawer;
 
     await Promise.all(moving.map((animation) => animation.finished));
 
-    return { from, to, width, moves: moving.map((animation) => animation.transitionProperty) };
+    return {
+      from,
+      to,
+      width,
+      moves: moving.map((animation) => animation.transitionProperty),
+      open,
+    };
   }, button);
 
 /** A shelf of each kind of picture a finger or a tilt moves, and what to call it. */
@@ -219,6 +229,19 @@ test("slides the drawer in from the edge, and back out", async ({ page }) => {
   expect(closing.moves).toContain("translate");
   expect(closing.from).toBeCloseTo(0, 0);
   expect(closing.to).toBeLessThanOrEqual(-closing.width + 1);
+  // Still open all the way out: a dialog that is closed first leaves the
+  // screen at once wherever the browser cannot carry it through a transition.
+  expect(closing.open).toBe(true);
+  await expect(drawer(page)).toBeHidden();
+});
+
+test("slides the drawer back out on Escape", async ({ page }) => {
+  await page.goto("/");
+  await slide(page, "Open menu");
+
+  await page.keyboard.press("Escape");
+
+  await expect(drawer(page)).toHaveAttribute("data-closing");
   await expect(drawer(page)).toBeHidden();
 });
 

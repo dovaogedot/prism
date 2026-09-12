@@ -151,6 +151,8 @@ export const Layout = () => {
   const open = useCallback(() => {
     Option.match<HTMLDialogElement, void>({
       onSome: (drawer) => {
+        // Opened again on its way out, it turns back from where it has got to.
+        drawer.removeAttribute("data-closing");
         if (!drawer.open) drawer.showModal();
       },
       onNone: () => undefined,
@@ -159,7 +161,24 @@ export const Layout = () => {
 
   const close = useCallback(() => {
     Option.match<HTMLDialogElement, void>({
-      onSome: (drawer) => drawer.close(),
+      onSome: (drawer) => {
+        if (!drawer.open || drawer.hasAttribute("data-closing")) return;
+
+        // Slid out while it is still open, and closed once it is out. A closed
+        // dialog leaves the top layer at once, and not every browser can carry
+        // it through a transition on the way. Reading the animations settles
+        // the style, so the slide the attribute starts is among them; with no
+        // slide to wait for, the drawer closes straight away.
+        drawer.setAttribute("data-closing", "");
+        void Promise.allSettled(drawer.getAnimations().map((slide) => slide.finished)).then(
+          () => {
+            if (!drawer.hasAttribute("data-closing")) return;
+
+            drawer.removeAttribute("data-closing");
+            drawer.close();
+          },
+        );
+      },
       onNone: () => undefined,
     })(Option.fromNullable(dialog.current));
   }, []);
@@ -280,6 +299,11 @@ export const Layout = () => {
           // itself is a click on the backdrop around it.
           onClick={(event) => {
             if (event.target === event.currentTarget) close();
+          }}
+          // Escape slides it out too, rather than taking it off the screen.
+          onCancel={(event) => {
+            event.preventDefault();
+            close();
           }}
         >
           <div className="flex h-full flex-col">
