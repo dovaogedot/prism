@@ -125,6 +125,16 @@ type Dressing = Readonly<{
    * floor and wall spills along with the subject.
    */
   spillFrom: number;
+  /**
+   * How strongly the room draws a spill, as a multiple of what the finish asks
+   * for.
+   *
+   * A spill is read against the room it lands in. Against a dark room it is
+   * light in the air; against a lit one, the same spill is a soft copy of the
+   * subject laid over the subject, which reads as the picture being out of
+   * focus.
+   */
+  spill: number;
 }>;
 
 /** The two dressings a room keeps, one per theme. */
@@ -139,19 +149,36 @@ const CORNER_PAINT: Record<Theme, number> = { light: 0x9c9c9c, dark: 0x3a3a3a };
  * One dressing, so the two corners are one room. The lamps are turned up under
  * the dark theme, because a corner has no light in it but what its own lamps
  * put there and dark paint returns little of that to the shadowed side of
- * anything. The fill is held well under the lamps under both: it opens the
- * side of a subject every lamp is turned away from, and light arriving from
- * everywhere at once fills the shadows on the floor in with it.
+ * anything. The fill is held well under the lamps there: it opens the side of
+ * a subject every lamp is turned away from, and light arriving from everywhere
+ * at once fills the shadows on the floor in with it.
+ *
+ * The corner dressed for a bright page carries far more of its light from
+ * everywhere at once. Walls and shaded sides as dark as the lamps alone leave
+ * them read as a dark hole in a bright page. Most of that light is fill rather
+ * than surroundings to reflect: a coating reflects its surroundings and spreads
+ * them around the hue wheel, and brighter surroundings bury the one hue the
+ * pointer turns. The lamps still lay their shadows on the floor and their
+ * scallops on the walls, and both are shallower than under the dark theme:
+ * light from everywhere at once lifts what is dim more than what is lit.
  */
 const CORNER_DRESSING: Dressings = {
   light: {
     paint: CORNER_PAINT.light,
     light: 0.66,
-    fill: 0.25,
-    ambient: 1,
+    fill: 0.6,
+    ambient: 3,
     spillFrom: 0.6,
+    spill: 1,
   },
-  dark: { paint: CORNER_PAINT.dark, light: 1.25, fill: 0.3, ambient: 1, spillFrom: 0.15 },
+  dark: {
+    paint: CORNER_PAINT.dark,
+    light: 1.25,
+    fill: 0.3,
+    ambient: 1,
+    spillFrom: 0.15,
+    spill: 1,
+  },
 };
 
 /**
@@ -170,10 +197,18 @@ const CORNER_DRESSING: Dressings = {
  * on every side reads as a painted object that also glows rather than as a
  * light in a dark room. The lamps still shade the subjects, and the glow still
  * lays its pools on the floor.
+ *
+ * The bright room carries far more of its light from everywhere at once, so it
+ * sits inside a bright page instead of reading as a dim box in it. Its lamps
+ * are lit little more than the dark room's, and `GLOW_STRENGTH` turns the glow
+ * up far enough to stand above the lit floor. Its spill is drawn weaker than
+ * the dark room's: against a lit floor a full spill is a soft copy of the
+ * subject laid over the subject, and a rim of it around each face is what
+ * reads as light leaving the face.
  */
 const OPEN_DRESSING: Dressings = {
-  light: { paint: 0xb0b0b0, light: 0.95, fill: 0.8, ambient: 1, spillFrom: 0.55 },
-  dark: { paint: 0x5a5a5a, light: 0.6, fill: 0.5, ambient: 0.35, spillFrom: 0 },
+  light: { paint: 0xb0b0b0, light: 0.4, fill: 0.8, ambient: 1.5, spillFrom: 0, spill: 0.35 },
+  dark: { paint: 0x5a5a5a, light: 0.6, fill: 0.5, ambient: 0.35, spillFrom: 0, spill: 1 },
 };
 
 /** How many lamps hang on a corner's ring. */
@@ -217,6 +252,17 @@ const GLOW_KEY = 3.2;
  * the floor under itself, which is what says the light is leaving the surface.
  */
 const GLOW_LAMP = 1.3;
+
+/**
+ * How hard a glow is turned up under each theme, as a multiple of it.
+ *
+ * A glow is read against the room it is in. The room dressed for a bright page
+ * is the brighter of the two, and a glow held at the same strength in both is
+ * lost against it: its faces are no brighter than the lit floor, so nothing
+ * crosses the threshold a spill starts above and no pool shows where its light
+ * lands.
+ */
+const GLOW_STRENGTH: Record<Theme, number> = { light: 2, dark: 1 };
 
 /**
  * How much of a glowing subject's own light is drawn as light leaving it.
@@ -468,6 +514,8 @@ type Dressed = Readonly<{
   light: number;
   /** What the threshold the room's spill starts above is lifted by. */
   spillFrom: number;
+  /** What the strength of the room's spill is scaled by. */
+  spill: number;
 }>;
 
 /**
@@ -489,7 +537,7 @@ const dressRoom = (room: Room, finish: FinisherRoom): Dressed => {
   // dim room fades into the dark instead of ending against a lit wall.
   room.clear.setHex(dressing.paint, SRGBColorSpace).multiplyScalar(Math.min(1, ambient));
 
-  return { light, spillFrom: dressing.spillFrom };
+  return { light, spillFrom: dressing.spillFrom, spill: dressing.spill };
 };
 
 /* ------------------------------------------------------------- the pigment */
@@ -1014,7 +1062,7 @@ const frameOf = (room: Room, finish: FinisherRoom, dressed: Dressed): Frame => (
   scene: room.scene,
   camera: room.camera,
   bloom: {
-    strength: finish.bloom.strength,
+    strength: finish.bloom.strength * dressed.spill,
     threshold: finish.bloom.threshold + dressed.spillFrom,
   },
   clear: room.clear,
@@ -1049,6 +1097,7 @@ const glowFrame = (rig: Glow, view: EmissionView): Frame => {
   const finish = roomFor(view);
   const dressed = dressRoom(rig.room, finish);
   const light = dressed.light;
+  const strength = GLOW_STRENGTH[themeNow()];
 
   rig.haze.color.copy(rig.room.clear);
 
@@ -1070,11 +1119,11 @@ const glowFrame = (rig: Glow, view: EmissionView): Frame => {
 
     paintRgb(subject.pigment.emissive, band);
     subject.pigment.emissiveIntensity =
-      GLOW_MIX * emissiveScale(finish.surface.emission, band);
+      GLOW_MIX * emissiveScale(finish.surface.emission, band) * strength;
     applySurface(subject.pigment, finish.surface);
 
     paintRgb(subject.glow.color, band);
-    subject.glow.intensity = finish.surface.emission * GLOW_LAMP;
+    subject.glow.intensity = finish.surface.emission * GLOW_LAMP * strength;
   }
 
   rig.key.intensity = GLOW_KEY * light;

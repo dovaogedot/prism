@@ -707,6 +707,15 @@ the shape off. At night the room keeps its ambient light, the light that arrives
 everywhere at once, well under those lamps, because ambient light lights every side alike
 and fills in the unlit side the lamps leave. Measured on the dark shelf, the darkest tenth of
 the faintest glow's stage sits at 2% lightness; `finisher-rooms.spec.ts` holds it under 5%.
+By day the room carries far more ambient light, so it sits inside the bright page instead of
+reading as a dim box in it, and the glow is turned up to stand above the lit floor. The spill
+is drawn weaker than at night: against a lit floor a full spill is a soft copy of the subject
+laid over the subject, which reads as the picture being out of focus, while a thin rim of it
+around each face reads as light leaving the face. Measured on the day shelf, the darkest tenth
+of every stage sits at 40% to 41% lightness, the brightest part of every glow stands 20 to 37
+points of lightness above the middle of its gray room, and the outer fifth of a stage carries
+3% to 8% color. `finisher-rooms.spec.ts` holds every darkest tenth at 36% or more, every glow
+at 17 points or more, and the most color at twice the least or more.
 
 **The two ends of the glow range have to look like two ends.** The finishers on that shelf
 sit in the top half of the range, so a spill straight in the amount separates them by the
@@ -752,9 +761,19 @@ only by lamps aimed at the floor is one flat value from edge to edge. Every lamp
 is white, so the lamps add no color of their own.
 
 Both corners are measured on the real picture, in both themes: each wall's brightest part is
-at least twice its dimmest, and at least a fiftieth of the floor lies where two shadows
-overlap. One lamp cannot lay a shadow inside its own shadow, so an overlap is what says more
-than one lamp is casting, however large or dark any one shadow is.
+at least twice its dimmest at night and at least a fifth brighter than it by day, and at
+least a fiftieth of the floor lies where two shadows overlap. One lamp cannot lay a shadow
+inside its own shadow, so an overlap is what says more than one lamp is casting, however
+large or dark any one shadow is.
+
+By day a corner carries far more of its light from everywhere at once, so the room is bright
+and its shaded walls and the shaded side of its subject stay open against the bright page.
+Most of that light is sky and bounce rather than the surroundings a surface reflects: a
+coating reflects its surroundings and spreads them around the hue wheel, and brighter
+surroundings bury the one hue the pointer turns. Measured on the roughness shelf by day, the
+darkest tenth of every stage sits at 42% lightness; `finisher-rooms.spec.ts` holds it at 34%
+or more. Light from everywhere at once lifts the dim part of a wall more than the lit part,
+so the scallops the wall lamps lay are shallower by day than at night.
 
 **The lamps that do not cast are cones.** Both corners hang a ring of four of them around
 what is standing there, evenly spaced at one height and one radius, turned onto the bearing
@@ -773,8 +792,8 @@ first is turned away from, so a face has a dark side rather than a black one.
 
 **Every room is dressed twice.** A room is looked at through a page that is either bright or
 dark, and a wall mixed to sit inside a bright page is a lamp in a dark one. So each room keeps
-two sets of paint, light level, ambient share, fill share and spill threshold, and picks by the
-theme in force when it is drawn.
+two sets of paint, light level, ambient share, fill share, spill threshold and spill strength,
+and picks by the theme in force when it is drawn.
 
 **A room is the same room for every finisher shown in it.** How many subjects there are,
 where they stand, how big they are, which way they face and what they are painted is written
@@ -807,9 +826,11 @@ arrives and simply stands still.
 
 [`finisher-rooms.spec.ts`](e2e/specs/finisher-rooms.spec.ts) drives all of it in a real
 browser — each finish draws a room, the pointer changes the pixels, each corner lays
-overlapping shadows and lights both its walls unevenly under both themes, a glowing room
-keeps its corners well under the faces glowing in it even with the spill drawn around them
-and keeps its ambient light low at night,
+overlapping shadows and lights both its walls unevenly under both themes and keeps its shade
+open by day, a glowing room keeps its corners well under the faces glowing in it even with
+the spill drawn around them, spills more off a harder glow than off a fainter one under both
+themes, stands every glow well above its room by day, and keeps its ambient light low at
+night and up by day,
 a coating room frames its near subject large and whole and shows colors nothing in it was
 painted, reduced motion draws once and stays put, and the switch off leaves stills and no
 canvases across a reload.

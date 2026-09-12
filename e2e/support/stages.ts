@@ -239,6 +239,119 @@ export const outerRings = (page: Page): Promise<readonly number[]> =>
   );
 
 /**
+ * How much color is in the outer fifth of each stage, in percent.
+ *
+ * The mean over the ring of how far apart each pixel's strongest and weakest
+ * channels are. The room is gray, so what color reaches the ring is light that
+ * left a colored subject. That reads a spill on a light floor, where a spill
+ * adds color more than it adds brightness.
+ */
+export const outerChromas = (page: Page): Promise<readonly number[]> =>
+  page.evaluate(() =>
+    [
+      ...document.querySelectorAll<HTMLCanvasElement>("canvas.stage__canvas"),
+    ].map((canvas) => {
+      const context = canvas.getContext("2d");
+      if (context === null) return 0;
+
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      const across = Math.floor(canvas.width * 0.2);
+      const down = Math.floor(canvas.height * 0.2);
+      let total = 0;
+      let counted = 0;
+
+      for (let y = 0; y < canvas.height; y += 1) {
+        for (let x = 0; x < canvas.width; x += 1) {
+          const inside =
+            y >= down && y <= canvas.height - down && x >= across && x <= canvas.width - across;
+          if (inside) continue;
+
+          const at = (y * canvas.width + x) * 4;
+          const [red, green, blue] = [
+            pixels[at] ?? 0,
+            pixels[at + 1] ?? 0,
+            pixels[at + 2] ?? 0,
+          ];
+
+          total += Math.max(red, green, blue) - Math.min(red, green, blue);
+          counted += 1;
+        }
+      }
+
+      return counted === 0 ? 0 : (total / counted / 255) * 100;
+    }),
+  );
+
+/**
+ * How far what glows in each stage stands above the room around it, in points
+ * of lightness.
+ *
+ * The brightest twentieth of the colored pixels against the middle of the gray
+ * ones. The room is gray and the subjects are colored, so the first is the
+ * glowing faces at their brightest and the second is the room. A stage with
+ * nothing colored or nothing gray on it answers nothing.
+ */
+export const glowContrasts = (page: Page): Promise<readonly number[]> =>
+  page.evaluate(() =>
+    [
+      ...document.querySelectorAll<HTMLCanvasElement>("canvas.stage__canvas"),
+    ].map((canvas) => {
+      const context = canvas.getContext("2d");
+      if (context === null) return 0;
+
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      // Both indexed by the brightest channel plus the dimmest, which is twice
+      // the lightness in 8-bit steps and keeps its half steps whole.
+      const colored = new Array<number>(511).fill(0);
+      const gray = new Array<number>(511).fill(0);
+      let coloredCount = 0;
+      let grayCount = 0;
+
+      for (let y = 0; y < canvas.height; y += 2) {
+        for (let x = 0; x < canvas.width; x += 2) {
+          const at = (y * canvas.width + x) * 4;
+          const [red, green, blue] = [
+            pixels[at] ?? 0,
+            pixels[at + 1] ?? 0,
+            pixels[at + 2] ?? 0,
+          ];
+          const most = Math.max(red, green, blue);
+          const least = Math.min(red, green, blue);
+          const chroma = (most - least) / 255;
+
+          if (chroma > 0.25) {
+            colored[most + least] = (colored[most + least] ?? 0) + 1;
+            coloredCount += 1;
+          } else if (chroma < 0.08) {
+            gray[most + least] = (gray[most + least] ?? 0) + 1;
+            grayCount += 1;
+          }
+        }
+      }
+
+      /** The doubled lightness under which `share` of the counted pixels lie. */
+      const under = (counts: readonly number[], total: number, share: number): number => {
+        let below = 0;
+
+        return Math.max(
+          0,
+          counts.findIndex((count) => {
+            below += count;
+            return below >= total * share;
+          }),
+        );
+      };
+
+      if (coloredCount === 0 || grayCount === 0) return 0;
+
+      const faces = under(colored, coloredCount, 0.95);
+      const room = under(gray, grayCount, 0.5);
+
+      return ((faces - room) / 2 / 255) * 100;
+    }),
+  );
+
+/**
  * How light the darkest tenth of each stage is, in percent lightness.
  *
  * That tenth is the part of the room no lamp and no glow reaches, so what

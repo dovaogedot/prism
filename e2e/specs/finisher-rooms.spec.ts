@@ -18,7 +18,9 @@ import {
   darkestTenths,
   DRAWN,
   drawn,
+  glowContrasts,
   hueSpread,
+  outerChromas,
   outerRings,
   pretendGpu,
   signature,
@@ -162,6 +164,100 @@ test.describe("a machine that can draw", () => {
   });
 
   /**
+   * The least lightness the darkest tenth of a glowing room has to keep by day,
+   * as a percentage.
+   *
+   * By day the room carries enough light from everywhere at once to sit inside
+   * the bright page instead of reading as a dim box in it, and that light is
+   * what lights the room's darkest tenth.
+   */
+  const DAY_AMBIENT_FLOOR = 36;
+
+  test("keeps the ambient light up in a glowing room by day", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto(shelf("fluorescent"));
+    await drawn(page);
+
+    const tenths = await darkestTenths(page);
+
+    expect(tenths.length).toBeGreaterThan(0);
+    for (const tenth of tenths) {
+      expect(tenth).toBeGreaterThanOrEqual(DAY_AMBIENT_FLOOR);
+    }
+  });
+
+  /**
+   * How far apart the two ends of a glowing shelf have to spill by day.
+   *
+   * The same demand as `GLOW_SPREAD`, read as color rather than brightness,
+   * because a spill on a light floor adds color more than it adds light: the
+   * hardest glow on the shelf puts this many times as much color into the
+   * outer fifth of its stage as the faintest does.
+   */
+  const DAY_GLOW_SPREAD = 2;
+
+  test("spills more color off a harder glow than off a fainter one by day", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto(shelf("fluorescent"));
+    await drawn(page);
+
+    const chromas = await outerChromas(page);
+
+    expect(chromas.length).toBeGreaterThan(1);
+    expect(Math.max(...chromas)).toBeGreaterThanOrEqual(Math.min(...chromas) * DAY_GLOW_SPREAD);
+  });
+
+  /**
+   * How far every glow on the shelf has to stand above its room by day, in
+   * points of lightness.
+   *
+   * The brightest part of what glows against the middle of the gray room
+   * around it. A face that stands no higher than paint under the same lamps
+   * reads as paint, and the faintest glow on the shelf is the one nearest to
+   * that.
+   */
+  const DAY_GLOW_CONTRAST = 17;
+
+  test("stands every glow well above its room by day", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto(shelf("fluorescent"));
+    await drawn(page);
+
+    const contrasts = await glowContrasts(page);
+
+    expect(contrasts.length).toBeGreaterThan(0);
+    for (const contrast of contrasts) {
+      expect(contrast).toBeGreaterThanOrEqual(DAY_GLOW_CONTRAST);
+    }
+  });
+
+  /**
+   * The least lightness the darkest tenth of a corner has to keep by day, as a
+   * percentage.
+   *
+   * By day a corner carries enough light from everywhere at once that its
+   * shaded walls and the shaded side of what stands in it stay open against the
+   * bright page. Read on the roughness shelf, whose subject is gray, so the
+   * darkest tenth there is shade rather than a dark pigment.
+   */
+  const DAY_CORNER_FLOOR = 34;
+
+  test("keeps the shade in a corner open by day", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto(shelf("roughness"));
+    await drawn(page);
+
+    const tenths = await darkestTenths(page);
+
+    expect(tenths.length).toBeGreaterThan(0);
+    for (const tenth of tenths) {
+      expect(tenth).toBeGreaterThanOrEqual(DAY_CORNER_FLOOR);
+    }
+  });
+
+  /**
    * What the floor and the walls of a corner have to be carrying.
    *
    * `overlap` is how much of the floor, in percent, has to lie where two
@@ -170,9 +266,11 @@ test.describe("a machine that can draw", () => {
    * darkness of any one shadow. `walls` is how many times as bright the
    * brightest part of each wall has to be as its dimmest — a wall that holds
    * one value from edge to edge is a backdrop, not a wall with light falling
-   * on it.
+   * on it. It is lower by day, when a corner carries far more light from
+   * everywhere at once and that light lifts the dim part of a wall more than
+   * the lit part; the wall still has to be brighter where its lamp lands.
    */
-  const CORNER_SURFACES = { overlap: 2, walls: 2 };
+  const CORNER_SURFACES = { overlap: 2, walls: { dark: 2, light: 1.2 } };
 
   /** The two corners, by the finish shown in each. */
   const CORNERS = [
@@ -192,8 +290,8 @@ test.describe("a machine that can draw", () => {
         const { overlap, walls } = await surfacesOf(page);
 
         expect(overlap).toBeGreaterThanOrEqual(CORNER_SURFACES.overlap);
-        expect(walls.left).toBeGreaterThanOrEqual(CORNER_SURFACES.walls);
-        expect(walls.right).toBeGreaterThanOrEqual(CORNER_SURFACES.walls);
+        expect(walls.left).toBeGreaterThanOrEqual(CORNER_SURFACES.walls[scheme]);
+        expect(walls.right).toBeGreaterThanOrEqual(CORNER_SURFACES.walls[scheme]);
       });
     }
   }
