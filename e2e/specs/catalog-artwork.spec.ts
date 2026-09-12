@@ -27,8 +27,11 @@ test.use({ colorScheme: "dark" });
  */
 const BACKGROUND_CEILING = 20;
 
-/** How saturated the background may get, as a percentage, in a lit room. */
-const NEUTRAL_CEILING = 12;
+/**
+ * How much color the background may take on in a lit room, as the distance
+ * between its strongest and weakest channels in percent.
+ */
+const NEUTRAL_CEILING = 7;
 
 /**
  * Every color in the shop that makes its own light, a page at a time.
@@ -65,15 +68,15 @@ test.describe("a glowing product on its card", () => {
 test.describe("a glowing color in a lit room", () => {
   test.use({ colorScheme: "light" });
 
-  test("leaves the background the gray it was", async ({ page }) => {
+  test("keeps the pigment's color off the wall", async ({ page }) => {
     await pretendGpu(page);
     await page.goto(glowing(1));
     await drawn(page);
 
-    // A lit room is gray rather than black, so the ceiling that applies here is
+    // A lit room is light rather than dark, so the ceiling that applies here is
     // the one on color: the wall may not take the pigment's hue.
     for (const stage of await backgrounds(page)) {
-      expect(stage.saturation).toBeLessThanOrEqual(NEUTRAL_CEILING);
+      expect(stage.chroma).toBeLessThanOrEqual(NEUTRAL_CEILING);
     }
   });
 });

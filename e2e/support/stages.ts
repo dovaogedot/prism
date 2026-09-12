@@ -108,14 +108,23 @@ export const drawn = async (page: Page): Promise<number> => {
   return held;
 };
 
-/** A background reading of one stage, in HSL percentages. */
+/** A background reading of one stage, in percent. */
 export type Background = Readonly<{
+  /** The lightest pixel, in HSL lightness. */
   peakLightness: number;
-  saturation: number;
+  /**
+   * How far apart the strongest and weakest channels of the average color
+   * are: how much color the background carries, whatever its lightness.
+   *
+   * Not HSL saturation, which divides by how far the lightness is from the
+   * ends of the scale, so a background a level or two off gray reads as
+   * strongly saturated once it is near white.
+   */
+  chroma: number;
 }>;
 
 /**
- * The background of every stage on the page, in HSL percentages.
+ * The background of every stage on the page.
  *
  * Everything outside the middle three fifths, which is where the subject is —
  * so the reading is the room and the spill against it, never the face.
@@ -126,7 +135,7 @@ export const backgrounds = (page: Page): Promise<readonly Background[]> =>
       ...document.querySelectorAll<HTMLCanvasElement>("canvas.stage__canvas"),
     ].map((canvas) => {
       const context = canvas.getContext("2d");
-      if (context === null) return { peakLightness: 0, saturation: 0 };
+      if (context === null) return { peakLightness: 0, chroma: 0 };
 
       const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
       const channel = (index: number): number => pixels[index] ?? 0;
@@ -155,14 +164,10 @@ export const backgrounds = (page: Page): Promise<readonly Background[]> =>
 
       const highest = Math.max(red, green, blue) / counted / 255;
       const lowest = Math.min(red, green, blue) / counted / 255;
-      const lightness = (highest + lowest) / 2;
 
       return {
         peakLightness: (peak / 255) * 100,
-        saturation:
-          highest === lowest
-            ? 0
-            : ((highest - lowest) / (1 - Math.abs(2 * lightness - 1))) * 100,
+        chroma: (highest - lowest) * 100,
       };
     }),
   );
@@ -256,15 +261,35 @@ export const outerRings = (page: Page): Promise<readonly number[]> =>
     }),
   );
 
+/** How light the page behind the stages is, in percent HSL lightness. */
+export const pageLightness = (page: Page): Promise<number> =>
+  page.evaluate(() => {
+    // Painted and read back, so the page is compared in the same bytes as a
+    // stage's pixels whatever color space its style is written in.
+    const probe = document.createElement("canvas");
+    probe.width = 1;
+    probe.height = 1;
+
+    const context = probe.getContext("2d");
+    if (context === null) return 0;
+
+    context.fillStyle = getComputedStyle(document.body).backgroundColor;
+    context.fillRect(0, 0, 1, 1);
+
+    const pixel = context.getImageData(0, 0, 1, 1).data;
+    const [red, green, blue] = [pixel[0] ?? 0, pixel[1] ?? 0, pixel[2] ?? 0];
+
+    return ((Math.max(red, green, blue) + Math.min(red, green, blue)) / 2 / 255) * 100;
+  });
+
 /**
- * How much color is in the outer fifth of each stage, in percent.
+ * How light the top of each stage is, in percent HSL lightness.
  *
- * The mean over the ring of how far apart each pixel's strongest and weakest
- * channels are. The room is gray, so what color reaches the ring is light that
- * left a colored subject. That reads a spill on a light floor, where a spill
- * adds color more than it adds brightness.
+ * The lightness of the mean color of the top sixth or so of the stage. That
+ * is the far wall in every room: nothing stands in it and no floor reaches it,
+ * so it is the background the stage shows against the page around it.
  */
-export const outerChromas = (page: Page): Promise<readonly number[]> =>
+export const topBands = (page: Page): Promise<readonly number[]> =>
   page.evaluate(() =>
     [
       ...document.querySelectorAll<HTMLCanvasElement>("canvas.stage__canvas"),
@@ -272,44 +297,39 @@ export const outerChromas = (page: Page): Promise<readonly number[]> =>
       const context = canvas.getContext("2d");
       if (context === null) return 0;
 
-      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-      const across = Math.floor(canvas.width * 0.2);
-      const down = Math.floor(canvas.height * 0.2);
-      let total = 0;
+      const band = Math.round(canvas.height * 0.15);
+      const pixels = context.getImageData(0, 0, canvas.width, band).data;
+      let red = 0;
+      let green = 0;
+      let blue = 0;
       let counted = 0;
 
-      for (let y = 0; y < canvas.height; y += 1) {
-        for (let x = 0; x < canvas.width; x += 1) {
-          const inside =
-            y >= down && y <= canvas.height - down && x >= across && x <= canvas.width - across;
-          if (inside) continue;
-
-          const at = (y * canvas.width + x) * 4;
-          const [red, green, blue] = [
-            pixels[at] ?? 0,
-            pixels[at + 1] ?? 0,
-            pixels[at + 2] ?? 0,
-          ];
-
-          total += Math.max(red, green, blue) - Math.min(red, green, blue);
-          counted += 1;
-        }
+      for (let at = 0; at < pixels.length; at += 4) {
+        red += pixels[at] ?? 0;
+        green += pixels[at + 1] ?? 0;
+        blue += pixels[at + 2] ?? 0;
+        counted += 1;
       }
 
-      return counted === 0 ? 0 : (total / counted / 255) * 100;
+      if (counted === 0) return 0;
+
+      const highest = Math.max(red, green, blue) / counted;
+      const lowest = Math.min(red, green, blue) / counted;
+
+      return ((highest + lowest) / 2 / 255) * 100;
     }),
   );
 
 /**
- * How far what glows in each stage stands above the room around it, in points
- * of lightness.
+ * How strong the most colored part of each stage is, in percent.
  *
- * The brightest twentieth of the colored pixels against the middle of the gray
- * ones. The room is gray and the subjects are colored, so the first is the
- * glowing faces at their brightest and the second is the room. A stage with
- * nothing colored or nothing gray on it answers nothing.
+ * A pixel's color is how far apart its strongest and weakest channels are, and
+ * the reading is the least of it in the most colored fiftieth of the stage. A
+ * face that glows carries its pigment at full strength; the same face under a
+ * spill laid over it, or in a room whose own light covers the pigment, fades
+ * toward white and reads as a soft copy of itself rather than as a light.
  */
-export const glowContrasts = (page: Page): Promise<readonly number[]> =>
+export const peakChromas = (page: Page): Promise<readonly number[]> =>
   page.evaluate(() =>
     [
       ...document.querySelectorAll<HTMLCanvasElement>("canvas.stage__canvas"),
@@ -318,12 +338,8 @@ export const glowContrasts = (page: Page): Promise<readonly number[]> =>
       if (context === null) return 0;
 
       const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-      // Both indexed by the brightest channel plus the dimmest, which is twice
-      // the lightness in 8-bit steps and keeps its half steps whole.
-      const colored = new Array<number>(511).fill(0);
-      const gray = new Array<number>(511).fill(0);
-      let coloredCount = 0;
-      let grayCount = 0;
+      const counts = new Array<number>(256).fill(0);
+      let counted = 0;
 
       for (let y = 0; y < canvas.height; y += 2) {
         for (let x = 0; x < canvas.width; x += 2) {
@@ -333,39 +349,20 @@ export const glowContrasts = (page: Page): Promise<readonly number[]> =>
             pixels[at + 1] ?? 0,
             pixels[at + 2] ?? 0,
           ];
-          const most = Math.max(red, green, blue);
-          const least = Math.min(red, green, blue);
-          const chroma = (most - least) / 255;
+          const chroma = Math.max(red, green, blue) - Math.min(red, green, blue);
 
-          if (chroma > 0.25) {
-            colored[most + least] = (colored[most + least] ?? 0) + 1;
-            coloredCount += 1;
-          } else if (chroma < 0.08) {
-            gray[most + least] = (gray[most + least] ?? 0) + 1;
-            grayCount += 1;
-          }
+          counts[chroma] = (counts[chroma] ?? 0) + 1;
+          counted += 1;
         }
       }
 
-      /** The doubled lightness under which `share` of the counted pixels lie. */
-      const under = (counts: readonly number[], total: number, share: number): number => {
-        let below = 0;
+      let below = 0;
+      const chroma = counts.findIndex((count) => {
+        below += count;
+        return below >= counted * 0.98;
+      });
 
-        return Math.max(
-          0,
-          counts.findIndex((count) => {
-            below += count;
-            return below >= total * share;
-          }),
-        );
-      };
-
-      if (coloredCount === 0 || grayCount === 0) return 0;
-
-      const faces = under(colored, coloredCount, 0.95);
-      const room = under(gray, grayCount, 0.5);
-
-      return ((faces - room) / 2 / 255) * 100;
+      return (Math.max(0, chroma) / 255) * 100;
     }),
   );
 
@@ -603,20 +600,100 @@ export type Surfaces = Readonly<{
 }>;
 
 /**
- * What the floor and the walls of the first stage on the page are carrying.
- *
- * The floor is what lies below the seam where a wall begins, less whatever
- * stands on it. Each wall is the outer part of its half of the picture, from
- * near the top down to that seam, less anything colored: nothing stands that
- * far out but in color. A stage with nothing drawn on it answers no overlap
- * and two walls with nothing on them.
+ * Where each column of a stage's picture stops being floor and starts being
+ * wall, as the row the floor last reached, with the size of the picture it
+ * was found in.
  */
-export const surfacesOf = (page: Page): Promise<Surfaces> =>
+export type Seams = Readonly<{ width: number; height: number; rows: readonly number[] }>;
+
+/**
+ * Where the walls of the first stage on the page meet its floor.
+ *
+ * The floor runs up each column from the bottom until a wall far darker than
+ * it begins. A room is the same room seen from the same place under both
+ * themes, so the seams found under the dark one, where every wall is that much
+ * darker, are the seams under the light one too, where a wall can be nearly
+ * as light as the floor. A stage with nothing drawn on it has no seams.
+ */
+export const seamsOf = (page: Page): Promise<Seams> =>
   page.evaluate(() => {
     const canvas = document.querySelector<HTMLCanvasElement>("canvas.stage__canvas");
     const context = canvas?.getContext("2d") ?? null;
 
     if (canvas === null || context === null || canvas.width === 0) {
+      return { width: 0, height: 0, rows: [] };
+    }
+
+    const { width, height } = canvas;
+    const pixels = context.getImageData(0, 0, width, height).data;
+    const read = (values: ArrayLike<number>, at: number): number => values[at] ?? 0;
+    const channel = (at: number, offset: number): number => read(pixels, at * 4 + offset);
+    const saturation = (at: number): number => {
+      const most = Math.max(channel(at, 0), channel(at, 1), channel(at, 2));
+      const least = Math.min(channel(at, 0), channel(at, 1), channel(at, 2));
+
+      return most === 0 ? 0 : (most - least) / most;
+    };
+    const lightnesses = Float32Array.from(
+      { length: width * height },
+      (_, at) => 0.2126 * channel(at, 0) + 0.7152 * channel(at, 1) + 0.0722 * channel(at, 2),
+    );
+    const lightness = (at: number): number => read(lightnesses, at);
+
+    // Up each column from the bottom. A colored pixel is a subject; one under
+    // half the brightest floor below it is a wall past the seam, or the dark
+    // side of a subject; a sudden rise well over that is the lit side of one.
+    // Everything else is floor, shadows included.
+    const floor = new Uint8Array(width * height);
+
+    for (let x = 0; x < width; x += 1) {
+      let brightest = lightness((height - 1) * width + x);
+
+      for (let y = height - 1; y >= 0; y -= 1) {
+        const at = y * width + x;
+        const here = lightness(at);
+        const rise = y + 3 < height ? here - lightness(at + 3 * width) : 0;
+
+        if (saturation(at) > 0.16 || here < brightest * 0.5) break;
+        if (here > brightest * 1.35 && rise > 14) break;
+        brightest = Math.max(brightest, here);
+        floor[at] = 1;
+      }
+    }
+
+    const rows = Array.from({ length: width }, (_, x) => {
+      let seam = height - 1;
+
+      while (seam > 0 && floor[seam * width + x] === 1) seam -= 1;
+
+      return seam;
+    });
+
+    return { width, height, rows };
+  });
+
+/**
+ * What the floor and the walls of the first stage on the page are carrying.
+ *
+ * The floor is what lies below the seam where a wall begins, less whatever
+ * stands on it. Each wall is the outer part of its half of the picture, from
+ * near the top down to the seam `seams` gives for that column, less anything
+ * colored: nothing stands that far out but in color. Seams found in a stage of
+ * another size are no seams. A stage with nothing drawn on it, or no seams,
+ * answers no overlap and two walls with nothing on them.
+ */
+export const surfacesOf = (page: Page, seams: Seams): Promise<Surfaces> =>
+  page.evaluate((found) => {
+    const canvas = document.querySelector<HTMLCanvasElement>("canvas.stage__canvas");
+    const context = canvas?.getContext("2d") ?? null;
+
+    if (
+      canvas === null ||
+      context === null ||
+      canvas.width === 0 ||
+      canvas.width !== found.width ||
+      canvas.height !== found.height
+    ) {
       return { overlap: 0, walls: { left: 0, right: 0 } };
     }
 
@@ -778,9 +855,7 @@ export const surfacesOf = (page: Page): Promise<Surfaces> =>
       const seen: number[] = [];
 
       for (let x = Math.round(width * from); x < Math.round(width * to); x += 2) {
-        let seam = height - 1;
-
-        while (seam > 0 && floor[seam * width + x] === 1) seam -= 1;
+        const seam = found.rows[x] ?? 0;
 
         // A little above the seam, and never below the lower part of the
         // picture whatever the walk found.
@@ -804,4 +879,4 @@ export const surfacesOf = (page: Page): Promise<Surfaces> =>
       overlap: area === 0 ? 0 : (overlapping / area) * 100,
       walls: { left: wall(0.04, 0.3), right: wall(0.7, 0.96) },
     };
-  });
+  }, seams);

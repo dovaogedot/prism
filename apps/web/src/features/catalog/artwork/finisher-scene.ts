@@ -101,8 +101,10 @@ const ROOM_ROUGHNESS = 0.95;
  * two of these and picks by the theme in force when it is drawn.
  */
 type Dressing = Readonly<{
-  /** What the floor and every wall are painted. */
-  paint: number;
+  /** What every wall is painted, and so what the room fades into beyond its lamps. */
+  walls: number;
+  /** What the floor is painted. */
+  floor: number;
   /** What the room's own light level is worth here, as a multiple of it. */
   light: number;
   /** How much sky and bounce the ambient light carries, as a multiple of `ambient`. */
@@ -140,9 +142,6 @@ type Dressing = Readonly<{
 /** The two dressings a room keeps, one per theme. */
 type Dressings = Record<Theme, Dressing>;
 
-/** What a corner's walls are painted, under each theme. */
-const CORNER_PAINT: Record<Theme, number> = { light: 0x9c9c9c, dark: 0x3a3a3a };
-
 /**
  * How a corner is dressed, whichever of the two is being looked at.
  *
@@ -154,25 +153,32 @@ const CORNER_PAINT: Record<Theme, number> = { light: 0x9c9c9c, dark: 0x3a3a3a };
  * at once fills the shadows on the floor in with it.
  *
  * The corner dressed for a bright page carries far more of its light from
- * everywhere at once. Walls and shaded sides as dark as the lamps alone leave
- * them read as a dark hole in a bright page. Most of that light is fill rather
- * than surroundings to reflect: a coating reflects its surroundings and spreads
- * them around the hue wheel, and brighter surroundings bury the one hue the
- * pointer turns. The lamps still lay their shadows on the floor and their
- * scallops on the walls, and both are shallower than under the dark theme:
- * light from everywhere at once lifts what is dim more than what is lit.
+ * everywhere at once, and its walls are white, so the far wall sits at about
+ * the page's own lightness instead of reading as a gray box set into it. Most
+ * of that light is fill rather than surroundings to reflect: a coating reflects
+ * its surroundings and spreads them around the hue wheel, and brighter
+ * surroundings bury the one hue the pointer turns.
+ *
+ * Its floor is a middle gray. A white floor under that much light sits at the
+ * top of what the display can show, where a shadow and the floor around it
+ * come out as the same white; a gray one keeps every shadow the lamps lay on
+ * it, and where two of them overlap. The lamps' scallops on the walls are
+ * shallower than under the dark theme: light from everywhere at once lifts
+ * what is dim more than what is lit.
  */
 const CORNER_DRESSING: Dressings = {
   light: {
-    paint: CORNER_PAINT.light,
+    walls: 0xffffff,
+    floor: 0x787878,
     light: 0.66,
-    fill: 0.6,
-    ambient: 3,
+    fill: 0.8,
+    ambient: 6,
     spillFrom: 0.6,
     spill: 1,
   },
   dark: {
-    paint: CORNER_PAINT.dark,
+    walls: 0x3a3a3a,
+    floor: 0x3a3a3a,
     light: 1.25,
     fill: 0.3,
     ambient: 1,
@@ -184,13 +190,13 @@ const CORNER_DRESSING: Dressings = {
 /**
  * How the open room a glow is demonstrated in is dressed.
  *
- * Its two paints are far closer together than a corner's. What that floor is
- * for is catching the light coming off the subjects standing on it, and the
- * pool it catches is the whole of what says the light is leaving them; a floor
- * painted as dark as the shop's dark walls catches almost none of it, and the
- * demonstration goes with it. The dark room is the dimmer of the two all the
- * same: a page that is already dark asks less of a room for its glow to be the
- * brightest thing on it.
+ * Its floor is never painted dark. What that floor is for is catching the
+ * light coming off the subjects standing on it, and the pool it catches is the
+ * whole of what says the light is leaving them; a floor painted as dark as the
+ * shop's dark walls catches almost none of it, and the demonstration goes with
+ * it. The dark room is the dimmer of the two all the same: a page that is
+ * already dark asks less of a room for its glow to be the brightest thing on
+ * it.
  *
  * The dark room holds its ambient well under its lamps. Light arriving from
  * everywhere at once lights every side of a subject alike, and a subject lit
@@ -198,17 +204,39 @@ const CORNER_DRESSING: Dressings = {
  * light in a dark room. The lamps still shade the subjects, and the glow still
  * lays its pools on the floor.
  *
- * The bright room carries far more of its light from everywhere at once, so it
- * sits inside a bright page instead of reading as a dim box in it. Its lamps
- * are lit little more than the dark room's, and `GLOW_STRENGTH` turns the glow
- * up far enough to stand above the lit floor. Its spill is drawn weaker than
- * the dark room's: against a lit floor a full spill is a soft copy of the
- * subject laid over the subject, and a rim of it around each face is what
- * reads as light leaving the face.
+ * The bright room carries far more of its light from everywhere at once, and
+ * its wall is white, so the haze its floor fades into sits at about the page's
+ * own lightness instead of reading as a dim box in it. Its floor is a light
+ * gray rather than white: a pool of colored light on a white floor that bright
+ * is lost at the top of what the display can show, and on gray it stays a
+ * color. Its lamps are lit little more than the dark room's, and
+ * `GLOW_STRENGTH` turns the glow up far enough to stand above the lit floor.
+ *
+ * Its spill starts well above the room's own surfaces, so the bright wall and
+ * floor never spill along with the subjects, and it is drawn weaker than the
+ * dark room's: against a lit floor a full spill is a soft copy of the subject
+ * laid over the subject, and a rim of it around each face is what reads as
+ * light leaving the face.
  */
 const OPEN_DRESSING: Dressings = {
-  light: { paint: 0xb0b0b0, light: 0.4, fill: 0.8, ambient: 1.5, spillFrom: 0, spill: 0.35 },
-  dark: { paint: 0x5a5a5a, light: 0.6, fill: 0.5, ambient: 0.35, spillFrom: 0, spill: 1 },
+  light: {
+    walls: 0xffffff,
+    floor: 0xb0b0b0,
+    light: 0.5,
+    fill: 0.8,
+    ambient: 4.5,
+    spillFrom: 1.6,
+    spill: 0.35,
+  },
+  dark: {
+    walls: 0x5a5a5a,
+    floor: 0x5a5a5a,
+    light: 0.6,
+    fill: 0.5,
+    ambient: 0.35,
+    spillFrom: 0,
+    spill: 1,
+  },
 };
 
 /** How many lamps hang on a corner's ring. */
@@ -383,6 +411,9 @@ const buildSubjects = (
 /* ---------------------------------------------------------------- the room */
 
 /** What every finisher's room has, whatever is being demonstrated in it. */
+/** What a room's shell is painted with, one material per kind of surface. */
+type Paint = Readonly<{ walls: MeshStandardMaterial; floor: MeshStandardMaterial }>;
+
 type Room = Readonly<{
   scene: Scene;
   camera: PerspectiveCamera;
@@ -390,7 +421,7 @@ type Room = Readonly<{
   fieldOfView: number;
   subjects: readonly Subject[];
   /** The floor and any walls, held so the room can be repainted with the theme. */
-  paint: MeshStandardMaterial;
+  paint: Paint;
   /** How the room is painted and lit, under each theme. */
   dressings: Dressings;
   /** Sky and bounce, so a face turned away from every lamp still has a shape. */
@@ -421,14 +452,17 @@ const farOf = (shell: Shell): number =>
     .exhaustive();
 
 /** Lay the floor and raise whatever wall this room has. */
-const buildShell = (scene: Scene, shell: Shell): MeshStandardMaterial => {
-  const paint = new MeshStandardMaterial({
-    roughness: ROOM_ROUGHNESS,
-    metalness: 0,
-  });
+const buildShell = (scene: Scene, shell: Shell): Paint => {
+  const paint: Paint = {
+    walls: new MeshStandardMaterial({ roughness: ROOM_ROUGHNESS, metalness: 0 }),
+    floor: new MeshStandardMaterial({ roughness: ROOM_ROUGHNESS, metalness: 0 }),
+  };
 
-  const surface = (geometry: CircleGeometry | CylinderGeometry | PlaneGeometry): Mesh => {
-    const face = new Mesh(geometry, paint);
+  const surface = (
+    geometry: CircleGeometry | CylinderGeometry | PlaneGeometry,
+    material: MeshStandardMaterial,
+  ): Mesh => {
+    const face = new Mesh(geometry, material);
     face.receiveShadow = true;
     scene.add(face);
 
@@ -439,25 +473,28 @@ const buildShell = (scene: Scene, shell: Shell): MeshStandardMaterial => {
     .with({ _tag: "Corner" }, ({ wallAt }) => {
       const extent = wallAt * ROOM_EXTENT;
 
-      surface(new PlaneGeometry(extent, extent)).rotation.x = -Math.PI / 2;
+      surface(new PlaneGeometry(extent, extent), paint.floor).rotation.x = -Math.PI / 2;
 
       // Centered half an extent up, so the bottom edge of each wall is exactly
       // the floor and the top is far outside the frame.
-      const back = surface(new PlaneGeometry(extent, extent));
+      const back = surface(new PlaneGeometry(extent, extent), paint.walls);
       back.position.set(0, extent / 2, -wallAt);
 
-      const side = surface(new PlaneGeometry(extent, extent));
+      const side = surface(new PlaneGeometry(extent, extent), paint.walls);
       side.position.set(-wallAt, extent / 2, 0);
       side.rotation.y = Math.PI / 2;
     })
     .with({ _tag: "Drum" }, ({ radius, height }) => {
       // Seen from inside, both of them: the eye stands on this floor rather
       // than looking down onto it.
-      paint.side = DoubleSide;
+      paint.walls.side = DoubleSide;
+      paint.floor.side = DoubleSide;
 
-      surface(new CircleGeometry(radius, 64)).rotation.x = -Math.PI / 2;
-      surface(new CylinderGeometry(radius, radius, height, 64, 1, true)).position.y =
-        height / 2;
+      surface(new CircleGeometry(radius, 64), paint.floor).rotation.x = -Math.PI / 2;
+      surface(
+        new CylinderGeometry(radius, radius, height, 64, 1, true),
+        paint.walls,
+      ).position.y = height / 2;
     })
     .exhaustive();
 
@@ -530,12 +567,13 @@ const dressRoom = (room: Room, finish: FinisherRoom): Dressed => {
   const light = finish.light * dressing.light;
   const ambient = dressing.ambient * light;
 
-  room.paint.color.setHex(dressing.paint, SRGBColorSpace);
+  room.paint.walls.color.setHex(dressing.walls, SRGBColorSpace);
+  room.paint.floor.color.setHex(dressing.floor, SRGBColorSpace);
   room.scene.environmentIntensity = ambient;
   room.fill.intensity = dressing.fill * ambient;
-  // What is beyond the room is the room's own paint with no lamp on it, so a
-  // dim room fades into the dark instead of ending against a lit wall.
-  room.clear.setHex(dressing.paint, SRGBColorSpace).multiplyScalar(Math.min(1, ambient));
+  // What is beyond the room is its walls with no lamp on them, so a dim room
+  // fades into the dark instead of ending against a lit wall.
+  room.clear.setHex(dressing.walls, SRGBColorSpace).multiplyScalar(ambient);
 
   return { light, spillFrom: dressing.spillFrom, spill: dressing.spill };
 };

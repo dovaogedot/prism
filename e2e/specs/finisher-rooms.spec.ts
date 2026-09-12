@@ -18,12 +18,12 @@ import {
   darkestTenths,
   DRAWN,
   drawn,
-  glowContrasts,
   hueSpread,
-  outerChromas,
   outerRings,
+  peakChromas,
   pretendGpu,
   refuseWebGl2,
+  seamsOf,
   signature,
   surfacesOf,
 } from "../support/stages.ts";
@@ -38,16 +38,19 @@ import {
 test.describe.configure({ timeout: 120_000 });
 
 /**
- * The most lightness a glowing room's corners may reach, as a percentage.
+ * The most lightness a glowing room's corners may reach at night, as a
+ * percentage.
  *
  * The corners are the part of a stage nothing stands in, so what reaches them
  * is the room's own light and whatever has spilled off the subjects. A
  * fluorescent finisher is the hardest case there is: three faces at the top of
  * what the display can show, with the bloom that says so drawn around all
  * three. If that spill were escaping the subjects the corners would climb
- * toward the faces themselves, which sit well above this.
+ * toward the faces themselves, which sit well above this. Read at night, where
+ * the room is dark and what lights its corners is spill; by day the room is
+ * itself about as light as the page.
  */
-const CORNER_CEILING = 70;
+const CORNER_CEILING = 45;
 
 const results = (page: Page) => page.getByRole("region", { name: "Results" });
 
@@ -107,7 +110,8 @@ test.describe("a machine that can draw", () => {
     });
   }
 
-  test("keeps a glowing room's spill inside its own stage", async ({ page }) => {
+  test("keeps a glowing room's spill inside its own stage at night", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "dark" });
     await page.goto(shelf("fluorescent"));
     await drawn(page);
 
@@ -172,7 +176,7 @@ test.describe("a machine that can draw", () => {
    * the bright page instead of reading as a dim box in it, and that light is
    * what lights the room's darkest tenth.
    */
-  const DAY_AMBIENT_FLOOR = 36;
+  const DAY_AMBIENT_FLOOR = 48;
 
   test("keeps the ambient light up in a glowing room by day", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "light" });
@@ -188,49 +192,27 @@ test.describe("a machine that can draw", () => {
   });
 
   /**
-   * How far apart the two ends of a glowing shelf have to spill by day.
+   * How strong the color of every glow on the shelf has to stay by day, in
+   * percent.
    *
-   * The same demand as `GLOW_SPREAD`, read as color rather than brightness,
-   * because a spill on a light floor adds color more than it adds light: the
-   * hardest glow on the shelf puts this many times as much color into the
-   * outer fifth of its stage as the faintest does.
+   * Read as `peakChromas` reads it, which in a room of white and gray is the
+   * glowing faces. A glow reads as light while its face carries the pigment
+   * at full strength. A spill laid over the face, or a room whose own light
+   * covers it, fades the face toward white, and what is left reads as a soft
+   * copy of the subject rather than as a subject that glows.
    */
-  const DAY_GLOW_SPREAD = 2;
+  const DAY_GLOW_COLOR = 70;
 
-  test("spills more color off a harder glow than off a fainter one by day", async ({
-    page,
-  }) => {
+  test("keeps every glow's color at full strength by day", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "light" });
     await page.goto(shelf("fluorescent"));
     await drawn(page);
 
-    const chromas = await outerChromas(page);
+    const chromas = await peakChromas(page);
 
-    expect(chromas.length).toBeGreaterThan(1);
-    expect(Math.max(...chromas)).toBeGreaterThanOrEqual(Math.min(...chromas) * DAY_GLOW_SPREAD);
-  });
-
-  /**
-   * How far every glow on the shelf has to stand above its room by day, in
-   * points of lightness.
-   *
-   * The brightest part of what glows against the middle of the gray room
-   * around it. A face that stands no higher than paint under the same lamps
-   * reads as paint, and the faintest glow on the shelf is the one nearest to
-   * that.
-   */
-  const DAY_GLOW_CONTRAST = 17;
-
-  test("stands every glow well above its room by day", async ({ page }) => {
-    await page.emulateMedia({ colorScheme: "light" });
-    await page.goto(shelf("fluorescent"));
-    await drawn(page);
-
-    const contrasts = await glowContrasts(page);
-
-    expect(contrasts.length).toBeGreaterThan(0);
-    for (const contrast of contrasts) {
-      expect(contrast).toBeGreaterThanOrEqual(DAY_GLOW_CONTRAST);
+    expect(chromas.length).toBeGreaterThan(0);
+    for (const chroma of chromas) {
+      expect(chroma).toBeGreaterThanOrEqual(DAY_GLOW_COLOR);
     }
   });
 
@@ -243,7 +225,7 @@ test.describe("a machine that can draw", () => {
    * bright page. Read on the roughness shelf, whose subject is gray, so the
    * darkest tenth there is shade rather than a dark pigment.
    */
-  const DAY_CORNER_FLOOR = 34;
+  const DAY_CORNER_FLOOR = 50;
 
   test("keeps the shade in a corner open by day", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "light" });
@@ -284,11 +266,19 @@ test.describe("a machine that can draw", () => {
       test(`lays overlapping shadows and lights both walls unevenly around ${room}, ${scheme}`, async ({
         page,
       }) => {
-        await page.emulateMedia({ colorScheme: scheme });
+        // The seams are found under the dark theme, where every wall is far
+        // darker than the floor it meets, and read under the one being tested.
+        await page.emulateMedia({ colorScheme: "dark" });
         await openFirst(page, finish);
         await drawn(page);
 
-        const { overlap, walls } = await surfacesOf(page);
+        const seams = await seamsOf(page);
+
+        await page.emulateMedia({ colorScheme: scheme });
+        await page.reload();
+        await drawn(page);
+
+        const { overlap, walls } = await surfacesOf(page, seams);
 
         expect(overlap).toBeGreaterThanOrEqual(CORNER_SURFACES.overlap);
         expect(walls.left).toBeGreaterThanOrEqual(CORNER_SURFACES.walls[scheme]);
@@ -313,7 +303,7 @@ test.describe("a machine that can draw", () => {
    * around one step rather than spread evenly over the wheel — and a pigment
    * mixed dark enough to lose that is one whose hue the pointer no longer
    * visibly moves. All three are read in the light theme, where the room is
-   * gray, so every colored pixel is on a subject.
+   * white and gray, so every colored pixel is on a subject.
    */
   const COATING_COLORS = { each: 8, strongest: 16, ownHue: 9 };
 

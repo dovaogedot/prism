@@ -601,8 +601,9 @@ takes the pigment's hue, the slab loses its edge, and a shelf of glowing colors 
 to look at. So the radius is small and the strength smaller, and the bound is checked rather
 than eyeballed: in the dark room the background behind every glowing color stays under 20%
 lightness, against a non-glowing control that sits around 8%. In the lit room, where the
-wall is gray to begin with, what is bounded is color rather than brightness: the background
-stays under 12% saturation, so it stays the gray it was.
+wall is white to begin with, what is bounded is color rather than brightness: the strongest
+and weakest channels of the background stay within 7% of each other, so it stays the white
+it was.
 [`catalog-artwork.spec.ts`](e2e/specs/catalog-artwork.spec.ts) measures every card on the
 shelf and fails on either.
 
@@ -680,7 +681,7 @@ nothing anywhere branches on a finish's *name*:
 | The finisher does | The room | What the pointer does |
 | --- | --- | --- |
 | a surface | plainly lit, one subject on bare gray, seen from low down and close | turns the ring of four cone lamps around it, each walking to its own place on the turned ring at its own rate, so a flick throws them out of formation and they come back in order |
-| a glow | dim, and dimmer the harder the glow, on a floor that fades out before it ends, with the light coming off the subjects spilling into the air around them | walks the eye around the three subjects standing on it |
+| a glow | dimmer the harder the glow, on a floor that fades out before it ends, with the light coming off the subjects spilling into the air around them | walks the eye around the three subjects standing on it |
 | a coating | bright, because interference is a reflection and a dim room gives it nothing to reflect, and framed on the near subject from low down | carries every hue in the room around the wheel, a full turn from one edge of the stage to the other — so both edges show the same colors and there is no seam in the middle to jump across |
 
 **A coated subject is painted dark.** Interference lives in the reflection, and a pigment's
@@ -691,7 +692,7 @@ in the middle of the range a coated color is sold on — the ceiling
 a surface anybody buys, and the floor is a mirror, which returns the room instead of the
 shape it is poured over. What is left is dark enough to show the film's colors and colored
 enough to say which hue the pointer is turning. Both are measured on the hue wheel, cut into
-thirty-six steps of ten degrees, in the light theme, where the room is gray and every colored
+thirty-six steps of ten degrees, in the light theme, where the room is white and gray and every colored
 pixel is on a subject: every room on the shelf reaches at least eight of the steps and the
 strongest at least sixteen, while the busiest step still holds at least nine percent of the
 colored pixels.
@@ -716,15 +717,18 @@ the shape off. At night the room keeps its ambient light, the light that arrives
 everywhere at once, well under those lamps, because ambient light lights every side alike
 and fills in the unlit side the lamps leave. Measured on the dark shelf, the darkest tenth of
 the faintest glow's stage sits at 2% lightness; `finisher-rooms.spec.ts` holds it under 5%.
-By day the room carries far more ambient light, so it sits inside the bright page instead of
-reading as a dim box in it, and the glow is turned up to stand above the lit floor. The spill
-is drawn weaker than at night: against a lit floor a full spill is a soft copy of the subject
-laid over the subject, which reads as the picture being out of focus, while a thin rim of it
-around each face reads as light leaving the face. Measured on the day shelf, the darkest tenth
-of every stage sits at 40% to 41% lightness, the brightest part of every glow stands 20 to 37
-points of lightness above the middle of its gray room, and the outer fifth of a stage carries
-3% to 8% color. `finisher-rooms.spec.ts` holds every darkest tenth at 36% or more, every glow
-at 17 points or more, and the most color at twice the least or more.
+By day the room carries far more ambient light and its wall is white, so the haze its floor
+fades into sits at about the page's own lightness instead of reading as a dim box in it, and
+the glow is turned up to stand above the lit floor. The floor is a light gray, because a pool
+of colored light on a white floor that bright is lost at the top of what the display can
+show. The spill starts well above the room's own surfaces, so the bright wall and floor never
+spill along with the subjects, and it is drawn weaker than at night: against a lit floor a
+full spill is a soft copy of the subject laid over the subject, which reads as the picture
+being out of focus, while a thin rim of it around each face reads as light leaving the face.
+Measured on the day shelf, the darkest tenth of every stage sits at 55% to 57% lightness, and
+the most colored fiftieth of every stage, which is its glowing faces, carries 74% to 80%
+color. `finisher-rooms.spec.ts` holds every darkest tenth at 48% or more and every glow's
+color at 70% or more.
 
 **The two ends of the glow range have to look like two ends.** The finishers on that shelf
 sit in the top half of the range, so a spill straight in the amount separates them by the
@@ -775,14 +779,17 @@ least a fiftieth of the floor lies where two shadows overlap. One lamp cannot la
 inside its own shadow, so an overlap is what says more than one lamp is casting, however
 large or dark any one shadow is.
 
-By day a corner carries far more of its light from everywhere at once, so the room is bright
-and its shaded walls and the shaded side of its subject stay open against the bright page.
-Most of that light is sky and bounce rather than the surroundings a surface reflects: a
-coating reflects its surroundings and spreads them around the hue wheel, and brighter
-surroundings bury the one hue the pointer turns. Measured on the roughness shelf by day, the
-darkest tenth of every stage sits at 42% lightness; `finisher-rooms.spec.ts` holds it at 34%
-or more. Light from everywhere at once lifts the dim part of a wall more than the lit part,
-so the scallops the wall lamps lay are shallower by day than at night.
+By day a corner carries far more of its light from everywhere at once and its walls are
+white, so the far wall sits at about the page's own lightness and the shaded side of its
+subject stays open against the bright page. Most of that light is sky and bounce rather than
+the surroundings a surface reflects: a coating reflects its surroundings and spreads them
+around the hue wheel, and brighter surroundings bury the one hue the pointer turns. The floor
+is a middle gray. A white floor under that much light sits at the top of what the display can
+show, where a shadow and the floor around it come out as the same white; a gray one keeps
+every shadow and every overlap. Measured on the roughness shelf by day, the darkest tenth of
+every stage sits at 57% to 58% lightness; `finisher-rooms.spec.ts` holds it at 50% or more.
+Light from everywhere at once lifts the dim part of a wall more than the lit part, so the
+scallops the wall lamps lay are shallower by day than at night.
 
 **The lamps that do not cast are cones.** Both corners hang a ring of four of them around
 what is standing there, evenly spaced at one height and one radius, turned onto the bearing
@@ -801,8 +808,14 @@ first is turned away from, so a face has a dark side rather than a black one.
 
 **Every room is dressed twice.** A room is looked at through a page that is either bright or
 dark, and a wall mixed to sit inside a bright page is a lamp in a dark one. So each room keeps
-two sets of paint, light level, ambient share, fill share, spill threshold and spill strength,
-and picks by the theme in force when it is drawn.
+two sets of wall paint, floor paint, light level, ambient share, fill share, spill threshold
+and spill strength, and picks by the theme in force when it is drawn. Under both themes the
+far wall of every room, a color's included, sits near the page's own lightness, so a stage
+reads as the product standing in the shop rather than as a box cut into the page. Measured on
+every shelf, the top of every stage is within 3 points of lightness of the page by day, and
+within 2 at night but for a hard glow, whose spill lifts the top of its stage by up to 8½.
+[`stage-backgrounds.spec.ts`](e2e/specs/stage-backgrounds.spec.ts) holds it within 4 by day
+and 10 at night.
 
 **A room is the same room for every finisher shown in it.** How many subjects there are,
 where they stand, how big they are, which way they face and what they are painted is written
@@ -838,10 +851,10 @@ arrives and simply stands still.
 [`finisher-rooms.spec.ts`](e2e/specs/finisher-rooms.spec.ts) drives all of it in a real
 browser — each finish draws a room, the pointer changes the pixels, each corner lays
 overlapping shadows and lights both its walls unevenly under both themes and keeps its shade
-open by day, a glowing room keeps its corners well under the faces glowing in it even with
-the spill drawn around them, spills more off a harder glow than off a fainter one under both
-themes, stands every glow well above its room by day, and keeps its ambient light low at
-night and up by day,
+open by day, a glowing room keeps its corners at night well under the faces glowing in it
+even with the spill drawn around them, spills more off a harder glow than off a fainter one,
+keeps every glow's color at full strength by day, and keeps its ambient light low at night
+and up by day,
 a coating room frames its near subject large and whole and shows colors nothing in it was
 painted, reduced motion draws once and stays put, the switch off leaves stills and no
 canvases across a reload, the switch on draws live even on a software rasterizer, and a
@@ -1047,7 +1060,8 @@ stays on one line, the drawer slides in holding the filters, the switches and si
 the sort and the filters are icons beside the search box, a picture turns as the phone
 tilts and a finger is then left to the page, and on a phone that reports no tilt a finger
 drawn across a picture turns it while one drawn up the page still scrolls it, that the
-artwork draws and answers the pointer and stays inside its own stage, and that the auth routes send
+artwork draws and answers the pointer, stays inside its own stage and sits near the page's
+own lightness under both themes, and that the auth routes send
 you where they should — including that signing in lands on the catalog rather than the
 account page, which depends on a redirect and a form navigation resolving in the same tick.
 

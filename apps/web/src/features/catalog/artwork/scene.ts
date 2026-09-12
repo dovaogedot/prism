@@ -58,7 +58,7 @@ import { fieldOfViewAt, lookFrom, type Viewpoint } from "./viewpoint.ts";
  * is about what is around it and how much light is in the air.
  */
 type Room = Readonly<{
-  /** The wall behind the slab. Gray, and the same gray everywhere on it. */
+  /** What the wall behind the slab is painted: one neutral paint everywhere on it. */
   wall: number;
   /** How much of the reflected room each face returns. */
   environment: number;
@@ -95,9 +95,13 @@ type Room = Readonly<{
  *
  * This is the balance where a matte face visibly shades across a turn and a
  * gloss one still has only one reflection on it.
+ *
+ * The wall is white, so under that much light it sits at about the bright
+ * page's own lightness, and the slab stands in the page rather than in a gray
+ * box set into it.
  */
 const ROOMS: Record<Theme, Room> = {
-  light: { wall: 0xb0b0b0, environment: 1.15, key: 2.5, fill: 2.35, strip: 1.15, bloom: 0.35 },
+  light: { wall: 0xffffff, environment: 1.15, key: 2.5, fill: 2.35, strip: 1.15, bloom: 0.35 },
   // Not the same room turned down: a dark room has a dark wall, so the lamp
   // has to work slightly harder for the slab to keep its own color, and bloom
   // carries further because there is somewhere for it to go.
