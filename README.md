@@ -26,9 +26,14 @@ migrates and seeds the database, and prints where everything is:
 | Inbox for password-reset mail (Mailpit) | <http://localhost:8025> |
 
 The seed plants a demo shopper you can sign in as: `shopper@prism.test` with the password
-`correct horse battery staple`. It also plants categories, each with its own property
-vocabulary, plus brands, products, placeholder images and reviews, all drawn from a fixed
-random seed, so every fresh database holds the same shop.
+`correct horse battery staple`. It also plants the catalog under `apps/api/seed`: Balatro's
+playing cards, Jokers, Tarot and Spectral cards, Vouchers and Decks, read from the Balatro
+wiki, and The Binding of Isaac's items, trinkets and consumables, read from tboi.com, each
+with its picture and the properties the filters draw on. The pictures and texts belong to
+the games' makers and stand in as placeholder data. Stock, sizes and reviews are drawn from
+a fixed random seed, so every fresh database holds the same shop.
+`npm run fetch-catalog --workspace @prism/api` writes the catalog directory again from its
+sources.
 
 `./start.sh down` stops the stack. `./start.sh reset` also deletes the database and the
 media volume, so the next start migrates and seeds from nothing.
@@ -265,8 +270,8 @@ the bindings, and the security tests send injection payloads through every query
 
 Product images are files in the media directory named by `MEDIA_DIR`, a Docker volume in
 the stack, and `product_image.file` holds the name. The API serves them at `/media/` through
-`@fastify/static`, which refuses paths outside the directory. The seed writes an SVG
-placeholder per product.
+`@fastify/static`, which refuses paths outside the directory. The seed copies each
+product's picture from `apps/api/seed/media`.
 
 ## Testing
 
@@ -282,7 +287,8 @@ clock, the mailer and the password hasher substituted. Docker has to be running.
 - **Unit** (`apps/api/tests/unit`, `packages/shared/tests`, `apps/web/tests`): JWT
   creation, verification and expiry against a fake clock; every input schema with valid,
   malformed and hostile input; the product data model's conversions and query parsing; the
-  search SQL and its bindings; the storefront's URL filter arithmetic.
+  search SQL and its bindings; the fetch script's readers of wiki infoboxes and of the item
+  page; the storefront's URL filter arithmetic.
 - **API integration** (`apps/api/tests/integration`): every auth endpoint including
   registration, sign-in, refresh rotation and replay, logout, password reset through the
   captured mail, 2FA setup and challenged sign-in, and the provider flow against the stand-in;

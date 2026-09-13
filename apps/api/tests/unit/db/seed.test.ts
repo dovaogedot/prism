@@ -1,3 +1,4 @@
+import { access } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { Seed } from "../../../src/db/seed.ts";
 
@@ -21,36 +22,19 @@ describe("Seed.slugOf", () => {
   });
 });
 
-describe("Seed.imageSvg", () => {
-  it("drops markup characters from the name", () => {
-    const svg = Seed.imageSvg('<b>"Lamp" & Co</b>', "#123456");
+describe("Seed.catalog", () => {
+  it("holds every category with products that each have a type and a picture on disk", async () => {
+    const catalog = await Seed.catalog();
 
-    expect(svg).toContain(">bLamp  Co/b<");
-    expect(svg).toContain('fill="#123456"');
-  });
-});
+    expect(catalog.categories.length).toBeGreaterThan(0);
 
-describe("Seed.categories", () => {
-  it("names each category once and gives each its own properties", () => {
-    const shelves = Seed.categories();
-    const names = shelves.map((shelf) => shelf.name);
+    for (const shelf of catalog.categories) {
+      expect(shelf.products.length, shelf.name).toBeGreaterThan(0);
 
-    expect(new Set(names).size).toBe(names.length);
-
-    for (const shelf of shelves) {
-      const properties = Object.entries(shelf.properties);
-      expect(properties.length, shelf.name).toBeGreaterThanOrEqual(2);
-
-      for (const [name, draw] of properties) {
-        expect(draw().length, `${shelf.name}.${name}`).toBeGreaterThan(0);
+      for (const product of shelf.products) {
+        expect(product.properties["type"], product.name).toBeTruthy();
+        await expect(access(new URL(`media/${product.image}`, Seed.CATALOG_DIR)), product.image).resolves.toBeUndefined();
       }
     }
-  });
-
-  it("gives two categories different vocabularies", () => {
-    const [first, second] = Seed.categories();
-    if (first === undefined || second === undefined) throw new Error("expected two categories");
-
-    expect(Object.keys(first.properties)).not.toEqual(Object.keys(second.properties));
   });
 });
