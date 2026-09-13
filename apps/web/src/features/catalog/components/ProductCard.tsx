@@ -22,7 +22,7 @@ export const Stock = ({ count, className }: Readonly<{ count: number; className:
 
 /** A product in the grid: its picture, name, brand, rating and price. */
 export const ProductCard = ({ product }: Readonly<{ product: ProductSummary }>) => (
-  <article className="group relative flex flex-col overflow-hidden rounded-[--radius-card] border border-line bg-surface transition-all hover:border-line-strong hover:shadow-lg">
+  <article className="group relative flex flex-col overflow-hidden rounded-(--radius-card) border border-line bg-surface transition-all hover:border-line-strong hover:shadow-lg">
     <Picture image={product.images[0]} name={product.name} className="aspect-square w-full" />
 
     <div className="flex flex-1 flex-col gap-2 p-3">

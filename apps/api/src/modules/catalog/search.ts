@@ -47,18 +47,31 @@ export const ProductSearch = {
     sql`EXISTS (SELECT 1 FROM ${productProperties} AS owned WHERE owned.product_id = ${products.id} AND owned.name = ${filter.name} AND ${inArray(sql`owned.value`, [...filter.values])})`,
 
   /**
-   * Every active filter as a condition, except the one named by `lifted`.
-   * With `property` lifted, each property filter still applies to every
-   * property row except those of its own name, which is what lets one
-   * property's facet count its sibling values.
+   * The filters that define the shelf: the text and, unless lifted, the
+   * category. Every facet lists its values over the shelf, so a value stays
+   * in view when a filter of the rail excludes it.
    */
-  conditions: (query: ProductQuery, rating: RatingColumns, lifted: LiftedFacet = "none"): SQL[] => {
+  shelf: (query: ProductQuery, lifted: LiftedFacet = "none"): SQL[] => {
     const where: SQL[] = [];
 
     if (query.text !== undefined) where.push(ProductSearch.textCondition(query.text));
     if (lifted !== "category" && query.category !== undefined) {
       where.push(eq(categories.slug, query.category));
     }
+
+    return where;
+  },
+
+  /**
+   * The filters the rail applies within the shelf, except the one named by
+   * `lifted`. A facet counts its values under these. With `property` lifted,
+   * each property filter still applies to every property row except those
+   * of its own name, which is what lets one property's facet count its
+   * sibling values.
+   */
+  narrowing: (query: ProductQuery, rating: RatingColumns, lifted: LiftedFacet = "none"): SQL[] => {
+    const where: SQL[] = [];
+
     if (lifted !== "brand" && query.brands.length > 0) where.push(inArray(brands.slug, [...query.brands]));
     if (lifted !== "price" && query.priceMinCents !== undefined) {
       where.push(gte(products.priceCents, query.priceMinCents));
@@ -79,6 +92,15 @@ export const ProductSearch = {
 
     return where;
   },
+
+  /** Every active filter as a condition, except the one named by `lifted`. */
+  conditions: (query: ProductQuery, rating: RatingColumns, lifted: LiftedFacet = "none"): SQL[] => [
+    ...ProductSearch.shelf(query, lifted),
+    ...ProductSearch.narrowing(query, rating, lifted),
+  ],
+
+  /** The conditions as one boolean for a `FILTER` clause; `true` when there are none. */
+  filter: (conditions: readonly SQL[]): SQL => and(...conditions) ?? sql`true`,
 
   /** `and` over the conditions, or nothing when there are none. */
   where: (conditions: readonly SQL[]): SQL | undefined =>

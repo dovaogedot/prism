@@ -27,6 +27,14 @@ const Group = ({ title, children }: Readonly<{ title: string; children: ReactNod
   </fieldset>
 );
 
+/** A value's row, greyed rather than removed when the other filters leave it nothing. */
+const Row = {
+  classes: (empty: boolean): string =>
+    empty
+      ? "flex items-center gap-2 text-sm text-ink-faint opacity-50"
+      : "flex items-center gap-2 text-sm text-ink-soft hover:text-ink",
+} as const;
+
 const Count = ({ count }: Readonly<{ count: number }>) => (
   <span className="text-xs tabular-nums text-ink-faint">{count}</span>
 );
@@ -51,7 +59,7 @@ const Checklist = ({
     .otherwise(() => (
       <Group title={title}>
         {visible.map((bucket) => (
-          <label key={bucket.value} className="flex items-center gap-2 text-sm text-ink-soft hover:text-ink">
+          <label key={bucket.value} className={Row.classes(bucket.count === 0 && !ticked(bucket))}>
             <input
               type="checkbox"
               checked={ticked(bucket)}
@@ -105,7 +113,7 @@ const RatingFacet = ({ facets, params, onChange }: FacetsProps) =>
           const threshold = Number(bucket.value);
 
           return (
-            <label key={bucket.value} className="flex items-center gap-2 text-sm text-ink-soft hover:text-ink">
+            <label key={bucket.value} className={Row.classes(bucket.count === 0 && !chosen)}>
               <input
                 type="radio"
                 name="rating"
@@ -158,7 +166,7 @@ const PriceFacet = ({ facets, params, onChange }: FacetsProps) => {
     .exhaustive();
 };
 
-/** Every filter the current results can be narrowed by, apart from the category. */
+/** Every filter the shelf can be narrowed by, apart from the category; the price and rating last. */
 export const Facets = ({ facets, params, onChange }: FacetsProps) => (
   <div className="space-y-6">
     {match(CatalogParams.isFiltered(params))
@@ -175,8 +183,6 @@ export const Facets = ({ facets, params, onChange }: FacetsProps) => (
       .exhaustive()}
 
     <Checklist title="Brand" keyName="brand" buckets={facets.brands} params={params} onChange={onChange} />
-    <PriceFacet facets={facets} params={params} onChange={onChange} />
-    <RatingFacet facets={facets} params={params} onChange={onChange} />
 
     {facets.properties.map((property) => (
       <Checklist
@@ -188,5 +194,8 @@ export const Facets = ({ facets, params, onChange }: FacetsProps) => (
         onChange={onChange}
       />
     ))}
+
+    <PriceFacet facets={facets} params={params} onChange={onChange} />
+    <RatingFacet facets={facets} params={params} onChange={onChange} />
   </div>
 );

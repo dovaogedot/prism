@@ -19,7 +19,7 @@ export const AuthShell = ({
       <p className="text-sm text-ink-soft">{lede}</p>
     </div>
 
-    <div className="rounded-[--radius-card] border border-line bg-surface p-6">
+    <div className="rounded-(--radius-card) border border-line bg-surface p-6">
       {children}
     </div>
 

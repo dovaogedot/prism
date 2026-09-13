@@ -16,7 +16,7 @@ import type {
   Suggestion,
 } from "@prism/shared";
 import { Dimensions, Weight } from "@prism/shared";
-import { asc, count, eq, ilike, max, min, sql } from "drizzle-orm";
+import { asc, eq, ilike, max, min, sql } from "drizzle-orm";
 import type { Database } from "../../db/client.ts";
 import { brands, categories, productProperties, productReviews, products } from "../../db/schema.ts";
 import { ProductSearch, type LiftedFacet } from "./search.ts";
@@ -98,18 +98,24 @@ export const CatalogRepository = {
     const conditions = (query: ProductQuery, lifted: LiftedFacet) =>
       ProductSearch.where(ProductSearch.conditions(query, ratingColumns, lifted));
 
-    // The same three joins open every query below; drizzle's chain types do
-    // not survive a generic helper, so they are spelled out each time.
+    /** The shelf a facet lists its values over. */
+    const shelf = (query: ProductQuery, lifted: LiftedFacet) =>
+      ProductSearch.where(ProductSearch.shelf(query, lifted));
+
+    /** How many shelf rows also pass the rail's other filters. */
+    const counted = (query: ProductQuery, lifted: LiftedFacet) =>
+      sql<number>`count(*) filter (where ${ProductSearch.filter(ProductSearch.narrowing(query, ratingColumns, lifted))})`.mapWith(Number);
+
     const bucketsOf = async (query: ProductQuery, lifted: "category" | "brand"): Promise<readonly FacetBucket[]> => {
       const named = lifted === "category" ? categories : brands;
 
       return db
-        .select({ value: named.slug, label: named.name, count: count() })
+        .select({ value: named.slug, label: named.name, count: counted(query, lifted) })
         .from(products)
         .innerJoin(categories, eq(products.categoryId, categories.id))
         .innerJoin(brands, eq(products.brandId, brands.id))
         .leftJoin(rating, eq(rating.productId, products.id))
-        .where(conditions(query, lifted))
+        .where(shelf(query, lifted))
         .groupBy(named.slug, named.name)
         .orderBy(asc(named.name));
     };
@@ -121,19 +127,19 @@ export const CatalogRepository = {
         .innerJoin(categories, eq(products.categoryId, categories.id))
         .innerJoin(brands, eq(products.brandId, brands.id))
         .leftJoin(rating, eq(rating.productId, products.id))
-        .where(conditions(query, "price"));
+        .where(shelf(query, "price"));
 
       return { minCents: row?.min ?? 0, maxCents: row?.max ?? 0 };
     };
 
     const ratingsOf = async (query: ProductQuery): Promise<readonly FacetBucket[]> => {
       const rows = await db
-        .select({ average: summaryColumns.average, matching: count() })
+        .select({ average: summaryColumns.average, matching: counted(query, "rating") })
         .from(products)
         .innerJoin(categories, eq(products.categoryId, categories.id))
         .innerJoin(brands, eq(products.brandId, brands.id))
         .leftJoin(rating, eq(rating.productId, products.id))
-        .where(conditions(query, "rating"))
+        .where(shelf(query, "rating"))
         .groupBy(rating.average);
 
       // Cumulative: a product rated 4.5 counts toward "4 stars & up" and below.
@@ -146,13 +152,13 @@ export const CatalogRepository = {
 
     const propertiesOf = async (query: ProductQuery): Promise<readonly PropertyFacet[]> => {
       const rows = await db
-        .select({ name: productProperties.name, value: productProperties.value, count: count() })
+        .select({ name: productProperties.name, value: productProperties.value, count: counted(query, "property") })
         .from(productProperties)
         .innerJoin(products, eq(productProperties.productId, products.id))
         .innerJoin(categories, eq(products.categoryId, categories.id))
         .innerJoin(brands, eq(products.brandId, brands.id))
         .leftJoin(rating, eq(rating.productId, products.id))
-        .where(conditions(query, "property"))
+        .where(shelf(query, "property"))
         .groupBy(productProperties.name, productProperties.value)
         .orderBy(asc(productProperties.name), asc(productProperties.value));
 

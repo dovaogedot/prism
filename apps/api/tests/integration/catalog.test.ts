@@ -164,7 +164,40 @@ describe("GET /api/v1/products", () => {
     expect(facets.properties.find((facet) => facet.name === "material")?.buckets).toEqual([
       { value: "steel", label: "steel", count: 1 },
     ]);
-    expect(facets.brands).toEqual([{ value: "acme", label: "Acme", count: 1 }]);
+    // Brands are listed over the shelf; the one the color filter excludes stays at zero.
+    expect(facets.brands).toEqual([
+      { value: "acme", label: "Acme", count: 1 },
+      { value: "globex", label: "Globex", count: 0 },
+    ]);
+  });
+
+  it("keeps a value listed at zero when a filter of the rail excludes it", async () => {
+    const facets = jsonOf(await get("/api/v1/products?brand=globex"))["facets"] as {
+      categories: { value: string; count: number }[];
+      properties: { name: string; buckets: { value: string; count: number }[] }[];
+      price: { minCents: number; maxCents: number };
+    };
+
+    expect(facets.categories).toEqual([
+      { value: "furniture", label: "Furniture", count: 0 },
+      { value: "lighting", label: "Lighting", count: 1 },
+    ]);
+    expect(facets.properties.find((facet) => facet.name === "color")?.buckets).toEqual([
+      { value: "black", label: "black", count: 1 },
+      { value: "red", label: "red", count: 0 },
+    ]);
+    // The slider's bounds come from the shelf, not from the brand chosen.
+    expect(facets.price).toEqual({ minCents: 2500, maxCents: 12000 });
+  });
+
+  it("lists only the shelf's values once a category is chosen", async () => {
+    const facets = jsonOf(await get("/api/v1/products?category=furniture"))["facets"] as {
+      brands: { value: string }[];
+      properties: { name: string; buckets: { value: string }[] }[];
+    };
+
+    expect(facets.brands.map((bucket) => bucket.value)).toEqual(["acme"]);
+    expect(facets.properties.find((facet) => facet.name === "material")?.buckets.map((b) => b.value)).toEqual(["wood"]);
   });
 
   it("sorts by price either way and by rating", async () => {

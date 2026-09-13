@@ -111,6 +111,21 @@ describe("ProductSearch.conditions", () => {
   });
 });
 
+describe("ProductSearch.shelf and narrowing", () => {
+  it("puts the text and category on the shelf and the rest in the narrowing", () => {
+    const full = query({ text: "lamp", category: "lamps", brands: ["acme"], minRating: 3 });
+
+    expect(render(and(...ProductSearch.shelf(full)) ?? sql``).params).toEqual(["lamp", "%lamp%", "lamps"]);
+    expect(render(and(...ProductSearch.narrowing(full, rating)) ?? sql``).params).toEqual(["acme", 3]);
+    expect(ProductSearch.shelf(full, "category")).toHaveLength(1);
+  });
+
+  it("renders no conditions as a true filter", () => {
+    expect(render(ProductSearch.filter([])).sql).toBe("true");
+    expect(render(ProductSearch.filter(ProductSearch.narrowing(query({ brands: ["acme"] }), rating))).params).toEqual(["acme"]);
+  });
+});
+
 describe("ProductSearch.orderBy", () => {
   it("ends every order in the slug so pages are stable", () => {
     for (const sort of ["relevance", "price_asc", "price_desc", "rating"] as const) {

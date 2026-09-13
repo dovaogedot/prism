@@ -6,7 +6,7 @@ export const Card = ({
   className = "",
 }: Readonly<{ children: ReactNode; className?: string }>) => (
   <div
-    className={["rounded-[--radius-card] border border-line bg-surface", className].join(
+    className={["rounded-(--radius-card) border border-line bg-surface", className].join(
       " ",
     )}
   >

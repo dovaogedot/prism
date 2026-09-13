@@ -55,9 +55,11 @@ submit to search names and descriptions. The rail beside the results offers ever
 to narrow them: any number of brands, a price range on a two-thumb slider between the
 cheapest and dearest match, a minimum rating in stars, and one group per property the
 matching products carry, with the number of matches next to each value. A group with many
-values folds behind "Show more". Counts within a group ignore that group's own choice, so
-picking one brand never hides the others. The sort menu orders by relevance, price either
-way, or rating. The filters live in the URL, so a filtered view is a link. On a narrow screen
+values folds behind "Show more". The search text and the category define the shelf; every
+value on the shelf stays listed, and one the other filters leave nothing for is greyed out
+rather than removed, so the rail never shifts under the pointer. Counts within a group ignore
+that group's own choice, so picking one brand never greys the others. The sort menu orders
+by relevance, price either way, or rating. The filters live in the URL, so a filtered view is a link. On a narrow screen
 the rail is in the drawer behind the filter button.
 
 A product's page shows its pictures, price, stock, brand, category, rating, description,
@@ -250,8 +252,10 @@ typed fragment finds something. Relevance ordering is `ts_rank` over the same ve
 Suggestions are a substring match on the name, prefixes first.
 
 A property filter is an `EXISTS` over `product_property` for the name with the value in the
-chosen set. Facets are counted with the results' own filters, except that each facet leaves
-its own filter out, so the counts say what choosing another of its values would match. Every
+chosen set. A facet lists every value found on the shelf, the products matching the text and
+the category, and counts each value under the other filters with a `FILTER` clause, so a value
+the rail excludes stays listed at zero and the counts say what choosing it would match. Each
+facet leaves its own filter out of the count. The price bounds are those of the shelf. Every
 value a shopper supplies is a bound parameter; the unit tests render the SQL and assert on
 the bindings, and the security tests send injection payloads through every query key.
 
