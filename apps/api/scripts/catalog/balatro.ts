@@ -10,7 +10,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { faker } from "@faker-js/faker";
 import { match } from "ts-pattern";
 import { z } from "zod";
-import { Sourced } from "./sourced.ts";
+import { Sourced, type Finish } from "./sourced.ts";
 
 const API = "https://balatrowiki.org/api.php";
 
@@ -67,6 +67,59 @@ const pages = async (titles: readonly string[]): Promise<ReadonlyMap<string, str
   return found;
 };
 
+const svgOf = (width: number, height: number, body: string): string =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${body}</svg>`;
+
+/** A color multiplied into the card, so its white face takes the color and its ink stays. */
+const tint = (color: string): Finish => ({
+  _tag: "Layer",
+  blend: "multiply",
+  svg: (width, height) => svgOf(width, height, `<rect width="100%" height="100%" fill="${color}"/>`),
+});
+
+/** A diagonal run of colors multiplied into the card. */
+const sheen = (stops: readonly string[]): Finish => ({
+  _tag: "Layer",
+  blend: "multiply",
+  svg: (width, height) =>
+    svgOf(
+      width,
+      height,
+      `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">${stops
+        .map((color, index) => `<stop offset="${index / (stops.length - 1)}" stop-color="${color}"/>`)
+        .join("")}</linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/>`,
+    ),
+});
+
+/** Two diagonal bands of light, as a glossy card catches it. */
+const shine: Finish = {
+  _tag: "Layer",
+  blend: "screen",
+  svg: (width, height) =>
+    svgOf(
+      width,
+      height,
+      `<polygon points="${0.15 * width},0 ${0.4 * width},0 ${0.1 * width},${height} 0,${height}" fill="#fff" fill-opacity="0.35"/>` +
+        `<polygon points="${0.6 * width},0 ${0.75 * width},0 ${0.45 * width},${height} ${0.3 * width},${height}" fill="#fff" fill-opacity="0.25"/>`,
+    ),
+};
+
+/** How each edition and enhancement is drawn, statically, on a card that carries it. */
+const FINISHES: Readonly<Record<string, readonly Finish[]>> = {
+  Foil: [sheen(["#c9e6ff", "#ffffff", "#b5d8ff"]), shine],
+  Holographic: [sheen(["#ffc2ec", "#dcc6ff", "#c2f0ff"]), shine],
+  Polychrome: [sheen(["#ffb3b3", "#fff0a8", "#b8f5b8", "#b3ecff", "#d5b8ff"]), shine],
+  Negative: [{ _tag: "Negate" }],
+  Bonus: [tint("#cfe0ff")],
+  Mult: [tint("#ffc9c9")],
+  Wild: [sheen(["#cfcfe6", "#f5bcbc", "#bcd6f0", "#f7d8b0"])],
+  Glass: [tint("#e3f4ff"), shine],
+  Steel: [tint("#d9dde3"), shine],
+  Stone: [tint("#b8bcc4")],
+  Gold: [tint("#f3d27c"), shine],
+  Lucky: [tint("#f3ecd2")],
+};
+
 /** The parameters of one infobox, keyed by name. */
 export type Infobox = Readonly<Record<string, string>>;
 
@@ -109,6 +162,11 @@ export const Balatro = {
     { type: "Voucher", category: "Vouchers", template: "Voucher info" },
     { type: "Deck", category: "Decks", template: "Deck info" },
   ] satisfies readonly Shelf[],
+
+
+  /** The finishes of a card with `properties`: its enhancement's first, then its edition's. */
+  finishes: (properties: Readonly<Record<string, string>>): readonly Finish[] =>
+    [properties["enhancement"], properties["edition"]].flatMap((value) => (value === undefined ? [] : (FINISHES[value] ?? []))),
 
   /** The names in the wiki's Lua data module of Jokers. */
   jokerNames: (lua: string): readonly string[] => [...lua.matchAll(/\bname = "([^"]+)"/g)].map((found) => found[1] ?? ""),
@@ -179,18 +237,21 @@ export const Balatro = {
           .with("Jack", "Queen", "King", () => "Face card")
           .otherwise(() => "Number card");
 
+        const properties = {
+          type: "Playing card",
+          rank,
+          suit,
+          kind,
+          edition: faker.helpers.weightedArrayElement(Balatro.EDITIONS),
+          enhancement: faker.helpers.weightedArrayElement(Balatro.ENHANCEMENTS),
+        };
+
         return {
           name,
           description: `The ${name} from the standard 52-card deck, worth ${chips} chips when scored.`,
           priceCents: 100 * faker.number.int({ min: 1, max: 5 }),
-          properties: {
-            type: "Playing card",
-            rank,
-            suit,
-            kind,
-            edition: faker.helpers.weightedArrayElement(Balatro.EDITIONS),
-            enhancement: faker.helpers.weightedArrayElement(Balatro.ENHANCEMENTS),
-          },
+          properties,
+          finishes: Balatro.finishes(properties),
           image: `${name}.png`,
         };
       }),
@@ -221,6 +282,7 @@ export const Balatro = {
       description: effect,
       priceCents: 100 * Balatro.dollars(box["buyprice"], type === "Voucher" ? 10 : faker.number.int({ min: 10, max: 30 })),
       properties,
+      finishes: Balatro.finishes(properties),
       image,
     };
   },

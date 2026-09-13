@@ -131,6 +131,7 @@ export const Isaac = {
       expansion: /^(.+?) (?:Items|Trinkets)\b/.exec(entry.section)?.[1],
     }),
     picture,
+    finishes: [],
   }),
 
   /** Every entry of the page that the stylesheet draws, as a product. */

@@ -29,8 +29,10 @@ The seed plants a demo shopper you can sign in as: `shopper@prism.test` with the
 `correct horse battery staple`. It also plants the catalog under `apps/api/seed`: Balatro's
 playing cards, Jokers, Tarot and Spectral cards, Vouchers and Decks, read from the Balatro
 wiki, and The Binding of Isaac's items, trinkets and consumables, read from tboi.com, each
-with its picture and the properties the filters draw on. The pictures and texts belong to
-the games' makers and stand in as placeholder data. Stock, sizes and reviews are drawn from
+with its picture and the properties the filters draw on. A card's edition and enhancement
+are drawn on its picture as still tints and sheens; a sprite is centered on a square with
+room around it, so every sprite shows at one scale. The pictures and texts belong to the
+games' makers and stand in as placeholder data. Stock, sizes and reviews are drawn from
 a fixed random seed, so every fresh database holds the same shop.
 `npm run fetch-catalog --workspace @prism/api` writes the catalog directory again from its
 sources.

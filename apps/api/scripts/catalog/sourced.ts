@@ -10,13 +10,19 @@ export type Picture =
   | Readonly<{ _tag: "File"; url: string }>
   | Readonly<{ _tag: "Sprite"; url: string; left: number; top: number; width: number; height: number }>;
 
-/** A product as its source describes it, the picture still to be fetched. */
+/** A static touch put on a picture once fetched: a layer blended in, drawn at the picture's size, or its colors inverted. */
+export type Finish =
+  | Readonly<{ _tag: "Layer"; blend: "multiply" | "screen"; svg: (width: number, height: number) => string }>
+  | Readonly<{ _tag: "Negate" }>;
+
+/** A product as its source describes it, the picture still to be fetched and finished. */
 export type Sourced = Readonly<{
   name: string;
   description: string;
   priceCents: number;
   properties: Readonly<Record<string, string>>;
   picture: Picture;
+  finishes: readonly Finish[];
 }>;
 
 export const Sourced = {

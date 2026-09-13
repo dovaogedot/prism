@@ -56,6 +56,7 @@ describe("Isaac.kind and product", () => {
 
     expect(product.description).toBe("Spore shot. Tears stick.");
     expect(product.properties).toEqual({ type: "Passive item", quality: "3", expansion: "Repentance" });
+    expect(product.finishes).toEqual([]);
     expect(product.priceCents % 100).toBe(0);
   });
 });

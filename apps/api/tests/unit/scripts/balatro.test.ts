@@ -66,6 +66,19 @@ describe("Balatro.playingCards", () => {
   });
 });
 
+describe("Balatro.finishes", () => {
+  it("puts the enhancement's layers before the edition's, and nothing on a plain card", () => {
+    expect(Balatro.finishes({ edition: "Base", enhancement: "None" })).toEqual([]);
+    expect(Balatro.finishes({ type: "Deck" })).toEqual([]);
+
+    const kinds = Balatro.finishes({ edition: "Negative", enhancement: "Gold" }).map((finish) => (finish._tag === "Layer" ? finish.blend : finish._tag));
+    expect(kinds).toEqual(["multiply", "screen", "Negate"]);
+
+    const [foil] = Balatro.finishes({ edition: "Foil" });
+    expect(foil?._tag === "Layer" ? foil.svg(20, 30) : "").toContain('width="20" height="30"');
+  });
+});
+
 describe("Balatro.card", () => {
   it("names the joker's rarity, effect and activation, and prices it at its shop cost", () => {
     faker.seed(1);
