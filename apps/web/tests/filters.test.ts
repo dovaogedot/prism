@@ -1,7 +1,16 @@
+import type { ProductFacets } from "@prism/shared";
 import { describe, expect, it } from "vitest";
 import { CatalogParams } from "../src/features/catalog/filters.ts";
 
 const params = (query: string) => new URLSearchParams(query);
+
+const facets: ProductFacets = {
+  categories: [{ value: "lighting", label: "Lighting", count: 3 }],
+  brands: [{ value: "acme", label: "Acme", count: 2 }],
+  ratings: [{ value: "4", label: "4 stars & up", count: 1 }],
+  price: { minCents: 500, maxCents: 90000 },
+  properties: [{ name: "color", buckets: [{ value: "red", label: "red", count: 1 }] }],
+};
 
 describe("CatalogParams.set", () => {
   it("sets a value and drops the page", () => {
@@ -62,6 +71,28 @@ describe("CatalogParams.isFiltered", () => {
   it("counts any other key", () => {
     expect(CatalogParams.isFiltered(params("q=lamp&p.color=red"))).toBe(true);
     expect(CatalogParams.isFiltered(params("rating=4"))).toBe(true);
+  });
+});
+
+describe("CatalogParams.active", () => {
+  it("names each filter from the facets, in URL order, and leaves the rest when one goes", () => {
+    const found = CatalogParams.active(params("q=lamp&category=lighting&brand=acme&brand=other&p.color=red&rating=4&page=2"), facets);
+
+    expect(found.map((filter) => filter.label)).toEqual(["Lighting", "Acme", "other", "color: red", "4 stars & up"]);
+    expect(found[1]?.next.toString()).toBe("q=lamp&category=lighting&p.color=red&rating=4&brand=other");
+    expect(found[0]?.next.toString()).toBe("q=lamp&brand=acme&brand=other&p.color=red&rating=4");
+  });
+
+  it("makes one filter of the two price bounds, and fills a missing bound from the facets", () => {
+    expect(CatalogParams.active(params("priceMin=1000&priceMax=2000"), facets).map((filter) => filter.label)).toEqual(["€10.00 – €20.00"]);
+
+    const [only] = CatalogParams.active(params("priceMax=2000&brand=acme"), facets);
+    expect(only?.label).toBe("€5.00 – €20.00");
+    expect(only?.next.toString()).toBe("brand=acme");
+  });
+
+  it("finds nothing among the text, sort and paging", () => {
+    expect(CatalogParams.active(params("q=lamp&sort=rating&page=2"), facets)).toEqual([]);
   });
 });
 

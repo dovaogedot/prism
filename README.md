@@ -55,7 +55,9 @@ submit to search names and descriptions. The rail beside the results offers ever
 to narrow them: any number of brands, a price range on a two-thumb slider between the
 cheapest and dearest match, a minimum rating in stars, and one group per property the
 matching products carry, with the number of matches next to each value. A group with many
-values folds behind "Show more". The search text and the category define the shelf; every
+values folds behind "Show more", and a group with a choice has "Clear all" beside its heading.
+The filters in force are listed beside the "Results" heading, each with a cross that removes
+it. The search text and the category define the shelf; every
 value on the shelf stays listed, and one the other filters leave nothing for is greyed out
 rather than removed, so the rail never shifts under the pointer. Counts within a group ignore
 that group's own choice, so picking one brand never greys the others. The sort menu orders

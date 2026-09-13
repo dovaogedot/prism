@@ -152,10 +152,26 @@ export const CatalogPage = () => {
             ))
             .otherwise(({ data }) => (
               <>
-                <p className="mb-2 text-sm text-ink-faint">
-                  {data.total} item{data.total === 1 ? "" : "s"}
-                  {data.totalPages > 1 ? ` · page ${data.page} of ${data.totalPages}` : ""}
-                </p>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <h2 className="text-base font-semibold text-ink">Results</h2>
+                  <span className="text-sm text-ink-faint">
+                    {data.total} item{data.total === 1 ? "" : "s"}
+                    {data.totalPages > 1 ? ` · page ${data.page} of ${data.totalPages}` : ""}
+                  </span>
+
+                  {CatalogParams.active(params, data.facets).map((filter) => (
+                    <button
+                      key={`${filter.key}=${filter.value}`}
+                      type="button"
+                      onClick={() => setParams(filter.next)}
+                      aria-label={`Remove ${filter.label}`}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2 py-0.5 text-xs text-ink-soft hover:border-line-strong hover:text-ink"
+                    >
+                      {filter.label}
+                      <span aria-hidden="true">×</span>
+                    </button>
+                  ))}
+                </div>
 
                 {match(data.items.length)
                   .with(0, () => (

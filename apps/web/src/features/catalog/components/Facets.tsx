@@ -20,9 +20,21 @@ export type FacetsProps = Readonly<{
 /** How many values a group shows before the rest fold behind "Show more". */
 const FOLD_AT = 8;
 
-const Group = ({ title, children }: Readonly<{ title: string; children: ReactNode }>) => (
-  <fieldset className="space-y-1.5">
-    <legend className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-ink-faint">{title}</legend>
+/** A group's frame: its heading, "Clear all" beside it while the group has a choice, and its rows. */
+const Group = ({ title, chosen, onClear, children }: Readonly<{ title: string; chosen: boolean; onClear: () => void; children: ReactNode }>) => (
+  // min-w-0: a fieldset is otherwise never narrower than its longest row, and would overflow the rail.
+  <fieldset className="min-w-0 space-y-1.5">
+    <legend className="mb-1.5 flex w-full items-center justify-between text-xs">
+      <span className="font-semibold uppercase tracking-wider text-ink-faint">{title}</span>
+      {match(chosen)
+        .with(true, () => (
+          <button type="button" onClick={onClear} className="font-medium text-accent hover:underline">
+            Clear all
+          </button>
+        ))
+        .with(false, () => null)
+        .exhaustive()}
+    </legend>
     {children}
   </fieldset>
 );
@@ -57,7 +69,7 @@ const Checklist = ({
   return match(buckets.length)
     .with(0, () => null)
     .otherwise(() => (
-      <Group title={title}>
+      <Group title={title} chosen={params.has(keyName)} onClear={() => onChange(CatalogParams.set(params, keyName, ""))}>
         {visible.map((bucket) => (
           <label key={bucket.value} className={Row.classes(bucket.count === 0 && !ticked(bucket))}>
             <input
@@ -107,7 +119,7 @@ const RatingFacet = ({ facets, params, onChange }: FacetsProps) =>
   match(facets.ratings.length)
     .with(0, () => null)
     .otherwise(() => (
-      <Group title="Rating">
+      <Group title="Rating" chosen={params.has("rating")} onClear={() => onChange(CatalogParams.set(params, "rating", ""))}>
         {facets.ratings.map((bucket) => {
           const chosen = params.get("rating") === bucket.value;
           const threshold = Number(bucket.value);
@@ -143,7 +155,11 @@ const PriceFacet = ({ facets, params, onChange }: FacetsProps) => {
   return match(maxCents > minCents)
     .with(false, () => null)
     .with(true, () => (
-      <Group title="Price">
+      <Group
+        title="Price"
+        chosen={params.has("priceMin") || params.has("priceMax")}
+        onClear={() => onChange(CatalogParams.set(CatalogParams.set(params, "priceMin", ""), "priceMax", ""))}
+      >
         <RangeSlider
           label="Price"
           min={minCents}
