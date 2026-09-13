@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { match, P } from "ts-pattern";
 import { Stars } from "../../../shared/ui/index.ts";
 
-/** The first picture, or a plain block where there is none. */
+/** The first picture, whole inside its box, or a plain block where there is none. */
 export const Picture = ({ image, name, className }: Readonly<{ image: ProductImage | undefined; name: string; className: string }>) =>
   match(image)
     .with(P.nullish, () => (
@@ -11,7 +11,7 @@ export const Picture = ({ image, name, className }: Readonly<{ image: ProductIma
         {name.slice(0, 1)}
       </div>
     ))
-    .otherwise((found) => <img src={found.url} alt={found.alt} loading="lazy" className={`${className} object-cover`} />);
+    .otherwise((found) => <img src={found.url} alt={found.alt} loading="lazy" className={`${className} bg-sunken object-contain`} />);
 
 /** How many are left, in the three steps the shop distinguishes. */
 export const Stock = ({ count, className }: Readonly<{ count: number; className: string }>) =>
