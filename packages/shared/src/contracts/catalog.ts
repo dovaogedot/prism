@@ -224,9 +224,9 @@ export type PropertyFacet = Readonly<{ name: string; buckets: readonly FacetBuck
 export type PriceRange = Readonly<{ minCents: number; maxCents: number }>;
 
 /**
- * Every filter a shopper can apply next, counted against the products that
- * match every other active filter, so a choice within one facet never hides
- * its siblings.
+ * Every filter a shopper can apply next. The categories count the whole
+ * shop; every other facet is counted against the products that match every
+ * other active filter, so a choice within one facet never hides its siblings.
  */
 export type ProductFacets = Readonly<{
   categories: readonly FacetBucket[];

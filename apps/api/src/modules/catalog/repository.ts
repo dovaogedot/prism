@@ -1,7 +1,8 @@
 /**
- * Every database statement the catalog makes. Facets are counted against
- * the products that match every other active filter, so a choice within one
- * facet never hides its siblings.
+ * Every database statement the catalog makes. The categories are counted
+ * over the whole shop; every other facet is counted against the products
+ * that match every other active filter, so a choice within one facet never
+ * hides its siblings.
  */
 
 import type {
@@ -16,7 +17,7 @@ import type {
   Suggestion,
 } from "@prism/shared";
 import { Dimensions, Weight } from "@prism/shared";
-import { asc, eq, ilike, max, min, sql } from "drizzle-orm";
+import { asc, count, eq, ilike, max, min, sql } from "drizzle-orm";
 import type { Database } from "../../db/client.ts";
 import { brands, categories, productProperties, productReviews, products } from "../../db/schema.ts";
 import { ProductSearch, type LiftedFacet } from "./search.ts";
@@ -99,26 +100,32 @@ export const CatalogRepository = {
       ProductSearch.where(ProductSearch.conditions(query, ratingColumns, lifted));
 
     /** The shelf a facet lists its values over. */
-    const shelf = (query: ProductQuery, lifted: LiftedFacet) =>
-      ProductSearch.where(ProductSearch.shelf(query, lifted));
+    const shelf = (query: ProductQuery) => ProductSearch.where(ProductSearch.shelf(query));
 
     /** How many shelf rows also pass the rail's other filters. */
     const counted = (query: ProductQuery, lifted: LiftedFacet) =>
       sql<number>`count(*) filter (where ${ProductSearch.filter(ProductSearch.narrowing(query, ratingColumns, lifted))})`.mapWith(Number);
 
-    const bucketsOf = async (query: ProductQuery, lifted: "category" | "brand"): Promise<readonly FacetBucket[]> => {
-      const named = lifted === "category" ? categories : brands;
+    /** Every category with how many products it files, whatever the query says. */
+    const categoriesOf = async (): Promise<readonly FacetBucket[]> =>
+      db
+        .select({ value: categories.slug, label: categories.name, count: count(products.id) })
+        .from(categories)
+        .leftJoin(products, eq(products.categoryId, categories.id))
+        .groupBy(categories.slug, categories.name)
+        .orderBy(asc(categories.name));
 
-      return db
-        .select({ value: named.slug, label: named.name, count: counted(query, lifted) })
+    /** Every brand on the shelf, counted under the rail's other filters. */
+    const brandsOf = async (query: ProductQuery): Promise<readonly FacetBucket[]> =>
+      db
+        .select({ value: brands.slug, label: brands.name, count: counted(query, "brand") })
         .from(products)
         .innerJoin(categories, eq(products.categoryId, categories.id))
         .innerJoin(brands, eq(products.brandId, brands.id))
         .leftJoin(rating, eq(rating.productId, products.id))
-        .where(shelf(query, lifted))
-        .groupBy(named.slug, named.name)
-        .orderBy(asc(named.name));
-    };
+        .where(shelf(query))
+        .groupBy(brands.slug, brands.name)
+        .orderBy(asc(brands.name));
 
     const priceOf = async (query: ProductQuery) => {
       const [row] = await db
@@ -127,7 +134,7 @@ export const CatalogRepository = {
         .innerJoin(categories, eq(products.categoryId, categories.id))
         .innerJoin(brands, eq(products.brandId, brands.id))
         .leftJoin(rating, eq(rating.productId, products.id))
-        .where(shelf(query, "price"));
+        .where(shelf(query));
 
       return { minCents: row?.min ?? 0, maxCents: row?.max ?? 0 };
     };
@@ -139,7 +146,7 @@ export const CatalogRepository = {
         .innerJoin(categories, eq(products.categoryId, categories.id))
         .innerJoin(brands, eq(products.brandId, brands.id))
         .leftJoin(rating, eq(rating.productId, products.id))
-        .where(shelf(query, "rating"))
+        .where(shelf(query))
         .groupBy(rating.average);
 
       // Cumulative: a product rated 4.5 counts toward "4 stars & up" and below.
@@ -158,7 +165,7 @@ export const CatalogRepository = {
         .innerJoin(categories, eq(products.categoryId, categories.id))
         .innerJoin(brands, eq(products.brandId, brands.id))
         .leftJoin(rating, eq(rating.productId, products.id))
-        .where(shelf(query, "property"))
+        .where(shelf(query))
         .groupBy(productProperties.name, productProperties.value)
         .orderBy(asc(productProperties.name), asc(productProperties.value));
 
@@ -191,8 +198,8 @@ export const CatalogRepository = {
             .orderBy(...ProductSearch.orderBy(query, ratingColumns))
             .limit(query.perPage)
             .offset(ProductSearch.offset(query)),
-          bucketsOf(query, "category"),
-          bucketsOf(query, "brand"),
+          categoriesOf(),
+          brandsOf(query),
           priceOf(query),
           ratingsOf(query),
           propertiesOf(query),

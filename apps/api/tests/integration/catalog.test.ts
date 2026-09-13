@@ -150,10 +150,10 @@ describe("GET /api/v1/products", () => {
       properties: { name: string; buckets: { value: string; count: number }[] }[];
     };
 
-    // Category counts ignore the category filter but keep the color filter.
+    // Category counts are the whole shop's, whatever is chosen.
     expect(facets.categories).toEqual([
       { value: "furniture", label: "Furniture", count: 1 },
-      { value: "lighting", label: "Lighting", count: 1 },
+      { value: "lighting", label: "Lighting", count: 2 },
     ]);
     // Color counts ignore the color filter but keep the category filter.
     expect(facets.properties.find((facet) => facet.name === "color")?.buckets).toEqual([
@@ -179,8 +179,8 @@ describe("GET /api/v1/products", () => {
     };
 
     expect(facets.categories).toEqual([
-      { value: "furniture", label: "Furniture", count: 0 },
-      { value: "lighting", label: "Lighting", count: 1 },
+      { value: "furniture", label: "Furniture", count: 1 },
+      { value: "lighting", label: "Lighting", count: 2 },
     ]);
     expect(facets.properties.find((facet) => facet.name === "color")?.buckets).toEqual([
       { value: "black", label: "black", count: 1 },

@@ -90,7 +90,6 @@ describe("ProductSearch.conditions", () => {
   it("leaves out the filter of the lifted facet", () => {
     const full = query({ category: "lamps", brands: ["acme"], priceMinCents: 1, minRating: 2 });
 
-    expect(render(and(...ProductSearch.conditions(full, rating, "category")) ?? sql``).params).toEqual(["acme", 1, 2]);
     expect(render(and(...ProductSearch.conditions(full, rating, "brand")) ?? sql``).params).toEqual(["lamps", 1, 2]);
     expect(render(and(...ProductSearch.conditions(full, rating, "price")) ?? sql``).params).toEqual(["lamps", "acme", 2]);
     expect(render(and(...ProductSearch.conditions(full, rating, "rating")) ?? sql``).params).toEqual(["lamps", "acme", 1]);
@@ -117,7 +116,6 @@ describe("ProductSearch.shelf and narrowing", () => {
 
     expect(render(and(...ProductSearch.shelf(full)) ?? sql``).params).toEqual(["lamp", "%lamp%", "lamps"]);
     expect(render(and(...ProductSearch.narrowing(full, rating)) ?? sql``).params).toEqual(["acme", 3]);
-    expect(ProductSearch.shelf(full, "category")).toHaveLength(1);
   });
 
   it("renders no conditions as a true filter", () => {

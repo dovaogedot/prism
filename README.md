@@ -54,8 +54,9 @@ runs. `npm run typecheck` checks every workspace.
 
 ### Shopping
 
-The front page is the catalog. The category cards at the top pick one category; choosing it
-again clears it. Type in the search box and product names that match appear as suggestions;
+The front page is the catalog. The category cards at the top count every product in each
+category; picking one drops the other filters, and picking it again clears it. Type in the
+search box and product names that match appear as suggestions;
 submit to search names and descriptions. The rail beside the results offers every other way
 to narrow them: any number of brands, a price range on a two-thumb slider between the
 cheapest and dearest match, a minimum rating in stars, and one group per property the
@@ -259,10 +260,11 @@ typed fragment finds something. Relevance ordering is `ts_rank` over the same ve
 Suggestions are a substring match on the name, prefixes first.
 
 A property filter is an `EXISTS` over `product_property` for the name with the value in the
-chosen set. A facet lists every value found on the shelf, the products matching the text and
-the category, and counts each value under the other filters with a `FILTER` clause, so a value
-the rail excludes stays listed at zero and the counts say what choosing it would match. Each
-facet leaves its own filter out of the count. The price bounds are those of the shelf. Every
+chosen set. The category facet counts the whole shop. Every other facet lists the values found
+on the shelf, the products matching the text and the category, and counts each value under
+the other filters with a `FILTER` clause, so a value the rail excludes stays listed at zero
+and the counts say what choosing it would match. Each facet leaves its own filter out of the
+count. The price bounds are those of the shelf. Every
 value a shopper supplies is a bound parameter; the unit tests render the SQL and assert on
 the bindings, and the security tests send injection payloads through every query key.
 

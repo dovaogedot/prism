@@ -9,24 +9,25 @@ export type CategoryCardsProps = Readonly<{
   onChange: (next: URLSearchParams) => void;
 }>;
 
-/** One card per category, greyed when the other filters leave it nothing. Choosing the chosen one clears the choice. */
+/**
+ * One card per category, counting everything filed under it. Choosing one
+ * drops every other filter; choosing the chosen one clears the choice.
+ */
 export const CategoryCards = ({ buckets, params, onChange }: CategoryCardsProps) => (
   <nav aria-label="Categories" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
     {buckets.map((bucket) => {
       const chosen = params.get("category") === bucket.value;
-      const empty = bucket.count === 0 && !chosen;
-      const tone = match({ chosen, empty })
-        .with({ chosen: true }, () => "border-accent bg-accent-wash text-ink")
-        .with({ empty: true }, () => "border-line bg-surface text-ink-faint opacity-50")
-        .otherwise(() => "border-line bg-surface text-ink-soft hover:border-line-strong hover:text-ink");
+      const tone = match(chosen)
+        .with(true, () => "border-accent bg-accent-wash text-ink")
+        .with(false, () => "border-line bg-surface text-ink-soft hover:border-line-strong hover:text-ink")
+        .exhaustive();
 
       return (
         <button
           key={bucket.value}
           type="button"
           aria-pressed={chosen}
-          disabled={empty}
-          onClick={() => onChange(CatalogParams.set(params, "category", chosen ? "" : bucket.value))}
+          onClick={() => onChange(CatalogParams.set(CatalogParams.cleared(params), "category", chosen ? "" : bucket.value))}
           className={`rounded-lg border px-3 py-3 text-left transition-colors ${tone}`}
         >
           <span className="block truncate text-sm font-semibold">{bucket.label}</span>

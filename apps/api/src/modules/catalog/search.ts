@@ -13,7 +13,7 @@ import { brands, categories, productProperties, products } from "../../db/schema
  * The facet whose own filter a condition list leaves out, so the facet can
  * count what choosing another of its values would match.
  */
-export type LiftedFacet = "none" | "category" | "brand" | "price" | "rating" | "property";
+export type LiftedFacet = "none" | "brand" | "price" | "rating" | "property";
 
 /** The per-product rating aggregate, as the queries alias it. */
 export type RatingColumns = Readonly<{ average: SQL; count: SQL }>;
@@ -47,17 +47,15 @@ export const ProductSearch = {
     sql`EXISTS (SELECT 1 FROM ${productProperties} AS owned WHERE owned.product_id = ${products.id} AND owned.name = ${filter.name} AND ${inArray(sql`owned.value`, [...filter.values])})`,
 
   /**
-   * The filters that define the shelf: the text and, unless lifted, the
-   * category. Every facet lists its values over the shelf, so a value stays
-   * in view when a filter of the rail excludes it.
+   * The filters that define the shelf: the text and the category. Every
+   * facet but the categories lists its values over the shelf, so a value
+   * stays in view when a filter of the rail excludes it.
    */
-  shelf: (query: ProductQuery, lifted: LiftedFacet = "none"): SQL[] => {
+  shelf: (query: ProductQuery): SQL[] => {
     const where: SQL[] = [];
 
     if (query.text !== undefined) where.push(ProductSearch.textCondition(query.text));
-    if (lifted !== "category" && query.category !== undefined) {
-      where.push(eq(categories.slug, query.category));
-    }
+    if (query.category !== undefined) where.push(eq(categories.slug, query.category));
 
     return where;
   },
@@ -95,7 +93,7 @@ export const ProductSearch = {
 
   /** Every active filter as a condition, except the one named by `lifted`. */
   conditions: (query: ProductQuery, rating: RatingColumns, lifted: LiftedFacet = "none"): SQL[] => [
-    ...ProductSearch.shelf(query, lifted),
+    ...ProductSearch.shelf(query),
     ...ProductSearch.narrowing(query, rating, lifted),
   ],
 
