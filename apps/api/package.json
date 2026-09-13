@@ -8,6 +8,7 @@
     "migrate": "node src/db/migrate.ts",
     "seed": "node src/db/seed.ts",
     "fetch-catalog": "node scripts/fetch-catalog.ts",
+    "check-margins": "node scripts/check-margins.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run --project unit"

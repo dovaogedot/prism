@@ -67,15 +67,54 @@ describe("Balatro.playingCards", () => {
 });
 
 describe("Balatro.finishes", () => {
-  it("puts the enhancement's layers before the edition's, and nothing on a plain card", () => {
+  it("puts the enhancement's face before the edition's shader, and nothing on a plain card", () => {
     expect(Balatro.finishes({ edition: "Base", enhancement: "None" })).toEqual([]);
     expect(Balatro.finishes({ type: "Deck" })).toEqual([]);
 
-    const kinds = Balatro.finishes({ edition: "Negative", enhancement: "Gold" }).map((finish) => (finish._tag === "Layer" ? finish.blend : finish._tag));
-    expect(kinds).toEqual(["multiply", "screen", "Negate"]);
+    const [gold, negative] = Balatro.finishes({ edition: "Negative", enhancement: "Gold" });
+    expect(gold?._tag).toBe("Face");
+    expect(gold?._tag === "Face" ? gold.picture : undefined).toMatchObject({ left: 852, top: 0, width: 142, height: 190, unit: 2 });
+    expect(negative?._tag === "Shader" ? negative.shade : undefined).toBe(Balatro.SHADERS.Negative);
+  });
 
-    const [foil] = Balatro.finishes({ edition: "Foil" });
-    expect(foil?._tag === "Layer" ? foil.svg(20, 30) : "").toContain('width="20" height="30"');
+  it("keeps the rank and suit off a stone card", () => {
+    const [stone] = Balatro.finishes({ enhancement: "Stone" });
+    expect(stone?._tag === "Face" ? stone.ink({ r: 0, g: 0, b: 0, a: 1 }) : true).toBe(false);
+  });
+});
+
+describe("Balatro.ink", () => {
+  it("takes the art and leaves the white face, its gray edge and the transparent corners", () => {
+    expect(Balatro.ink({ r: 65 / 255, g: 82 / 255, b: 85 / 255, a: 1 })).toBe(true);
+    expect(Balatro.ink({ r: 1, g: 1, b: 1, a: 1 })).toBe(false);
+    expect(Balatro.ink({ r: 192 / 255, g: 200 / 255, b: 214 / 255, a: 1 })).toBe(false);
+    expect(Balatro.ink({ r: 0, g: 0, b: 0, a: 0 })).toBe(false);
+  });
+});
+
+describe("Balatro.SHADERS", () => {
+  const white = { r: 1, g: 1, b: 1, a: 1 };
+  const clear = { r: 0, g: 0, b: 0, a: 0 };
+
+  it("turns white to the negative's dark cast", () => {
+    const { r, g, b, a } = Balatro.SHADERS.Negative({ x: 0.5, y: 0.5 }, white);
+    expect([r, g, b].map((channel) => Math.round(channel * 255))).toEqual([63, 79, 82]);
+    expect(a).toBe(1);
+  });
+
+  it("tints a foil card blue and keeps every channel in range", () => {
+    const { r, g, b, a } = Balatro.SHADERS.Foil({ x: 0.3, y: 0.7 }, white);
+    expect(b).toBeGreaterThan(r);
+    expect(b).toBeLessThanOrEqual(1);
+    expect(r).toBeGreaterThanOrEqual(0);
+    expect(a).toBe(1);
+  });
+
+  it("keeps a transparent pixel transparent and stays put for the same input", () => {
+    for (const shade of Object.values(Balatro.SHADERS)) {
+      expect(shade({ x: 0.2, y: 0.9 }, clear).a).toBe(0);
+      expect(shade({ x: 0.2, y: 0.9 }, { r: 0.9, g: 0.2, b: 0.4, a: 1 })).toEqual(shade({ x: 0.2, y: 0.9 }, { r: 0.9, g: 0.2, b: 0.4, a: 1 }));
+    }
   });
 });
 

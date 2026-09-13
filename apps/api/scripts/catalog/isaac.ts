@@ -105,7 +105,7 @@ export const Isaac = {
     const size = (side: string): number =>
       Number(new RegExp(`${side}:(\\d+)px`).exec(slice.declarations)?.[1] ?? new RegExp(`${side}:(\\d+)px`).exec(sheet.declarations)?.[1] ?? 50);
 
-    return { _tag: "Sprite", url: new URL(address, `${SITE}assets/`).href, left: 0 - Number(position[1]), top: 0 - Number(position[2]), width: size("width"), height: size("height") };
+    return { url: new URL(address, `${SITE}assets/`).href, left: 0 - Number(position[1]), top: 0 - Number(position[2]), width: size("width"), height: size("height"), unit: 1 };
   },
 
   /** What an entry is, as the shop's type property names it. */

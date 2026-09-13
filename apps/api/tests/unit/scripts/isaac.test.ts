@@ -27,7 +27,7 @@ describe("Isaac.sprite", () => {
   it("finds the sheet through one class and the slice through another, sized by the slice or the sheet", () => {
     const rules = Isaac.rules(css);
 
-    expect(Isaac.sprite(rules, ["item", "rep-item", "rep553"])).toEqual({ _tag: "Sprite", url: "https://www.tboi.com/images/repentance-items2.png", left: 0, top: 0, width: 52, height: 50 });
+    expect(Isaac.sprite(rules, ["item", "rep-item", "rep553"])).toEqual({ url: "https://www.tboi.com/images/repentance-items2.png", left: 0, top: 0, width: 52, height: 50, unit: 1 });
     expect(Isaac.sprite(rules, ["rebirth-card", "item", "r-card01"])).toMatchObject({ url: "https://www.tboi.com/images/ap-cards2.png", left: 50, top: 0, width: 39, height: 50 });
     expect(Isaac.sprite(rules, ["item", "rep-item", "rep999"])).toBeUndefined();
   });
@@ -51,7 +51,7 @@ describe("Isaac.kind and product", () => {
 
   it("writes the quote before the paragraphs and keeps only the properties the entry has", () => {
     faker.seed(1);
-    const picture = { _tag: "Sprite", url: "https://www.tboi.com/images/x.png", left: 0, top: 0, width: 50, height: 50 } as const;
+    const picture = { url: "https://www.tboi.com/images/x.png", left: 0, top: 0, width: 50, height: 50, unit: 1 } as const;
     const product = Isaac.product(entry({ section: "Repentance Items (173)", name: "Mucormycosis", quote: "Spore shot", paragraphs: ["Tears stick."], quality: "3", type: "Passive" }), picture);
 
     expect(product.description).toBe("Spore shot. Tears stick.");

@@ -29,13 +29,15 @@ The seed plants a demo shopper you can sign in as: `shopper@prism.test` with the
 `correct horse battery staple`. It also plants the catalog under `apps/api/seed`: Balatro's
 playing cards, Jokers, Tarot and Spectral cards, Vouchers and Decks, read from the Balatro
 wiki, and The Binding of Isaac's items, trinkets and consumables, read from tboi.com, each
-with its picture and the properties the filters draw on. A card's edition and enhancement
-are drawn on its picture as still tints and sheens; a sprite is centered on a square with
-room around it, so every sprite shows at one scale. The pictures and texts belong to the
+with its picture and the properties the filters draw on. A card's enhancement is the game's
+own card face put under the card's rank and suit, and its edition is the game's shader for it,
+drawn at one frame. Every picture is cut to its content, given the margin its category shares,
+and scaled up pixel for pixel, so nothing is blurred. The pictures and texts belong to the
 games' makers and stand in as placeholder data. Stock, sizes and reviews are drawn from
 a fixed random seed, so every fresh database holds the same shop.
 `npm run fetch-catalog --workspace @prism/api` writes the catalog directory again from its
-sources.
+sources, and `npm run check-margins --workspace @prism/api` verifies that every picture in a
+category keeps the same margin.
 
 `./start.sh down` stops the stack. `./start.sh reset` also deletes the database and the
 media volume, so the next start migrates and seeds from nothing.
@@ -65,7 +67,8 @@ cheapest and dearest match, a minimum rating in stars, and one group per propert
 matching products carry, with the number of matches next to each value. A group with many
 values folds behind "Show more", and a group with a choice has "Clear all" beside its heading.
 The filters in force are listed beside the "Results" heading, each with a cross that removes
-it. The search text and the category define the shelf; every
+it, and "Clear all filters" removes them all, keeping the search text and the category. The
+search text and the category define the shelf; every
 value on the shelf stays listed, and one the other filters leave nothing for is greyed out
 rather than removed, so the rail never shifts under the pointer. Counts within a group ignore
 that group's own choice, so picking one brand never greys the others. The sort menu orders

@@ -4,16 +4,23 @@
  */
 
 import { setTimeout as sleep } from "node:timers/promises";
+import type { Rgba, Shader } from "./raster.ts";
 
-/** Where a product's picture is: a file on the web, or a slice of a sprite sheet. */
-export type Picture =
-  | Readonly<{ _tag: "File"; url: string }>
-  | Readonly<{ _tag: "Sprite"; url: string; left: number; top: number; width: number; height: number }>;
+/**
+ * Where a product's picture is: a box on an image on the web. `unit` is how
+ * many pixels of the image make one pixel of the art; the box is scaled down
+ * by it, so every source lands at the same scale.
+ */
+export type Picture = Readonly<{ url: string; left: number; top: number; width: number; height: number; unit: number }>;
 
-/** A static touch put on a picture once fetched: a layer blended in, drawn at the picture's size, or its colors inverted. */
+/**
+ * A touch put on a picture once fetched. A face goes under the picture:
+ * the pixels `ink` accepts, and those they enclose, stay, and the face
+ * shows through the rest. A shader recolors every pixel.
+ */
 export type Finish =
-  | Readonly<{ _tag: "Layer"; blend: "multiply" | "screen"; svg: (width: number, height: number) => string }>
-  | Readonly<{ _tag: "Negate" }>;
+  | Readonly<{ _tag: "Face"; picture: Picture; ink: (color: Rgba) => boolean }>
+  | Readonly<{ _tag: "Shader"; shade: Shader }>;
 
 /** A product as its source describes it, the picture still to be fetched and finished. */
 export type Sourced = Readonly<{
