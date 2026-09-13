@@ -68,9 +68,11 @@ jobs:
       # whether a deploy proceeds.
       - run: npm run test:unit
 
+  # Runs alongside the tests: an image nobody deploys costs a minute of
+  # runner time, and waiting for the tests first would cost that minute on
+  # every deploy instead.
   build:
     name: Build and push images
-    needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -93,8 +95,6 @@ jobs:
           file: apps/api/Dockerfile
           push: true
           tags: ${{ env.API_IMAGE }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       # The site key is read by Vite at build time, so it is baked into this
       # image rather than set on the server. Supply one and the real widget
@@ -109,12 +109,10 @@ jobs:
           tags: ${{ env.WEB_IMAGE }}:${{ github.sha }}
           build-args: |
             VITE_RECAPTCHA_SITE_KEY=${{ secrets.RECAPTCHA_SITE_KEY }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   deploy:
     name: Pull and restart on the server
-    needs: build
+    needs: [verify, build]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -128,6 +126,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # One connection serves every step below: the first ssh opens it and
+      # the rest ride on it instead of each doing its own handshake.
       - name: Open an SSH connection to the server
         env:
           KEY: ${{ secrets.DEPLOY_SSH_KEY }}
@@ -137,6 +137,7 @@ jobs:
           printf '%s\n' "$KEY" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          printf 'Host *\n  ControlMaster auto\n  ControlPath ~/.ssh/control-%%C\n  ControlPersist 10m\n' > ~/.ssh/config
 
       - name: Send the compose files
         run: |

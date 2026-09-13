@@ -7,11 +7,6 @@
 FROM node:26-slim AS build
 WORKDIR /app
 
-# argon2 builds a native addon when no prebuild matches the platform.
-RUN apt-get update \
- && apt-get install -y --no-install-recommends python3 make g++ \
- && rm -rf /var/lib/apt/lists/*
-
 # Manifests first: this layer is cached until a dependency actually changes.
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/shared/package.json ./packages/shared/
