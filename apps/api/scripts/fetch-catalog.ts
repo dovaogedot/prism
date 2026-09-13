@@ -15,6 +15,7 @@ import { Seed } from "../src/db/seed.ts";
 import { SeedCatalog, type SeedProduct } from "../src/db/seed-catalog.ts";
 import { Balatro } from "./catalog/balatro.ts";
 import { Isaac } from "./catalog/isaac.ts";
+import { Minecraft } from "./catalog/minecraft.ts";
 import { Raster, type Raw } from "./catalog/raster.ts";
 import { Sourced, type Picture } from "./catalog/sourced.ts";
 
@@ -27,6 +28,7 @@ faker.seed(42);
 const sources = [
   { name: "Balatro", brand: "LocalThunk", margin: 2, scale: 8, products: await Balatro.fetch() },
   { name: "The Binding of Isaac", brand: "Nicalis", margin: 23, scale: 6, products: await Isaac.fetch() },
+  { name: "Minecraft", brand: "Mojang", margin: 4, scale: 24, products: await Minecraft.fetch() },
 ];
 
 const downloads = new Map<string, Promise<Buffer>>();

@@ -28,8 +28,9 @@ migrates and seeds the database, and prints where everything is:
 The seed plants a demo shopper you can sign in as: `shopper@prism.test` with the password
 `correct horse battery staple`. It also plants the catalog under `apps/api/seed`: Balatro's
 playing cards, Jokers, Tarot and Spectral cards, Vouchers and Decks, read from the Balatro
-wiki, and The Binding of Isaac's items, trinkets and consumables, read from tboi.com, each
-with its picture and the properties the filters draw on. A card's enhancement is the game's
+wiki, The Binding of Isaac's items, trinkets and consumables, read from tboi.com, and
+Minecraft's items and blocks, read from the Minecraft wiki, each with its picture and the
+properties the filters draw on. A card's enhancement is the game's
 own card face put under the card's rank and suit, and its edition is the game's shader for it,
 drawn at one frame. Every picture is cut to its content, given the margin its category shares,
 and scaled up pixel for pixel, so nothing is blurred. The pictures and texts belong to the
