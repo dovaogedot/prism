@@ -67,69 +67,70 @@ export const CatalogPage = () => {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-      <div className="mb-4">
+      {/* One gap between the category cards, and the same one down to the search. */}
+      <div className="mb-8 grid gap-3">
         {match(results.data)
           .with(P.nullish, () => (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
               {[0, 1, 2, 3, 4, 5].map((index) => (
                 <Skeleton key={index} className="h-[3.75rem] w-full" />
               ))}
             </div>
           ))
           .otherwise((data) => <CategoryCards buckets={data.facets.categories} params={params} onChange={setParams} />)}
-      </div>
 
-      <div className="mb-8 flex gap-2">
-        <SearchBox key={params.get("q") ?? ""} value={params.get("q") ?? ""} onSubmit={(text) => setParams(CatalogParams.set(params, "q", text))} />
+        <div className="flex gap-2">
+          <SearchBox key={params.get("q") ?? ""} value={params.get("q") ?? ""} onSubmit={(text) => setParams(CatalogParams.set(params, "q", text))} />
 
-        {match(wide)
-          .with(true, () => (
-            <label className="flex items-center gap-2 text-sm">
-              <span className="sr-only">Sort by</span>
-              <select
-                value={sort}
-                onChange={(event) => setParams(CatalogParams.set(params, "sort", event.target.value))}
-                className="h-[2.625rem] rounded-lg border border-line bg-surface px-3 text-sm text-ink hover:border-line-strong"
-              >
-                {sortOptions}
-              </select>
-            </label>
-          ))
-          .with(false, () => (
-            <>
-              {/*
-                The select is laid invisibly over its icon, so a tap opens the
-                phone's own picker and the control keeps its name. The icons take
-                the accent while a sort or a filter is in force.
-              */}
-              <label className={`${ICON_CONTROL} relative focus-within:border-accent ${sort === "relevance" ? "" : "text-accent"}`}>
+          {match(wide)
+            .with(true, () => (
+              <label className="flex items-center gap-2 text-sm">
                 <span className="sr-only">Sort by</span>
-                <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M7.5 19V5M4.5 8l3-3 3 3M16.5 5v14M13.5 16l3 3 3-3" />
-                </svg>
                 <select
                   value={sort}
                   onChange={(event) => setParams(CatalogParams.set(params, "sort", event.target.value))}
-                  className="absolute inset-0 size-full cursor-pointer opacity-0"
+                  className="h-[2.625rem] rounded-lg border border-line bg-surface px-3 text-sm text-ink hover:border-line-strong"
                 >
                   {sortOptions}
                 </select>
               </label>
+            ))
+            .with(false, () => (
+              <>
+                {/*
+                  The select is laid invisibly over its icon, so a tap opens the
+                  phone's own picker and the control keeps its name. The icons take
+                  the accent while a sort or a filter is in force.
+                */}
+                <label className={`${ICON_CONTROL} relative focus-within:border-accent ${sort === "relevance" ? "" : "text-accent"}`}>
+                  <span className="sr-only">Sort by</span>
+                  <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M7.5 19V5M4.5 8l3-3 3 3M16.5 5v14M13.5 16l3 3 3-3" />
+                  </svg>
+                  <select
+                    value={sort}
+                    onChange={(event) => setParams(CatalogParams.set(params, "sort", event.target.value))}
+                    className="absolute inset-0 size-full cursor-pointer opacity-0"
+                  >
+                    {sortOptions}
+                  </select>
+                </label>
 
-              <button
-                type="button"
-                aria-label="Filters"
-                aria-haspopup="dialog"
-                onClick={drawer.open}
-                className={`${ICON_CONTROL} ${CatalogParams.isFiltered(params) ? "text-accent" : ""}`}
-              >
-                <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 5.5h16l-6.2 7.2v5.6l-3.6 1.9v-7.5z" />
-                </svg>
-              </button>
-            </>
-          ))
-          .exhaustive()}
+                <button
+                  type="button"
+                  aria-label="Filters"
+                  aria-haspopup="dialog"
+                  onClick={drawer.open}
+                  className={`${ICON_CONTROL} ${CatalogParams.isFiltered(params) ? "text-accent" : ""}`}
+                >
+                  <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 5.5h16l-6.2 7.2v5.6l-3.6 1.9v-7.5z" />
+                  </svg>
+                </button>
+              </>
+            ))
+            .exhaustive()}
+        </div>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[15rem_1fr]">

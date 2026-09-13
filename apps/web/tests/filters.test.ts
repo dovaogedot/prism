@@ -64,8 +64,8 @@ describe("CatalogParams.has", () => {
 });
 
 describe("CatalogParams.isFiltered", () => {
-  it("ignores the text, sort and paging", () => {
-    expect(CatalogParams.isFiltered(params("q=lamp&sort=rating&page=2&perPage=24"))).toBe(false);
+  it("ignores the text, category, sort and paging", () => {
+    expect(CatalogParams.isFiltered(params("q=lamp&category=lighting&sort=rating&page=2&perPage=24"))).toBe(false);
   });
 
   it("counts any other key", () => {
@@ -78,9 +78,8 @@ describe("CatalogParams.active", () => {
   it("names each filter from the facets, in URL order, and leaves the rest when one goes", () => {
     const found = CatalogParams.active(params("q=lamp&category=lighting&brand=acme&brand=other&p.color=red&rating=4&page=2"), facets);
 
-    expect(found.map((filter) => filter.label)).toEqual(["Lighting", "Acme", "other", "color: red", "4 stars & up"]);
-    expect(found[1]?.next.toString()).toBe("q=lamp&category=lighting&p.color=red&rating=4&brand=other");
-    expect(found[0]?.next.toString()).toBe("q=lamp&brand=acme&brand=other&p.color=red&rating=4");
+    expect(found.map((filter) => filter.label)).toEqual(["Acme", "other", "color: red", "4 stars & up"]);
+    expect(found[0]?.next.toString()).toBe("q=lamp&category=lighting&p.color=red&rating=4&brand=other");
   });
 
   it("makes one filter of the two price bounds, and fills a missing bound from the facets", () => {
@@ -91,15 +90,15 @@ describe("CatalogParams.active", () => {
     expect(only?.next.toString()).toBe("brand=acme");
   });
 
-  it("finds nothing among the text, sort and paging", () => {
-    expect(CatalogParams.active(params("q=lamp&sort=rating&page=2"), facets)).toEqual([]);
+  it("finds nothing among the text, category, sort and paging", () => {
+    expect(CatalogParams.active(params("q=lamp&category=lighting&sort=rating&page=2"), facets)).toEqual([]);
   });
 });
 
 describe("CatalogParams.cleared", () => {
-  it("keeps the text, sort and page size, and drops everything else", () => {
+  it("keeps the text, category, sort and page size, and drops everything else", () => {
     expect(
-      CatalogParams.cleared(params("q=lamp&sort=rating&page=2&perPage=24&brand=acme&p.color=red")).toString(),
-    ).toBe("q=lamp&sort=rating&perPage=24");
+      CatalogParams.cleared(params("q=lamp&category=lighting&sort=rating&page=2&perPage=24&brand=acme&p.color=red")).toString(),
+    ).toBe("q=lamp&category=lighting&sort=rating&perPage=24");
   });
 });

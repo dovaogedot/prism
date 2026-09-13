@@ -13,8 +13,8 @@ import { match } from "ts-pattern";
 export type ActiveFilter = Readonly<{ key: string; value: string; label: string; next: URLSearchParams }>;
 
 export const CatalogParams = {
-  /** Keys that shape the list without narrowing it. */
-  UNFILTERED: new Set(["q", "sort", "page", "perPage"]),
+  /** Keys that shape the list without narrowing it: the shelf, the order and the paging. */
+  UNFILTERED: new Set(["q", "category", "sort", "page", "perPage"]),
 
   /** The query key for a filter on the property of that name. */
   propertyKey: (name: string): string => `${ProductQuery.PROPERTY_PREFIX}${name}`,
@@ -75,7 +75,6 @@ export const CatalogParams = {
         .with("priceMin", "priceMax", () =>
           `${Price.format(Number(priceMin ?? facets.price.minCents))} – ${Price.format(Number(priceMax ?? facets.price.maxCents))}`,
         )
-        .with("category", () => labelOf(facets.categories, value))
         .with("brand", () => labelOf(facets.brands, value))
         .with("rating", () => labelOf(facets.ratings, value))
         .otherwise(() => `${key.startsWith(ProductQuery.PROPERTY_PREFIX) ? key.slice(ProductQuery.PROPERTY_PREFIX.length) : key}: ${value}`);
@@ -90,7 +89,7 @@ export const CatalogParams = {
     return filters;
   },
 
-  /** `params` with every narrowing filter removed; the text, sort and page size stay. */
+  /** `params` with every narrowing filter removed; the text, category, sort and page size stay. */
   cleared: (params: URLSearchParams): URLSearchParams => {
     const next = new URLSearchParams();
 

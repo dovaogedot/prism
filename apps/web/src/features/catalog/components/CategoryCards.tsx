@@ -14,7 +14,7 @@ export type CategoryCardsProps = Readonly<{
  * drops every other filter; choosing the chosen one clears the choice.
  */
 export const CategoryCards = ({ buckets, params, onChange }: CategoryCardsProps) => (
-  <nav aria-label="Categories" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+  <nav aria-label="Categories" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
     {buckets.map((bucket) => {
       const chosen = params.get("category") === bucket.value;
       const tone = match(chosen)
