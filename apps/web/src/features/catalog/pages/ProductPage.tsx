@@ -98,7 +98,7 @@ export const ProductPage = () => {
         .otherwise(({ data }) => (
           <article className="grid gap-10 lg:grid-cols-2">
             <div className="space-y-3">
-              <Picture image={data.images[0]} name={data.name} className="aspect-square w-full rounded-(--radius-card) border border-line" />
+              <Picture image={data.images[0]} name={data.name} className="aspect-square w-full rounded-lg border border-line" />
 
               {match(data.images.length > 1)
                 .with(true, () => (

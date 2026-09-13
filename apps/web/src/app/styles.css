@@ -30,8 +30,6 @@
 
   /* Between "in stock" and "out of stock". */
   --color-warn: oklch(58% 0.14 62);
-
-  --radius-card: 0.875rem;
 }
 
 .dark {

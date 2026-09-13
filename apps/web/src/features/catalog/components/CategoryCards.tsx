@@ -27,7 +27,7 @@ export const CategoryCards = ({ buckets, params, onChange }: CategoryCardsProps)
           aria-pressed={chosen}
           disabled={empty}
           onClick={() => onChange(CatalogParams.set(params, "category", chosen ? "" : bucket.value))}
-          className={`rounded-(--radius-card) border px-3 py-3 text-left transition-colors ${tone}`}
+          className={`rounded-lg border px-3 py-3 text-left transition-colors ${tone}`}
         >
           <span className="block truncate text-sm font-semibold">{bucket.label}</span>
           <span className="block text-xs tabular-nums text-ink-faint">

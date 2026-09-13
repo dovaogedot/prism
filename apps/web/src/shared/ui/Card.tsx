@@ -6,7 +6,7 @@ export const Card = ({
   className = "",
 }: Readonly<{ children: ReactNode; className?: string }>) => (
   <div
-    className={["rounded-(--radius-card) border border-line bg-surface", className].join(
+    className={["rounded-lg border border-line bg-surface", className].join(
       " ",
     )}
   >
@@ -16,5 +16,5 @@ export const Card = ({
 
 /** A block standing where content will be, sized entirely by its class. */
 export const Skeleton = ({ className = "" }: Readonly<{ className?: string }>) => (
-  <div className={`animate-pulse rounded-md bg-sunken ${className}`} />
+  <div className={`animate-pulse rounded-lg bg-sunken ${className}`} />
 );

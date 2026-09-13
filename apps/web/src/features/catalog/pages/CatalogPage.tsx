@@ -159,7 +159,7 @@ export const CatalogPage = () => {
 
                 {match(data.items.length)
                   .with(0, () => (
-                    <div className="rounded-(--radius-card) border border-dashed border-line bg-surface px-6 py-16 text-center">
+                    <div className="rounded-lg border border-dashed border-line bg-surface px-6 py-16 text-center">
                       <p className="font-medium text-ink">Nothing matches that.</p>
                       <Button tone="quiet" className="mt-4" onClick={() => setParams(CatalogParams.cleared(params))}>
                         Clear all filters
