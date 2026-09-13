@@ -15,6 +15,7 @@ export type Infobox = Readonly<Record<string, string>>;
 export type WikiFile = Readonly<{ url: string; width: number; height: number }>;
 
 const responses = {
+  error: z.object({ error: z.object({ code: z.string(), info: z.string() }) }),
   pages: z.object({
     query: z.object({
       pages: z.array(
@@ -49,7 +50,11 @@ export const MediaWiki = {
       body: new URLSearchParams({ ...params, format: "json", formatversion: "2" }),
     });
     if (!response.ok) throw new Error(`${api} answered ${response.status}`);
-    return schema.parse(await response.json());
+
+    const answer: unknown = await response.json();
+    const refusal = responses.error.safeParse(answer);
+    if (refusal.success) throw new Error(`${api} refused ${params["action"] ?? "the call"}: ${refusal.data.error.info}`);
+    return schema.parse(answer);
   },
 
   /** `items` in runs of at most `size`. */

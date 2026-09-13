@@ -63,9 +63,14 @@ const framed = (art: Raw, margin: number, scale: number): Promise<Raw> =>
       .extend({ top: margin * scale, bottom: margin * scale, left: margin * scale, right: margin * scale, background: { r: 0, g: 0, b: 0, alpha: 0 } }),
   );
 
-/** The PNG of `product`'s picture: its faces put under the art, then the art framed, then its shaders run over the frame. */
-const png = async (product: Sourced, margin: number, scale: number): Promise<Buffer> => {
+/**
+ * The PNG of `product`'s picture: its faces put under the art, then the art
+ * framed, then its shaders run over the frame. Nothing when the art has no
+ * solid pixel, since a translucent picture has no edge to frame.
+ */
+const png = async (product: Sourced, margin: number, scale: number): Promise<Buffer | undefined> => {
   let art = await content(product.picture);
+  if (Raster.blank(art)) return undefined;
   for (const finish of product.finishes) {
     if (finish._tag === "Face") art = Raster.faced(await content(finish.picture), art, finish.ink);
   }
@@ -87,8 +92,14 @@ for (const source of sources) {
   const products: SeedProduct[] = [];
 
   for (const { picture, finishes, ...product } of source.products) {
+    const bytes = await png({ ...product, picture, finishes }, source.margin, source.scale);
+    if (bytes === undefined) {
+      process.stderr.write(`Skipping ${product.name}: its picture has no solid pixel.\n`);
+      continue;
+    }
+
     const image = `${Seed.slugOf(`${prefix} ${product.name}`, files)}.png`;
-    await writeFile(new URL(image, MEDIA_DIR), await png({ ...product, picture, finishes }, source.margin, source.scale));
+    await writeFile(new URL(image, MEDIA_DIR), bytes);
     products.push({ ...product, image });
   }
 

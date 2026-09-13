@@ -30,6 +30,8 @@ describe("Raster.bounds and margin", () => {
   });
 
   it("takes the whole image when nothing is solid", () => {
+    expect(Raster.blank(image(["..", ".."]))).toBe(true);
+    expect(Raster.blank(image([".k", ".."]))).toBe(false);
     expect(Raster.bounds(image(["..", ".."]))).toEqual({ left: 0, top: 0, width: 2, height: 2 });
     expect(Raster.margin(image(["kk", "kk"]))).toBe(0);
   });

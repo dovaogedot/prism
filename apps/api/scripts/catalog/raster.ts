@@ -48,6 +48,14 @@ export const Raster = {
   /** Whether the pixel at (`x`, `y`) counts as content. */
   solid: (raw: Raw, x: number, y: number): boolean => (raw.data[at(raw, x, y) + 3] ?? 0) >= Raster.SOLID,
 
+  /** Whether no pixel of `raw` is solid. */
+  blank: (raw: Raw): boolean => {
+    for (let y = 0; y < raw.height; y += 1) {
+      for (let x = 0; x < raw.width; x += 1) if (Raster.solid(raw, x, y)) return false;
+    }
+    return true;
+  },
+
   /** The smallest box around the content; the whole image when it has none. */
   bounds: (raw: Raw): Box => {
     let left = raw.width;
