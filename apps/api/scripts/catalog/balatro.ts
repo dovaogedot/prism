@@ -6,66 +6,18 @@
  * as cards, are drawn at random so the shelf carries some of each.
  */
 
-import { setTimeout as sleep } from "node:timers/promises";
 import { faker } from "@faker-js/faker";
 import { match } from "ts-pattern";
 import { z } from "zod";
+import { MediaWiki, type Infobox } from "./mediawiki.ts";
 import type { Rgba, Shader } from "./raster.ts";
 import { Sourced, type Finish } from "./sourced.ts";
 
 const API = "https://balatrowiki.org/api.php";
 
 const responses = {
-  members: z.object({ query: z.object({ categorymembers: z.array(z.object({ title: z.string() })) }) }),
   parsed: z.object({ parse: z.object({ wikitext: z.string() }) }),
-  pages: z.object({
-    query: z.object({
-      pages: z.array(
-        z.object({
-          title: z.string(),
-          revisions: z.array(z.object({ slots: z.object({ main: z.object({ content: z.string() }) }) })).optional(),
-        }),
-      ),
-    }),
-  }),
-  images: z.object({
-    query: z.object({
-      pages: z.array(z.object({ title: z.string(), imageinfo: z.array(z.object({ url: z.string(), width: z.number(), height: z.number() })).optional() })),
-    }),
-  }),
   expanded: z.object({ expandtemplates: z.object({ wikitext: z.string() }) }),
-};
-
-/** One call to the wiki's API, read through `schema`. */
-const call = async <T>(schema: z.ZodType<T>, params: Readonly<Record<string, string>>): Promise<T> => {
-  await sleep(200);
-  const response = await fetch(API, {
-    method: "POST",
-    headers: { "user-agent": Sourced.USER_AGENT },
-    body: new URLSearchParams({ ...params, format: "json", formatversion: "2" }),
-  });
-  if (!response.ok) throw new Error(`${API} answered ${response.status}`);
-  return schema.parse(await response.json());
-};
-
-/** `items` in runs of at most `size`. */
-const chunks = <T>(items: readonly T[], size: number): readonly (readonly T[])[] =>
-  Array.from({ length: Math.ceil(items.length / size) }, (_, index) => items.slice(index * size, (index + 1) * size));
-
-/** The wikitext of every page named in `titles`, keyed by title. */
-const pages = async (titles: readonly string[]): Promise<ReadonlyMap<string, string>> => {
-  const found = new Map<string, string>();
-
-  for (const batch of chunks(titles, 50)) {
-    // The data module names a few Jokers by a redirect, which the wiki follows.
-    const result = await call(responses.pages, { action: "query", prop: "revisions", rvprop: "content", rvslots: "main", redirects: "1", titles: batch.join("|") });
-    for (const page of result.query.pages) {
-      const content = page.revisions?.[0]?.slots.main.content;
-      if (content !== undefined) found.set(page.title, content);
-    }
-  }
-
-  return found;
 };
 
 /** A color as hue, saturation and lightness, each from 0 to 1, with alpha. */
@@ -252,9 +204,6 @@ const FINISHES: Readonly<Record<string, readonly Finish[]>> = {
   ...Object.fromEntries(Object.keys(FACES).map((name) => [name, face(name)])),
 };
 
-/** The parameters of one infobox, keyed by name. */
-export type Infobox = Readonly<Record<string, string>>;
-
 /** A card before its picture is looked up: `image` is the wiki's file name. */
 export type Card = Readonly<Omit<Sourced, "picture"> & { image: string }>;
 
@@ -311,37 +260,6 @@ export const Balatro = {
 
   /** The names in the wiki's Lua data module of Jokers. */
   jokerNames: (lua: string): readonly string[] => [...lua.matchAll(/\bname = "([^"]+)"/g)].map((found) => found[1] ?? ""),
-
-  /**
-   * The parameters of the `{{<template>` infobox in `wikitext`, or undefined
-   * when the page carries none. A parameter starts a line with `|`.
-   */
-  infobox: (wikitext: string, template: string): Infobox | undefined => {
-    const start = wikitext.indexOf(`{{${template}`);
-    if (start < 0) return undefined;
-
-    let depth = 0;
-    let index = start;
-    while (index < wikitext.length) {
-      if (wikitext.startsWith("{{", index)) {
-        depth += 1;
-        index += 2;
-      } else if (wikitext.startsWith("}}", index)) {
-        depth -= 1;
-        index += 2;
-        if (depth === 0) break;
-      } else index += 1;
-    }
-
-    const fields: Record<string, string> = {};
-    for (const line of wikitext.slice(start + 2 + template.length, index - 2).split(/\n\s*\|/)) {
-      const equals = line.indexOf("=");
-      if (equals < 0) continue;
-      fields[line.slice(0, equals).trim()] = line.slice(equals + 1).replace(/<!--[\s\S]*?-->/g, "").trim();
-    }
-
-    return fields;
-  },
 
   /** The readable text of expanded wikitext: links and tags gone, their labels kept. */
   plain: (expanded: string): string =>
@@ -430,17 +348,17 @@ export const Balatro = {
 
   /** Every card the wiki lists, with the address of its picture. */
   fetch: async (): Promise<readonly Sourced[]> => {
-    const lua = (await call(responses.parsed, { action: "parse", page: "Module:Jokers/data", prop: "wikitext" })).parse.wikitext;
+    const lua = (await MediaWiki.call(API, responses.parsed, { action: "parse", page: "Module:Jokers/data", prop: "wikitext" })).parse.wikitext;
     const boxes: { type: string; box: Infobox }[] = [];
 
     for (const shelf of [{ type: "Joker", titles: Balatro.jokerNames(lua), template: "Joker info" }, ...Balatro.SHELVES]) {
       const titles =
         "titles" in shelf
           ? shelf.titles
-          : (await call(responses.members, { action: "query", list: "categorymembers", cmtitle: `Category:${shelf.category}`, cmnamespace: "0", cmlimit: "500" })).query.categorymembers.map((member) => member.title);
+          : await MediaWiki.list(API, "categorymembers", { cmtitle: `Category:${shelf.category}`, cmnamespace: "0", cmlimit: "500" });
 
-      for (const [title, wikitext] of await pages(titles)) {
-        const box = Balatro.infobox(wikitext, shelf.template);
+      for (const [title, wikitext] of await MediaWiki.pages(API, titles)) {
+        const box = MediaWiki.infobox(wikitext, shelf.template);
         // The Decks category also files the challenge pages, which carry the same box.
         if (box !== undefined && (shelf.type !== "Deck" || title.endsWith(" Deck"))) boxes.push({ type: shelf.type, box });
       }
@@ -448,8 +366,8 @@ export const Balatro = {
 
     // Expanded in a few calls, so the readable text carries the words the templates add.
     const effects: string[] = [];
-    for (const batch of chunks(boxes.map(({ box }) => box["effect"] ?? box["limit"] ?? ""), 40)) {
-      const text = (await call(responses.expanded, { action: "expandtemplates", prop: "wikitext", text: batch.join("\n@@@\n") })).expandtemplates.wikitext;
+    for (const batch of MediaWiki.chunks(boxes.map(({ box }) => box["effect"] ?? box["limit"] ?? ""), 40)) {
+      const text = (await MediaWiki.call(API, responses.expanded, { action: "expandtemplates", prop: "wikitext", text: batch.join("\n@@@\n") })).expandtemplates.wikitext;
       effects.push(...text.split("\n@@@\n").map(Balatro.plain));
     }
     if (effects.length !== boxes.length) throw new Error(`asked for ${boxes.length} effects, the wiki expanded ${effects.length}`);
@@ -458,14 +376,7 @@ export const Balatro = {
 
     // The wiki names a file with spaces and a capital, whatever the box wrote.
     const fileTitle = (image: string): string => `File:${image.replace(/_/g, " ").replace(/^./, (first) => first.toUpperCase())}`;
-    const files = new Map<string, { url: string; width: number; height: number }>();
-    for (const batch of chunks(cards.map((card) => fileTitle(card.image)), 50)) {
-      const result = await call(responses.images, { action: "query", prop: "imageinfo", iiprop: "url|size", titles: batch.join("|") });
-      for (const page of result.query.pages) {
-        const info = page.imageinfo?.[0];
-        if (info !== undefined) files.set(page.title, info);
-      }
-    }
+    const files = await MediaWiki.files(API, cards.map((card) => fileTitle(card.image)));
 
     // The wiki draws a card on its cell, at its own number of pixels per pixel, and some renders line the cell's border with a soft outline; the art inside is what is kept.
     return cards.map(({ image, ...card }) => {
