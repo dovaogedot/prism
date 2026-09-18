@@ -6,7 +6,7 @@
  * back rather than trusting the response.
  */
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   cookieValue,
   jsonOf,
@@ -441,6 +441,45 @@ describe("password recovery", () => {
     });
 
     expect(response.statusCode).toBe(400);
+  });
+
+  describe("when a step fails part way", () => {
+    // Refusing every change to a session row makes signing the sessions out,
+    // the last step of a reset, fail after the earlier steps have run.
+    const REFUSE_SESSION_UPDATES = `
+      CREATE FUNCTION refuse_session_update() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN RAISE EXCEPTION 'session update refused'; END $$;
+      CREATE TRIGGER refuse_session_update BEFORE UPDATE ON session
+        FOR EACH ROW EXECUTE FUNCTION refuse_session_update();`;
+
+    afterEach(async () => {
+      await harness.database.sql.unsafe(
+        "DROP TRIGGER IF EXISTS refuse_session_update ON session; DROP FUNCTION IF EXISTS refuse_session_update();",
+      );
+    });
+
+    it("keeps the password and the token as they were", async () => {
+      await registerUser(harness, "a@example.com");
+      await post("/api/v1/auth/password/forgot", { email: "a@example.com" });
+
+      const selectHash = () => harness.database.sql<{ password_hash: string }[]>`SELECT password_hash FROM app_user`;
+      const [before] = await selectHash();
+
+      await harness.database.sql.unsafe(REFUSE_SESSION_UPDATES);
+
+      const response = await post("/api/v1/auth/password/reset", {
+        token: resetTokenFrom(harness),
+        password: "an entirely different passphrase",
+      });
+
+      expect(response.statusCode).toBe(500);
+
+      const [after] = await selectHash();
+      const tokens = await harness.database.sql`SELECT used_at FROM password_reset_token`;
+
+      expect(after?.password_hash).toBe(before?.password_hash);
+      expect(tokens[0]?.["used_at"]).toBeNull();
+    });
   });
 });
 

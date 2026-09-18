@@ -72,6 +72,9 @@ export type RotationOutcome =
   | Readonly<{ _tag: "Unknown" }>
   | Readonly<{ _tag: "SessionEnded" }>;
 
+/** The outcome of presenting a password-reset token with a replacement password. */
+export type PasswordResetOutcome = Readonly<{ _tag: "Reset" }> | Readonly<{ _tag: "TokenInvalid" }>;
+
 /** Every read and write the auth module makes against the database. */
 export type AuthRepository = Readonly<{
   findUserByEmail: (email: string) => Promise<UserRecord | undefined>;
@@ -94,7 +97,6 @@ export type AuthRepository = Readonly<{
   /** The guard's hot path: is this session still live? */
   isSessionLive: (sessionId: string, now: Date) => Promise<boolean>;
   revokeSession: (sessionId: string, reason: RevocationReason) => Promise<void>;
-  revokeSessionsForUser: (userId: string, reason: RevocationReason) => Promise<void>;
   rotateRefreshToken: (input: {
     presentedDigest: string;
     replacementDigest: string;
@@ -102,8 +104,13 @@ export type AuthRepository = Readonly<{
     replacementExpiresAt: Date;
   }) => Promise<RotationOutcome>;
   createPasswordResetToken: (input: { userId: string; digest: string; expiresAt: Date }) => Promise<void>;
-  /** The user a live, unused token belongs to, marking it used. */
-  consumePasswordResetToken: (digest: string, now: Date) => Promise<string | undefined>;
+  /**
+   * Spends a live, unused reset token, stores `passwordHash` on its user and
+   * signs every session of that user out, as one transaction: all three
+   * happen or none does. A token that is unknown, spent or expired changes
+   * nothing.
+   */
+  resetPassword: (input: { digest: string; passwordHash: string; now: Date }) => Promise<PasswordResetOutcome>;
 }>;
 
 export const AuthRepository = {
@@ -237,13 +244,6 @@ export const AuthRepository = {
           .where(and(eq(sessions.id, sessionId), isNull(sessions.revokedAt)));
       },
 
-      revokeSessionsForUser: async (userId, reason) => {
-        await db
-          .update(sessions)
-          .set({ revokedAt: new Date(), revokedReason: reason })
-          .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)));
-      },
-
       /**
        * Single-use rotation with replay detection. `FOR UPDATE` on the token
        * row makes a concurrent second presentation wait, then re-read the row
@@ -299,21 +299,34 @@ export const AuthRepository = {
         await db.insert(passwordResetTokens).values({ userId, tokenHash: digest, expiresAt });
       },
 
-      consumePasswordResetToken: async (digest, now) => {
-        const [row] = await db
-          .update(passwordResetTokens)
-          .set({ usedAt: now })
-          .where(
-            and(
-              eq(passwordResetTokens.tokenHash, digest),
-              isNull(passwordResetTokens.usedAt),
-              gt(passwordResetTokens.expiresAt, now),
-            ),
-          )
-          .returning({ userId: passwordResetTokens.userId });
+      resetPassword: ({ digest, passwordHash, now }) =>
+        db.transaction(async (tx): Promise<PasswordResetOutcome> => {
+          // The check and the spending are one statement, so the token works
+          // once however many requests carry it.
+          const [spent] = await tx
+            .update(passwordResetTokens)
+            .set({ usedAt: now })
+            .where(
+              and(
+                eq(passwordResetTokens.tokenHash, digest),
+                isNull(passwordResetTokens.usedAt),
+                gt(passwordResetTokens.expiresAt, now),
+              ),
+            )
+            .returning({ userId: passwordResetTokens.userId });
 
-        return row?.userId;
-      },
+          if (spent === undefined) return { _tag: "TokenInvalid" };
+
+          await tx.update(users).set({ passwordHash }).where(eq(users.id, spent.userId));
+
+          // Whoever knew the old password no longer has a way in.
+          await tx
+            .update(sessions)
+            .set({ revokedAt: now, revokedReason: "password_reset" })
+            .where(and(eq(sessions.userId, spent.userId), isNull(sessions.revokedAt)));
+
+          return { _tag: "Reset" };
+        }),
     };
   },
 } as const;

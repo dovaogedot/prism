@@ -280,19 +280,20 @@ export const AuthService = {
         }),
 
       resetPassword: ({ token, password }) =>
-        ResultAsync.fromSafePromise(
-          repository.consumePasswordResetToken(OpaqueToken.digest(token), clock.now()),
-        ).andThen((userId) =>
-          userId === undefined
-            ? errAsync<void, DomainError>({ _tag: "ResetTokenInvalid" })
-            : ResultAsync.fromSafePromise(
-                hasher.hash(password).then(async (passwordHash) => {
-                  await repository.setPasswordHash(userId, passwordHash);
-                  // Whoever knew the old password no longer has a way in.
-                  await repository.revokeSessionsForUser(userId, "password_reset");
-                }),
-              ),
-        ),
+        // Hashed before the transaction opens, so no row stays locked while
+        // argon2 runs. An invalid token still costs one hash; the route's rate
+        // limit bounds that.
+        ResultAsync.fromSafePromise(hasher.hash(password))
+          .andThen((passwordHash) =>
+            ResultAsync.fromSafePromise(
+              repository.resetPassword({ digest: OpaqueToken.digest(token), passwordHash, now: clock.now() }),
+            ),
+          )
+          .andThen((outcome) =>
+            outcome._tag === "Reset"
+              ? okAsync<void, DomainError>(undefined)
+              : errAsync<void, DomainError>({ _tag: "ResetTokenInvalid" }),
+          ),
 
       beginTwoFactorSetup: (userId) =>
         requireUser(userId, { _tag: "Unauthenticated" }).andThen((user) => {
