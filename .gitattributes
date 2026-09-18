@@ -1,0 +1,4 @@
+# A checkout on Windows keeps each script in the line endings its shell reads.
+*.sh  text eol=lf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

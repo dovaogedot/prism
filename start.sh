@@ -6,25 +6,19 @@
 #   ./start.sh --pull   also refresh base images
 #   ./start.sh down     stop and remove the stack
 #   ./start.sh reset    stop and delete the volumes too
+#   ./start.sh test     run every test suite in a container
+#   ./start.sh test npm run test:unit     run that command there instead
 
 set -euo pipefail
 cd "$(dirname "$0")"
 
 readonly WEB_PORT_DEFAULT=3000
 
-random_secret() {
-  if command -v openssl >/dev/null 2>&1; then
-    openssl rand -hex 32
-  else
-    head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'
-  fi
-}
-
 ensure_env_file() {
   [ -f .env ] && return 0
 
-  echo "No .env found — creating one from .env.example with a random JWT_SECRET."
-  sed "s|^JWT_SECRET=.*|JWT_SECRET=$(random_secret)|" .env.example > .env
+  echo "No .env found — copying .env.example."
+  cp .env.example .env
 }
 
 case "${1:-up}" in
@@ -40,6 +34,14 @@ case "${1:-up}" in
 esac
 
 ensure_env_file
+
+# After the .env step: compose checks the whole file, where the api requires
+# JWT_SECRET, even when it runs only the test service.
+case "${1:-up}" in
+  test)
+    exec docker compose run --rm --build test "${@:2}"
+    ;;
+esac
 
 # `depends_on: service_completed_successfully` makes this fail by itself if the
 # migration or seed step exits non-zero, so its status is the whole check.
