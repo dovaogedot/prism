@@ -9,7 +9,7 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { DomainError, OAuthProvider } from "@prism/shared";
-import { errAsync, okAsync, ResultAsync } from "neverthrow";
+import { err, errAsync, ok, okAsync, type Result, ResultAsync } from "neverthrow";
 
 /** Who a provider says the person completing a sign-in is. */
 export type OAuthProfile = Readonly<{
@@ -113,6 +113,29 @@ export const GitHubEmails = {
   },
 } as const;
 
+/** Google's userinfo answer, reduced to the stable id and a verified address. */
+export const GoogleUserInfo = {
+  /**
+   * The profile the answer describes. An answer without a string `sub` fails
+   * the exchange. An address that Google does not mark `email_verified: true`
+   * is refused, with the address lowercased otherwise.
+   */
+  read: (payload: unknown): Result<OAuthProfile, DomainError> => {
+    if (typeof payload !== "object" || payload === null || !("sub" in payload) || typeof payload.sub !== "string") {
+      return err<OAuthProfile, DomainError>({ _tag: "OAuthExchangeFailed" });
+    }
+
+    const subject = payload.sub;
+    const verified = "email_verified" in payload && payload.email_verified === true;
+
+    // An unverified address would let anyone who registers a victim's address
+    // at Google link themselves to that account here.
+    return "email" in payload && typeof payload.email === "string" && verified
+      ? ok<OAuthProfile, DomainError>({ provider: "google", subject, email: payload.email.toLowerCase() })
+      : err<OAuthProfile, DomainError>({ _tag: "OAuthEmailUnavailable" });
+  },
+} as const;
+
 export const IdentityProvider = {
   exchangeFailed: { _tag: "OAuthExchangeFailed" } as DomainError,
 
@@ -192,20 +215,7 @@ export const IdentityProvider = {
             () => IdentityProvider.exchangeFailed,
           ),
         )
-        .andThen((payload) =>
-          typeof payload === "object" &&
-          payload !== null &&
-          "sub" in payload &&
-          typeof payload.sub === "string" &&
-          "email" in payload &&
-          typeof payload.email === "string"
-            ? okAsync<OAuthProfile, DomainError>({
-                provider: "google",
-                subject: payload.sub,
-                email: payload.email.toLowerCase(),
-              })
-            : errAsync<OAuthProfile, DomainError>(IdentityProvider.exchangeFailed),
-        ),
+        .andThen(GoogleUserInfo.read),
   }),
 
   /**

@@ -1,11 +1,13 @@
 /**
  * OAuth provider behavior that is pure enough to test without a network:
- * the registry, the offline mock's code signing, and GitHub's email selection.
+ * the registry, the offline mock's code signing, GitHub's email selection,
+ * and the reading of Google's profile.
  */
 
 import { describe, expect, it } from "vitest";
 import {
   GitHubEmails,
+  GoogleUserInfo,
   IdentityProvider,
   IdentityProviders,
   MockAuthorizationCode,
@@ -216,5 +218,64 @@ describe("GitHubEmails.select", () => {
         entry("good@example.com", true, true),
       ]),
     ).toBe("good@example.com");
+  });
+});
+
+describe("GoogleUserInfo.read", () => {
+  const info = (fields: Readonly<Record<string, unknown>>): Record<string, unknown> => ({
+    sub: "1234567890",
+    email: "someone@example.com",
+    email_verified: true,
+    ...fields,
+  });
+
+  it("reads the stable id and the verified address", () => {
+    expect(GoogleUserInfo.read(info({}))._unsafeUnwrap()).toEqual({
+      provider: "google",
+      subject: "1234567890",
+      email: "someone@example.com",
+    });
+  });
+
+  it("refuses an address Google has not verified", () => {
+    // Accepting one would link whoever registered a victim's address at
+    // Google to the victim's account here.
+    expect(GoogleUserInfo.read(info({ email_verified: false }))._unsafeUnwrapErr()).toEqual({
+      _tag: "OAuthEmailUnavailable",
+    });
+  });
+
+  it("refuses an answer that leaves the verification out", () => {
+    const { email_verified: _verified, ...silent } = info({});
+
+    expect(GoogleUserInfo.read(silent)._unsafeUnwrapErr()).toEqual({ _tag: "OAuthEmailUnavailable" });
+  });
+
+  it("takes only a boolean true as verified", () => {
+    for (const verified of ["true", 1, null]) {
+      expect(GoogleUserInfo.read(info({ email_verified: verified }))._unsafeUnwrapErr(), String(verified)).toEqual({
+        _tag: "OAuthEmailUnavailable",
+      });
+    }
+  });
+
+  it("refuses an answer without an address", () => {
+    const { email: _email, ...anonymous } = info({});
+
+    expect(GoogleUserInfo.read(anonymous)._unsafeUnwrapErr()).toEqual({ _tag: "OAuthEmailUnavailable" });
+  });
+
+  it("lowercases the address so one person is one account", () => {
+    expect(GoogleUserInfo.read(info({ email: "Someone@Example.COM" }))._unsafeUnwrap().email).toBe(
+      "someone@example.com",
+    );
+  });
+
+  it("fails the exchange for anything that is not a profile", () => {
+    for (const payload of [null, undefined, {}, "nope", 42, info({ sub: 42 })]) {
+      expect(GoogleUserInfo.read(payload)._unsafeUnwrapErr(), JSON.stringify(payload)).toEqual({
+        _tag: "OAuthExchangeFailed",
+      });
+    }
   });
 });
