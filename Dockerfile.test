@@ -1,0 +1,22 @@
+# Every test suite, on a host with Docker and no Node: `./start.sh test`.
+# Build context is the repository root.
+#
+# The integration and security suites start their own Postgres through
+# Testcontainers. The container reaches the host's Docker through the socket
+# the compose service mounts, and reaches that Postgres at the gateway of the
+# default bridge network.
+
+FROM node:26-slim
+WORKDIR /app
+
+# Manifests first: this layer is cached until a dependency actually changes.
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY packages/shared/package.json ./packages/shared/
+COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
+RUN npm ci
+
+COPY packages ./packages
+COPY apps ./apps
+
+CMD ["npm", "test"]

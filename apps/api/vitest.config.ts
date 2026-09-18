@@ -5,7 +5,8 @@ import { defineConfig } from "vitest/config";
  *
  * `unit` touches nothing outside the process and finishes in under a second,
  * so it runs on every save. `integration` and `security` each start a real
- * Postgres in a container and are the slower gate before a commit.
+ * Postgres in a container and are the slower gate before a commit; CI runs
+ * all three before every deploy.
  */
 export default defineConfig({
   test: {

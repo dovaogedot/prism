@@ -63,10 +63,10 @@ jobs:
 
       - run: npm run typecheck
 
-      # Unit tests only. The integration and security suites need
-      # Testcontainers, which does not belong in the gate that decides
-      # whether a deploy proceeds.
-      - run: npm run test:unit
+      # Every suite: unit, API integration and security. The integration and
+      # security suites start their own Postgres through Testcontainers, on
+      # the runner's Docker.
+      - run: npm test
 
   # Runs alongside the tests: an image nobody deploys costs a minute of
   # runner time, and waiting for the tests first would cost that minute on

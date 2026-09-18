@@ -121,6 +121,20 @@ services:
       timeout: 3s
       retries: 20
 
+  # Every test suite, for a host with Docker and no Node: `./start.sh test`.
+  # The profile keeps it out of `up`. Testcontainers starts the suites' own
+  # Postgres through the host's Docker socket and, from inside a container,
+  # reaches it at the gateway of the default bridge network, so this service
+  # joins that network rather than the project's.
+  test:
+    profiles: [test]
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    network_mode: bridge
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
 volumes:
   postgres-data:
   media:
