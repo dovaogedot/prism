@@ -1,6 +1,6 @@
 import { faker } from "@faker-js/faker";
 import { describe, expect, it } from "vitest";
-import { Isaac, type Entry } from "../../../scripts/catalog/isaac.ts";
+import { Isaac, type Entry } from "../fetch/catalog/isaac.ts";
 
 const css = `.item{height:50px}.rep-item{background:url("../images/repentance-items2.png") top left no-repeat;width:50px;height:50px}.rep-item.rep553{background-position:0 0;width:52px;cursor:url(../images/hand.png),auto}.rebirth-card{background:url(../images/ap-cards2.png)}.rebirth-card.r-card01{background-position:-50px 0px;width:39px;height:50px}`;
 

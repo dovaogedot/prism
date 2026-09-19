@@ -1,6 +1,6 @@
 /**
- * Writes the catalog the seed plants: `seed/catalog.json` and one picture
- * per product under `seed/media/`, from the sources under `catalog/`. Run
+ * Writes the catalog the seed plants: `../catalog.json` and one picture
+ * per product under `../media/`, from the sources under `catalog/`. Run
  * by hand when a source changes; the seed itself never touches the network.
  *
  * Every picture is cut to its content, given the same margin as the rest
@@ -11,8 +11,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { faker } from "@faker-js/faker";
 import sharp, { type Sharp } from "sharp";
-import { Seed } from "../src/db/seed.ts";
-import { SeedCatalog, type SeedProduct } from "../src/db/seed-catalog.ts";
+import { Seed } from "../seed.ts";
+import { SeedCatalog, type SeedProduct } from "../seed-catalog.ts";
 import { Balatro } from "./catalog/balatro.ts";
 import { Isaac } from "./catalog/isaac.ts";
 import { Minecraft } from "./catalog/minecraft.ts";

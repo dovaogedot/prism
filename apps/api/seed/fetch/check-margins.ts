@@ -7,7 +7,7 @@
 
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
-import { Seed } from "../src/db/seed.ts";
+import { Seed } from "../seed.ts";
 import { Raster } from "./catalog/raster.ts";
 
 let disagreement = false;

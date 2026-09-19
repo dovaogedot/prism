@@ -1,4 +1,6 @@
-# Every test suite, on a host with Docker and no Node: `./start.sh test`.
+# The whole workspace with its development dependencies, for a host with
+# Docker and no Node: `./start.sh test` runs every test suite in it, and
+# `./start.sh seed` runs the seed's tools in it.
 # Build context is the repository root.
 #
 # The integration and security suites start their own Postgres through

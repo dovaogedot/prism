@@ -16,10 +16,11 @@ Caddy. TypeScript end to end. Docker is the only thing a machine needs.
 
 | Command | What it does |
 | --- | --- |
-| `./start.sh` | Copies `.env.example` to `.env` if there is none, then builds, migrates, seeds and starts everything. |
+| `./start.sh` | Copies `.env.example` to `.env` if there is none, then builds, migrates and starts everything, and seeds the shop. |
 | `./start.sh --pull` | The same, and refreshes the base images. |
 | `./start.sh down` | Stops the stack. |
 | `./start.sh reset` | Stops it and deletes the database and the media. |
+| `./start.sh seed` | Runs only the seed: placeholder products and a demo shopper, planted into an empty catalog. |
 | `./start.sh test` | Runs every test suite in a container. |
 | `./start.sh test npm run test:unit` | Runs only the unit tests there. |
 
@@ -31,14 +32,15 @@ On Windows each command is `.\start.cmd ...` with the same arguments.
 | API | <http://localhost:3000/api/v1> |
 | Inbox for password-reset mail (Mailpit) | <http://localhost:8025> |
 
-Sign in as `shopper@prism.test` with the password `correct horse battery staple`.
-
 The stack needs no external accounts: the CAPTCHA uses Google's always-pass test key, the
 provider buttons go to a built-in stand-in, and mail lands in Mailpit. Real keys go in `.env`;
 `.env.example` describes each one. Its `JWT_SECRET` is public, so replace it anywhere but
 your own machine.
 
-The seed fills the shop with placeholder products. Every fresh database holds the same shop.
+The seed is separate from the shop: the shop runs without it, and a failed seed leaves an
+empty shop. Its data is one archive, `apps/api/seed/data.zip`. After the seed, sign in as
+`shopper@prism.test` with the password `correct horse battery staple`.
+`apps/api/seed/README.md` has the details.
 
 ### Running it without the scripts
 
@@ -46,6 +48,8 @@ The seed fills the shop with placeholder products. Every fresh database holds th
 2. `docker compose up --build --detach`. If it fails, `docker compose logs migrate` says why.
 3. Open <http://localhost:3000>. The storefront answers a few seconds after step 2 returns.
 4. `docker compose down` stops the stack. Add `--volumes` to delete the data too.
+
+Placeholder products: `docker compose run --rm --build seed`.
 
 Tests: `docker compose run --rm --build test`. Append `npm run test:unit` for the unit tests
 only.

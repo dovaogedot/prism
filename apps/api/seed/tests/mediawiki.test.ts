@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MediaWiki } from "../../../scripts/catalog/mediawiki.ts";
+import { MediaWiki } from "../fetch/catalog/mediawiki.ts";
 
 const hierophant = `{{Consumable info
 | number = 7

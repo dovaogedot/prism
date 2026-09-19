@@ -9,3 +9,7 @@ coverage/
 
 .DS_Store
 *.log
+
+# The seed's data, unpacked from apps/api/seed/data.zip.
+apps/api/seed/catalog.json
+apps/api/seed/media/

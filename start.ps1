@@ -3,10 +3,11 @@
 #
 # The entire prerequisite list for this project is Docker.
 #
-#   .\start.cmd          build and run everything
+#   .\start.cmd          build, run and seed everything
 #   .\start.cmd --pull   also refresh base images
 #   .\start.cmd down     stop and remove the stack
 #   .\start.cmd reset    stop and delete the volumes too
+#   .\start.cmd seed     run only the seed
 #   .\start.cmd test     run every test suite in a container
 #   .\start.cmd test npm run test:unit     run that command there instead
 
@@ -40,6 +41,11 @@ Initialize-EnvFile
 
 # After the .env step: compose checks the whole file, where the api requires
 # JWT_SECRET, even when it runs only the test service.
+if ($action -eq "seed") {
+  docker compose run --rm --build seed
+  exit $LASTEXITCODE
+}
+
 if ($action -eq "test") {
   $rest = @($args | Select-Object -Skip 1)
   docker compose run --rm --build test @rest
@@ -47,11 +53,11 @@ if ($action -eq "test") {
 }
 
 # `depends_on: service_completed_successfully` makes this fail by itself if the
-# migration or seed step exits non-zero, so its status is the whole check.
+# migration exits non-zero, so its status is the whole check.
 docker compose up --build --detach @args
 if ($LASTEXITCODE -ne 0) {
   Write-Host ""
-  Write-Host "The stack did not come up. Migration/seed logs:"
+  Write-Host "The stack did not come up. Migration logs:"
   docker compose logs migrate
   exit 1
 }
@@ -69,6 +75,17 @@ foreach ($attempt in 1..60) {
   Start-Sleep -Seconds 1
 }
 
+# The shop already answers. The seed stands apart from it, so a failed seed
+# leaves an empty shop running instead of failing the start.
+Write-Host ""
+Write-Host "Seeding the shop."
+$shopper = "  Seeded shopper    shopper@prism.test / correct horse battery staple"
+docker compose run --rm --build seed
+if ($LASTEXITCODE -ne 0) {
+  Write-Host "The seed failed, so the shop is empty. .\start.cmd seed runs it again."
+  $shopper = ""
+}
+
 Write-Host @"
 
 
@@ -77,7 +94,7 @@ Write-Host @"
     Storefront      http://localhost:$webPort
     Inbox (Mailpit) http://localhost:8025
 
-  Seeded shopper    shopper@prism.test / correct horse battery staple
+$shopper
 
   Logs   docker compose logs -f
   Stop   .\start.cmd down

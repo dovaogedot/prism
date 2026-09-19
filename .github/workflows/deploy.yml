@@ -25,9 +25,9 @@ on:
     inputs:
       # The way on from a refused migration, and the server's `./start.sh
       # reset`: the database and the media volume are deleted, and the start
-      # builds both again from the migrations and the seed.
+      # builds an empty shop again from the migrations.
       rebuild_database:
-        description: Rebuild the database from the migrations and the seed, deleting every account and review
+        description: Rebuild the database from the migrations, deleting every account, product and review
         type: boolean
         default: false
 
@@ -218,7 +218,7 @@ jobs:
             docker compose -f docker-compose.yml -f docker-compose.prod.yml pull --quiet"
 
       # Takes the stack down with its volumes, so the start below creates an
-      # empty database, migrates it and seeds it. Only a run started by hand
+      # empty database and migrates it. Only a run started by hand
       # with the box ticked gets here.
       - name: Delete the database
         if: github.event_name == 'workflow_dispatch' && inputs.rebuild_database
@@ -228,10 +228,10 @@ jobs:
             cd $DEPLOY_PATH
             docker compose -f docker-compose.yml -f docker-compose.prod.yml down --volumes"
 
-      # The migration and the seed run by themselves first, attached, so their
-      # output lands in this log and a failure stops the deploy before any
-      # running container is replaced. `up` runs them again as the api's
-      # dependency and they find nothing left to do.
+      # The migration runs by itself first, attached, so its output lands in
+      # this log and a failure stops the deploy before any running container
+      # is replaced. `up` runs it again as the api's dependency and it finds
+      # nothing left to do.
       - name: Migrate and start
         run: |
           ssh -i ~/.ssh/id_deploy "$SSH_TARGET" "

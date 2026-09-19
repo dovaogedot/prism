@@ -38,19 +38,15 @@ services:
       timeout: 3s
       retries: 20
 
-  # One-shot: applies migrations, then seeds the catalog. The api waits for
-  # this to exit 0, so it never serves a request against a half-built schema.
+  # One-shot: applies migrations. The api waits for this to exit 0, so it
+  # never serves a request against a half-built schema.
   migrate:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
-    command: ["sh", "-c", "node src/db/migrate.ts && node src/db/seed.ts"]
+    command: ["node", "src/db/migrate.ts"]
     environment:
       DATABASE_URL: postgres://prism:${POSTGRES_PASSWORD:-prism}@postgres:5432/prism
-      MEDIA_DIR: /srv/media
-    volumes:
-      # The seed writes the placeholder product images the api serves.
-      - media:/srv/media
     depends_on:
       postgres:
         condition: service_healthy
@@ -134,6 +130,38 @@ services:
     network_mode: bridge
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+
+  # Placeholder products. `./start.sh` runs it once the shop is up, and
+  # `./start.sh seed` runs it alone. The profile keeps it out of `up`, so the
+  # shop never depends on it and the production stack never sees it. A run
+  # that finds no unpacked data in apps/api/seed unpacks data.zip there
+  # first, and every run plants what is there into an empty catalog. Unpacked
+  # files get the owner of the folder they land in, not root.
+  seed:
+    profiles: [seed]
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    working_dir: /app/apps/api
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        if [ ! -f seed/catalog.json ]; then
+          node seed/archive.ts unpack
+          chown -R "$$(stat -c %u:%g seed)" seed/catalog.json seed/media
+        fi
+        node seed/seed.ts
+    environment:
+      DATABASE_URL: postgres://prism:${POSTGRES_PASSWORD:-prism}@postgres:5432/prism
+      MEDIA_DIR: /srv/media
+    volumes:
+      - ./apps/api/seed:/app/apps/api/seed
+      - media:/srv/media
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   postgres-data:

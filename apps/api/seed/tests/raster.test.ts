@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Raster, type Raw, type Rgba } from "../../../scripts/catalog/raster.ts";
+import { Raster, type Raw, type Rgba } from "../fetch/catalog/raster.ts";
 
 /** An image from rows of characters: `.` is transparent, `w` white, `k` black, `h` a half-clear white. */
 const image = (rows: readonly string[]): Raw => {

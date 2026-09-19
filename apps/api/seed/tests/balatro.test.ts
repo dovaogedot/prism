@@ -1,6 +1,6 @@
 import { faker } from "@faker-js/faker";
 import { describe, expect, it } from "vitest";
-import { Balatro } from "../../../scripts/catalog/balatro.ts";
+import { Balatro } from "../fetch/catalog/balatro.ts";
 
 describe("Balatro.plain", () => {
   it("keeps the words of links and spans and drops files, tags and hidden metadata", () => {

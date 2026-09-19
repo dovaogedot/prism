@@ -1,6 +1,5 @@
-import { access } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { Seed } from "../../../src/db/seed.ts";
+import { Seed } from "../seed.ts";
 
 describe("Seed.slugOf", () => {
   it("lowercases and joins words with single dashes", () => {
@@ -19,22 +18,5 @@ describe("Seed.slugOf", () => {
 
   it("falls back to a word when nothing in the name survives", () => {
     expect(Seed.slugOf("???", new Set())).toBe("item");
-  });
-});
-
-describe("Seed.catalog", () => {
-  it("holds every category with products that each have a type and a picture on disk", async () => {
-    const catalog = await Seed.catalog();
-
-    expect(catalog.categories.length).toBeGreaterThan(0);
-
-    for (const shelf of catalog.categories) {
-      expect(shelf.products.length, shelf.name).toBeGreaterThan(0);
-
-      for (const product of shelf.products) {
-        expect(product.properties["type"], product.name).toBeTruthy();
-        await expect(access(new URL(`media/${product.image}`, Seed.CATALOG_DIR)), product.image).resolves.toBeUndefined();
-      }
-    }
   });
 });

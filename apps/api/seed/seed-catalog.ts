@@ -1,4 +1,4 @@
-/** The catalog file the seed plants, as `scripts/fetch-catalog.ts` writes it. */
+/** The catalog file the seed plants, as `fetch/fetch-catalog.ts` writes it. */
 
 import { z } from "zod";
 

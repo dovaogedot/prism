@@ -1,7 +1,7 @@
 /**
  * Fills an empty database with the shop's placeholder data: one demo
- * account, a shelf of reviewers, and the catalog under `seed/`, which
- * `scripts/fetch-catalog.ts` writes from its sources. Stock, sizes and
+ * account, a shelf of reviewers, and the catalog beside this file, which
+ * `fetch/fetch-catalog.ts` writes from its sources. Stock, sizes and
  * reviews are drawn from faker under a fixed seed, so two runs against an
  * empty database plant the same shop. A database that already holds
  * products is left alone. Run as a script it seeds the database named by
@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { faker } from "@faker-js/faker";
 import { count } from "drizzle-orm";
-import { Database, type Database as Db } from "./client.ts";
+import { Database, type Database as Db } from "../src/db/client.ts";
 import {
   brands,
   categories,
@@ -22,9 +22,9 @@ import {
   productReviews,
   products,
   users,
-} from "./schema.ts";
+} from "../src/db/schema.ts";
 import { SeedCatalog } from "./seed-catalog.ts";
-import { Hasher } from "../platform/hasher.ts";
+import { Hasher } from "../src/platform/hasher.ts";
 
 /** What one run of the seed did. */
 export type SeedReport =
@@ -37,7 +37,7 @@ export const Seed = {
   REVIEWER_COUNT: 10,
 
   /** Where the catalog file and, under `media/`, its pictures are. */
-  CATALOG_DIR: new URL("../../seed/", import.meta.url),
+  CATALOG_DIR: new URL("./", import.meta.url),
 
   /**
    * A URL-safe slug for a name, given a numeric suffix when `taken` already

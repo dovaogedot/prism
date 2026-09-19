@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Minecraft } from "../../../scripts/catalog/minecraft.ts";
+import { Minecraft } from "../fetch/catalog/minecraft.ts";
 
 describe("Minecraft.icons", () => {
   it("lists the invimage fields in order, skipping spacers, edition copies and markup", () => {
