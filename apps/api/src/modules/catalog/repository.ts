@@ -9,11 +9,13 @@ import type {
   FacetBucket,
   ProductDetail,
   ProductFacets,
+  ProductId,
   ProductImage,
   ProductQuery,
   ProductSearchResult,
   ProductSummary,
   PropertyFacet,
+  Slug,
   Suggestion,
 } from "@prism/shared";
 import { Dimensions, Weight } from "@prism/shared";
@@ -26,7 +28,7 @@ import { ProductSearch, type LiftedFacet } from "./search.ts";
 export type CatalogRepository = Readonly<{
   search: (query: ProductQuery) => Promise<ProductSearchResult>;
   suggest: (text: string, limit: number) => Promise<readonly Suggestion[]>;
-  findBySlug: (slug: string) => Promise<ProductDetail | undefined>;
+  findBySlug: (slug: Slug) => Promise<ProductDetail | undefined>;
 }>;
 
 export const CatalogRepository = {
@@ -70,14 +72,14 @@ export const CatalogRepository = {
     };
 
     type SummaryRow = Readonly<{
-      id: string;
-      slug: string;
+      id: ProductId;
+      slug: Slug;
       name: string;
       priceCents: number;
       stock: number;
-      categorySlug: string;
+      categorySlug: Slug;
       categoryName: string;
-      brandSlug: string;
+      brandSlug: Slug;
       brandName: string;
       images: readonly ProductImage[];
       average: number;

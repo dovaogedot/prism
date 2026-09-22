@@ -4,12 +4,19 @@
  */
 
 import argon2 from "argon2";
+import { z } from "zod";
+
+/** A password in the only form stored. Only a hasher makes one. */
+export type PasswordHash = z.infer<typeof PasswordHash.schema>;
+export const PasswordHash = {
+  schema: z.string().min(1).brand<"PasswordHash">(),
+} as const;
 
 /** Turning a password into something safe to store, and checking it again. */
 export type Hasher = Readonly<{
-  hash: (plaintext: string) => Promise<string>;
+  hash: (plaintext: string) => Promise<PasswordHash>;
   /** Never rejects: a malformed stored hash is a failed verification. */
-  verify: (storedHash: string, plaintext: string) => Promise<boolean>;
+  verify: (storedHash: PasswordHash, plaintext: string) => Promise<boolean>;
   /**
    * Burns the CPU a real verification would, so sign-in takes as long for an
    * unknown address as for a wrong password.
@@ -27,7 +34,7 @@ export const Hasher = {
     const decoy = argon2.hash("decoy-for-constant-time-signin", Hasher.OPTIONS);
 
     return {
-      hash: (plaintext) => argon2.hash(plaintext, Hasher.OPTIONS),
+      hash: (plaintext) => argon2.hash(plaintext, Hasher.OPTIONS).then((hash) => PasswordHash.schema.parse(hash)),
       // Verification reads its parameters from the stored digest, so a hash
       // written under other parameters keeps verifying.
       verify: (storedHash, plaintext) => argon2.verify(storedHash, plaintext).catch(() => false),

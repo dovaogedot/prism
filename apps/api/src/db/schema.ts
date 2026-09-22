@@ -11,6 +11,7 @@
  */
 
 import { relations, sql } from "drizzle-orm";
+import type { Email, OAuthProvider, ProductId, Slug, UserId } from "@prism/shared";
 import {
   check,
   customType,
@@ -24,6 +25,11 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { PasswordHash } from "../platform/hasher.ts";
+import type { ProviderSubject } from "../platform/oauth.ts";
+import type { Digest } from "../platform/tokens.ts";
+import type { TotpSecret } from "../platform/totp.ts";
+import type { BrandId, CategoryId, SessionId } from "./ids.ts";
 
 /** Postgres full-text search vectors, which drizzle has no built-in for. */
 const tsvector = customType<{ data: string; driverData: string }>({
@@ -36,12 +42,12 @@ const tsvector = customType<{ data: string; driverData: string }>({
 export const users = pgTable(
   "app_user",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
-    email: text("email").notNull(),
+    id: uuid("id").primaryKey().defaultRandom().$type<UserId>(),
+    email: text("email").notNull().$type<Email>(),
     /** Null for an account that only ever signed in through a provider. */
-    passwordHash: text("password_hash"),
+    passwordHash: text("password_hash").$type<PasswordHash>(),
     /** Present once setup begins; confirmed only when `totpEnabledAt` is set. */
-    totpSecret: text("totp_secret"),
+    totpSecret: text("totp_secret").$type<TotpSecret>(),
     totpEnabledAt: timestamp("totp_enabled_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -63,10 +69,11 @@ export const oauthIdentities = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    provider: text("provider").notNull(),
+      .references(() => users.id, { onDelete: "cascade" })
+      .$type<UserId>(),
+    provider: text("provider").notNull().$type<OAuthProvider>(),
     /** The provider's immutable user identifier, never the email. */
-    subject: text("subject").notNull(),
+    subject: text("subject").notNull().$type<ProviderSubject>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -74,6 +81,9 @@ export const oauthIdentities = pgTable(
     index("oauth_identity_user_idx").on(table.userId),
   ],
 );
+
+/** Why a session ended, so an investigation can tell logout from attack. */
+export type RevocationReason = "logout" | "token_reuse" | "password_reset";
 
 /**
  * A session is both the revocation unit and the refresh-token family. The
@@ -83,15 +93,16 @@ export const oauthIdentities = pgTable(
 export const sessions = pgTable(
   "session",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: uuid("id").primaryKey().defaultRandom().$type<SessionId>(),
     userId: uuid("user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" })
+      .$type<UserId>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
-    /** `logout` | `token_reuse` | `password_reset`: why the session ended. */
-    revokedReason: text("revoked_reason"),
+    /** Why the session ended; null while it is live. */
+    revokedReason: text("revoked_reason").$type<RevocationReason>(),
     userAgent: text("user_agent").notNull().default(""),
     ipAddress: text("ip_address").notNull().default(""),
   },
@@ -116,9 +127,10 @@ export const refreshTokens = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     sessionId: uuid("session_id")
       .notNull()
-      .references(() => sessions.id, { onDelete: "cascade" }),
+      .references(() => sessions.id, { onDelete: "cascade" })
+      .$type<SessionId>(),
     /** SHA-256 of the token. A database leak must not yield usable tokens. */
-    tokenHash: text("token_hash").notNull(),
+    tokenHash: text("token_hash").notNull().$type<Digest>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     usedAt: timestamp("used_at", { withTimezone: true }),
@@ -136,8 +148,9 @@ export const passwordResetTokens = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    tokenHash: text("token_hash").notNull(),
+      .references(() => users.id, { onDelete: "cascade" })
+      .$type<UserId>(),
+    tokenHash: text("token_hash").notNull().$type<Digest>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     usedAt: timestamp("used_at", { withTimezone: true }),
@@ -154,8 +167,8 @@ export const passwordResetTokens = pgTable(
 export const categories = pgTable(
   "category",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
-    slug: text("slug").notNull(),
+    id: uuid("id").primaryKey().defaultRandom().$type<CategoryId>(),
+    slug: text("slug").notNull().$type<Slug>(),
     name: text("name").notNull(),
   },
   (table) => [uniqueIndex("category_slug_key").on(table.slug)],
@@ -165,8 +178,8 @@ export const categories = pgTable(
 export const brands = pgTable(
   "brand",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
-    slug: text("slug").notNull(),
+    id: uuid("id").primaryKey().defaultRandom().$type<BrandId>(),
+    slug: text("slug").notNull().$type<Slug>(),
     name: text("name").notNull(),
   },
   (table) => [uniqueIndex("brand_slug_key").on(table.slug)],
@@ -176,18 +189,20 @@ export const brands = pgTable(
 export const products = pgTable(
   "product",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
-    slug: text("slug").notNull(),
+    id: uuid("id").primaryKey().defaultRandom().$type<ProductId>(),
+    slug: text("slug").notNull().$type<Slug>(),
     name: text("name").notNull(),
     description: text("description").notNull(),
     priceCents: integer("price_cents").notNull(),
     stock: integer("stock").notNull().default(0),
     categoryId: uuid("category_id")
       .notNull()
-      .references(() => categories.id, { onDelete: "restrict" }),
+      .references(() => categories.id, { onDelete: "restrict" })
+      .$type<CategoryId>(),
     brandId: uuid("brand_id")
       .notNull()
-      .references(() => brands.id, { onDelete: "restrict" }),
+      .references(() => brands.id, { onDelete: "restrict" })
+      .$type<BrandId>(),
     weightGrams: integer("weight_grams").notNull(),
     widthMm: integer("width_mm").notNull(),
     heightMm: integer("height_mm").notNull(),
@@ -224,7 +239,8 @@ export const productProperties = pgTable(
   {
     productId: uuid("product_id")
       .notNull()
-      .references(() => products.id, { onDelete: "cascade" }),
+      .references(() => products.id, { onDelete: "cascade" })
+      .$type<ProductId>(),
     name: text("name").notNull(),
     value: text("value").notNull(),
   },
@@ -241,7 +257,8 @@ export const productImages = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     productId: uuid("product_id")
       .notNull()
-      .references(() => products.id, { onDelete: "cascade" }),
+      .references(() => products.id, { onDelete: "cascade" })
+      .$type<ProductId>(),
     /** The file's name under the media directory. */
     file: text("file").notNull(),
     alt: text("alt").notNull().default(""),
@@ -257,10 +274,12 @@ export const productReviews = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     productId: uuid("product_id")
       .notNull()
-      .references(() => products.id, { onDelete: "cascade" }),
+      .references(() => products.id, { onDelete: "cascade" })
+      .$type<ProductId>(),
     userId: uuid("user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" })
+      .$type<UserId>(),
     /** Whole stars, 1 to 5. */
     rating: smallint("rating").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -1,10 +1,11 @@
 /** Email bodies as pure functions: input in, message out, nothing sent. */
 
+import type { Email } from "@prism/shared";
 import type { OutboundEmail } from "../../platform/mailer.ts";
 
 export const PasswordResetEmail = {
   /** The URL is the only interpolation, and the caller percent-encodes it. */
-  compose: (input: { to: string; resetUrl: string; expiresInMinutes: number }): OutboundEmail => ({
+  compose: (input: { to: Email; resetUrl: string; expiresInMinutes: number }): OutboundEmail => ({
     to: input.to,
     subject: "Reset your Prism password",
     text: [

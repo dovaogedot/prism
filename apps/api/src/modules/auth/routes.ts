@@ -4,7 +4,9 @@
  */
 
 import {
+  ChallengeToken,
   ChangePasswordInput,
+  Email,
   ForgotPasswordInput,
   LoginInput,
   OAuthProvider,
@@ -19,7 +21,8 @@ import { z } from "zod";
 import { Cookies, type CookieOptions } from "../../http/cookies.ts";
 import { HttpErrors } from "../../http/errors.ts";
 import type { Guards } from "../../http/guard.ts";
-import { MockAuthorizationCode } from "../../platform/oauth.ts";
+import { AuthorizationCode, MockAuthorizationCode, OAuthState, RedirectUri } from "../../platform/oauth.ts";
+import { RefreshToken } from "../../platform/tokens.ts";
 import { MockConsentPage } from "./mock-consent.ts";
 import type { AuthService, IssuedSession, RequestContext } from "./service.ts";
 
@@ -56,8 +59,8 @@ export const AuthRoutes = {
     const moderate = { rateLimit: { max: deps.authRateLimitPerMinute * 3, timeWindow: "1 minute" } };
 
     const providerParams = z.object({ provider: OAuthProvider.schema });
-    const callbackUriFor = (provider: string): string =>
-      `${deps.publicWebOrigin}/api/v1/auth/oauth/${provider}/callback`;
+    const callbackUriFor = (provider: OAuthProvider): RedirectUri =>
+      RedirectUri.schema.parse(`${deps.publicWebOrigin}/api/v1/auth/oauth/${provider}/callback`);
 
     routes.post("/register", { config: strict, schema: { body: RegisterInput.schema } }, async (request, reply) => {
       const result = await service.register({ ...request.body, context: AuthRoutes.contextOf(request) });
@@ -85,7 +88,8 @@ export const AuthRoutes = {
       { config: strict, schema: { body: TwoFactorLoginInput.schema } },
       async (request, reply) => {
         // The body's token wins; the cookie is what the OAuth redirect leaves behind.
-        const challengeToken = request.body.challengeToken ?? request.cookies[Cookies.TWO_FACTOR];
+        const fromCookie = ChallengeToken.schema.safeParse(request.cookies[Cookies.TWO_FACTOR]);
+        const challengeToken = request.body.challengeToken ?? (fromCookie.success ? fromCookie.data : undefined);
 
         if (challengeToken === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
@@ -104,11 +108,11 @@ export const AuthRoutes = {
     );
 
     routes.post("/refresh", { config: moderate }, async (request, reply) => {
-      const presented = request.cookies[Cookies.REFRESH];
+      const presented = RefreshToken.schema.safeParse(request.cookies[Cookies.REFRESH]);
 
-      if (presented === undefined) return HttpErrors.send(reply, { _tag: "RefreshTokenInvalid" });
+      if (!presented.success) return HttpErrors.send(reply, { _tag: "RefreshTokenInvalid" });
 
-      const result = await service.refresh(presented);
+      const result = await service.refresh(presented.data);
 
       if (result.isErr()) {
         // The cookie is spent either way.
@@ -227,7 +231,7 @@ export const AuthRoutes = {
         config: moderate,
         schema: {
           params: providerParams,
-          querystring: z.object({ code: z.string().min(1).max(2048), state: z.string().min(1).max(512) }),
+          querystring: z.object({ code: AuthorizationCode.schema, state: OAuthState.schema }),
         },
       },
       async (request, reply) => {
@@ -269,7 +273,7 @@ export const AuthRoutes = {
       {
         schema: {
           params: providerParams,
-          querystring: z.object({ state: z.string().min(1).max(512), redirect_uri: z.string().min(1).max(2048) }),
+          querystring: z.object({ state: OAuthState.schema, redirect_uri: RedirectUri.schema }),
         },
       },
       async (request, reply) =>
@@ -289,9 +293,9 @@ export const AuthRoutes = {
         schema: {
           params: providerParams,
           body: z.object({
-            email: z.string().trim().toLowerCase().pipe(z.email().max(254)),
-            state: z.string().min(1).max(512),
-            redirect_uri: z.string().min(1).max(2048),
+            email: Email.schema,
+            state: OAuthState.schema,
+            redirect_uri: RedirectUri.schema,
           }),
         },
       },

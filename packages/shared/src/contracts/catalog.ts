@@ -8,9 +8,21 @@
 
 import { z } from "zod";
 
-/** A URL-safe identifier for a product, category or brand. */
+/** A URL-safe identifier for a product, category or brand. Only the schema makes one. */
+export type Slug = z.infer<typeof Slug.schema>;
 export const Slug = {
-  schema: z.string().trim().max(120).regex(/^[a-z0-9-]+$/, "Not a valid slug."),
+  schema: z
+    .string()
+    .trim()
+    .max(120)
+    .regex(/^[a-z0-9-]+$/, "Not a valid slug.")
+    .brand<"Slug">(),
+} as const;
+
+/** The identity of a product, as the database assigns it. */
+export type ProductId = z.infer<typeof ProductId.schema>;
+export const ProductId = {
+  schema: z.uuid().brand<"ProductId">(),
 } as const;
 
 /** The orders a result list can come in. */
@@ -62,8 +74,8 @@ export type PropertyFilter = Readonly<{ name: string; values: readonly string[] 
  */
 export type ProductQuery = Readonly<{
   text?: string;
-  category?: string;
-  brands: readonly string[];
+  category?: Slug;
+  brands: readonly Slug[];
   priceMinCents?: number;
   priceMaxCents?: number;
   minRating?: number;
@@ -140,10 +152,10 @@ export const SuggestParams = {
 } as const;
 
 /** One product a typed prefix could mean. */
-export type Suggestion = Readonly<{ slug: string; name: string }>;
+export type Suggestion = Readonly<{ slug: Slug; name: string }>;
 
 /** A name a product is filed under: a category or a brand. */
-export type Named = Readonly<{ slug: string; name: string }>;
+export type Named = Readonly<{ slug: Slug; name: string }>;
 
 /** How shoppers have rated a product. `average` is 0 while `count` is 0. */
 export type Rating = Readonly<{ average: number; count: number }>;
@@ -191,8 +203,8 @@ export const Price = {
 
 /** A product as a result list shows it. */
 export type ProductSummary = Readonly<{
-  id: string;
-  slug: string;
+  id: ProductId;
+  slug: Slug;
   name: string;
   priceCents: number;
   stock: number;

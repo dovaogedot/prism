@@ -20,5 +20,7 @@ RUN npm ci
 
 COPY packages ./packages
 COPY apps ./apps
+# The shared package the api imports, so the seed runs without a test run first.
+RUN npm run build
 
 CMD ["npm", "test"]

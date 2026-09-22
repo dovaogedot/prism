@@ -6,7 +6,19 @@
 
 import { z } from "zod";
 
+/**
+ * Every structured value here is opaque: only its schema makes one, so a
+ * string of the wrong kind, or an empty one, cannot stand in for it.
+ */
+
+/** The identity of an account, as the database assigns it. */
+export type UserId = z.infer<typeof UserId.schema>;
+export const UserId = {
+  schema: z.uuid().brand<"UserId">(),
+} as const;
+
 /** An email address, trimmed and lowercased so equality is string equality. */
+export type Email = z.infer<typeof Email.schema>;
 export const Email = {
   /** The longest address RFC 5321 allows. */
   MAX_LENGTH: 254,
@@ -14,7 +26,8 @@ export const Email = {
     .string()
     .trim()
     .toLowerCase()
-    .pipe(z.email("Enter a valid email address.").max(254)),
+    .pipe(z.email("Enter a valid email address.").max(254))
+    .brand<"Email">(),
 } as const;
 
 /**
@@ -49,8 +62,19 @@ export const Password = {
 };
 
 /** A six-digit authenticator code. */
+export type TotpCode = z.infer<typeof TotpCode.schema>;
 export const TotpCode = {
-  schema: z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit code from your authenticator app."),
+  schema: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "Enter the 6-digit code from your authenticator app.")
+    .brand<"TotpCode">(),
+} as const;
+
+/** What the CAPTCHA widget hands the page once the person passes it. */
+export type CaptchaToken = z.infer<typeof CaptchaToken.schema>;
+export const CaptchaToken = {
+  schema: z.string().min(1, "Complete the CAPTCHA to continue.").brand<"CaptchaToken">(),
 } as const;
 
 /** A validated `POST /auth/register` body. */
@@ -59,7 +83,7 @@ export const RegisterInput = {
   schema: z.object({
     email: Email.schema,
     password: Password.schema,
-    captchaToken: z.string().min(1, "Complete the CAPTCHA to continue."),
+    captchaToken: CaptchaToken.schema,
   }),
 } as const;
 
@@ -76,6 +100,24 @@ export const LoginInput = {
   }),
 } as const;
 
+/** The proof a challenged sign-in carries into its second step. */
+export type ChallengeToken = z.infer<typeof ChallengeToken.schema>;
+export const ChallengeToken = {
+  schema: z.string().min(1).brand<"ChallengeToken">(),
+} as const;
+
+/** The signed token every authenticated request carries. */
+export type AccessToken = z.infer<typeof AccessToken.schema>;
+export const AccessToken = {
+  schema: z.string().min(1).brand<"AccessToken">(),
+} as const;
+
+/** The secret in a password-reset link. */
+export type ResetToken = z.infer<typeof ResetToken.schema>;
+export const ResetToken = {
+  schema: z.string().min(1).brand<"ResetToken">(),
+} as const;
+
 /**
  * A validated second-factor body. The challenge arrives in the body after a
  * password sign-in, and in a short-lived httpOnly cookie after an OAuth
@@ -84,7 +126,7 @@ export const LoginInput = {
 export type TwoFactorLoginInput = z.infer<typeof TwoFactorLoginInput.schema>;
 export const TwoFactorLoginInput = {
   schema: z.object({
-    challengeToken: z.string().min(1).optional(),
+    challengeToken: ChallengeToken.schema.optional(),
     code: TotpCode.schema,
   }),
 } as const;
@@ -98,7 +140,7 @@ export const ForgotPasswordInput = {
 /** A validated `POST /auth/password/reset` body. */
 export type ResetPasswordInput = z.infer<typeof ResetPasswordInput.schema>;
 export const ResetPasswordInput = {
-  schema: z.object({ token: z.string().min(1), password: Password.schema }),
+  schema: z.object({ token: ResetToken.schema, password: Password.schema }),
 } as const;
 
 /**
@@ -179,13 +221,13 @@ export type AvailableProviders = Readonly<{
 
 /** Who is signed in, as every authenticated response reports it. */
 export type SessionUser = Readonly<{
-  id: string;
-  email: string;
+  id: UserId;
+  email: Email;
   twoFactorEnabled: boolean;
   /** Whether a password is set; an account without one signs in through a provider. */
   hasPassword: boolean;
   /** Linked providers, alphabetically. */
-  providers: readonly string[];
+  providers: readonly OAuthProvider[];
 }>;
 
 /**
@@ -193,7 +235,7 @@ export type SessionUser = Readonly<{
  * the browser and dies with the tab. The refresh cookie survives a reload.
  */
 export type AccessGrant = Readonly<{
-  accessToken: string;
+  accessToken: AccessToken;
   expiresInSeconds: number;
   user: SessionUser;
 }>;
@@ -201,7 +243,7 @@ export type AccessGrant = Readonly<{
 /** The sign-in outcome that asks for a second factor before granting anything. */
 export type TwoFactorChallenge = Readonly<{
   status: "two_factor_required";
-  challengeToken: string;
+  challengeToken: ChallengeToken;
 }>;
 
 /** Sign-in is two outcomes, so it is a tagged union rather than optional fields. */
@@ -209,10 +251,16 @@ export type LoginOutcome =
   | Readonly<{ status: "authenticated"; grant: AccessGrant }>
   | TwoFactorChallenge;
 
+/** The `otpauth://` URI an authenticator app enrolls from. */
+export type OtpauthUri = z.infer<typeof OtpauthUri.schema>;
+export const OtpauthUri = {
+  schema: z.string().startsWith("otpauth://").brand<"OtpauthUri">(),
+} as const;
+
 /** The secret being enrolled, in the two forms an authenticator app accepts. */
 export type TwoFactorSetup = Readonly<{
-  /** `otpauth://` URI for manual entry. */
-  uri: string;
+  /** For manual entry. */
+  uri: OtpauthUri;
   /** The same URI as an inline SVG QR code. */
   qrCodeSvg: string;
 }>;

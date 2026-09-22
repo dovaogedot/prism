@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ChallengeToken,
   Email,
   LoginInput,
   Password,
@@ -159,6 +160,13 @@ describe("LoginInput.schema", () => {
     expect(
       LoginInput.schema.safeParse({ email: "shopper@example.com", password: "" }).success,
     ).toBe(false);
+  });
+});
+
+describe("ChallengeToken.schema", () => {
+  it("takes any non-empty string and refuses an empty one", () => {
+    expect(ChallengeToken.schema.safeParse("t").success).toBe(true);
+    expect(ChallengeToken.schema.safeParse("").success).toBe(false);
   });
 });
 

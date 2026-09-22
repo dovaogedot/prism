@@ -4,12 +4,12 @@
  * account; supply a secret key and the same code path verifies for real.
  */
 
-import type { DomainError } from "@prism/shared";
+import type { CaptchaToken, DomainError } from "@prism/shared";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 
 /** Deciding whether a widget response came from a person. */
 export type CaptchaVerifier = Readonly<{
-  verify: (response: string, remoteIp: string) => ResultAsync<true, DomainError>;
+  verify: (response: CaptchaToken, remoteIp: string) => ResultAsync<true, DomainError>;
 }>;
 
 export const CaptchaVerifier = {

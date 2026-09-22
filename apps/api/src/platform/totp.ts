@@ -4,17 +4,25 @@
  * over still work; wider than that hands out replay windows.
  */
 
+import { OtpauthUri, type Email, type TotpCode } from "@prism/shared";
 import { generateSecret, generateURI, verifySync } from "otplib";
 import QRCode from "qrcode";
+import { z } from "zod";
 import type { Clock } from "./clock.ts";
+
+/** The secret an authenticator app and the server share. Only this service makes one. */
+export type TotpSecret = z.infer<typeof TotpSecret.schema>;
+export const TotpSecret = {
+  schema: z.string().min(1).brand<"TotpSecret">(),
+} as const;
 
 /** Enrolling a second factor, and checking the codes it produces. */
 export type TotpService = Readonly<{
-  generateSecret: () => string;
-  /** The `otpauth://` URI an authenticator app consumes. */
-  keyUri: (accountEmail: string, secret: string) => string;
-  verify: (secret: string, code: string) => boolean;
-  qrCodeSvg: (uri: string) => Promise<string>;
+  generateSecret: () => TotpSecret;
+  /** The URI an authenticator app consumes. */
+  keyUri: (accountEmail: Email, secret: TotpSecret) => OtpauthUri;
+  verify: (secret: TotpSecret, code: TotpCode) => boolean;
+  qrCodeSvg: (uri: OtpauthUri) => Promise<string>;
 }>;
 
 export const TotpService = {
@@ -23,17 +31,19 @@ export const TotpService = {
 
   /** Codes read against the injected clock. */
   create: (clock: Clock): TotpService => ({
-    generateSecret: () => generateSecret(),
+    generateSecret: () => TotpSecret.schema.parse(generateSecret()),
 
     keyUri: (accountEmail, secret) =>
-      generateURI({
-        strategy: "totp",
-        issuer: TotpService.ISSUER,
-        label: accountEmail,
-        secret,
-        period: TotpService.PERIOD_SECONDS,
-        digits: 6,
-      }),
+      OtpauthUri.schema.parse(
+        generateURI({
+          strategy: "totp",
+          issuer: TotpService.ISSUER,
+          label: accountEmail,
+          secret,
+          period: TotpService.PERIOD_SECONDS,
+          digits: 6,
+        }),
+      ),
 
     verify: (secret, code) =>
       verifySync({

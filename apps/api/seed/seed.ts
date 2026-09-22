@@ -12,6 +12,7 @@ import { copyFile, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { faker } from "@faker-js/faker";
+import { Email, Slug } from "@prism/shared";
 import { count } from "drizzle-orm";
 import { Database, type Database as Db } from "../src/db/client.ts";
 import {
@@ -32,7 +33,7 @@ export type SeedReport =
   | Readonly<{ _tag: "Present"; products: number }>;
 
 export const Seed = {
-  DEMO_EMAIL: "shopper@prism.test",
+  DEMO_EMAIL: Email.schema.parse("shopper@prism.test"),
   DEMO_PASSWORD: "correct horse battery staple",
   REVIEWER_COUNT: 10,
 
@@ -43,14 +44,14 @@ export const Seed = {
    * A URL-safe slug for a name, given a numeric suffix when `taken` already
    * holds it. The result is added to `taken`.
    */
-  slugOf: (name: string, taken: Set<string>): string => {
+  slugOf: (name: string, taken: Set<string>): Slug => {
     const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "item";
     let slug = base;
 
     for (let suffix = 2; taken.has(slug); suffix += 1) slug = `${base}-${suffix}`;
 
     taken.add(slug);
-    return slug;
+    return Slug.schema.parse(slug);
   },
 
   /** The catalog file, checked against its schema. */
@@ -71,7 +72,7 @@ export const Seed = {
       .values([
         { email: Seed.DEMO_EMAIL, passwordHash },
         ...Array.from({ length: Seed.REVIEWER_COUNT }, () => ({
-          email: faker.internet.email().toLowerCase(),
+          email: Email.schema.parse(faker.internet.email()),
           passwordHash,
         })),
       ])

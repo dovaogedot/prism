@@ -4,27 +4,39 @@
  */
 
 import { and, eq, getTableColumns, gt, isNull, sql } from "drizzle-orm";
-import type { DomainError, SessionUser } from "@prism/shared";
+import type { DomainError, Email, OAuthProvider, SessionUser, UserId } from "@prism/shared";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import type { Database } from "../../db/client.ts";
-import { oauthIdentities, passwordResetTokens, refreshTokens, sessions, users } from "../../db/schema.ts";
+import type { SessionId } from "../../db/ids.ts";
+import {
+  oauthIdentities,
+  passwordResetTokens,
+  refreshTokens,
+  sessions,
+  users,
+  type RevocationReason,
+} from "../../db/schema.ts";
+import type { PasswordHash } from "../../platform/hasher.ts";
+import type { ProviderSubject } from "../../platform/oauth.ts";
+import type { Digest } from "../../platform/tokens.ts";
+import type { TotpSecret } from "../../platform/totp.ts";
 
 /** An account as the rest of the module sees it. */
 export type UserRecord = Readonly<{
-  id: string;
-  email: string;
+  id: UserId;
+  email: Email;
   /** Left out for an account that only ever signed in through a provider. */
-  passwordHash?: string;
+  passwordHash?: PasswordHash;
   /** Present once setup begins; confirmed only when `totpEnabledAt` is set. */
-  totpSecret?: string;
+  totpSecret?: TotpSecret;
   totpEnabledAt?: Date;
   /** Every provider linked to this account, alphabetically. */
-  providers: readonly string[];
+  providers: readonly OAuthProvider[];
   createdAt: Date;
 }>;
 
 /** The row as the driver returns it, with the linked providers alongside. */
-type UserRow = typeof users.$inferSelect & Readonly<{ providers: readonly string[] }>;
+type UserRow = typeof users.$inferSelect & Readonly<{ providers: readonly OAuthProvider[] }>;
 
 export const UserRecord = {
   fromRow: (row: UserRow): UserRecord => ({
@@ -50,24 +62,21 @@ export const UserRecord = {
    * The record as it stands once `provider` has just been linked, in the
    * same alphabetical order the SQL produces.
    */
-  withProvider: (user: UserRecord, provider: string): UserRecord => ({
+  withProvider: (user: UserRecord, provider: OAuthProvider): UserRecord => ({
     ...user,
     providers: [...new Set([...user.providers, provider])].sort(),
   }),
 } as const;
 
 /** One sign-in, which is both the revocation unit and the refresh family. */
-export type SessionRecord = Readonly<{ id: string; userId: string; expiresAt: Date }>;
-
-/** Why a session ended, so an investigation can tell logout from attack. */
-export type RevocationReason = "logout" | "token_reuse" | "password_reset";
+export type SessionRecord = Readonly<{ id: SessionId; userId: UserId; expiresAt: Date }>;
 
 /**
  * The outcome of presenting a refresh token. A union rather than an
  * exception, because a replay must still COMMIT the revocation it performed.
  */
 export type RotationOutcome =
-  | Readonly<{ _tag: "Rotated"; userId: string; sessionId: string }>
+  | Readonly<{ _tag: "Rotated"; userId: UserId; sessionId: SessionId }>
   | Readonly<{ _tag: "Replayed" }>
   | Readonly<{ _tag: "Unknown" }>
   | Readonly<{ _tag: "SessionEnded" }>;
@@ -77,40 +86,40 @@ export type PasswordResetOutcome = Readonly<{ _tag: "Reset" }> | Readonly<{ _tag
 
 /** Every read and write the auth module makes against the database. */
 export type AuthRepository = Readonly<{
-  findUserByEmail: (email: string) => Promise<UserRecord | undefined>;
-  findUserById: (id: string) => Promise<UserRecord | undefined>;
-  findUserByOAuthIdentity: (provider: string, subject: string) => Promise<UserRecord | undefined>;
-  createUser: (input: { email: string; passwordHash?: string }) => ResultAsync<UserRecord, DomainError>;
-  linkOAuthIdentity: (input: { userId: string; provider: string; subject: string }) => Promise<void>;
-  setPasswordHash: (userId: string, passwordHash: string) => Promise<void>;
-  setTotpSecret: (userId: string, secret: string) => Promise<void>;
-  enableTotp: (userId: string, enabledAt: Date) => Promise<void>;
-  disableTotp: (userId: string) => Promise<void>;
+  findUserByEmail: (email: Email) => Promise<UserRecord | undefined>;
+  findUserById: (id: UserId) => Promise<UserRecord | undefined>;
+  findUserByOAuthIdentity: (provider: OAuthProvider, subject: ProviderSubject) => Promise<UserRecord | undefined>;
+  createUser: (input: { email: Email; passwordHash?: PasswordHash }) => ResultAsync<UserRecord, DomainError>;
+  linkOAuthIdentity: (input: { userId: UserId; provider: OAuthProvider; subject: ProviderSubject }) => Promise<void>;
+  setPasswordHash: (userId: UserId, passwordHash: PasswordHash) => Promise<void>;
+  setTotpSecret: (userId: UserId, secret: TotpSecret) => Promise<void>;
+  enableTotp: (userId: UserId, enabledAt: Date) => Promise<void>;
+  disableTotp: (userId: UserId) => Promise<void>;
   createSession: (input: {
-    userId: string;
+    userId: UserId;
     expiresAt: Date;
     userAgent: string;
     ipAddress: string;
-    refreshTokenDigest: string;
+    refreshTokenDigest: Digest;
     refreshExpiresAt: Date;
   }) => Promise<SessionRecord>;
   /** The guard's hot path: is this session still live? */
-  isSessionLive: (sessionId: string, now: Date) => Promise<boolean>;
-  revokeSession: (sessionId: string, reason: RevocationReason) => Promise<void>;
+  isSessionLive: (sessionId: SessionId, now: Date) => Promise<boolean>;
+  revokeSession: (sessionId: SessionId, reason: RevocationReason) => Promise<void>;
   rotateRefreshToken: (input: {
-    presentedDigest: string;
-    replacementDigest: string;
+    presentedDigest: Digest;
+    replacementDigest: Digest;
     now: Date;
     replacementExpiresAt: Date;
   }) => Promise<RotationOutcome>;
-  createPasswordResetToken: (input: { userId: string; digest: string; expiresAt: Date }) => Promise<void>;
+  createPasswordResetToken: (input: { userId: UserId; digest: Digest; expiresAt: Date }) => Promise<void>;
   /**
    * Spends a live, unused reset token, stores `passwordHash` on its user and
    * signs every session of that user out, as one transaction: all three
    * happen or none does. A token that is unknown, spent or expired changes
    * nothing.
    */
-  resetPassword: (input: { digest: string; passwordHash: string; now: Date }) => Promise<PasswordResetOutcome>;
+  resetPassword: (input: { digest: Digest; passwordHash: PasswordHash; now: Date }) => Promise<PasswordResetOutcome>;
 }>;
 
 export const AuthRepository = {
@@ -120,7 +129,7 @@ export const AuthRepository = {
    * because drizzle renders a column bare in a single-table select and
    * qualified in a join; the table alone renders the same in both.
    */
-  linkedProviders: sql<readonly string[]>`COALESCE(
+  linkedProviders: sql<readonly OAuthProvider[]>`COALESCE(
     (SELECT array_agg(DISTINCT link.provider ORDER BY link.provider)
      FROM oauth_identity link WHERE link.user_id = ${users}."id"),
     ARRAY[]::text[]

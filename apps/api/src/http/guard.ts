@@ -4,16 +4,17 @@
  * is still live, which makes revocation immediate.
  */
 
-import type { DomainError } from "@prism/shared";
+import type { DomainError, UserId } from "@prism/shared";
 import type { FastifyInstance, FastifyRequest, preHandlerHookHandler } from "fastify";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
+import type { SessionId } from "../db/ids.ts";
 import type { AuthRepository } from "../modules/auth/repository.ts";
 import type { Clock } from "../platform/clock.ts";
 import type { TokenService } from "../platform/tokens.ts";
 import { HttpErrors } from "./errors.ts";
 
 /** Who a request is from, once its token has been checked against a live session. */
-export type AuthenticatedUser = Readonly<{ id: string; sessionId: string }>;
+export type AuthenticatedUser = Readonly<{ id: UserId; sessionId: SessionId }>;
 
 declare module "fastify" {
   // The one place an interface is unavoidable: merging into Fastify's declaration.

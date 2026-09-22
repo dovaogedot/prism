@@ -5,11 +5,12 @@
  * account-enumeration oracle.
  */
 
+import type { Email } from "@prism/shared";
 import { createTransport } from "nodemailer";
 
 /** One message, carrying both bodies so a client can take either. */
 export type OutboundEmail = Readonly<{
-  to: string;
+  to: Email;
   subject: string;
   text: string;
   html: string;

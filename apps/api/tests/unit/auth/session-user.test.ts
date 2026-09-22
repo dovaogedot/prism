@@ -4,12 +4,18 @@
  * read before the identity row was written.
  */
 
+import { Email, UserId, type OAuthProvider } from "@prism/shared";
 import { describe, expect, it } from "vitest";
 import { UserRecord } from "../../../src/modules/auth/repository.ts";
+import { PasswordHash } from "../../../src/platform/hasher.ts";
+import { TotpSecret } from "../../../src/platform/totp.ts";
 
-const account = (providers: readonly string[]): UserRecord => ({
-  id: "00000000-0000-0000-0000-000000000001",
-  email: "a@example.com",
+const ID = UserId.schema.parse("11111111-1111-4111-8111-111111111111");
+const EMAIL = Email.schema.parse("a@example.com");
+
+const account = (providers: readonly OAuthProvider[]): UserRecord => ({
+  id: ID,
+  email: EMAIL,
   providers,
   createdAt: new Date(0),
 });
@@ -40,14 +46,14 @@ describe("UserRecord.toSessionUser", () => {
   it("reports the flags without either secret", () => {
     const user = UserRecord.toSessionUser({
       ...account(["google"]),
-      passwordHash: "hash",
-      totpSecret: "secret",
+      passwordHash: PasswordHash.schema.parse("hash"),
+      totpSecret: TotpSecret.schema.parse("secret"),
       totpEnabledAt: new Date(0),
     });
 
     expect(user).toEqual({
-      id: "00000000-0000-0000-0000-000000000001",
-      email: "a@example.com",
+      id: ID,
+      email: EMAIL,
       twoFactorEnabled: true,
       hasPassword: true,
       providers: ["google"],
@@ -56,8 +62,8 @@ describe("UserRecord.toSessionUser", () => {
 
   it("maps a null column to an absent field", () => {
     const record = UserRecord.fromRow({
-      id: "id",
-      email: "a@example.com",
+      id: ID,
+      email: EMAIL,
       passwordHash: null,
       totpSecret: null,
       totpEnabledAt: null,

@@ -5,7 +5,7 @@
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { OAuthProvider } from "@prism/shared";
+import { Email, OAuthProvider } from "@prism/shared";
 import { MockAuthorizationCode } from "../../src/platform/oauth.ts";
 import {
   cookieValue,
@@ -43,7 +43,7 @@ const signInWith = async (provider: string, email: string) => {
 
   const code = MockAuthorizationCode.issue(
     provider === "github" ? "github" : "google",
-    email,
+    Email.schema.parse(email),
     harness.config.tokens.secret,
   );
 
@@ -190,7 +190,7 @@ describe.each(OAuthProvider.NAMES)("signing in with %s", (provider) => {
   it("rejects a callback whose state does not match the cookie", async () => {
     const code = MockAuthorizationCode.issue(
       provider === "github" ? "github" : "google",
-      "forged@example.com",
+      Email.schema.parse("forged@example.com"),
       harness.config.tokens.secret,
     );
 
@@ -461,7 +461,7 @@ describe("provider isolation", () => {
     // Signed for GitHub, presented at Google's callback.
     const code = MockAuthorizationCode.issue(
       "github",
-      "crossover@example.com",
+      Email.schema.parse("crossover@example.com"),
       harness.config.tokens.secret,
     );
 

@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import { Email, Slug } from "@prism/shared";
 import { generateSync } from "otplib";
 import { App } from "../../src/app.ts";
 import { Config } from "../../src/config.ts";
@@ -27,7 +28,7 @@ import {
   users,
 } from "../../src/db/schema.ts";
 import { Clock, type MutableClock } from "../../src/platform/clock.ts";
-import type { Hasher } from "../../src/platform/hasher.ts";
+import { PasswordHash, type Hasher } from "../../src/platform/hasher.ts";
 import { Mailer, type MemoryMailer } from "../../src/platform/mailer.ts";
 import { TotpService } from "../../src/platform/totp.ts";
 
@@ -39,7 +40,7 @@ export const VALID_PASSWORD = "correct horse battery staple";
 
 /** Argon2 costs ~50 ms per call; this keeps the shape at no cost. */
 export const fastHasher: Hasher = {
-  hash: async (plaintext) => `fake:${Buffer.from(plaintext).toString("base64")}`,
+  hash: async (plaintext) => PasswordHash.schema.parse(`fake:${Buffer.from(plaintext).toString("base64")}`),
   verify: async (storedHash, plaintext) => storedHash === `fake:${Buffer.from(plaintext).toString("base64")}`,
   fakeVerify: async () => undefined,
 };
@@ -209,7 +210,7 @@ export type ProductSeed = Readonly<{
 }>;
 
 /** A slug for a name a test writes in words. */
-const slugOf = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+const slugOf = (name: string): Slug => Slug.schema.parse(name.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
 
 /** Plants the given products, creating whatever categories, brands and reviewers they name. */
 export const seedCatalog = async (harness: Harness, seeds: readonly ProductSeed[]): Promise<void> => {
@@ -232,7 +233,7 @@ export const seedCatalog = async (harness: Harness, seeds: readonly ProductSeed[
     const [product] = await db
       .insert(products)
       .values({
-        slug: seed.slug,
+        slug: Slug.schema.parse(seed.slug),
         name: seed.name,
         description: seed.description ?? `${seed.name} description`,
         priceCents: seed.priceCents,
@@ -260,7 +261,7 @@ export const seedCatalog = async (harness: Harness, seeds: readonly ProductSeed[
     for (const [index, rating] of (seed.ratings ?? []).entries()) {
       const [reviewer] = await db
         .insert(users)
-        .values({ email: `reviewer-${seed.slug}-${index}@example.com` })
+        .values({ email: Email.schema.parse(`reviewer-${seed.slug}-${index}@example.com`) })
         .returning({ id: users.id });
       if (reviewer === undefined) throw new Error("reviewer insert returned no row");
 

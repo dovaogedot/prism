@@ -7,8 +7,10 @@
 
 import { describe, expect, it } from "vitest";
 import { decodeJwt, decodeProtectedHeader, SignJWT } from "jose";
+import { UserId } from "@prism/shared";
+import { SessionId } from "../../../src/db/ids.ts";
 import { Clock } from "../../../src/platform/clock.ts";
-import { OpaqueToken, TokenService } from "../../../src/platform/tokens.ts";
+import { OpaqueToken, RefreshToken, TokenId, TokenService } from "../../../src/platform/tokens.ts";
 
 const SECRET = new TextEncoder().encode("a".repeat(64));
 const OTHER_SECRET = new TextEncoder().encode("b".repeat(64));
@@ -35,9 +37,9 @@ const build = (): Readonly<{
 };
 
 const claims = {
-  subject: "11111111-1111-4111-8111-111111111111",
-  sessionId: "22222222-2222-4222-8222-222222222222",
-  tokenId: "33333333-3333-4333-8333-333333333333",
+  subject: UserId.schema.parse("11111111-1111-4111-8111-111111111111"),
+  sessionId: SessionId.schema.parse("22222222-2222-4222-8222-222222222222"),
+  tokenId: TokenId.schema.parse("33333333-3333-4333-8333-333333333333"),
 } as const;
 
 describe("access token generation", () => {
@@ -231,7 +233,7 @@ describe("audience separation", () => {
 
 describe("opaque tokens", () => {
   it("returns a plaintext and its digest, which differ", () => {
-    const token = OpaqueToken.create();
+    const token = OpaqueToken.create(RefreshToken.schema);
 
     expect(token.plaintext).not.toBe(token.digest);
     expect(token.digest).toBe(OpaqueToken.digest(token.plaintext));
@@ -239,18 +241,18 @@ describe("opaque tokens", () => {
 
   it("is URL-safe, so it survives an email client", () => {
     for (let attempt = 0; attempt < 50; attempt += 1) {
-      expect(OpaqueToken.create().plaintext).toMatch(/^[A-Za-z0-9_-]+$/);
+      expect(OpaqueToken.create(RefreshToken.schema).plaintext).toMatch(/^[A-Za-z0-9_-]+$/);
     }
   });
 
   it("carries at least 256 bits of entropy", () => {
     // 32 bytes in base64url is 43 characters.
-    expect(OpaqueToken.create().plaintext.length).toBeGreaterThanOrEqual(43);
+    expect(OpaqueToken.create(RefreshToken.schema).plaintext.length).toBeGreaterThanOrEqual(43);
   });
 
   it("never repeats", () => {
     const seen = new Set(
-      Array.from({ length: 500 }, () => OpaqueToken.create().plaintext),
+      Array.from({ length: 500 }, () => OpaqueToken.create(RefreshToken.schema).plaintext),
     );
 
     expect(seen.size).toBe(500);

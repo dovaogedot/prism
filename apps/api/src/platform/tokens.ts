@@ -6,31 +6,57 @@
  * SHA-256 digests, so a database leak yields digests rather than credentials.
  */
 
-import { createHash, randomBytes } from "node:crypto";
-import type { DomainError } from "@prism/shared";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { AccessToken, ChallengeToken, UserId, type DomainError } from "@prism/shared";
 import { jwtVerify, SignJWT } from "jose";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
+import { z } from "zod";
+import { SessionId } from "../db/ids.ts";
 import type { Clock } from "./clock.ts";
+
+const tokenIdSchema = z.uuid().brand<"TokenId">();
+
+/** What tells one access token from every other. */
+export type TokenId = z.infer<typeof tokenIdSchema>;
+export const TokenId = {
+  schema: tokenIdSchema,
+  fresh: (): TokenId => tokenIdSchema.parse(randomUUID()),
+} as const;
+
+/** The form a refresh token is sent in. Only `OpaqueToken.create` makes one. */
+export type RefreshToken = z.infer<typeof RefreshToken.schema>;
+export const RefreshToken = {
+  schema: z.string().min(1).brand<"RefreshToken">(),
+} as const;
+
+/** The hex SHA-256 of an opaque token, which is the only form of it stored. */
+export type Digest = z.infer<typeof Digest.schema>;
+export const Digest = {
+  schema: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .brand<"Digest">(),
+} as const;
 
 /** What an access token asserts about the request carrying it. */
 export type AccessTokenClaims = Readonly<{
   /** The user. */
-  subject: string;
+  subject: UserId;
   /** The session, so revoking one row invalidates this token at once. */
-  sessionId: string;
+  sessionId: SessionId;
   /** Unique per token. */
-  tokenId: string;
+  tokenId: TokenId;
 }>;
 
 /** Who a two-factor challenge belongs to. It asserts nothing else. */
-export type ChallengeClaims = Readonly<{ subject: string }>;
+export type ChallengeClaims = Readonly<{ subject: UserId }>;
 
 /** Minting the two signed tokens, and reading them back. */
 export type TokenService = Readonly<{
-  issueAccessToken: (claims: AccessTokenClaims) => ResultAsync<string, DomainError>;
+  issueAccessToken: (claims: AccessTokenClaims) => ResultAsync<AccessToken, DomainError>;
   verifyAccessToken: (token: string) => ResultAsync<AccessTokenClaims, DomainError>;
   /** Proves "password accepted, 2FA still outstanding" without a database row. */
-  issueTwoFactorChallenge: (claims: ChallengeClaims) => ResultAsync<string, DomainError>;
+  issueTwoFactorChallenge: (claims: ChallengeClaims) => ResultAsync<ChallengeToken, DomainError>;
   verifyTwoFactorChallenge: (token: string) => ResultAsync<ChallengeClaims, DomainError>;
 }>;
 
@@ -42,6 +68,10 @@ export type TokenOptions = Readonly<{
   twoFactorChallengeTtlSeconds: number;
   clock: Clock;
 }>;
+
+/** The claims of each token as they travel in the JWT payload. */
+const accessPayload = z.object({ sub: UserId.schema, sid: SessionId.schema, jti: TokenId.schema });
+const challengePayload = z.object({ sub: UserId.schema });
 
 export const TokenService = {
   ALGORITHM: "HS256",
@@ -93,64 +123,60 @@ export const TokenService = {
         () => onInvalid,
       ).map((result) => result.payload);
 
-    const nonEmpty = (value: unknown): value is string =>
-      typeof value === "string" && value.length > 0;
-
     return {
       issueAccessToken: (claims) =>
         sign(TokenService.ACCESS_AUDIENCE, options.accessTtlSeconds, {
           sub: claims.subject,
           sid: claims.sessionId,
           jti: claims.tokenId,
-        }),
+        }).map((token) => AccessToken.schema.parse(token)),
 
       verifyAccessToken: (token) =>
-        verify(token, TokenService.ACCESS_AUDIENCE, { _tag: "AccessTokenInvalid" }).andThen(
-          (payload) => {
-            const subject = payload["sub"];
-            const sessionId = payload["sid"];
-            const tokenId = payload["jti"];
+        verify(token, TokenService.ACCESS_AUDIENCE, { _tag: "AccessTokenInvalid" }).andThen((payload) => {
+          // A valid signature is not a valid shape.
+          const claims = accessPayload.safeParse(payload);
 
-            // A valid signature is not a valid shape.
-            return nonEmpty(subject) && nonEmpty(sessionId) && nonEmpty(tokenId)
-              ? okAsync<AccessTokenClaims, DomainError>({ subject, sessionId, tokenId })
-              : errAsync<AccessTokenClaims, DomainError>({ _tag: "AccessTokenInvalid" });
-          },
-        ),
+          return claims.success
+            ? okAsync<AccessTokenClaims, DomainError>({
+                subject: claims.data.sub,
+                sessionId: claims.data.sid,
+                tokenId: claims.data.jti,
+              })
+            : errAsync<AccessTokenClaims, DomainError>({ _tag: "AccessTokenInvalid" });
+        }),
 
       issueTwoFactorChallenge: (claims) =>
         sign(TokenService.CHALLENGE_AUDIENCE, options.twoFactorChallengeTtlSeconds, {
           sub: claims.subject,
-        }),
+        }).map((token) => ChallengeToken.schema.parse(token)),
 
       verifyTwoFactorChallenge: (token) =>
-        verify(token, TokenService.CHALLENGE_AUDIENCE, { _tag: "TwoFactorCodeInvalid" }).andThen(
-          (payload) => {
-            const subject = payload["sub"];
-            return nonEmpty(subject)
-              ? okAsync<ChallengeClaims, DomainError>({ subject })
-              : errAsync<ChallengeClaims, DomainError>({ _tag: "TwoFactorCodeInvalid" });
-          },
-        ),
+        verify(token, TokenService.CHALLENGE_AUDIENCE, { _tag: "TwoFactorCodeInvalid" }).andThen((payload) => {
+          const claims = challengePayload.safeParse(payload);
+
+          return claims.success
+            ? okAsync<ChallengeClaims, DomainError>({ subject: claims.data.sub })
+            : errAsync<ChallengeClaims, DomainError>({ _tag: "TwoFactorCodeInvalid" });
+        }),
     };
   },
 } as const;
 
 /** A random credential in the form sent out and the form stored. */
-export type OpaqueToken = Readonly<{
+export type OpaqueToken<T extends string> = Readonly<{
   /** Sent to the user, never stored. */
-  plaintext: string;
+  plaintext: T;
   /** Stored, never sent. */
-  digest: string;
+  digest: Digest;
 }>;
 
 export const OpaqueToken = {
-  /** 256 bits of entropy, URL-safe so it survives an email client. */
-  create: (): OpaqueToken => {
-    const plaintext = randomBytes(32).toString("base64url");
+  /** 256 bits of entropy, URL-safe so it survives an email client, in the form `schema` names. */
+  create: <S extends z.ZodType<string>>(schema: S): OpaqueToken<z.output<S>> => {
+    const plaintext = schema.parse(randomBytes(32).toString("base64url"));
     return { plaintext, digest: OpaqueToken.digest(plaintext) };
   },
 
-  /** The hex SHA-256 of a token, which is the only form of it stored. */
-  digest: (plaintext: string): string => createHash("sha256").update(plaintext).digest("hex"),
+  digest: (plaintext: string): Digest =>
+    Digest.schema.parse(createHash("sha256").update(plaintext).digest("hex")),
 } as const;

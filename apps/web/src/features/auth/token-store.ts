@@ -8,10 +8,10 @@
  * it for a fresh access token on boot.
  */
 
-import type { SessionUser } from "@prism/shared";
+import type { AccessToken, SessionUser } from "@prism/shared";
 
 /** The token and the person it was granted to. */
-export type Held = Readonly<{ token: string; user: SessionUser }>;
+export type Held = Readonly<{ token: AccessToken; user: SessionUser }>;
 
 /** The one held grant and who wants to know when it changes. */
 const TokenState: { held: Held | undefined; readonly listeners: Set<() => void> } = {
@@ -26,11 +26,11 @@ const TokenState: { held: Held | undefined; readonly listeners: Set<() => void> 
  * reads this store rather than a copy of it.
  */
 export const TokenStore = {
-  get: (): string | undefined => TokenState.held?.token,
+  get: (): AccessToken | undefined => TokenState.held?.token,
 
   user: (): SessionUser | undefined => TokenState.held?.user,
 
-  set: (token: string, user: SessionUser): void => {
+  set: (token: AccessToken, user: SessionUser): void => {
     TokenState.held = { token, user };
     TokenStore.announce();
   },

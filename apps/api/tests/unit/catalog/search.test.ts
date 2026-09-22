@@ -3,13 +3,15 @@
  * has to show up as a parameter, never inside the statement.
  */
 
-import type { ProductQuery } from "@prism/shared";
+import { Slug, type ProductQuery } from "@prism/shared";
 import { and, sql, type SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 import { ProductSearch, type RatingColumns } from "../../../src/modules/catalog/search.ts";
 
 const dialect = new PgDialect();
+
+const slug = (value: string): Slug => Slug.schema.parse(value);
 
 /** The statement and its parameters, the way the driver would receive them. */
 const render = (fragment: SQL) => dialect.sqlToQuery(fragment);
@@ -75,8 +77,8 @@ describe("ProductSearch.conditions", () => {
   it("binds the category, brands, price bounds and rating", () => {
     const conditions = ProductSearch.conditions(
       query({
-        category: "lamps",
-        brands: ["acme", "globex"],
+        category: slug("lamps"),
+        brands: [slug("acme"), slug("globex")],
         priceMinCents: 100,
         priceMaxCents: 5000,
         minRating: 4,
@@ -88,7 +90,7 @@ describe("ProductSearch.conditions", () => {
   });
 
   it("leaves out the filter of the lifted facet", () => {
-    const full = query({ category: "lamps", brands: ["acme"], priceMinCents: 1, minRating: 2 });
+    const full = query({ category: slug("lamps"), brands: [slug("acme")], priceMinCents: 1, minRating: 2 });
 
     expect(render(and(...ProductSearch.conditions(full, rating, "brand")) ?? sql``).params).toEqual(["lamps", 1, 2]);
     expect(render(and(...ProductSearch.conditions(full, rating, "price")) ?? sql``).params).toEqual(["lamps", "acme", 2]);
@@ -112,7 +114,7 @@ describe("ProductSearch.conditions", () => {
 
 describe("ProductSearch.shelf and narrowing", () => {
   it("puts the text and category on the shelf and the rest in the narrowing", () => {
-    const full = query({ text: "lamp", category: "lamps", brands: ["acme"], minRating: 3 });
+    const full = query({ text: "lamp", category: slug("lamps"), brands: [slug("acme")], minRating: 3 });
 
     expect(render(and(...ProductSearch.shelf(full)) ?? sql``).params).toEqual(["lamp", "%lamp%", "lamps"]);
     expect(render(and(...ProductSearch.narrowing(full, rating)) ?? sql``).params).toEqual(["acme", 3]);
@@ -120,7 +122,7 @@ describe("ProductSearch.shelf and narrowing", () => {
 
   it("renders no conditions as a true filter", () => {
     expect(render(ProductSearch.filter([])).sql).toBe("true");
-    expect(render(ProductSearch.filter(ProductSearch.narrowing(query({ brands: ["acme"] }), rating))).params).toEqual(["acme"]);
+    expect(render(ProductSearch.filter(ProductSearch.narrowing(query({ brands: [slug("acme")] }), rating))).params).toEqual(["acme"]);
   });
 });
 

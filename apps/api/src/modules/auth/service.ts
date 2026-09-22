@@ -4,23 +4,36 @@
  * returns `ResultAsync<T, DomainError>`; nothing throws.
  */
 
-import { randomUUID } from "node:crypto";
-import type {
-  AccessGrant,
-  AvailableProviders,
-  DomainError,
-  LoginOutcome,
-  SessionUser,
-  TwoFactorChallenge,
-  TwoFactorSetup,
+import {
+  ResetToken,
+  type AccessGrant,
+  type AvailableProviders,
+  type CaptchaToken,
+  type ChallengeToken,
+  type DomainError,
+  type Email,
+  type LoginOutcome,
+  type OAuthProvider,
+  type SessionUser,
+  type TotpCode,
+  type TwoFactorChallenge,
+  type TwoFactorSetup,
+  type UserId,
 } from "@prism/shared";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
+import type { SessionId } from "../../db/ids.ts";
 import type { CaptchaVerifier } from "../../platform/captcha.ts";
 import { Clock } from "../../platform/clock.ts";
 import type { Hasher } from "../../platform/hasher.ts";
 import type { Mailer } from "../../platform/mailer.ts";
-import type { IdentityProviders } from "../../platform/oauth.ts";
-import { OpaqueToken, type TokenService } from "../../platform/tokens.ts";
+import {
+  OAuthState,
+  type AuthorizationCode,
+  type IdentityProviders,
+  type ProviderSubject,
+  type RedirectUri,
+} from "../../platform/oauth.ts";
+import { OpaqueToken, RefreshToken, TokenId, type TokenService } from "../../platform/tokens.ts";
 import type { TotpService } from "../../platform/totp.ts";
 import { PasswordResetEmail } from "./emails.ts";
 import { UserRecord, type AuthRepository } from "./repository.ts";
@@ -47,52 +60,52 @@ export type RequestContext = Readonly<{ userAgent: string; ipAddress: string }>;
 /** The refresh token travels in a cookie, so it leaves the service separately. */
 export type IssuedSession = Readonly<{
   grant: AccessGrant;
-  refreshToken: string;
+  refreshToken: RefreshToken;
   refreshExpiresAt: Date;
 }>;
 
 /** Everything an account can do, with every failure a `DomainError`. */
 export type AuthService = Readonly<{
   register: (input: {
-    email: string;
+    email: Email;
     password: string;
-    captchaToken: string;
+    captchaToken: CaptchaToken;
     context: RequestContext;
   }) => ResultAsync<IssuedSession, DomainError>;
   login: (input: {
-    email: string;
+    email: Email;
     password: string;
     context: RequestContext;
   }) => ResultAsync<LoginOutcome | IssuedSession, DomainError>;
   completeTwoFactorLogin: (input: {
-    challengeToken: string;
-    code: string;
+    challengeToken: ChallengeToken;
+    code: TotpCode;
     context: RequestContext;
   }) => ResultAsync<IssuedSession, DomainError>;
-  refresh: (presentedToken: string) => ResultAsync<IssuedSession, DomainError>;
-  logout: (sessionId: string) => ResultAsync<void, DomainError>;
-  currentUser: (userId: string) => ResultAsync<SessionUser, DomainError>;
+  refresh: (presentedToken: RefreshToken) => ResultAsync<IssuedSession, DomainError>;
+  logout: (sessionId: SessionId) => ResultAsync<void, DomainError>;
+  currentUser: (userId: UserId) => ResultAsync<SessionUser, DomainError>;
   /** Succeeds whether or not the address exists, so it is not an oracle. */
-  requestPasswordReset: (email: string) => ResultAsync<void, DomainError>;
+  requestPasswordReset: (email: Email) => ResultAsync<void, DomainError>;
   changePassword: (input: {
-    userId: string;
+    userId: UserId;
     currentPassword?: string;
     password: string;
   }) => ResultAsync<SessionUser, DomainError>;
-  resetPassword: (input: { token: string; password: string }) => ResultAsync<void, DomainError>;
-  beginTwoFactorSetup: (userId: string) => ResultAsync<TwoFactorSetup, DomainError>;
-  enableTwoFactor: (input: { userId: string; code: string }) => ResultAsync<SessionUser, DomainError>;
-  disableTwoFactor: (input: { userId: string; code: string }) => ResultAsync<SessionUser, DomainError>;
+  resetPassword: (input: { token: ResetToken; password: string }) => ResultAsync<void, DomainError>;
+  beginTwoFactorSetup: (userId: UserId) => ResultAsync<TwoFactorSetup, DomainError>;
+  enableTwoFactor: (input: { userId: UserId; code: TotpCode }) => ResultAsync<SessionUser, DomainError>;
+  disableTwoFactor: (input: { userId: UserId; code: TotpCode }) => ResultAsync<SessionUser, DomainError>;
   availableProviders: () => AvailableProviders;
   oauthAuthorizationUrl: (input: {
-    provider: string;
-    redirectUri: string;
-  }) => ResultAsync<Readonly<{ url: string; state: string }>, DomainError>;
+    provider: OAuthProvider;
+    redirectUri: RedirectUri;
+  }) => ResultAsync<Readonly<{ url: string; state: OAuthState }>, DomainError>;
   /** A challenge rather than a session when the account has a second factor. */
   completeOAuthLogin: (input: {
-    provider: string;
-    code: string;
-    redirectUri: string;
+    provider: OAuthProvider;
+    code: AuthorizationCode;
+    redirectUri: RedirectUri;
     context: RequestContext;
   }) => ResultAsync<TwoFactorChallenge | IssuedSession, DomainError>;
 }>;
@@ -101,19 +114,19 @@ export const AuthService = {
   create: (deps: AuthDependencies): AuthService => {
     const { repository, clock, hasher, tokens, totp, mailer, captcha, oauth } = deps;
 
-    const requireUser = (userId: string, missing: DomainError): ResultAsync<UserRecord, DomainError> =>
+    const requireUser = (userId: UserId, missing: DomainError): ResultAsync<UserRecord, DomainError> =>
       ResultAsync.fromSafePromise(repository.findUserById(userId)).andThen((found) =>
         found === undefined ? errAsync<UserRecord, DomainError>(missing) : okAsync<UserRecord, DomainError>(found),
       );
 
     const grantFor = (
       user: UserRecord,
-      sessionId: string,
-      refreshToken: string,
+      sessionId: SessionId,
+      refreshToken: RefreshToken,
       refreshExpiresAt: Date,
     ): ResultAsync<IssuedSession, DomainError> =>
       tokens
-        .issueAccessToken({ subject: user.id, sessionId, tokenId: randomUUID() })
+        .issueAccessToken({ subject: user.id, sessionId, tokenId: TokenId.fresh() })
         .map((accessToken) => ({
           grant: { accessToken, expiresInSeconds: deps.accessTtlSeconds, user: UserRecord.toSessionUser(user) },
           refreshToken,
@@ -122,7 +135,7 @@ export const AuthService = {
 
     /** Mints a session: one row, one opaque refresh token, one JWT. */
     const issueSession = (user: UserRecord, context: RequestContext): ResultAsync<IssuedSession, DomainError> => {
-      const refresh = OpaqueToken.create();
+      const refresh = OpaqueToken.create(RefreshToken.schema);
       const refreshExpiresAt = Clock.after(clock, deps.refreshTtlSeconds);
 
       return ResultAsync.fromSafePromise(
@@ -154,8 +167,8 @@ export const AuthService = {
 
     const linkAndSignIn = (
       user: UserRecord,
-      provider: string,
-      subject: string,
+      provider: OAuthProvider,
+      subject: ProviderSubject,
       context: RequestContext,
     ): ResultAsync<TwoFactorChallenge | IssuedSession, DomainError> =>
       ResultAsync.fromSafePromise(
@@ -203,7 +216,7 @@ export const AuthService = {
           }),
 
       refresh: (presentedToken) => {
-        const replacement = OpaqueToken.create();
+        const replacement = OpaqueToken.create(RefreshToken.schema);
         const replacementExpiresAt = Clock.after(clock, deps.refreshTtlSeconds);
 
         return ResultAsync.fromSafePromise(
@@ -238,7 +251,7 @@ export const AuthService = {
           repository.findUserByEmail(email).then(async (user) => {
             if (user === undefined) return;
 
-            const reset = OpaqueToken.create();
+            const reset = OpaqueToken.create(ResetToken.schema);
             const expiresAt = Clock.after(clock, deps.passwordResetTtlSeconds);
 
             await repository.createPasswordResetToken({ userId: user.id, digest: reset.digest, expiresAt });
@@ -355,12 +368,12 @@ export const AuthService = {
         const chosen = oauth.find(provider);
 
         if (chosen === undefined) {
-          return errAsync<{ url: string; state: string }, DomainError>({ _tag: "OAuthProviderUnknown" });
+          return errAsync<{ url: string; state: OAuthState }, DomainError>({ _tag: "OAuthProviderUnknown" });
         }
 
         // Kept in a cookie by the route and compared on the way back, so a
         // callback this browser did not start is rejected.
-        const state = OpaqueToken.create().plaintext;
+        const state = OpaqueToken.create(OAuthState.schema).plaintext;
 
         return okAsync({ url: chosen.authorizationUrl(state, redirectUri), state });
       },

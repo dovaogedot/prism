@@ -6,7 +6,10 @@
  * surviving the top-level navigation an OAuth redirect makes.
  */
 
+import type { ChallengeToken } from "@prism/shared";
 import type { FastifyReply } from "fastify";
+import type { OAuthState } from "../platform/oauth.ts";
+import type { RefreshToken } from "../platform/tokens.ts";
 
 /** Whether the connection is https, which decides the `Secure` attribute. */
 export type CookieOptions = Readonly<{ secure: boolean }>;
@@ -33,7 +36,7 @@ export const Cookies = {
   }),
 
   /** Puts a refresh token in the browser, expiring when the token does. */
-  setRefresh: (reply: FastifyReply, token: string, expiresAt: Date, options: CookieOptions): void => {
+  setRefresh: (reply: FastifyReply, token: RefreshToken, expiresAt: Date, options: CookieOptions): void => {
     reply.setCookie(Cookies.REFRESH, token, { ...Cookies.attributes(options), expires: expiresAt });
   },
 
@@ -42,7 +45,7 @@ export const Cookies = {
   },
 
   /** Keeps the state value for the length of one sign-in. */
-  setOAuthState: (reply: FastifyReply, state: string, options: CookieOptions): void => {
+  setOAuthState: (reply: FastifyReply, state: OAuthState, options: CookieOptions): void => {
     reply.setCookie(Cookies.OAUTH_STATE, state, { ...Cookies.attributes(options), maxAge: 600 });
   },
 
@@ -51,7 +54,7 @@ export const Cookies = {
   },
 
   /** Short-lived: the challenge itself expires, this only stops it lingering. */
-  setTwoFactor: (reply: FastifyReply, challengeToken: string, options: CookieOptions): void => {
+  setTwoFactor: (reply: FastifyReply, challengeToken: ChallengeToken, options: CookieOptions): void => {
     reply.setCookie(Cookies.TWO_FACTOR, challengeToken, {
       ...Cookies.attributes(options),
       maxAge: 600,
