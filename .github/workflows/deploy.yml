@@ -1,266 +1,248 @@
-# Build the two images, then tell a server to run them.
-#
-# Nothing here knows where it deploys. The host, the paths, the ports and the
-# public URL all arrive as repository variables and secrets, so pointing this
-# at a different machine is a settings change rather than a commit.
-#
-# Nothing is compiled on the server either. A box small enough to be cheap
-# runs this stack comfortably and cannot build it, so the runner builds both
-# images, pushes them to the registry tagged with the commit, and the deploy
-# step is a pull, a migration and an `up`. The tag is the commit SHA rather
-# than `latest`, so what is running is always traceable to one commit and a
-# rollback is one variable in the server's `.env`.
-#
-# The migrations run on their own before anything is replaced. If they fail,
-# or the runner refuses the database because a migration it applied was
-# edited afterward, the deploy stops there with the runner's output in the
-# log, and the version already running keeps serving.
+# Tests the shop, builds its two images, and restarts it on the VPS with them.
+name: Deploy # The name shown in the Actions tab.
 
-name: Deploy
+on: # The events that start this workflow.
+  push: # A push starts a deploy...
+    branches: [main] # ...but only a push to main.
+  workflow_dispatch: # Allows a manual run from the Actions tab.
+    inputs: # The choices a manual run offers.
+      rebuild_database: # The way on from a refused migration, like `./start.sh reset` on a laptop.
+        description: Rebuild the database from the migrations, deleting every account, product and review # The label beside the box.
+        type: boolean # A checkbox.
+        default: false # Unticked, so a manual run keeps the data.
 
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-    inputs:
-      # The way on from a refused migration, and the server's `./start.sh
-      # reset`: the database and the media volume are deleted, and the start
-      # builds an empty shop again from the migrations.
-      rebuild_database:
-        description: Rebuild the database from the migrations, deleting every account, product and review
-        type: boolean
-        default: false
+permissions: # The rights of each job's GITHUB_TOKEN, unless the job sets its own.
+  contents: read # Enough to check out the code; the token can change nothing.
 
-concurrency:
-  # A second push while a deploy is in flight waits for it rather than racing
-  # it onto the same server.
-  group: deploy-${{ github.ref }}
-  cancel-in-progress: false
+concurrency: # Keeps deploys from overlapping.
+  group: deploy # Every run joins the same group, so they run one at a time.
+  cancel-in-progress: false # A running deploy finishes; the next one waits.
 
-env:
-  # Images are named after the repository, so a fork publishes its own without
-  # editing anything.
-  API_IMAGE: ghcr.io/${{ github.repository }}-api
-  WEB_IMAGE: ghcr.io/${{ github.repository }}-web
+env: # Variables every job can read.
+  # Each image is named after the repository and tagged with the commit, so
+  # what the server runs traces back to one commit. A moving tag such as
+  # `latest` could name a different build by the time the server pulls it.
+  API_IMAGE: ghcr.io/${{ github.repository }}-api:${{ github.sha }} # The API; it also runs the migrations.
+  WEB_IMAGE: ghcr.io/${{ github.repository }}-web:${{ github.sha }} # The storefront, served by Caddy.
 
-jobs:
-  verify:
-    name: Typecheck and test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
+jobs: # The work this workflow does.
+  verify: # Typechecks and runs every test suite.
+    name: Typecheck and test # The name shown in the run's graph.
+    runs-on: ubuntu-latest # A fresh GitHub-hosted Linux machine with Docker, which the tests use.
+    steps: # The steps run in order; a failing step stops the job.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; a commit SHA cannot be moved like a tag.
+        with: # Settings for the checkout.
+          persist-credentials: false # Leaves no GitHub token in .git for later steps.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0; pinned the same way.
+        with: # Settings for Node.
+          node-version-file: .nvmrc # Uses the same Node version as local work.
+          cache: npm # Caches npm downloads between runs.
+      - run: npm ci # Installs exactly what package-lock.json lists.
+      - run: npm run build # Builds the shared package; both apps import its built output, so the typecheck needs it.
+      - run: npm run typecheck # Stops the deploy on a type error.
+      - run: npm test # Stops the deploy on a failing test; the integration and security suites start their own Postgres with Testcontainers.
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - run: npm ci
-
-      # The shared package is consumed as built output, so it has to exist
-      # before anything that imports it can be typechecked.
-      - run: npm run build
-
-      - run: npm run typecheck
-
-      # Every suite: unit, API integration and security. The integration and
-      # security suites start their own Postgres through Testcontainers, on
-      # the runner's Docker.
-      - run: npm test
-
-  # Runs alongside the tests: an image nobody deploys costs a minute of
-  # runner time, and waiting for the tests first would cost that minute on
-  # every deploy instead.
-  build:
-    name: Build and push images
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: docker/setup-buildx-action@v4
-
-      - uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push the API image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: apps/api/Dockerfile
-          push: true
-          tags: ${{ env.API_IMAGE }}:${{ github.sha }}
-
-      # The site key is read by Vite at build time, so it is baked into this
-      # image rather than set on the server. Supply one and the real widget
-      # ships; leave it out and the build falls back to Google's public
-      # always-pass test key, as the local stack does.
-      - name: Build and push the web image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: apps/web/Dockerfile
-          push: true
-          tags: ${{ env.WEB_IMAGE }}:${{ github.sha }}
-          build-args: |
+  # The VPS is too small to build the images, so this job builds them and the
+  # server only pulls. It runs beside the tests rather than after them: an
+  # image of a failing commit is never deployed, and waiting for the tests
+  # would add the build time to every deploy.
+  build: # Builds both images and pushes them to the registry.
+    name: Build and push images # The name shown in the run's graph.
+    runs-on: ubuntu-latest # A fresh GitHub-hosted Linux machine with Docker.
+    environment: production # Runs only on main, the one branch this environment allows, and reads its secrets.
+    permissions: # This job's rights, in place of the ones above.
+      contents: read # Enough to check out the code.
+      packages: write # Pushes the images to this repository's registry.
+    steps: # The steps run in order; a failing step stops the job.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; pinned the same way.
+        with: # Settings for the checkout.
+          persist-credentials: false # Leaves no GitHub token in .git for later steps.
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1; pinned the same way.
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0; pinned the same way.
+        with: # Settings for the sign-in.
+          registry: ghcr.io # The GitHub container registry.
+          username: ${{ github.actor }} # The account that started the run.
+          password: ${{ secrets.GITHUB_TOKEN }} # This job's token; it expires with the job.
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0; pinned the same way.
+        with: # Settings for the API image.
+          context: . # The checkout, less what .dockerignore leaves out.
+          file: apps/api/Dockerfile # The recipe for the API image.
+          push: true # Pushes the image once it is built.
+          tags: ${{ env.API_IMAGE }} # The name and commit tag from the top of this file.
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0; pinned the same way.
+        with: # Settings for the storefront image.
+          context: . # The checkout, less what .dockerignore leaves out.
+          file: apps/web/Dockerfile # The recipe for the storefront image.
+          push: true # Pushes the image once it is built.
+          tags: ${{ env.WEB_IMAGE }} # The name and commit tag from the top of this file.
+          # Vite reads the site key at build time, so the key is part of the
+          # image. Empty, the build uses Google's always-pass test key.
+          build-args: | # Build-time values, one per line.
             VITE_RECAPTCHA_SITE_KEY=${{ secrets.RECAPTCHA_SITE_KEY }}
 
-  deploy:
-    name: Pull and restart on the server
-    needs: [verify, build]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: read
-    env:
-      SSH_TARGET: ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
-      # Where the compose files and the generated .env live on the server.
-      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '~/prism' }}
-      WEB_PORT: ${{ vars.WEB_PORT || '8090' }}
-      MAILPIT_PORT: ${{ vars.MAILPIT_PORT || '8026' }}
-    steps:
-      - uses: actions/checkout@v7
+  deploy: # Sends the settings to the VPS and restarts the shop on the new images.
+    name: Pull and restart on the server # The name shown in the run's graph.
+    needs: [verify, build] # Starts only when the tests pass and both images are in the registry.
+    runs-on: ubuntu-latest # A fresh GitHub-hosted Linux machine with ssh and scp.
+    environment: production # Runs only on main, the one branch this environment allows, and reads its secrets.
+    permissions: # This job's rights, in place of the ones above.
+      contents: read # Enough to check out the code.
+      packages: read # Lets the server pull the images with this job's token.
+    env: # Variables every step can read.
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }} # The folder with the compose files and .env: absolute, or relative to the user's home without a leading ~.
+      WEB_PORT: ${{ vars.WEB_PORT || '8090' }} # The loopback port the reverse proxy forwards the site to.
+    steps: # The steps run in order; a failing step stops the job.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; pinned the same way.
+        with: # Settings for the checkout.
+          persist-credentials: false # Leaves no GitHub token in .git for later steps.
 
-      # One connection serves every step below: the first ssh opens it and
-      # the rest ride on it instead of each doing its own handshake.
-      - name: Open an SSH connection to the server
-        env:
-          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          HOST: ${{ secrets.DEPLOY_HOST }}
-        run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "$KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          printf 'Host *\n  ControlMaster auto\n  ControlPath ~/.ssh/control-%%C\n  ControlPersist 10m\n' > ~/.ssh/config
+      - name: Configure SSH # Prepares the key, the host key and a host alias.
+        env: # Secrets reach the shell as variables, never pasted into the script.
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }} # The server's IP address or name.
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }} # The SSH port; may be unset.
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }} # The user that runs the stack; it needs the docker group.
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }} # The private key that user accepts.
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }} # The server's pinned host key line.
+        run: | # A bash script.
+          install -d -m 700 ~/.ssh # ssh refuses a key directory that others can read.
+          install -m 600 /dev/null ~/.ssh/deploy_key # Creates the key file private before anything is written to it.
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key # Writes the key; the trailing newline is required.
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts # The only host key this job trusts.
+          # "host" becomes a name that ssh and scp both resolve to the server.
+          cat > ~/.ssh/config <<EOF
+          Host host
+            HostName $DEPLOY_HOST
+            Port ${DEPLOY_PORT:-22}
+            User $DEPLOY_USER
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            BatchMode yes
+            ControlMaster auto
+            ControlPath ~/.ssh/cm-%C
+            ControlPersist 2m
+          EOF
+          # The lines above: the server's address, port (22 when unset) and
+          # user; the key to use, and no other key; refuse any host key not in
+          # known_hosts; fail rather than prompt; and share one connection
+          # among the ssh and scp calls below, kept open for two minutes.
 
-      - name: Send the compose files
-        run: |
-          ssh -i ~/.ssh/id_deploy "$SSH_TARGET" "mkdir -p $DEPLOY_PATH"
-          scp -i ~/.ssh/id_deploy docker-compose.yml docker-compose.prod.yml \
-            "$SSH_TARGET:$DEPLOY_PATH/"
+      - name: Upload the settings # Sends the compose files, and writes the server's .env from this repository's settings.
+        env: # Secrets reach the shell as variables, never pasted into the script. Each name is also its name in .env.
+          COMPOSE_FILE: docker-compose.yml:docker-compose.prod.yml # Makes every `docker compose` in that folder, by hand too, apply the production overlay.
+          MAILPIT_PORT: ${{ vars.MAILPIT_PORT || '8026' }} # The loopback port of the reset-mail inbox.
+          PUBLIC_WEB_URL: ${{ vars.PUBLIC_WEB_URL }} # The address people type; reset links and OAuth redirects are built from it.
+          MAIL_FROM: ${{ vars.MAIL_FROM || 'Prism <noreply@localhost>' }} # The sender of reset mail.
+          AUTH_RATE_LIMIT_PER_MINUTE: ${{ vars.AUTH_RATE_LIMIT_PER_MINUTE || '60' }} # Requests per address per minute on /auth/*.
+          LOG_LEVEL: info # The lowest level the API logs.
+          JWT_SECRET: ${{ secrets.JWT_SECRET }} # Signs the sessions.
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }} # Read only when the database is first created.
+          RECAPTCHA_SECRET_KEY: ${{ secrets.RECAPTCHA_SECRET_KEY }} # Set, the API checks each CAPTCHA with Google.
+          OAUTH_GOOGLE_CLIENT_ID: ${{ secrets.OAUTH_GOOGLE_CLIENT_ID }} # Set with its secret, Google sign-in is real.
+          OAUTH_GOOGLE_CLIENT_SECRET: ${{ secrets.OAUTH_GOOGLE_CLIENT_SECRET }} # The other half of Google's pair.
+          OAUTH_GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }} # Set with its secret, GitHub sign-in is real.
+          OAUTH_GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }} # The other half of GitHub's pair.
+        run: | # A bash script.
+          # Stops before the server is touched when a value with no safe
+          # default is missing. An empty POSTGRES_PASSWORD would fall back to
+          # the public local one, and a wrong PUBLIC_WEB_URL breaks every
+          # reset link and OAuth redirect.
+          for name in DEPLOY_PATH PUBLIC_WEB_URL JWT_SECRET POSTGRES_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "$name is not set." >&2
+              exit 1
+            fi
+          done
 
-      # Written fresh every deploy, so the repository's settings are the only
-      # place these values are edited. There is no mode to set: supplying a
-      # CAPTCHA or OAuth credential is what turns that path on, and leaving it
-      # out is what leaves the built-in offline stand-in answering, exactly as
-      # on a laptop.
-      #
-      # Values are written by printf from the environment rather than
-      # interpolated into the heredoc, so a secret containing a quote, a
-      # newline or a `$` cannot break the file or the shell.
-      - name: Write the environment
-        env:
-          PUBLIC_WEB_URL: ${{ vars.PUBLIC_WEB_URL }}
-          MAIL_FROM: ${{ vars.MAIL_FROM || 'Prism <noreply@localhost>' }}
-          AUTH_RATE_LIMIT_PER_MINUTE: ${{ vars.AUTH_RATE_LIMIT_PER_MINUTE || '60' }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          RECAPTCHA_SECRET_KEY: ${{ secrets.RECAPTCHA_SECRET_KEY }}
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          OAUTH_GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
-          OAUTH_GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
-        run: |
-          set -euo pipefail
-          umask 077
+          # Builds the .env text, one NAME='value' line per setting. Compose
+          # reads a single-quoted value literally, so a `$`, `#` or space in a
+          # secret stays as it is. A single quote or a line break cannot be
+          # written that way, so either one stops the deploy.
+          settings=''
+          for name in COMPOSE_FILE API_IMAGE WEB_IMAGE WEB_PORT MAILPIT_PORT PUBLIC_WEB_URL MAIL_FROM \
+            AUTH_RATE_LIMIT_PER_MINUTE LOG_LEVEL JWT_SECRET POSTGRES_PASSWORD RECAPTCHA_SECRET_KEY \
+            OAUTH_GOOGLE_CLIENT_ID OAUTH_GOOGLE_CLIENT_SECRET OAUTH_GITHUB_CLIENT_ID OAUTH_GITHUB_CLIENT_SECRET; do
+            value=${!name} # The value of the variable with that name.
+            if [[ $value == *"'"* || $value == *$'\n'* ]]; then
+              echo "$name holds a single quote or a line break, which a .env line cannot carry." >&2
+              exit 1
+            fi
+            settings+="$name='$value'"$'\n'
+          done
 
-          if [ -z "$PUBLIC_WEB_URL" ]; then
-            echo "PUBLIC_WEB_URL is not set. Password-reset links and OAuth" >&2
-            echo "redirects are built from it, so it has no safe default." >&2
-            exit 1
-          fi
+          ssh host "mkdir -p '$DEPLOY_PATH'" # Creates the folder on the first deploy.
+          scp docker-compose.yml docker-compose.prod.yml "host:$DEPLOY_PATH/" # The compose files of this commit.
+          printf '%s' "$settings" | ssh host "umask 077 && cat > '$DEPLOY_PATH/.env.new' && mv -f '$DEPLOY_PATH/.env.new' '$DEPLOY_PATH/.env'"
+          # The last line: the secrets travel on stdin, so they appear in no
+          # command line and in no file on this machine. umask 077 creates
+          # the file readable by its owner alone, and mv swaps it in whole, so
+          # no one ever reads an open or half-written .env.
 
-          {
-            printf 'API_IMAGE=%s\n' "${{ env.API_IMAGE }}:${{ github.sha }}"
-            printf 'WEB_IMAGE=%s\n' "${{ env.WEB_IMAGE }}:${{ github.sha }}"
-            printf 'WEB_PORT=%s\n' "$WEB_PORT"
-            printf 'MAILPIT_PORT=%s\n' "$MAILPIT_PORT"
-            printf 'PUBLIC_WEB_URL=%s\n' "$PUBLIC_WEB_URL"
-            printf 'MAIL_FROM=%s\n' "$MAIL_FROM"
-            printf 'AUTH_RATE_LIMIT_PER_MINUTE=%s\n' "$AUTH_RATE_LIMIT_PER_MINUTE"
-            printf 'LOG_LEVEL=%s\n' 'info'
-            printf 'JWT_SECRET=%s\n' "$JWT_SECRET"
-            printf 'POSTGRES_PASSWORD=%s\n' "$POSTGRES_PASSWORD"
-            printf 'RECAPTCHA_SECRET_KEY=%s\n' "$RECAPTCHA_SECRET_KEY"
-            printf 'OAUTH_GOOGLE_CLIENT_ID=%s\n' "$GOOGLE_CLIENT_ID"
-            printf 'OAUTH_GOOGLE_CLIENT_SECRET=%s\n' "$GOOGLE_CLIENT_SECRET"
-            printf 'OAUTH_GITHUB_CLIENT_ID=%s\n' "$OAUTH_GITHUB_CLIENT_ID"
-            printf 'OAUTH_GITHUB_CLIENT_SECRET=%s\n' "$OAUTH_GITHUB_CLIENT_SECRET"
-          } > deploy.env
+      - name: Sign the server in to the registry # Lets the server pull the private images.
+        id: login # Named, so the sign-out below can tell whether this ran.
+        env: # The only secret this step needs.
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This job's token: it can read packages and expires with the job.
+        run: | # A bash script.
+          # The token travels on stdin; in the command it would show in the
+          # server's process list.
+          printf '%s\n' "$REGISTRY_TOKEN" | ssh host "docker login ghcr.io --username '$GITHUB_ACTOR' --password-stdin"
 
-          scp -i ~/.ssh/id_deploy deploy.env "$SSH_TARGET:$DEPLOY_PATH/.env"
-          ssh -i ~/.ssh/id_deploy "$SSH_TARGET" "chmod 600 $DEPLOY_PATH/.env"
-          rm -f deploy.env
+      - name: Pull the images # Downloads both images while the running shop keeps serving.
+        run: ssh host "cd '$DEPLOY_PATH' && docker compose pull --quiet" # COMPOSE_FILE in .env adds the production overlay.
 
-      # The job's own token is enough to pull and it expires with the job, so
-      # no long-lived registry credential has to live on the server. It travels
-      # on stdin rather than in the command, which would put it in that host's
-      # process list.
-      - name: Sign in to the registry from the server
-        env:
-          TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ACTOR: ${{ github.actor }}
-        run: |
-          printf '%s' "$TOKEN" | ssh -i ~/.ssh/id_deploy "$SSH_TARGET" \
-            "docker login ghcr.io -u '$ACTOR' --password-stdin"
+      - name: Delete the database # Only a manual run with the box ticked gets here.
+        if: github.event_name == 'workflow_dispatch' && inputs.rebuild_database # The box from the top of this file.
+        run: ssh host "cd '$DEPLOY_PATH' && docker compose down --volumes" # Removes the stack and its volumes, so the next step starts from an empty database.
 
-      - name: Pull the images
-        run: |
-          ssh -i ~/.ssh/id_deploy "$SSH_TARGET" "
-            set -eu
-            cd $DEPLOY_PATH
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull --quiet"
+      - name: Migrate and start # Applies the migrations, then replaces the running containers.
+        run: | # A bash script.
+          # Runs the script below on the server, passing the folder as $1.
+          # The quoted 'EOF' stops this machine from expanding anything in it.
+          ssh host sh -s -- "'$DEPLOY_PATH'" <<'EOF'
+          set -eu
+          cd "$1"
+          docker compose run --rm -T migrate
+          docker compose up -d --remove-orphans
+          EOF
+          # The server script, line by line:
+          # - set -eu: stop at the first failing command or unset variable,
+          #   so a refused migration never reaches `up`.
+          # - cd: work inside the folder, where .env names the compose files.
+          # - run migrate: the migration runs alone first and attached, so its
+          #   output lands in this log, and a failure stops the deploy while
+          #   the running version keeps serving. -T gives it no terminal.
+          # - up: replaces every container whose image or settings changed.
+          #   It runs the migration again as the API's dependency, which
+          #   finds nothing left to do. --remove-orphans stops containers of
+          #   services that the compose files no longer have.
 
-      # Takes the stack down with its volumes, so the start below creates an
-      # empty database and migrates it. Only a run started by hand
-      # with the box ticked gets here.
-      - name: Delete the database
-        if: github.event_name == 'workflow_dispatch' && inputs.rebuild_database
-        run: |
-          ssh -i ~/.ssh/id_deploy "$SSH_TARGET" "
-            set -eu
-            cd $DEPLOY_PATH
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml down --volumes"
+      - name: Sign the server out of the registry # Deletes the token from the server's disk.
+        if: always() && steps.login.outcome == 'success' # Runs after a failure too, once the sign-in has happened.
+        run: ssh host docker logout ghcr.io # The token dies with the job anyway; this removes the copy sooner.
 
-      # The migration runs by itself first, attached, so its output lands in
-      # this log and a failure stops the deploy before any running container
-      # is replaced. `up` runs it again as the api's dependency and it finds
-      # nothing left to do.
-      - name: Migrate and start
-        run: |
-          ssh -i ~/.ssh/id_deploy "$SSH_TARGET" "
-            set -eu
-            cd $DEPLOY_PATH
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm -T migrate
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
-            docker logout ghcr.io"
+      - name: Wait for the storefront to answer # Fails the deploy when the new version does not come up.
+        run: | # A bash script.
+          # Runs the script below on the server, passing the folder and the
+          # storefront's port as $1 and $2.
+          ssh host sh -s -- "'$DEPLOY_PATH'" "$WEB_PORT" <<'EOF'
+          set -eu
+          for attempt in $(seq 1 60); do
+            if curl -fsS -o /dev/null "http://127.0.0.1:$2/api/v1/health"; then
+              echo "healthy after ${attempt}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo 'the stack did not become healthy' >&2
+          cd "$1"
+          docker compose ps
+          docker compose logs --tail 60 api web
+          exit 1
+          EOF
+          # The server script asks the health route through the storefront
+          # once a second for up to a minute, which checks Caddy and the API
+          # together. When no answer comes, it prints the state of the
+          # containers and their last log lines here, then fails.
 
-      - name: Wait for the storefront to answer
-        run: |
-          ssh -i ~/.ssh/id_deploy "$SSH_TARGET" "
-            set -eu
-            for attempt in \$(seq 1 60); do
-              if curl -fsS -o /dev/null http://127.0.0.1:$WEB_PORT/api/v1/health; then
-                echo \"healthy after \${attempt}s\"
-                exit 0
-              fi
-              sleep 1
-            done
-            echo 'the stack did not become healthy' >&2
-            cd $DEPLOY_PATH
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail 60 api web
-            exit 1"
-
-      # One image per commit accumulates quickly on a small disk.
-      - name: Drop images no container is using
-        if: success()
-        run: |
-          ssh -i ~/.ssh/id_deploy "$SSH_TARGET" \
-            'docker image prune -af --filter "until=168h" >/dev/null && echo pruned'
+      - name: Drop images no container uses # Keeps a small disk from filling with an image pair per commit.
+        run: ssh host 'docker image prune --all --force --filter "until=168h" > /dev/null' # Removes each unused image built more than a week ago.

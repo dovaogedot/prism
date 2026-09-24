@@ -285,4 +285,5 @@ with real Google or GitHub keys, and 2FA enrollment with a phone app.
 `.github/workflows/deploy.yml` typechecks, runs every test suite, builds both images, pushes
 them to the GitHub container registry, and restarts the stack on a server over SSH with
 `docker-compose.prod.yml` over `docker-compose.yml`. The host, ports, public URL and
-credentials are repository variables and secrets; `.env.example` lists them.
+credentials are secrets and variables of the repository's `production` environment, which
+only `main` can deploy to; `.env.example` lists them.
