@@ -201,7 +201,7 @@ jobs: # The work this workflow does.
           ssh host sh -s -- "'$DEPLOY_PATH'" <<'EOF'
           set -eu
           cd "$1"
-          docker compose run --rm -T migrate
+          docker compose run --rm -T migrate < /dev/null
           docker compose up -d --remove-orphans
           EOF
           # The server script, line by line:
@@ -211,6 +211,9 @@ jobs: # The work this workflow does.
           # - run migrate: the migration runs alone first and attached, so its
           #   output lands in this log, and a failure stops the deploy while
           #   the running version keeps serving. -T gives it no terminal.
+          #   `run` keeps stdin open, and stdin is this script: without
+          #   < /dev/null it reads the lines below as its own input, and the
+          #   shell reaches the end with `up` never run.
           # - up: replaces every container whose image or settings changed.
           #   It runs the migration again as the API's dependency, which
           #   finds nothing left to do. --remove-orphans stops containers of
