@@ -286,4 +286,7 @@ with real Google or GitHub keys, and 2FA enrollment with a phone app.
 them to the GitHub container registry, and restarts the stack on a server over SSH with
 `docker-compose.prod.yml` over `docker-compose.yml`. The host, ports, public URL and
 credentials are secrets and variables of the repository's `production` environment, which
-only `main` can deploy to; `.env.example` lists them.
+only `main` can deploy to; `.env.example` lists them. A Deploy run started by hand from the
+Actions tab offers a box that rebuilds the database from the migrations, deleting every
+account, product and review. `.github/workflows/seed.yml`, also started by hand, seeds an
+empty catalog in the running shop without a deploy.

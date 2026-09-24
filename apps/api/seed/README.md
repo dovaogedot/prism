@@ -2,7 +2,8 @@
 
 Placeholder data for the shop. The application never imports from this folder, and the
 stack starts without it. `./start.sh` runs the seed once the shop is up, and `./start.sh seed`
-(`.\start.cmd seed` on Windows) runs it alone.
+(`.\start.cmd seed` on Windows) runs it alone. On the server, the Seed workflow runs it,
+started by hand from the Actions tab.
 
 | Path | What it is |
 | --- | --- |

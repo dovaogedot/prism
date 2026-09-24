@@ -1,0 +1,85 @@
+# Plants the placeholder catalog into the shop running on the VPS, without a deploy.
+name: Seed # The name shown in the Actions tab.
+
+on: # The events that start this workflow.
+  workflow_dispatch: # Only a manual run from the Actions tab.
+
+permissions: # The rights of the job's GITHUB_TOKEN.
+  contents: read # Enough to check out the code; the token can change nothing.
+
+concurrency: # Keeps a seed and a deploy from overlapping.
+  group: deploy # The deploy's group, so each waits for the other to finish.
+  cancel-in-progress: false # A running one finishes; the next one waits.
+
+jobs: # The work this workflow does.
+  seed: # The only job: copy the data over, then plant it.
+    runs-on: ubuntu-latest # A fresh GitHub-hosted Linux machine with ssh, tar and unzip.
+    environment: production # Runs only on main, the one branch this environment allows, and reads its secrets.
+    env: # Variables every step can read.
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }} # The folder with the compose files and .env: absolute, or relative to the user's home without a leading ~.
+    steps: # The steps run in order; a failing step stops the job.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; a commit SHA cannot be moved like a tag.
+        with: # Settings for the checkout.
+          persist-credentials: false # Leaves no GitHub token in .git for later steps.
+
+      - name: Configure SSH # Prepares the key, the host key and a host alias.
+        env: # Secrets reach the shell as variables, never pasted into the script.
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }} # The server's IP address or name.
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }} # The SSH port; may be unset.
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }} # The user that runs the stack; it needs the docker group.
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }} # The private key that user accepts.
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }} # The server's pinned host key line.
+        run: | # A bash script.
+          install -d -m 700 ~/.ssh # ssh refuses a key directory that others can read.
+          install -m 600 /dev/null ~/.ssh/deploy_key # Creates the key file private before anything is written to it.
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key # Writes the key; the trailing newline is required.
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts # The only host key this job trusts.
+          # "host" becomes a name that ssh resolves to the server.
+          cat > ~/.ssh/config <<EOF
+          Host host
+            HostName $DEPLOY_HOST
+            Port ${DEPLOY_PORT:-22}
+            User $DEPLOY_USER
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            BatchMode yes
+            ControlMaster auto
+            ControlPath ~/.ssh/cm-%C
+            ControlPersist 2m
+          EOF
+          # The lines above: the server's address, port (22 when unset) and
+          # user; the key to use, and no other key; refuse any host key not in
+          # known_hosts; fail rather than prompt; and share one connection
+          # among the ssh calls below, kept open for two minutes.
+
+      - name: Seed the shop # Copies the data over and plants it.
+        run: | # A bash script.
+          mkdir seed # Where the data is unpacked on this machine.
+          unzip -q apps/api/seed/data.zip -d seed # catalog.json and media/; the API image has no unzip tool.
+          ssh host "rm -rf '$DEPLOY_PATH/seed' && mkdir '$DEPLOY_PATH/seed'" # An empty folder for the data on the server.
+          tar -C seed -czf - . | ssh host "tar -xzf - -C '$DEPLOY_PATH/seed'" # Copies the data in one stream.
+          # Runs the script below on the server, passing the folder as $1.
+          ssh host sh -s -- "'$DEPLOY_PATH'" <<'EOF'
+          set -eu
+          cd "$1"
+          trap 'rm -rf seed' EXIT
+          docker compose run --rm --no-deps --pull never -T \
+            -v "$PWD/seed/catalog.json:/app/apps/api/seed/catalog.json:ro" \
+            -v "$PWD/seed/media:/app/apps/api/seed/media:ro" \
+            api node seed/seed.ts < /dev/null
+          EOF
+          # The server script, line by line:
+          # - set -eu: stop at the first failing command or unset variable.
+          # - cd: work inside the folder, where .env names the compose files.
+          # - trap: deletes the uploaded data when the script ends, whether
+          #   or not the seed succeeded; the pictures it needs are copied
+          #   into the media volume by then.
+          # - run: a one-off container of the API service, with its database
+          #   address and media volume, runs the seed that the API image
+          #   carries. The two -v mounts put the data where the seed looks
+          #   for it, beside itself. --no-deps leaves the running services
+          #   alone, and --pull never uses the image the last deploy pulled,
+          #   since the server holds no registry sign-in. < /dev/null keeps the
+          #   container off stdin, which carries this script. A catalog that
+          #   already holds products is left as it is.
