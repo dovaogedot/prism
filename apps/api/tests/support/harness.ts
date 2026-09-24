@@ -81,10 +81,10 @@ export const testEnvironment = (databaseUrl: string, mediaDirectory: string, aut
     SMTP_SECURE: false,
     MAIL_FROM: "Prism <noreply@prism.test>",
     RECAPTCHA_SECRET_KEY: "",
-    GOOGLE_CLIENT_ID: "",
-    GOOGLE_CLIENT_SECRET: "",
-    GITHUB_CLIENT_ID: "",
-    GITHUB_CLIENT_SECRET: "",
+    OAUTH_GOOGLE_CLIENT_ID: "",
+    OAUTH_GOOGLE_CLIENT_SECRET: "",
+    OAUTH_GITHUB_CLIENT_ID: "",
+    OAUTH_GITHUB_CLIENT_SECRET: "",
     // Effectively off: the limiter keys on the client address and cannot tell
     // one test from the next. The throttling tests build their own app.
     AUTH_RATE_LIMIT_PER_MINUTE: authRateLimitPerMinute,

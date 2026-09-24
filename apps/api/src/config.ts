@@ -37,10 +37,10 @@ export const Environment = {
     SMTP_SECURE: z.stringbool().default(false),
     MAIL_FROM: z.string().min(1).default("Prism <noreply@prism.test>"),
     RECAPTCHA_SECRET_KEY: z.string().default(""),
-    GOOGLE_CLIENT_ID: z.string().default(""),
-    GOOGLE_CLIENT_SECRET: z.string().default(""),
-    GITHUB_CLIENT_ID: z.string().default(""),
-    GITHUB_CLIENT_SECRET: z.string().default(""),
+    OAUTH_GOOGLE_CLIENT_ID: z.string().default(""),
+    OAUTH_GOOGLE_CLIENT_SECRET: z.string().default(""),
+    OAUTH_GITHUB_CLIENT_ID: z.string().default(""),
+    OAUTH_GITHUB_CLIENT_SECRET: z.string().default(""),
     /** Sign-in attempts allowed per minute per client address. */
     AUTH_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(10),
     MEDIA_DIR: z.string().min(1).default("/srv/media"),
@@ -80,8 +80,8 @@ export const Config = {
   /** A parsed environment as the shape the application asks questions of. */
   fromEnvironment: (environment: Environment): Config => {
     const pairs: readonly OAuthCredential[] = [
-      { provider: "google", clientId: environment.GOOGLE_CLIENT_ID, clientSecret: environment.GOOGLE_CLIENT_SECRET },
-      { provider: "github", clientId: environment.GITHUB_CLIENT_ID, clientSecret: environment.GITHUB_CLIENT_SECRET },
+      { provider: "google", clientId: environment.OAUTH_GOOGLE_CLIENT_ID, clientSecret: environment.OAUTH_GOOGLE_CLIENT_SECRET },
+      { provider: "github", clientId: environment.OAUTH_GITHUB_CLIENT_ID, clientSecret: environment.OAUTH_GITHUB_CLIENT_SECRET },
     ];
     // A provider counts as configured only when both halves of its pair are set.
     const credentials = pairs.filter(
