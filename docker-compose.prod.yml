@@ -35,6 +35,13 @@ services:
     ports: !override
       - "127.0.0.1:${MAILPIT_PORT:?set MAILPIT_PORT}:8025"
 
+  rabbitmq:
+    restart: unless-stopped
+    # Loopback only, like the inbox: the management UI is for whoever can
+    # reach the server.
+    ports: !override
+      - "127.0.0.1:${RABBITMQ_UI_PORT:?set RABBITMQ_UI_PORT}:15672"
+
   migrate:
     image: ${API_IMAGE:?set API_IMAGE}
     pull_policy: always

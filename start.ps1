@@ -15,6 +15,7 @@ $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
 $WebPortDefault = "3000"
+$RabbitPortDefault = "15672"
 $EnvFile = Join-Path $PSScriptRoot ".env"
 
 function Initialize-EnvFile {
@@ -64,6 +65,11 @@ if ($LASTEXITCODE -ne 0) {
 
 $webPort = (Get-Content $EnvFile | Where-Object { $_ -like "WEB_PORT=*" } | Select-Object -First 1) -replace "^WEB_PORT=", ""
 if (-not $webPort) { $webPort = $WebPortDefault }
+$rabbitPort = (Get-Content $EnvFile | Where-Object { $_ -like "RABBITMQ_UI_PORT=*" } | Select-Object -First 1) -replace "^RABBITMQ_UI_PORT=", ""
+if (-not $rabbitPort) { $rabbitPort = $RabbitPortDefault }
+
+$stripeKey = (Get-Content $EnvFile | Where-Object { $_ -like "STRIPE_SECRET_KEY=*" } | Select-Object -First 1) -replace "^STRIPE_SECRET_KEY=", ""
+$payments = if ($stripeKey) { "Stripe test mode" } else { "off until STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY are in .env" }
 
 Write-Host ""
 Write-Host -NoNewline "Waiting for the storefront"
@@ -93,6 +99,8 @@ Write-Host @"
 
     Storefront      http://localhost:$webPort
     Inbox (Mailpit) http://localhost:8025
+    RabbitMQ UI     http://localhost:$rabbitPort   prism / RABBITMQ_PASSWORD
+    Payments        $payments
 
 $shopper
 

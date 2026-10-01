@@ -38,6 +38,27 @@ services:
       timeout: 3s
       retries: 20
 
+  # The message queue between the order and payment services. The management
+  # UI on 15672 shows the exchanges, the queues and the dead-letter queue.
+  rabbitmq:
+    image: rabbitmq:4.3.6-management-alpine
+    # RabbitMQ names its data directory after the host, so a fixed name keeps
+    # the queues across a container being recreated.
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: prism
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-prism}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    ports:
+      - "${RABBITMQ_UI_PORT:-15672}:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
   # One-shot: applies migrations. The api waits for this to exit 0, so it
   # never serves a request against a half-built schema.
   migrate:
@@ -80,12 +101,29 @@ services:
       OAUTH_GOOGLE_CLIENT_SECRET: ${OAUTH_GOOGLE_CLIENT_SECRET:-}
       OAUTH_GITHUB_CLIENT_ID: ${OAUTH_GITHUB_CLIENT_ID:-}
       OAUTH_GITHUB_CLIENT_SECRET: ${OAUTH_GITHUB_CLIENT_SECRET:-}
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:?set DATA_ENCRYPTION_KEY in .env}
+      RABBITMQ_URL: amqp://prism:${RABBITMQ_PASSWORD:-prism}@rabbitmq:5672
+      # Both keys turn payments on. Without them the cart works and checkout
+      # says payments are not set up.
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      # Set on a server with a webhook endpoint registered in the Stripe
+      # dashboard. Empty, the API reads the file the stripe service writes.
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_WEBHOOK_SECRET_FILE: /run/stripe/webhook-secret
+      STRIPE_TIMEOUT_MS: ${STRIPE_TIMEOUT_MS:-10000}
+      ADDRESS_LOOKUP_URL: ${ADDRESS_LOOKUP_URL-https://nominatim.openstreetmap.org}
+      PAYMENT_WINDOW_SECONDS: ${PAYMENT_WINDOW_SECONDS:-1800}
+      FULFILLMENT_STEP_SECONDS: ${FULFILLMENT_STEP_SECONDS:-600}
     volumes:
       - media:/srv/media
+      - stripe-secret:/run/stripe:ro
     depends_on:
       postgres:
         condition: service_healthy
       mailpit:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
@@ -116,6 +154,33 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  # Forwards Stripe's test-mode webhooks to the API, so a laptop needs no
+  # public address. Each start gets a signing secret from Stripe and writes it
+  # where the API reads it on every webhook. COMPOSE_PROFILES=stripe in .env
+  # brings it up with the rest; without a secret key it exits at once.
+  stripe:
+    profiles: [stripe]
+    image: stripe/stripe-cli:v1.53.0
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        if [ -z "$$STRIPE_SECRET_KEY" ]; then
+          echo "STRIPE_SECRET_KEY is empty in .env, so there are no webhooks to forward."
+          exit 0
+        fi
+        stripe listen --api-key "$$STRIPE_SECRET_KEY" --print-secret > /run/stripe/webhook-secret
+        exec stripe listen --api-key "$$STRIPE_SECRET_KEY" \
+          --forward-to http://api:8080/api/v1/payments/webhook \
+          --events payment_intent.succeeded,payment_intent.payment_failed,payment_intent.canceled,refund.updated
+    environment:
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+    volumes:
+      - stripe-secret:/run/stripe
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: on-failure
 
   # Every test suite, for a host with Docker and no Node: `./start.sh test`.
   # The profile keeps it out of `up`. Testcontainers starts the suites' own
@@ -166,3 +231,6 @@ services:
 volumes:
   postgres-data:
   media:
+  rabbitmq-data:
+  # The webhook signing secret the stripe service writes and the api reads.
+  stripe-secret:

@@ -7,7 +7,7 @@ on: # The events that start this workflow.
   workflow_dispatch: # Allows a manual run from the Actions tab.
     inputs: # The choices a manual run offers.
       rebuild_database: # The way on from a refused migration, like `./start.sh reset` on a laptop.
-        description: Rebuild the database from the migrations, deleting every account, product and review # The label beside the box.
+        description: Rebuild the database from the migrations, deleting every account, product, review and order # The label beside the box.
         type: boolean # A checkbox.
         default: false # Unticked, so a manual run keeps the data.
 
@@ -131,12 +131,18 @@ jobs: # The work this workflow does.
         env: # Secrets reach the shell as variables, never pasted into the script. Each name is also its name in .env.
           COMPOSE_FILE: docker-compose.yml:docker-compose.prod.yml # Makes every `docker compose` in that folder, by hand too, apply the production overlay.
           MAILPIT_PORT: ${{ vars.MAILPIT_PORT || '8026' }} # The loopback port of the reset-mail inbox.
+          RABBITMQ_UI_PORT: ${{ vars.RABBITMQ_UI_PORT || '15672' }} # The loopback port of the RabbitMQ management UI.
           PUBLIC_WEB_URL: ${{ vars.PUBLIC_WEB_URL }} # The address people type; reset links and OAuth redirects are built from it.
           MAIL_FROM: ${{ vars.MAIL_FROM || 'Prism <noreply@localhost>' }} # The sender of reset mail.
           AUTH_RATE_LIMIT_PER_MINUTE: ${{ vars.AUTH_RATE_LIMIT_PER_MINUTE || '60' }} # Requests per address per minute on /auth/*.
           LOG_LEVEL: info # The lowest level the API logs.
           JWT_SECRET: ${{ secrets.JWT_SECRET }} # Signs the sessions.
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }} # Read only when the database is first created.
+          DATA_ENCRYPTION_KEY: ${{ secrets.DATA_ENCRYPTION_KEY }} # Encrypts the order contact, address and payment records at rest.
+          RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }} # Read only when RabbitMQ first initializes its volume.
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }} # Set with the publishable key, the shop takes payments.
+          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }} # The browser half of the pair.
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }} # Verifies the webhook endpoint registered in the Stripe dashboard.
           RECAPTCHA_SECRET_KEY: ${{ secrets.RECAPTCHA_SECRET_KEY }} # Set, the API checks each CAPTCHA with Google.
           OAUTH_GOOGLE_CLIENT_ID: ${{ secrets.OAUTH_GOOGLE_CLIENT_ID }} # Set with its secret, Google sign-in is real.
           OAUTH_GOOGLE_CLIENT_SECRET: ${{ secrets.OAUTH_GOOGLE_CLIENT_SECRET }} # The other half of Google's pair.
@@ -147,21 +153,30 @@ jobs: # The work this workflow does.
           # default is missing. An empty POSTGRES_PASSWORD would fall back to
           # the public local one, and a wrong PUBLIC_WEB_URL breaks every
           # reset link and OAuth redirect.
-          for name in DEPLOY_PATH PUBLIC_WEB_URL JWT_SECRET POSTGRES_PASSWORD; do
+          for name in DEPLOY_PATH PUBLIC_WEB_URL JWT_SECRET POSTGRES_PASSWORD DATA_ENCRYPTION_KEY RABBITMQ_PASSWORD; do
             if [ -z "${!name}" ]; then
               echo "$name is not set." >&2
               exit 1
             fi
           done
 
+          # A server has no Stripe CLI to hand the API a signing secret, so
+          # payments without the dashboard endpoint's secret would refuse
+          # every webhook.
+          if [ -n "$STRIPE_SECRET_KEY" ] && [ -z "$STRIPE_WEBHOOK_SECRET" ]; then
+            echo "STRIPE_SECRET_KEY is set but STRIPE_WEBHOOK_SECRET is not." >&2
+            exit 1
+          fi
+
           # Builds the .env text, one NAME='value' line per setting. Compose
           # reads a single-quoted value literally, so a `$`, `#` or space in a
           # secret stays as it is. A single quote or a line break cannot be
           # written that way, so either one stops the deploy.
           settings=''
-          for name in COMPOSE_FILE API_IMAGE WEB_IMAGE WEB_PORT MAILPIT_PORT PUBLIC_WEB_URL MAIL_FROM \
+          for name in COMPOSE_FILE API_IMAGE WEB_IMAGE WEB_PORT MAILPIT_PORT RABBITMQ_UI_PORT PUBLIC_WEB_URL MAIL_FROM \
             AUTH_RATE_LIMIT_PER_MINUTE LOG_LEVEL JWT_SECRET POSTGRES_PASSWORD RECAPTCHA_SECRET_KEY \
-            OAUTH_GOOGLE_CLIENT_ID OAUTH_GOOGLE_CLIENT_SECRET OAUTH_GITHUB_CLIENT_ID OAUTH_GITHUB_CLIENT_SECRET; do
+            OAUTH_GOOGLE_CLIENT_ID OAUTH_GOOGLE_CLIENT_SECRET OAUTH_GITHUB_CLIENT_ID OAUTH_GITHUB_CLIENT_SECRET \
+            DATA_ENCRYPTION_KEY RABBITMQ_PASSWORD STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET; do
             value=${!name} # The value of the variable with that name.
             if [[ $value == *"'"* || $value == *$'\n'* ]]; then
               echo "$name holds a single quote or a line break, which a .env line cannot carry." >&2

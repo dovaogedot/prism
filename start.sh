@@ -14,6 +14,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 readonly WEB_PORT_DEFAULT=3000
+readonly RABBITMQ_UI_PORT_DEFAULT=15672
 
 ensure_env_file() {
   [ -f .env ] && return 0
@@ -60,6 +61,14 @@ fi
 
 web_port="$(grep -E '^WEB_PORT=' .env | cut -d= -f2)"
 web_port="${web_port:-$WEB_PORT_DEFAULT}"
+rabbit_port="$(grep -E '^RABBITMQ_UI_PORT=' .env | cut -d= -f2)"
+rabbit_port="${rabbit_port:-$RABBITMQ_UI_PORT_DEFAULT}"
+
+if [ -n "$(grep -E '^STRIPE_SECRET_KEY=' .env | cut -d= -f2)" ]; then
+  payments="Stripe test mode"
+else
+  payments="off until STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY are in .env"
+fi
 
 echo
 printf 'Waiting for the storefront'
@@ -87,6 +96,8 @@ cat <<BANNER
 
     Storefront      http://localhost:${web_port}
     Inbox (Mailpit) http://localhost:8025
+    RabbitMQ UI     http://localhost:${rabbit_port}   prism / RABBITMQ_PASSWORD
+    Payments        ${payments}
 
 ${shopper}
 

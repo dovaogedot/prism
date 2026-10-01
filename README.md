@@ -1,11 +1,14 @@
 # Prism
 
-A small business-to-consumer shop: accounts and a searchable catalog. The code does not know
-what the shop sells. Every filter comes from the products' own properties at query time, so
-the same code sells lamps, books or pet food.
+A small business-to-consumer shop: accounts, a searchable catalog, a cart that guests and
+members both keep, a single-page checkout that takes card payments through Stripe's test
+mode, and an order history where customers follow, filter and cancel their orders. The code
+does not know what the shop sells. Every filter comes from the products' own properties at
+query time, so the same code sells lamps, books or pet food.
 
-Fastify API on Node, Postgres behind Drizzle, React storefront built with Vite and served by
-Caddy. TypeScript end to end. Docker is the only thing a machine needs.
+Fastify API on Node, Postgres behind Drizzle, RabbitMQ between the order and payment services,
+React storefront built with Vite and served by Caddy. TypeScript end to end. Docker is the only
+thing a machine needs; taking test payments also needs a free Stripe account's test keys.
 
 ## Running it
 
@@ -30,12 +33,29 @@ On Windows each command is `.\start.cmd ...` with the same arguments.
 | --- | --- |
 | Storefront | <http://localhost:3000> |
 | API | <http://localhost:3000/api/v1> |
-| Inbox for password-reset mail (Mailpit) | <http://localhost:8025> |
+| Inbox for order and password-reset mail (Mailpit) | <http://localhost:8025> |
+| RabbitMQ management UI, as `prism` / `RABBITMQ_PASSWORD` | <http://localhost:15672> |
 
-The stack needs no external accounts: the CAPTCHA uses Google's always-pass test key, the
+The stack runs with no external accounts: the CAPTCHA uses Google's always-pass test key, the
 provider buttons go to a built-in stand-in, and mail lands in Mailpit. Real keys go in `.env`;
-`.env.example` describes each one. Its `JWT_SECRET` is public, so replace it anywhere but
-your own machine.
+`.env.example` describes each one. Its `JWT_SECRET` and `DATA_ENCRYPTION_KEY` are public, so
+replace them anywhere but your own machine.
+
+### Taking test payments
+
+Without Stripe keys the cart works and checkout says that payments are not set up. To pay:
+
+1. Sign up at <https://dashboard.stripe.com>, which is free, and stay in test mode.
+2. Copy the two test keys from Developers > API keys into `.env`: `STRIPE_SECRET_KEY`
+   (`sk_test_...`) and `STRIPE_PUBLISHABLE_KEY` (`pk_test_...`).
+3. Run `./start.sh` again.
+
+Stripe tells the shop how each payment went through a webhook. `COMPOSE_PROFILES=stripe` in
+`.env` starts the Stripe CLI as a container that forwards those webhooks to the API, so the
+laptop needs no public address and no CLI of its own. To run the CLI on the host instead,
+remove that line, run
+`stripe listen --forward-to localhost:3000/api/v1/payments/webhook`, and put the `whsec_...`
+secret it prints into `STRIPE_WEBHOOK_SECRET`.
 
 The seed is separate from the shop: the shop runs without it, and a failed seed leaves an
 empty shop. Its data is one archive, `apps/api/seed/data.zip`. After the seed, sign in as
@@ -63,7 +83,7 @@ npm ci && npm run build                         # the shared package both apps i
 npm run dev --workspace @prism/web              # storefront with hot reload, proxied to the running stack
 npm run typecheck
 npm run test:unit                               # unit tests of every workspace
-npm test --workspace @prism/api                 # unit, integration and security; Docker running
+npm test --workspace @prism/api                 # unit, integration, security and flows; Docker running
 ```
 
 ## Usage
@@ -82,7 +102,66 @@ npm test --workspace @prism/api                 # unit, integration and security
 - The filters live in the URL, so a filtered view is a link.
 - A narrow screen puts the filters in a drawer.
 - **Product page**: pictures, price, stock, brand, category, rating, description,
-  properties, and weight and size in metric or imperial units.
+  properties, and weight and size in metric or imperial units. A quantity and "Add to cart",
+  or "Sold out" when there is no stock.
+
+### Cart
+
+- The cart button in the header shows how many items the cart holds, at every width.
+- **Cart page**: each line with its picture, name, unit price, a quantity stepper, a remove
+  button and the line total. The subtotal changes as soon as a quantity does.
+- Asking for more than the stock says how many are left. A line the shop can no longer supply
+  in full says so, with a button that reduces it to what is left.
+- **Recommended for you**: in-stock products from the same categories as the cart, best rated
+  first.
+- **Guests** keep their cart for 30 days in the browser that made it. **Members** keep theirs
+  in the account, across devices and sign-ins. Signing in moves a guest's cart into the
+  account's.
+
+### Checkout
+
+One page, in four parts, with the order summary beside it, or folded at the top on a narrow
+screen. The summary has steppers and remove buttons too.
+
+1. **Contact**: name, email, phone.
+2. **Shipping address**. Once it is complete, the page looks it up in OpenStreetMap and says
+   "Address found", or that it could not find it.
+3. **Shipping**: standard, €4.90 and free from €50, or express, €9.90.
+4. **Payment**: Stripe's card fields.
+
+A signed-in customer starts with the account email, and after a first order with that order's
+contact, address and shipping. "Place order" checks every field and the card before anything
+is sent, places the order, then has Stripe confirm the payment. The order page that follows is
+the confirmation; it updates by itself once the payment settles, and the confirmation mail
+arrives in Mailpit.
+
+Stripe's test cards, with any future expiry and any CVC:
+
+| Card | What happens |
+| --- | --- |
+| `4242 4242 4242 4242` | Paid |
+| `4000 0000 0000 9995` | Declined: insufficient funds |
+| `4000 0000 0000 0069` | Declined: expired card |
+| `4000 0000 0000 0127` | Declined: incorrect CVC |
+| `4000 0000 0000 3220` | Asks for 3D Secure; approve or fail it |
+| `4242 4242 4242 4241` | Refused by the card field before submission: invalid number |
+
+A declined order releases its stock and mails the reason; the cart keeps its items, so
+"Place order" again tries another card. To see a gateway timeout, set `STRIPE_TIMEOUT_MS=1` in
+`.env`, run `docker compose up -d api`, and place an order.
+
+### Orders
+
+- **Orders** (signed in): status chips, any number at once, a date range whose ends both
+  count, and newest, oldest or status order. The filters live in the URL.
+- **Order page**: status, a timeline of every change, the tracking number once shipped, the
+  items, totals, address, and how it was paid. A guest opens it from the link in the
+  confirmation mail.
+- **Cancel** works until the order is processing. A paid order is refunded in full, which
+  shows in the timeline and arrives as a second mail.
+- After payment a simulated warehouse moves the order to processing, then shipped with a
+  tracking number and a mail, then delivered, one step every `FULFILLMENT_STEP_SECONDS`
+  (600 by default). An order unpaid for 30 minutes is canceled and its stock released.
 
 ### Accounts
 
@@ -100,8 +179,9 @@ npm test --workspace @prism/api                 # unit, integration and security
 ### The API
 
 Every route is under `/api/v1` and answers JSON. A refusal is
-`{ "error": { "code", "message", "issues" } }`, where `issues` names the rejected fields.
-Authenticated routes take `Authorization: Bearer <access token>`.
+`{ "error": { "code", "message", "issues" } }`, where `issues` names the rejected fields, or
+the products a stock refusal is about. Authenticated routes take
+`Authorization: Bearer <access token>`; cart and order routes take it when there is one.
 
 | Method and path | What it does |
 | --- | --- |
@@ -123,6 +203,19 @@ Authenticated routes take `Authorization: Bearer <access token>`.
 | `GET /products` | Searches the catalog. See the query keys below. |
 | `GET /products/suggest?q=` | Names containing the typed text, those starting with it first. |
 | `GET /products/:slug` | One product with its measurements in both unit systems. |
+| `GET /cart` | The caller's cart. A guest's is found by the `prism_cart` cookie. |
+| `POST /cart/items` | Adds `quantity` of `productId`. Starts a guest cart and sets its cookie when needed. |
+| `PUT /cart/items/:productId` | Sets the quantity of a line. |
+| `DELETE /cart/items/:productId` | Removes a line. |
+| `GET /cart/recommendations` | Products to go with the cart. |
+| `GET /checkout/config` | Whether payments are on, and Stripe's publishable key. |
+| `GET /checkout/prefill` | The signed-in customer's email and last order details. |
+| `POST /checkout/address` | Looks an address up: `verified`, `not_found` or `unavailable`. |
+| `POST /orders` | Places an order from the caller's cart. Body: `contact`, `address`, `shippingMethod`, `expectedTotalCents`. Answers the order and the client secret Stripe.js confirms with; a guest also gets the order's key. |
+| `GET /orders` | The signed-in customer's orders. Reads `status` (repeats), `from`, `to`, `sort` (`newest`, `oldest`, `status`), `page`, `perPage`. |
+| `GET /orders/:id` | One order. A guest adds `?key=`. |
+| `POST /orders/:id/cancel` | Cancels an order not yet processing, and refunds it if paid. |
+| `POST /payments/webhook` | Where Stripe reports payments and refunds. Checks Stripe's signature. |
 | `GET /media/:file` | A product image. |
 | `GET /health` | Liveness. |
 
@@ -225,6 +318,76 @@ erDiagram
     smallint rating "1 to 5"
     timestamptz created_at
   }
+  cart {
+    uuid id PK
+    uuid user_id FK, UK "null for a guest cart"
+    text token_hash UK "SHA-256 of the guest cookie; null for a user cart"
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz expires_at "set exactly for a guest cart"
+  }
+  cart_item {
+    uuid cart_id PK, FK
+    uuid product_id PK, FK
+    integer quantity "1 to 99"
+    timestamptz added_at
+  }
+  customer_order {
+    uuid id PK
+    integer number UK "from 100001"
+    uuid user_id FK "null for a guest order"
+    uuid cart_id FK "the cart it was placed from"
+    text status "one of the seven statuses"
+    text shipping_method "standard or express"
+    integer subtotal_cents
+    integer shipping_cents
+    integer total_cents "subtotal plus shipping"
+    bytea contact "encrypted: name, email, phone"
+    bytea shipping_address "encrypted"
+    bytea access_key "encrypted; guest orders only"
+    text tracking_number "set exactly when shipped or delivered"
+    timestamptz refunded_at
+    timestamptz payment_due_at
+    timestamptz created_at
+    timestamptz status_changed_at
+  }
+  order_line {
+    uuid id PK
+    uuid order_id FK
+    uuid product_id FK "null once the product is gone"
+    text product_name "as sold"
+    text product_slug "as sold"
+    integer unit_price_cents "as sold"
+    integer quantity "at least 1"
+    integer line_total_cents "unit price times quantity"
+  }
+  order_event {
+    bigint id PK
+    uuid order_id FK
+    text status
+    text note "null when the status says it all"
+    timestamptz created_at
+  }
+  payment {
+    uuid id PK
+    uuid order_id FK "unique with kind"
+    text kind "charge or refund"
+    text status "pending, succeeded, failed or canceled"
+    integer amount_cents
+    text provider
+    bytea reference "encrypted Stripe id"
+    bytea details "encrypted card brand, last four, failure"
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  outbox_message {
+    uuid id PK "also the message id"
+    text exchange
+    text routing_key
+    jsonb payload "ids and codes only"
+    timestamptz created_at
+    timestamptz published_at "null until published"
+  }
 
   app_user ||--o{ oauth_identity : "signs in through"
   app_user ||--o{ session : "opens"
@@ -236,11 +399,23 @@ erDiagram
   product ||--o{ product_property : "carries"
   product ||--o{ product_image : "shows"
   product ||--o{ product_review : "receives"
+  app_user |o--o| cart : "keeps"
+  cart ||--o{ cart_item : "holds"
+  product ||--o{ cart_item : "is in"
+  app_user |o--o{ customer_order : "places"
+  cart |o--o{ customer_order : "is checked out as"
+  customer_order ||--|{ order_line : "lists"
+  product |o--o{ order_line : "is sold as"
+  customer_order ||--|{ order_event : "records"
+  customer_order ||--o{ payment : "is paid by"
 ```
 
+`outbox_message` stands alone: it holds messages on their way to RabbitMQ.
+
 The schema is `apps/api/src/db/schema.ts`, and the migrations under `apps/api/drizzle/` are
-applied at start. Deleting a user or a product cascades to the rows that hang off it. A
-category or brand with products refuses deletion.
+applied at start. Deleting a user or a product cascades to the rows that hang off it, except
+that an account with orders cannot be deleted, and an order line keeps its snapshot when its
+product goes. A category or brand with products refuses deletion.
 
 ## Design notes
 
@@ -259,6 +434,33 @@ category or brand with products refuses deletion.
 - **SQL.** Every value a shopper supplies is a bound parameter.
 - **Images.** Files in the `MEDIA_DIR` volume, named by `product_image.file` and served at
   `/media/` by `@fastify/static`.
+- **Carts.** Both kinds live in Postgres, so a cart is never lost and stock is checked against
+  one truth. A guest cart belongs to an opaque cookie whose SHA-256 is stored, like a refresh
+  token. Prices are never stored in a cart: every read joins today's price and stock.
+- **Placing an order** is one transaction that reserves every line with
+  `UPDATE product SET stock = stock - q WHERE id = $1 AND stock >= q`, in product id order,
+  then writes the order, its lines and its first event. Of two checkouts racing for the last
+  unit, the second waits for the first and then finds it gone, so two payments can never be
+  taken for one item. A failed, expired or canceled order gives its stock back.
+- **Payments.** The browser sends the card to Stripe's own fields; Prism only creates a
+  PaymentIntent and reads Stripe's signed webhooks, checked against the raw body. Card data
+  never touches Prism, which keeps it in PCI DSS's smallest scope (SAQ A).
+- **Messages.** The payment service publishes `payment.status`; the order service consumes it
+  and updates the order, the stock and the customer. Cancellations go the other way as
+  `order.canceled`, and the payment service refunds. A message is written to `outbox_message`
+  in the same transaction as the change it announces, then published by a relay with a broker
+  confirm, so a committed change always gets its message. Consumers apply every change as a
+  conditional `UPDATE`, so a duplicate does nothing.
+- **Failed messages.** Both queues are quorum queues with `x-delivery-limit: 5` and a
+  dead-letter exchange. A handler that fails rejects its message back to the queue; after the
+  sixth failed delivery, or at once for a malformed message, RabbitMQ moves it to the
+  `dead-letter` queue, which the management UI shows.
+- **Encryption at rest.** The order contact, shipping address and guest key, and each
+  payment's Stripe id and card summary, are sealed with AES-256-GCM under
+  `DATA_ENCRYPTION_KEY` before they reach Postgres, so a dump or backup holds ciphertext.
+  Status, dates and amounts stay plain: lists filter on them and they identify nobody.
+- **Encryption in transit.** Card data goes from the browser to Stripe over TLS. The deployed
+  shop is served over HTTPS by its reverse proxy, and the API calls Stripe over TLS.
 
 ## Testing
 
@@ -267,18 +469,27 @@ category or brand with products refuses deletion.
 ./start.sh test npm run test:unit     # only the unit tests, in the same container
 ```
 
-This needs only Docker. The integration and security suites run the real application on a
-real Postgres, started through Testcontainers. Only the clock, the mailer and the password
-hasher are substituted. CI runs every suite before each deploy.
+This needs only Docker. The integration, security and flow suites run the real application
+on a real Postgres, started through Testcontainers. Only what would reach the outside world
+is substituted: the clock, the mailer, the password hasher, the message queue, Stripe and the
+address lookup. Stripe's stand-in signs its webhooks the way Stripe does. CI runs every suite
+before each deploy.
 
 | Suite | Where | Covers |
 | --- | --- | --- |
-| Unit | `apps/api/tests/unit`, `packages/shared/tests`, `apps/web/tests` | JWT creation, verification and expiry; input schemas; product conversions; the search SQL and its bindings; URL filter arithmetic |
-| Integration | `apps/api/tests/integration` | Every auth and catalog endpoint |
-| Security | `apps/api/tests/security` | Injection, forged tokens, mass assignment, path traversal, rate limiting, script payloads |
+| Unit | `apps/api/tests/unit`, `packages/shared/tests`, `apps/web/tests` | JWT creation, verification and expiry; input schemas; product conversions; the search SQL and its bindings; URL filter arithmetic; cart rules and totals; prices and shipping; field encryption; order emails; Stripe error messages |
+| Integration | `apps/api/tests/integration` | Every auth, catalog, cart, checkout, order and webhook endpoint; overselling under ten concurrent checkouts; encryption at rest; the database's constraints; RabbitMQ itself, with its dead-letter queue |
+| Security | `apps/api/tests/security` | Injection, forged tokens and webhooks, other customers' orders, prices in request bodies, mass assignment, path traversal, rate limiting, script payloads in pages and mail |
+| Flows | `apps/api/tests/flows` | Registration, a guest checkout and a member checkout, each a whole journey through the API |
 
 Checked by hand, because a third party's screen is involved: the CAPTCHA, a provider sign-in
-with real Google or GitHub keys, and 2FA enrollment with a phone app.
+with real Google or GitHub keys, 2FA enrollment with a phone app, and payments with Stripe's
+test cards. Encryption is checked by hand too:
+
+- At rest: `docker compose exec postgres psql -U prism -c "select contact, shipping_address from customer_order limit 1"`
+  shows bytes, not text, while the order page shows the address.
+- In transit: in the browser's network tab, the card number is only ever sent to Stripe's
+  domains, over HTTPS, and `POST /orders` carries no card field.
 
 ## Deployment
 
@@ -288,5 +499,11 @@ them to the GitHub container registry, and restarts the stack on a server over S
 credentials are secrets and variables of the repository's `production` environment, which
 only `main` can deploy to; `.env.example` lists them. A Deploy run started by hand from the
 Actions tab offers a box that rebuilds the database from the migrations, deleting every
-account, product and review. `.github/workflows/seed.yml`, also started by hand, seeds an
+account, product, review and order. `.github/workflows/seed.yml`, also started by hand, seeds an
 empty catalog in the running shop without a deploy.
+
+A server has a public address, so Stripe calls it directly instead of through the CLI:
+register a webhook endpoint at `<PUBLIC_WEB_URL>/api/v1/payments/webhook` in the Stripe
+dashboard (Developers > Webhooks) for `payment_intent.succeeded`,
+`payment_intent.payment_failed`, `payment_intent.canceled` and `refund.updated`, and set its
+signing secret as `STRIPE_WEBHOOK_SECRET`.
