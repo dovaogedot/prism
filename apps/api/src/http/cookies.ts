@@ -1,15 +1,16 @@
 /**
- * The refresh token lives in a cookie; the access token never does.
+ * The refresh token lives in a cookie; the access token never does. A guest's
+ * cart is found by a cookie too.
  *
- * httpOnly keeps the refresh token away from page scripts, `Path` scopes it
- * to the auth endpoints, and SameSite=Lax blocks cross-site POSTs while still
- * surviving the top-level navigation an OAuth redirect makes.
+ * httpOnly keeps both away from page scripts, `Path` scopes each to the
+ * endpoints that read it, and SameSite=Lax blocks cross-site POSTs while
+ * still surviving the top-level navigation an OAuth redirect makes.
  */
 
 import type { ChallengeToken } from "@prism/shared";
 import type { FastifyReply } from "fastify";
 import type { OAuthState } from "../platform/oauth.ts";
-import type { RefreshToken } from "../platform/tokens.ts";
+import type { CartToken, RefreshToken } from "../platform/tokens.ts";
 
 /** Whether the connection is https, which decides the `Secure` attribute. */
 export type CookieOptions = Readonly<{ secure: boolean }>;
@@ -24,15 +25,20 @@ export const Cookies = {
    * page to hand the token to, and a URL would leave it in history.
    */
   TWO_FACTOR: "prism_2fa_challenge",
-  /** Everything under here, and nothing else, receives these cookies. */
+  /** A guest's cart. Signed-in carts belong to the account instead. */
+  CART: "prism_cart",
+  /** Everything under here, and nothing else, receives the auth cookies. */
   PATH: "/api/v1/auth",
+  /** The cart cookie travels with every API call, so the cart follows the guest to checkout. */
+  CART_PATH: "/api/v1",
 
-  attributes: (options: CookieOptions) => ({
+  /** The attributes every cookie here shares. `path` defaults to the auth endpoints. */
+  attributes: (options: CookieOptions, path?: string) => ({
     httpOnly: true,
     // Off over plain http, or localhost drops the cookie with no visible cause.
     secure: options.secure,
     sameSite: "lax" as const,
-    path: Cookies.PATH,
+    path: path ?? Cookies.PATH,
   }),
 
   /** Puts a refresh token in the browser, expiring when the token does. */
@@ -63,5 +69,14 @@ export const Cookies = {
 
   clearTwoFactor: (reply: FastifyReply, options: CookieOptions): void => {
     reply.clearCookie(Cookies.TWO_FACTOR, Cookies.attributes(options));
+  },
+
+  /** Keeps a guest cart's token for as long as the cart lives. */
+  setCart: (reply: FastifyReply, token: CartToken, expiresAt: Date, options: CookieOptions): void => {
+    reply.setCookie(Cookies.CART, token, { ...Cookies.attributes(options, Cookies.CART_PATH), expires: expiresAt });
+  },
+
+  clearCart: (reply: FastifyReply, options: CookieOptions): void => {
+    reply.clearCookie(Cookies.CART, Cookies.attributes(options, Cookies.CART_PATH));
   },
 } as const;

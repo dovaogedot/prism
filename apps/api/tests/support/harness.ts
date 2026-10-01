@@ -1,9 +1,11 @@
 /**
  * Integration test harness: a real Postgres in a container, the real
  * migrations, and the real application. Only the pieces that would reach
- * the outside world are substituted: the clock, the mailer and the hasher.
- * Requests go through `app.inject`, which runs the whole Fastify pipeline
- * without a socket.
+ * the outside world are substituted: the clock, the mailer, the hasher, the
+ * message queue, the payment gateway and the address lookup. Requests go
+ * through `app.inject`, which runs the whole Fastify pipeline without a
+ * socket. The background jobs never start on their own; `settle` and
+ * `jobs.housekeeping.run` do their work when a test asks.
  */
 
 import { mkdtemp, rm } from "node:fs/promises";
@@ -14,10 +16,12 @@ import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { Email, Slug } from "@prism/shared";
 import { generateSync } from "otplib";
-import { App } from "../../src/app.ts";
+import { App, type Jobs } from "../../src/app.ts";
 import { Config } from "../../src/config.ts";
 import { Database, type DatabaseHandle } from "../../src/db/client.ts";
 import { Migrations } from "../../src/db/migrate.ts";
+import { Topology } from "../../src/messaging/topology.ts";
+import { AddressVerifier, type FakeAddressVerifier } from "../../src/platform/address-verifier.ts";
 import {
   brands,
   categories,
@@ -30,6 +34,8 @@ import {
 import { Clock, type MutableClock } from "../../src/platform/clock.ts";
 import { PasswordHash, type Hasher } from "../../src/platform/hasher.ts";
 import { Mailer, type MemoryMailer } from "../../src/platform/mailer.ts";
+import { PaymentGateway, type FakeGateway } from "../../src/platform/payment-gateway.ts";
+import { MessageQueue, type MemoryQueue } from "../../src/platform/queue.ts";
 import { TotpService } from "../../src/platform/totp.ts";
 
 /** Where the harness clock starts, so every expiry is reasoned from one instant. */
@@ -51,6 +57,12 @@ export type Harness = Readonly<{
   database: DatabaseHandle;
   clock: MutableClock;
   mailer: MemoryMailer;
+  queue: MemoryQueue;
+  gateway: FakeGateway;
+  addressVerifier: FakeAddressVerifier;
+  jobs: Jobs;
+  /** Publishes the outbox and delivers the queue until neither has anything left. */
+  settle: () => Promise<void>;
   config: Config;
   /** A live TOTP code for the harness clock, which is not the wall clock. */
   totpCodeFor: (secret: string) => string;
@@ -88,11 +100,32 @@ export const testEnvironment = (databaseUrl: string, mediaDirectory: string, aut
     // Effectively off: the limiter keys on the client address and cannot tell
     // one test from the next. The throttling tests build their own app.
     AUTH_RATE_LIMIT_PER_MINUTE: authRateLimitPerMinute,
+    CHECKOUT_RATE_LIMIT_PER_MINUTE: 1_000_000,
     MEDIA_DIR: mediaDirectory,
+    DATA_ENCRYPTION_KEY: "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0",
+    // Never dialed: the harness hands the app a memory queue.
+    RABBITMQ_URL: "amqp://unused",
+    // Empty: payments are off unless a test hands the app a gateway.
+    STRIPE_SECRET_KEY: "",
+    STRIPE_PUBLISHABLE_KEY: "",
+    STRIPE_WEBHOOK_SECRET: "",
+    STRIPE_WEBHOOK_SECRET_FILE: "",
+    STRIPE_TIMEOUT_MS: 10_000,
+    ADDRESS_LOOKUP_URL: "",
+    GUEST_CART_TTL_SECONDS: 30 * 24 * 60 * 60,
+    PAYMENT_WINDOW_SECONDS: 1800,
+    FULFILLMENT_STEP_SECONDS: 600,
   }) as const;
 
 /** Every table the tests write to, in an order that respects the foreign keys. */
 const MUTABLE_TABLES = [
+  "outbox_message",
+  "payment",
+  "order_event",
+  "order_line",
+  "customer_order",
+  "cart_item",
+  "cart",
   "refresh_token",
   "password_reset_token",
   "session",
@@ -106,12 +139,18 @@ const MUTABLE_TABLES = [
   "app_user",
 ];
 
+/** What a suite can choose about its harness. */
+export type HarnessOptions = Readonly<{
+  /** Defaults to a fast stand-in; a suite about stored passwords passes the real one. */
+  hasher?: Hasher;
+}>;
+
 /**
  * Starts a Postgres container, migrates it, and builds the app against it.
  * `reset` empties the tables and moves the clock an hour on; `stop` takes
  * the container down.
  */
-export const startHarness = async (): Promise<Harness> => {
+export const startHarness = async (options: HarnessOptions = {}): Promise<Harness> => {
   const container = await new PostgreSqlContainer("postgres:18-alpine").start();
   const mediaDirectory = await mkdtemp(join(tmpdir(), "prism-media-"));
 
@@ -121,7 +160,14 @@ export const startHarness = async (): Promise<Harness> => {
 
   const clock = Clock.mutable(TEST_START);
   const mailer = Mailer.memory();
-  const app = await App.build({ config, database, overrides: { clock, mailer, hasher: fastHasher } });
+  const queue = MessageQueue.memory(Topology.declarations());
+  const gateway = PaymentGateway.fake();
+  const addressVerifier = AddressVerifier.fake();
+  const { app, jobs } = await App.build({
+    config,
+    database,
+    overrides: { clock, mailer, hasher: options.hasher ?? fastHasher, queue, gateway, addressVerifier },
+  });
 
   let epoch = TEST_START.getTime();
 
@@ -130,8 +176,23 @@ export const startHarness = async (): Promise<Harness> => {
     database,
     clock,
     mailer,
+    queue,
+    gateway,
+    addressVerifier,
+    jobs,
     config,
     mediaDirectory,
+
+    settle: async () => {
+      // A handler may enqueue the next message, so this runs until a round moves nothing.
+      for (let round = 0; round < 20; round += 1) {
+        const published = await jobs.relay.flush();
+        const delivered = await queue.drain();
+        if (published === 0 && delivered === 0) return;
+      }
+
+      throw new Error("The outbox and the queue did not settle in 20 rounds.");
+    },
 
     totpCodeFor: (secret) =>
       generateSync({
@@ -146,6 +207,9 @@ export const startHarness = async (): Promise<Harness> => {
       epoch += 60 * 60 * 1000;
       clock.set(new Date(epoch));
       mailer.clear();
+      queue.clear();
+      gateway.clear();
+      addressVerifier.clear();
     },
 
     stop: async () => {

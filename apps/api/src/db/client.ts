@@ -10,6 +10,9 @@ import { schema } from "./schema.ts";
 /** The query builder, typed against this schema. */
 export type Database = ReturnType<typeof drizzle<typeof schema>>;
 
+/** The query builder inside `db.transaction`, where every statement shares one commit. */
+export type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+
 /** The driver, for the statements the builder cannot express. */
 export type Sql = ReturnType<typeof postgres>;
 

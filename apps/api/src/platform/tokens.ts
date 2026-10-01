@@ -29,6 +29,12 @@ export const RefreshToken = {
   schema: z.string().min(1).brand<"RefreshToken">(),
 } as const;
 
+/** The form a guest cart's cookie is sent in. Only `OpaqueToken.create` makes one. */
+export type CartToken = z.infer<typeof CartToken.schema>;
+export const CartToken = {
+  schema: z.string().min(1).brand<"CartToken">(),
+} as const;
+
 /** The hex SHA-256 of an opaque token, which is the only form of it stored. */
 export type Digest = z.infer<typeof Digest.schema>;
 export const Digest = {

@@ -23,3 +23,15 @@ export type BrandId = z.infer<typeof BrandId.schema>;
 export const BrandId = {
   schema: z.uuid().brand<"BrandId">(),
 } as const;
+
+/** The identity of a cart. */
+export type CartId = z.infer<typeof CartId.schema>;
+export const CartId = {
+  schema: z.uuid().brand<"CartId">(),
+} as const;
+
+/** The identity of a payment row: one charge or one refund. */
+export type PaymentId = z.infer<typeof PaymentId.schema>;
+export const PaymentId = {
+  schema: z.uuid().brand<"PaymentId">(),
+} as const;

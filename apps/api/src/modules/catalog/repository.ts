@@ -19,7 +19,7 @@ import type {
   Suggestion,
 } from "@prism/shared";
 import { Dimensions, Weight } from "@prism/shared";
-import { asc, count, eq, ilike, max, min, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, inArray, max, min, not, sql } from "drizzle-orm";
 import type { Database } from "../../db/client.ts";
 import { brands, categories, productProperties, productReviews, products } from "../../db/schema.ts";
 import { ProductSearch, type LiftedFacet } from "./search.ts";
@@ -29,6 +29,11 @@ export type CatalogRepository = Readonly<{
   search: (query: ProductQuery) => Promise<ProductSearchResult>;
   suggest: (text: string, limit: number) => Promise<readonly Suggestion[]>;
   findBySlug: (slug: Slug) => Promise<ProductDetail | undefined>;
+  /**
+   * In-stock products outside `productIds`: those sharing a category with
+   * them first, then the rest, each group best rated first.
+   */
+  related: (productIds: readonly ProductId[], limit: number) => Promise<readonly ProductSummary[]>;
 }>;
 
 export const CatalogRepository = {
@@ -233,6 +238,38 @@ export const CatalogRepository = {
           .where(ilike(products.name, ProductSearch.likePattern(text)))
           .orderBy(...ProductSearch.suggestionOrder(text))
           .limit(limit),
+
+      related: async (productIds, limit) => {
+        const listed = sql.join(
+          productIds.map((id) => sql`${id}`),
+          sql`, `,
+        );
+        // Postgres refuses a constant in ORDER BY, so an empty cart leaves the term out.
+        const byCategory =
+          productIds.length === 0
+            ? []
+            : [
+                desc(
+                  sql`${products.categoryId} IN (SELECT listed.category_id FROM product listed WHERE listed.id IN (${listed}))`,
+                ),
+              ];
+
+        const rows = await db
+          .select(summaryColumns)
+          .from(products)
+          .innerJoin(categories, eq(products.categoryId, categories.id))
+          .innerJoin(brands, eq(products.brandId, brands.id))
+          .leftJoin(rating, eq(rating.productId, products.id))
+          .where(
+            productIds.length === 0
+              ? gt(products.stock, 0)
+              : and(gt(products.stock, 0), not(inArray(products.id, [...productIds]))),
+          )
+          .orderBy(...byCategory, desc(summaryColumns.average), desc(summaryColumns.count), asc(products.name))
+          .limit(limit);
+
+        return rows.map(toSummary);
+      },
 
       findBySlug: async (slug) => {
         const [row] = await db

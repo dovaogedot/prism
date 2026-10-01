@@ -11,6 +11,9 @@ import { SignJWT } from "jose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { App } from "../../src/app.ts";
 import { Config } from "../../src/config.ts";
+import { Topology } from "../../src/messaging/topology.ts";
+import { MessageQueue } from "../../src/platform/queue.ts";
+import { CHECKOUT, Shop } from "../support/commerce.ts";
 import {
   jsonOf,
   registerUser,
@@ -374,11 +377,12 @@ describe("rate limiting", () => {
   let throttled: FastifyInstance;
 
   beforeAll(async () => {
-    throttled = await App.build({
+    const built = await App.build({
       config: Config.fromEnvironment(testEnvironment(harness.config.database.url, harness.mediaDirectory, LIMIT)),
       database: harness.database,
-      overrides: { clock: harness.clock, mailer: harness.mailer },
+      overrides: { clock: harness.clock, mailer: harness.mailer, queue: MessageQueue.memory(Topology.declarations()) },
     });
+    throttled = built.app;
   });
 
   afterAll(async () => {
@@ -448,3 +452,197 @@ describe("rate limiting", () => {
     expect((await attempt("203.0.113.12")).statusCode).not.toBe(429);
   });
 });
+
+describe("payment webhooks", () => {
+  beforeEach(async () => {
+    await seedCatalog(harness, [{ slug: "desk-lamp", name: "Desk Lamp", priceCents: 2500, stock: 5 }]);
+  });
+
+  const deliver = (payload: string, signature: string) =>
+    harness.app.inject({
+      method: "POST",
+      url: "/api/v1/payments/webhook",
+      headers: { "content-type": "application/json", "stripe-signature": signature },
+      payload,
+    });
+
+  it("refuses an event signed with another secret", async () => {
+    const placed = await Shop.placed(harness, await Shop.fill(harness, [["desk-lamp", 1]]));
+    const payload = JSON.stringify({ id: "evt_forged", object: "event", type: "payment_intent.succeeded", data: { object: Shop.intent(placed.charge) } });
+    const timestamp = Math.floor(Date.now() / 1000);
+    const { createHmac } = await import("node:crypto");
+    const forged = createHmac("sha256", "whsec_someone_else").update(`${timestamp}.${payload}`).digest("hex");
+
+    const response = await deliver(payload, `t=${timestamp},v1=${forged}`);
+
+    expect(response.statusCode).toBe(400);
+    await harness.settle();
+    expect(harness.mailer.sent).toHaveLength(0);
+  });
+
+  it("refuses a correctly signed event replayed after the tolerance window", async () => {
+    const placed = await Shop.placed(harness, await Shop.fill(harness, [["desk-lamp", 1]]));
+    const { payload, signature } = harness.gateway.sign({
+      type: "payment_intent.succeeded",
+      object: Shop.intent(placed.charge),
+      timestamp: Math.floor(Date.now() / 1000) - 600,
+    });
+
+    expect((await deliver(payload, signature)).statusCode).toBe(400);
+  });
+
+  it("acts once on a fresh event delivered again", async () => {
+    const placed = await Shop.placed(harness, await Shop.fill(harness, [["desk-lamp", 1]]));
+    const { payload, signature } = harness.gateway.sign({ type: "payment_intent.succeeded", object: Shop.intent(placed.charge) });
+
+    expect((await deliver(payload, signature)).statusCode).toBe(200);
+    expect((await deliver(payload, signature)).statusCode).toBe(200);
+    await harness.settle();
+
+    expect(harness.mailer.sent).toHaveLength(1);
+  });
+});
+
+describe("orders of other customers", () => {
+  beforeEach(async () => {
+    await seedCatalog(harness, [{ slug: "desk-lamp", name: "Desk Lamp", priceCents: 2500, stock: 5 }]);
+  });
+
+  it("cannot be read or canceled by id, by another account or by a guest", async () => {
+    const owner = await registerUser(harness, "owner@example.com");
+    const intruder = await registerUser(harness, "intruder@example.com");
+    const placed = await Shop.placed(harness, await Shop.fill(harness, [["desk-lamp", 1]], { token: owner.accessToken }));
+
+    for (const caller of [{ token: intruder.accessToken }, {}]) {
+      expect((await Shop.call(harness, "GET", `/orders/${placed.orderId}`, caller)).statusCode).toBe(404);
+      expect((await Shop.call(harness, "POST", `/orders/${placed.orderId}/cancel`, caller)).statusCode).toBe(404);
+    }
+
+    const list = jsonOf(await Shop.call(harness, "GET", "/orders", { token: intruder.accessToken }));
+    expect(list["total"]).toBe(0);
+    expect((jsonOf(await Shop.call(harness, "GET", `/orders/${placed.orderId}`, { token: owner.accessToken })))["status"]).toBe(
+      "pending_payment",
+    );
+  });
+
+  it("cannot be opened with another order's key", async () => {
+    const first = await Shop.placed(harness, await Shop.fill(harness, [["desk-lamp", 1]]));
+    const second = await Shop.placed(harness, await Shop.fill(harness, [["desk-lamp", 1]]));
+
+    expect((await Shop.call(harness, "GET", `/orders/${first.orderId}?key=${second.key}`)).statusCode).toBe(404);
+  });
+
+  it("cannot be read through someone else's cart cookie", async () => {
+    const guest = await Shop.fill(harness, [["desk-lamp", 2]]);
+    const stranger = await Shop.fill(harness, [["desk-lamp", 1]]);
+
+    expect(jsonOf(await Shop.call(harness, "GET", "/cart", stranger))["itemCount"]).toBe(1);
+    expect(jsonOf(await Shop.call(harness, "GET", "/cart", guest))["itemCount"]).toBe(2);
+  });
+});
+
+describe("money in request bodies", () => {
+  beforeEach(async () => {
+    await seedCatalog(harness, [{ slug: "desk-lamp", name: "Desk Lamp", priceCents: 2500, stock: 5 }]);
+  });
+
+  it("refuses a price or amount sent with a cart change or an order", async () => {
+    const productId = await Shop.productId(harness, "desk-lamp");
+    const guest = await Shop.fill(harness, [["desk-lamp", 1]]);
+    const total = await Shop.totalOf(harness, guest);
+    const order = { ...CHECKOUT, shippingMethod: "standard", expectedTotalCents: total };
+
+    for (const [url, payload] of [
+      ["/cart/items", { productId, quantity: 1, priceCents: 1 }],
+      ["/orders", { ...order, totalCents: 1 }],
+      ["/orders", { ...order, lines: [{ productId, quantity: 1, unitPriceCents: 1 }] }],
+    ] as const) {
+      const response = await Shop.call(harness, "POST", url, guest, payload);
+      expect(response.statusCode, `${url} ${JSON.stringify(payload)}`).toBe(422);
+    }
+
+    expect(harness.gateway.calls.createIntent).toHaveLength(0);
+  });
+
+  it("charges the server's price whatever total the browser claims", async () => {
+    const guest = await Shop.fill(harness, [["desk-lamp", 1]]);
+    const response = await Shop.place(harness, guest, { expectedTotalCents: 1 });
+
+    expect(response.statusCode).toBe(409);
+    expect(jsonOf(response)["error"]).toMatchObject({ code: "CartChanged" });
+    expect(harness.gateway.calls.createIntent).toHaveLength(0);
+  });
+
+  it("accepts no card field at all, so card data cannot reach the server", async () => {
+    const guest = await Shop.fill(harness, [["desk-lamp", 1]]);
+
+    for (const field of [{ cardNumber: "4242424242424242" }, { card: { number: "4242424242424242", cvc: "123" } }, { cvc: "123" }]) {
+      const response = await Shop.place(harness, guest, field);
+      expect(response.statusCode, JSON.stringify(field)).toBe(422);
+    }
+  });
+});
+
+describe("SQL injection through cart and order parameters", () => {
+  it("rejects payloads in the order filters", async () => {
+    const { accessToken } = await registerUser(harness, "buyer@example.com");
+
+    for (const payload of SQL_PAYLOADS) {
+      for (const parameter of ["status", "from", "to", "sort", "page"]) {
+        const response = await Shop.call(harness, "GET", `/orders?${parameter}=${encodeURIComponent(payload)}`, {
+          token: accessToken,
+        });
+
+        expect([400, 422], `${parameter}=${payload}`).toContain(response.statusCode);
+      }
+    }
+  });
+
+  it("rejects payloads in product and order ids", async () => {
+    for (const payload of SQL_PAYLOADS) {
+      const encoded = encodeURIComponent(payload);
+
+      expect([400, 404, 422], payload).toContain((await Shop.call(harness, "DELETE", `/cart/items/${encoded}`)).statusCode);
+      expect([400, 404, 422], payload).toContain((await Shop.call(harness, "GET", `/orders/${encoded}`)).statusCode);
+      expect([400, 422], payload).toContain(
+        (await Shop.call(harness, "POST", "/cart/items", {}, { productId: payload, quantity: 1 })).statusCode,
+      );
+    }
+
+    expect(await harness.database.sql`SELECT count(*)::int AS n FROM app_user`).toEqual([{ n: 0 }]);
+  });
+
+  it("stores markup in the address as text and never runs it", async () => {
+    await seedCatalog(harness, [{ slug: "desk-lamp", name: "Desk Lamp", priceCents: 2500, stock: 5 }]);
+    const guest = await Shop.fill(harness, [["desk-lamp", 1]]);
+    const hostile = "Robert'); DROP TABLE customer_order; --";
+
+    const placed = await Shop.place(harness, guest, { contact: { ...CHECKOUT.contact, fullName: hostile } });
+    expect(placed.statusCode).toBe(201);
+
+    const body = jsonOf(placed) as { orderId: string; key: string };
+    const order = jsonOf(await Shop.call(harness, "GET", `/orders/${body.orderId}?key=${body.key}`));
+    expect((order["contact"] as { fullName: string }).fullName).toBe(hostile);
+  });
+});
+
+describe("markup in order emails", () => {
+  it("escapes a product name in every email it appears in", async () => {
+    for (const payload of XSS_PAYLOADS) {
+      await harness.reset();
+      const slug = "hostile";
+      await seedCatalog(harness, [{ slug, name: payload, priceCents: 2500, stock: 5 }]);
+
+      const placed = await Shop.placed(harness, await Shop.fill(harness, [[slug, 1]]));
+      await Shop.succeed(harness, placed.charge);
+      await harness.settle();
+
+      const html = harness.mailer.sent.map((email) => email.html).join("\n");
+      expect(harness.mailer.sent, payload).toHaveLength(1);
+      // Escaped, the payload is text: no tag it carried survives as a tag.
+      expect(html, payload).not.toMatch(/<(script|img|svg)/i);
+      if (payload.includes("<")) expect(html, payload).toContain("&lt;");
+    }
+  });
+});
+

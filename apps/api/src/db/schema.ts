@@ -11,12 +11,24 @@
  */
 
 import { relations, sql } from "drizzle-orm";
-import type { Email, OAuthProvider, ProductId, Slug, UserId } from "@prism/shared";
 import {
+  OrderStatus,
+  ShippingMethod,
+  type Email,
+  type OAuthProvider,
+  type OrderId,
+  type OrderNumber,
+  type ProductId,
+  type Slug,
+  type UserId,
+} from "@prism/shared";
+import {
+  bigint,
   check,
   customType,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   smallint,
@@ -29,12 +41,26 @@ import type { PasswordHash } from "../platform/hasher.ts";
 import type { ProviderSubject } from "../platform/oauth.ts";
 import type { Digest } from "../platform/tokens.ts";
 import type { TotpSecret } from "../platform/totp.ts";
-import type { BrandId, CategoryId, SessionId } from "./ids.ts";
+import type { BrandId, CartId, CategoryId, PaymentId, SessionId } from "./ids.ts";
 
 /** Postgres full-text search vectors, which drizzle has no built-in for. */
 const tsvector = customType<{ data: string; driverData: string }>({
   dataType: () => "tsvector",
 });
+
+/** Raw bytes, which drizzle has no built-in for. Every encrypted column is one. */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
+
+/** A SQL list of string literals, for a CHECK over a closed set of names. */
+const literals = (names: readonly string[]) => sql.raw(names.map((name) => `'${name}'`).join(", "));
+
+/** What a payment row records: money taken, or money given back. */
+export type PaymentKind = "charge" | "refund";
+
+/** Where a payment row stands at the provider. */
+export type PaymentStatus = "pending" | "succeeded" | "failed" | "canceled";
 
 /* ----------------------------------------------------------------- identity */
 
@@ -291,6 +317,219 @@ export const productReviews = pgTable(
   ],
 );
 
+/* ----------------------------------------------------------------- commerce */
+
+/**
+ * A cart belongs to a user or to a guest's cookie, never both. A guest cart
+ * expires; a user cart lives until checkout empties it.
+ */
+export const carts = pgTable(
+  "cart",
+  {
+    id: uuid("id").primaryKey().defaultRandom().$type<CartId>(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .$type<UserId>(),
+    /** SHA-256 of the guest cookie; the cookie itself is never stored. */
+    tokenHash: text("token_hash").$type<Digest>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Null for a user cart. */
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("cart_user_key").on(table.userId),
+    uniqueIndex("cart_token_hash_key").on(table.tokenHash),
+    // The cleanup scans guest carts by expiry.
+    index("cart_guest_expiry_idx").on(table.expiresAt).where(sql`${table.userId} IS NULL`),
+    check("cart_one_owner", sql`(${table.userId} IS NULL) <> (${table.tokenHash} IS NULL)`),
+    check("cart_guest_expires", sql`${table.userId} IS NOT NULL OR ${table.expiresAt} IS NOT NULL`),
+  ],
+);
+
+/** One product in one cart. Prices are read from the product, never stored here. */
+export const cartItems = pgTable(
+  "cart_item",
+  {
+    cartId: uuid("cart_id")
+      .notNull()
+      .references(() => carts.id, { onDelete: "cascade" })
+      .$type<CartId>(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" })
+      .$type<ProductId>(),
+    quantity: integer("quantity").notNull(),
+    addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.cartId, table.productId] }),
+    index("cart_item_product_idx").on(table.productId),
+    check("cart_item_quantity_range", sql`${table.quantity} BETWEEN 1 AND 99`),
+  ],
+);
+
+/**
+ * A placed order. The contact, the address and a guest's access key are
+ * sealed by the API before they are written, so these columns hold
+ * ciphertext. Status, dates and amounts stay plain: lists filter and sort
+ * on them, and they identify nobody.
+ */
+export const orders = pgTable(
+  "customer_order",
+  {
+    id: uuid("id").primaryKey().defaultRandom().$type<OrderId>(),
+    /** What the customer quotes. */
+    number: integer("number").notNull().generatedAlwaysAsIdentity({ startWith: 100001 }).$type<OrderNumber>(),
+    /** Null for a guest's order. An account with orders cannot be deleted. */
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "restrict" })
+      .$type<UserId>(),
+    /** The cart this order was placed from, emptied once the payment succeeds. */
+    cartId: uuid("cart_id")
+      .references(() => carts.id, { onDelete: "set null" })
+      .$type<CartId>(),
+    status: text("status").notNull().$type<OrderStatus>(),
+    shippingMethod: text("shipping_method").notNull().$type<ShippingMethod>(),
+    subtotalCents: integer("subtotal_cents").notNull(),
+    shippingCents: integer("shipping_cents").notNull(),
+    totalCents: integer("total_cents").notNull(),
+    /** Sealed: name, email and phone. */
+    contact: bytea("contact").notNull(),
+    /** Sealed. */
+    shippingAddress: bytea("shipping_address").notNull(),
+    /** Sealed, not hashed: the emails sent later carry it in their links. Guest orders only. */
+    accessKey: bytea("access_key"),
+    trackingNumber: text("tracking_number"),
+    /** When the payment came back to the customer; set once. */
+    refundedAt: timestamp("refunded_at", { withTimezone: true }),
+    /** When an unpaid order expires and gives its stock back. */
+    paymentDueAt: timestamp("payment_due_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    statusChangedAt: timestamp("status_changed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("customer_order_number_key").on(table.number),
+    index("customer_order_user_created_idx").on(table.userId, table.createdAt.desc()),
+    // Housekeeping finds orders by status and how long they have had it.
+    index("customer_order_status_changed_idx").on(table.status, table.statusChangedAt),
+    check("customer_order_status_known", sql`${table.status} IN (${literals(OrderStatus.NAMES)})`),
+    check("customer_order_shipping_known", sql`${table.shippingMethod} IN (${literals(ShippingMethod.NAMES)})`),
+    check(
+      "customer_order_money_not_negative",
+      sql`${table.subtotalCents} >= 0 AND ${table.shippingCents} >= 0 AND ${table.totalCents} >= 0`,
+    ),
+    check("customer_order_total_adds_up", sql`${table.totalCents} = ${table.subtotalCents} + ${table.shippingCents}`),
+    check("customer_order_has_owner", sql`${table.userId} IS NOT NULL OR ${table.accessKey} IS NOT NULL`),
+    check(
+      "customer_order_tracking_when_shipped",
+      sql`(${table.trackingNumber} IS NOT NULL) = (${table.status} IN ('shipped', 'delivered'))`,
+    ),
+  ],
+);
+
+/**
+ * One product of an order, as it was sold. The name, slug and price are a
+ * snapshot, so the order stays true when the catalog changes.
+ */
+export const orderLines = pgTable(
+  "order_line",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" })
+      .$type<OrderId>(),
+    /** Null once the product has left the catalog. */
+    productId: uuid("product_id")
+      .references(() => products.id, { onDelete: "set null" })
+      .$type<ProductId>(),
+    productName: text("product_name").notNull(),
+    productSlug: text("product_slug").notNull().$type<Slug>(),
+    unitPriceCents: integer("unit_price_cents").notNull(),
+    quantity: integer("quantity").notNull(),
+    lineTotalCents: integer("line_total_cents").notNull(),
+  },
+  (table) => [
+    uniqueIndex("order_line_product_key").on(table.orderId, table.productId),
+    index("order_line_product_idx").on(table.productId),
+    check("order_line_quantity_positive", sql`${table.quantity} >= 1`),
+    check("order_line_price_not_negative", sql`${table.unitPriceCents} >= 0`),
+    check("order_line_total_adds_up", sql`${table.lineTotalCents} = ${table.unitPriceCents} * ${table.quantity}`),
+  ],
+);
+
+/** An order's timeline: one row per status it reached. */
+export const orderEvents = pgTable(
+  "order_event",
+  {
+    /** Increasing, so two events with the same timestamp keep the order they were written in. */
+    id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" })
+      .$type<OrderId>(),
+    status: text("status").notNull().$type<OrderStatus>(),
+    /** Null when the status says it all. */
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("order_event_order_created_idx").on(table.orderId, table.createdAt),
+    check("order_event_status_known", sql`${table.status} IN (${literals(OrderStatus.NAMES)})`),
+  ],
+);
+
+/**
+ * Money moving for an order: one charge, and at most one refund. The
+ * provider's reference and the card summary are sealed.
+ */
+export const payments = pgTable(
+  "payment",
+  {
+    id: uuid("id").primaryKey().defaultRandom().$type<PaymentId>(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" })
+      .$type<OrderId>(),
+    kind: text("kind").notNull().$type<PaymentKind>(),
+    status: text("status").notNull().$type<PaymentStatus>(),
+    amountCents: integer("amount_cents").notNull(),
+    provider: text("provider").notNull().default("stripe"),
+    /** Sealed intent or refund id; null until the provider has answered. */
+    reference: bytea("reference"),
+    /** Sealed card brand and last four digits, failure code and provider message. */
+    details: bytea("details"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("payment_order_kind_key").on(table.orderId, table.kind),
+    check("payment_kind_known", sql`${table.kind} IN ('charge', 'refund')`),
+    check("payment_status_known", sql`${table.status} IN ('pending', 'succeeded', 'failed', 'canceled')`),
+    check("payment_amount_not_negative", sql`${table.amountCents} >= 0`),
+  ],
+);
+
+/**
+ * Messages waiting to be published. A module writes one in the same
+ * transaction as the change it announces, so a message exists exactly when
+ * its change committed; the relay publishes it and stamps `published_at`.
+ */
+export const outboxMessages = pgTable(
+  "outbox_message",
+  {
+    /** Also the message id a consumer sees. */
+    id: uuid("id").primaryKey().defaultRandom(),
+    exchange: text("exchange").notNull(),
+    routingKey: text("routing_key").notNull(),
+    payload: jsonb("payload").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+  },
+  (table) => [index("outbox_message_unpublished_idx").on(table.createdAt).where(sql`${table.publishedAt} IS NULL`)],
+);
+
 /* ---------------------------------------------------------------- relations */
 
 /** What `db.query.products` can join in one call. */
@@ -327,6 +566,13 @@ export const schema = {
   productProperties,
   productImages,
   productReviews,
+  carts,
+  cartItems,
+  orders,
+  orderLines,
+  orderEvents,
+  payments,
+  outboxMessages,
   productRelations,
   productImageRelations,
   productPropertyRelations,

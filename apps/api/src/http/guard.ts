@@ -31,8 +31,17 @@ export type GuardDependencies = Readonly<{
   clock: Clock;
 }>;
 
-/** The preHandler that answers 401 to a request without a live session. */
-export type Guards = Readonly<{ requireUser: preHandlerHookHandler }>;
+/** The preHandlers that turn a bearer token into `request.authenticated`. */
+export type Guards = Readonly<{
+  /** Answers 401 to a request without a live session. */
+  requireUser: preHandlerHookHandler;
+  /**
+   * Lets a request without an `Authorization` header through as a guest. A
+   * header that fails verification still answers 401, so the browser
+   * refreshes and retries instead of acting as a guest by mistake.
+   */
+  optionalUser: preHandlerHookHandler;
+}>;
 
 export const Guards = {
   BEARER: /^Bearer (.+)$/,
@@ -84,6 +93,17 @@ export const Guards = {
 
   create: (deps: GuardDependencies): Guards => ({
     requireUser: async (request, reply) => {
+      const result = await Guards.authenticate(deps, request);
+
+      if (result.isErr()) return HttpErrors.send(reply, result.error);
+
+      request.authenticated = result.value;
+      return undefined;
+    },
+
+    optionalUser: async (request, reply) => {
+      if (request.headers.authorization === undefined) return undefined;
+
       const result = await Guards.authenticate(deps, request);
 
       if (result.isErr()) return HttpErrors.send(reply, result.error);
