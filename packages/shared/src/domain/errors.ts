@@ -31,6 +31,15 @@ export type DomainError =
   | Readonly<{ _tag: "OAuthProviderUnknown" }>
   | Readonly<{ _tag: "OAuthEmailUnavailable" }>
   | Readonly<{ _tag: "ProductNotFound" }>
+  /** One issue per short product, with the product id as its path. */
+  | Readonly<{ _tag: "OutOfStock"; issues: readonly ValidationIssue[] }>
+  | Readonly<{ _tag: "CartEmpty" }>
+  | Readonly<{ _tag: "CartChanged" }>
+  | Readonly<{ _tag: "PaymentsUnavailable" }>
+  | Readonly<{ _tag: "PaymentGatewayUnavailable" }>
+  | Readonly<{ _tag: "OrderNotFound" }>
+  | Readonly<{ _tag: "OrderNotCancelable" }>
+  | Readonly<{ _tag: "WebhookSignatureInvalid" }>
   | Readonly<{ _tag: "ValidationFailed"; issues: readonly ValidationIssue[] }>
   | Readonly<{ _tag: "RateLimited" }>
   | Readonly<{ _tag: "Conflict" }>;
@@ -73,6 +82,14 @@ export const DomainError = {
     OAuthProviderUnknown: 404,
     OAuthEmailUnavailable: 422,
     ProductNotFound: 404,
+    OutOfStock: 409,
+    CartEmpty: 409,
+    CartChanged: 409,
+    PaymentsUnavailable: 503,
+    PaymentGatewayUnavailable: 504,
+    OrderNotFound: 404,
+    OrderNotCancelable: 409,
+    WebhookSignatureInvalid: 400,
     ValidationFailed: 422,
     RateLimited: 429,
     Conflict: 409,
@@ -103,6 +120,14 @@ export const DomainError = {
     OAuthProviderUnknown: "We do not support signing in with that.",
     OAuthEmailUnavailable: "We could not read a verified email address from that account.",
     ProductNotFound: "We could not find that product.",
+    OutOfStock: "Some items are not available in the quantity you asked for.",
+    CartEmpty: "Your cart is empty.",
+    CartChanged: "Prices or stock changed. Check the summary and place the order again.",
+    PaymentsUnavailable: "Payments are not set up on this shop yet, so orders cannot be placed.",
+    PaymentGatewayUnavailable: "The payment provider did not answer. You have not been charged.",
+    OrderNotFound: "We could not find that order.",
+    OrderNotCancelable: "This order can no longer be canceled.",
+    WebhookSignatureInvalid: "The payment notification could not be verified.",
     ValidationFailed: "Please check the highlighted fields.",
     RateLimited: "Too many attempts. Please wait a moment and try again.",
     Conflict: "That conflicts with something that already exists.",
@@ -119,7 +144,7 @@ export const DomainError = {
     error: {
       code: error._tag,
       message: DomainError.message[error._tag],
-      issues: error._tag === "ValidationFailed" ? error.issues : [],
+      issues: "issues" in error ? error.issues : [],
     },
   }),
 } as const;

@@ -53,4 +53,12 @@ describe("DomainError.toResponse", () => {
     expect(DomainError.toResponse(error).error.issues).toEqual(issues);
     expect(DomainError.httpStatus(error)).toBe(422);
   });
+
+  it("carries the per-product issues of a stock failure", () => {
+    const issues = [{ path: "7f0c2a52-3b8e-4f43-9a6e-1c2d3e4f5a6b", message: "Only 2 left." }];
+    const error: DomainError = { _tag: "OutOfStock", issues };
+
+    expect(DomainError.toResponse(error).error.issues).toEqual(issues);
+    expect(DomainError.httpStatus(error)).toBe(409);
+  });
 });
