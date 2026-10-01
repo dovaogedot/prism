@@ -71,7 +71,7 @@ export const Api = {
     return fetch(`${Api.BASE}${path}`, {
       method: options.method ?? "GET",
       headers,
-      // The refresh cookie is same-origin; Caddy puts the API behind /api.
+      // The refresh and cart cookies are same-origin; Caddy puts the API behind /api.
       credentials: "same-origin",
       body: options.body === undefined ? null : JSON.stringify(options.body),
       ...(options.signal === undefined ? {} : { signal: options.signal }),
@@ -136,6 +136,10 @@ export const Api = {
     Api.request<A>(path, signal === undefined ? {} : { signal }),
 
   post: <A>(path: string, body?: unknown): Promise<A> => Api.request<A>(path, { method: "POST", body }),
+
+  put: <A>(path: string, body?: unknown): Promise<A> => Api.request<A>(path, { method: "PUT", body }),
+
+  delete: <A>(path: string): Promise<A> => Api.request<A>(path, { method: "DELETE" }),
 
   postEmpty: (path: string, body?: unknown): Promise<void> =>
     Api.requestEmpty(path, { method: "POST", body }),

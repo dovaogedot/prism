@@ -17,8 +17,12 @@ import {
   TwoFactorPage,
 } from "../features/auth/pages/index.ts";
 import { useSessionBootstrap } from "../features/auth/session.ts";
+import { CartPage } from "../features/cart/pages/CartPage.tsx";
 import { CatalogPage } from "../features/catalog/pages/CatalogPage.tsx";
 import { ProductPage } from "../features/catalog/pages/ProductPage.tsx";
+import { CheckoutPage } from "../features/checkout/pages/CheckoutPage.tsx";
+import { OrderPage } from "../features/orders/pages/OrderPage.tsx";
+import { OrdersPage } from "../features/orders/pages/OrdersPage.tsx";
 import { Layout } from "../shared/layout/Layout.tsx";
 import "./styles.css";
 
@@ -49,6 +53,13 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <CatalogPage /> },
       { path: "item/:slug", element: <ProductPage /> },
+      { path: "cart", element: <CartPage /> },
+      { path: "checkout", element: <CheckoutPage /> },
+
+      // OrdersPage sends a signed-out visitor to /login itself. An order opens
+      // for its owner, or for a guest with the key from its confirmation link.
+      { path: "orders", element: <OrdersPage /> },
+      { path: "orders/:id", element: <OrderPage /> },
 
       // Signing in when already signed in is a no-op with a form attached.
       {

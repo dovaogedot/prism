@@ -5,6 +5,7 @@ import { Link, useParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { Alert, Card, Skeleton, Stars } from "../../../shared/ui/index.ts";
+import { AddToCart } from "../../cart/components/index.ts";
 import { Picture, Stock } from "../components/ProductCard.tsx";
 
 /** One row of a specification list. */
@@ -131,6 +132,8 @@ export const ProductPage = () => {
                 <span className="text-3xl font-semibold tabular-nums text-ink">{Price.format(data.priceCents)}</span>
                 <Stock count={data.stock} className="text-sm" />
               </div>
+
+              <AddToCart product={data} />
 
               <p className="leading-relaxed text-ink-soft">{data.description}</p>
 

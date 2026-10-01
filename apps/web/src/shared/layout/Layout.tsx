@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { match, P } from "ts-pattern";
 import { useSession, useSignOut } from "../../features/auth/session.ts";
+import { CartButton } from "../../features/cart/components/index.ts";
 import { useTheme } from "../theme/use-theme.ts";
 import { Drawer, type Drawer as DrawerHandle } from "./drawer.ts";
 import { useWide } from "./use-wide.ts";
@@ -140,6 +141,8 @@ export const Layout = () => {
               <ThemeToggle look="icon" />
             </div>
 
+            <CartButton />
+
             {match(session)
               .with(P.nullish, () => (
                 <div className="flex shrink-0 items-center gap-1">
@@ -165,6 +168,12 @@ export const Layout = () => {
                       <circle cx="12" cy="8.5" r="3.8" />
                       <path d="M4.5 20.5c1.2-3.6 4.1-5.6 7.5-5.6s6.3 2 7.5 5.6" />
                     </svg>
+                  </Link>
+                  <Link
+                    to="/orders"
+                    className="hidden whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium text-ink-soft hover:bg-sunken hover:text-ink lg:block"
+                  >
+                    Orders
                   </Link>
                   <Link
                     to="/account"
@@ -211,6 +220,16 @@ export const Layout = () => {
             <div className="flex-1 space-y-5 overflow-y-auto px-4 pb-4">
               <div className="space-y-1 border-b border-line pb-4">
                 <ThemeToggle look="row" />
+                {match(session)
+                  .with(P.nullish, () => null)
+                  .otherwise(() => (
+                    <Link to="/orders" className={Looks.row}>
+                      <svg viewBox="0 0 24 24" className="size-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5zM4 7.5l8 4.5 8-4.5M12 12v9" />
+                      </svg>
+                      <span>Orders</span>
+                    </Link>
+                  ))}
               </div>
 
               <div ref={holdSlot} />
