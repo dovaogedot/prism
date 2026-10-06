@@ -95,7 +95,7 @@ cat <<BANNER
   Prism is up.
 
     Storefront      http://localhost:${web_port}
-    Inbox (Mailpit) http://localhost:8025
+    Inbox (Mailpit) http://localhost:8025    prism / MAILPIT_PASSWORD
     RabbitMQ UI     http://localhost:${rabbit_port}   prism / RABBITMQ_PASSWORD
     Payments        ${payments}
 

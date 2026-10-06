@@ -30,8 +30,8 @@ services:
 
   mailpit:
     restart: unless-stopped
-    # Loopback only. Whatever publishes this should ask for a password: it is
-    # the inbox a reviewer opens to finish a password reset.
+    # Loopback only. The reverse proxy publishes it, and Mailpit asks for its
+    # own login.
     ports: !override
       - "127.0.0.1:${MAILPIT_PORT:?set MAILPIT_PORT}:8025"
 

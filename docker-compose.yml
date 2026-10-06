@@ -29,8 +29,10 @@ services:
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: 1
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
+      # The inbox's page and API ask for this login; sending mail to it needs none.
+      MP_UI_AUTH: prism:${MAILPIT_PASSWORD:-prism}
     ports:
-      # Password-reset emails land here — this is the inbox a reviewer opens.
+      # Order and password-reset emails land here — this is the inbox a reviewer opens.
       - "8025:8025"
     healthcheck:
       test: ["CMD", "/mailpit", "readyz"]

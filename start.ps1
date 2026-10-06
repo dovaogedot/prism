@@ -98,7 +98,7 @@ Write-Host @"
   Prism is up.
 
     Storefront      http://localhost:$webPort
-    Inbox (Mailpit) http://localhost:8025
+    Inbox (Mailpit) http://localhost:8025    prism / MAILPIT_PASSWORD
     RabbitMQ UI     http://localhost:$rabbitPort   prism / RABBITMQ_PASSWORD
     Payments        $payments
 

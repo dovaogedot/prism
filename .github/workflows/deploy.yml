@@ -140,6 +140,7 @@ jobs: # The work this workflow does.
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }} # Read only when the database is first created.
           DATA_ENCRYPTION_KEY: ${{ secrets.DATA_ENCRYPTION_KEY }} # Encrypts the order contact, address and payment records at rest.
           RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }} # Read only when RabbitMQ first initializes its volume.
+          MAILPIT_PASSWORD: ${{ secrets.MAILPIT_PASSWORD }} # The Mailpit inbox's login, as prism / this.
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }} # Set with the publishable key, the shop takes payments.
           STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }} # The browser half of the pair.
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }} # Verifies the webhook endpoint registered in the Stripe dashboard.
@@ -153,7 +154,7 @@ jobs: # The work this workflow does.
           # default is missing. An empty POSTGRES_PASSWORD would fall back to
           # the public local one, and a wrong PUBLIC_WEB_URL breaks every
           # reset link and OAuth redirect.
-          for name in DEPLOY_PATH PUBLIC_WEB_URL JWT_SECRET POSTGRES_PASSWORD DATA_ENCRYPTION_KEY RABBITMQ_PASSWORD; do
+          for name in DEPLOY_PATH PUBLIC_WEB_URL JWT_SECRET POSTGRES_PASSWORD DATA_ENCRYPTION_KEY RABBITMQ_PASSWORD MAILPIT_PASSWORD; do
             if [ -z "${!name}" ]; then
               echo "$name is not set." >&2
               exit 1
@@ -176,7 +177,7 @@ jobs: # The work this workflow does.
           for name in COMPOSE_FILE API_IMAGE WEB_IMAGE WEB_PORT MAILPIT_PORT RABBITMQ_UI_PORT PUBLIC_WEB_URL MAIL_FROM \
             AUTH_RATE_LIMIT_PER_MINUTE LOG_LEVEL JWT_SECRET POSTGRES_PASSWORD RECAPTCHA_SECRET_KEY \
             OAUTH_GOOGLE_CLIENT_ID OAUTH_GOOGLE_CLIENT_SECRET OAUTH_GITHUB_CLIENT_ID OAUTH_GITHUB_CLIENT_SECRET \
-            DATA_ENCRYPTION_KEY RABBITMQ_PASSWORD STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET; do
+            DATA_ENCRYPTION_KEY RABBITMQ_PASSWORD MAILPIT_PASSWORD STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET; do
             value=${!name} # The value of the variable with that name.
             if [[ $value == *"'"* || $value == *$'\n'* ]]; then
               echo "$name holds a single quote or a line break, which a .env line cannot carry." >&2

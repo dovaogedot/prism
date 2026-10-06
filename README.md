@@ -33,8 +33,10 @@ On Windows each command is `.\start.cmd ...` with the same arguments.
 | --- | --- |
 | Storefront | <http://localhost:3000> |
 | API | <http://localhost:3000/api/v1> |
-| Inbox for order and password-reset mail (Mailpit) | <http://localhost:8025> |
+| Inbox for order and password-reset mail (Mailpit), as `prism` / `MAILPIT_PASSWORD` | <http://localhost:8025> |
 | RabbitMQ management UI, as `prism` / `RABBITMQ_PASSWORD` | <http://localhost:15672> |
+
+Both passwords are `prism` unless `.env` sets them.
 
 The stack runs with no external accounts: the CAPTCHA uses Google's always-pass test key, the
 provider buttons go to a built-in stand-in, and mail lands in Mailpit. Real keys go in `.env`;
