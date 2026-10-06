@@ -5,9 +5,12 @@
  * nothing stored the theme follows the operating system until the visitor
  * picks for themselves. The inline script in index.html reads the same key by
  * the same rule, so the first paint is already the right one.
+ *
+ * The `dark` class on the root element is the one record of the theme in
+ * force, so every component that reads the theme sees the same one.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 /** Which of the two looks the page is drawn in. */
 export type Theme = "light" | "dark";
@@ -23,43 +26,50 @@ export const Theme = {
   systemPrefers: (): Theme =>
     window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
 
-  /** The theme in force: the stored choice, or the system's where there is none. */
-  current: (): Theme => {
-    const raw = localStorage.getItem(Theme.STORAGE_KEY);
-    return Theme.is(raw) ? raw : Theme.systemPrefers();
-  },
+  /** The theme the page is drawn in right now. */
+  shown: (): Theme => (document.documentElement.classList.contains("dark") ? "dark" : "light"),
 
   apply: (theme: Theme): void => {
     document.documentElement.classList.toggle("dark", theme === "dark");
   },
+
+  /** Every component reading the theme, told when it changes. */
+  listeners: new Set<() => void>(),
+
+  /** Stores `theme` over the system preference, draws the page in it, and tells every reader. */
+  choose: (theme: Theme): void => {
+    localStorage.setItem(Theme.STORAGE_KEY, theme);
+    Theme.apply(theme);
+    for (const listener of Theme.listeners) listener();
+  },
+
+  /**
+   * Calls `listener` whenever the theme changes, including when the system
+   * preference changes while no theme is stored. Shaped for `useSyncExternalStore`.
+   */
+  subscribe: (listener: () => void): (() => void) => {
+    const query = window.matchMedia("(prefers-color-scheme: dark)");
+    const followSystem = (): void => {
+      if (Theme.chosen()) return;
+      Theme.apply(Theme.systemPrefers());
+      listener();
+    };
+
+    Theme.listeners.add(listener);
+    query.addEventListener("change", followSystem);
+
+    return () => {
+      Theme.listeners.delete(listener);
+      query.removeEventListener("change", followSystem);
+    };
+  },
 } as const;
 
-/** The current theme, and the toggle that stores a choice over the system preference. */
+/** The current theme, the same in every component, and the toggle that stores a choice over the system preference. */
 export const useTheme = (): Readonly<{ theme: Theme; toggle: () => void }> => {
-  const [theme, setTheme] = useState<Theme>(Theme.current);
-  const [following, setFollowing] = useState<boolean>(() => !Theme.chosen());
+  const theme = useSyncExternalStore(Theme.subscribe, Theme.shown);
 
-  useEffect(() => {
-    Theme.apply(theme);
-  }, [theme]);
-
-  useEffect(() => {
-    if (!following) return undefined;
-
-    const query = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = (): void => setTheme(Theme.systemPrefers());
-
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
-  }, [following]);
-
-  const toggle = useCallback(() => {
-    const next: Theme = theme === "dark" ? "light" : "dark";
-
-    localStorage.setItem(Theme.STORAGE_KEY, next);
-    setFollowing(false);
-    setTheme(next);
-  }, [theme]);
+  const toggle = useCallback(() => Theme.choose(theme === "dark" ? "light" : "dark"), [theme]);
 
   return { theme, toggle };
 };
