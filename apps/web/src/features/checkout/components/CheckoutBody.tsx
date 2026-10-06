@@ -67,11 +67,18 @@ export const CheckoutBody = ({ cart, payments, prefill }: CheckoutBodyProps) => 
 
   const totals = Pricing.totals(cart.lines, method);
   const blocked = Cart.issues(cart.lines).length > 0;
+  // Which products the cart holds and how many; a refreshed price or stock leaves it as it is.
+  const contents = cart.lines.map((line) => `${line.productId}:${line.quantity}`).join(",");
 
   // Stripe's fields are told the amount, which has to match the intent the server creates.
   useEffect(() => {
     if (payments.status === "ready") payments.elements.update({ amount: totals.totalCents });
   }, [payments, totals.totalCents]);
+
+  // A refusal about the cart stands until the customer changes what is in it.
+  useEffect(() => {
+    setCartProblem(undefined);
+  }, [contents]);
 
   const refused = (reason: unknown): void => {
     const failure = Api.failureOf(reason);
