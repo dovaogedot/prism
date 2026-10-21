@@ -249,9 +249,15 @@ export const CatalogRepository = {
           name: categories.name,
           description: categories.description,
           productCount: sql<number>`(SELECT count(*)::int FROM product p WHERE p.category_id = ${categories}."id")`,
+          // The first picture of the first product on the shelf that has one, read off product_category_shelf_idx.
           image: sql<ImageRow | null>`(
-            SELECT ${ImageRows.json("i")} FROM product p JOIN product_image i ON i.product_id = p.id
-            WHERE p.category_id = ${categories}."id" ORDER BY p.featured_at DESC NULLS LAST, p.name, i.position LIMIT 1
+            SELECT ${ImageRows.json("i")} FROM product_image i
+            WHERE i.product_id = (
+              SELECT p.id FROM product p
+              WHERE p.category_id = ${categories}."id" AND EXISTS (SELECT 1 FROM product_image x WHERE x.product_id = p.id)
+              ORDER BY p.featured_at DESC NULLS LAST, p.name LIMIT 1
+            )
+            ORDER BY i.position LIMIT 1
           )`,
         })
         .from(categories)

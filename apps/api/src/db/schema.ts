@@ -296,6 +296,8 @@ export const products = pgTable(
     // Substring matches and the similar-name fallback both read trigrams of the name.
     index("product_name_trgm_idx").using("gin", table.name.op("gin_trgm_ops")),
     index("product_featured_idx").on(table.featuredAt).where(sql`${table.featuredAt} IS NOT NULL`),
+    // A category's shelf in display order: its picture is the first product here that has one.
+    index("product_category_shelf_idx").on(table.categoryId, table.featuredAt.desc().nullsLast(), table.name),
     check("product_price_not_negative", sql`${table.priceCents} >= 0`),
     check("product_stock_not_negative", sql`${table.stock} >= 0`),
     check(

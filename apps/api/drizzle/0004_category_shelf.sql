@@ -1,0 +1,1 @@
+CREATE INDEX "product_category_shelf_idx" ON "product" USING btree ("category_id","featured_at" DESC NULLS LAST,"name");
