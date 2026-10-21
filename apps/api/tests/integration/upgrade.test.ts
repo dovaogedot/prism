@@ -342,8 +342,9 @@ describe("an upgrade that fails halfway", () => {
 
   it("upgrades on the next run", async () => {
     await Migrations.apply(database.db, FieldCipher.create(config.encryptionKey));
+    const journal = JSON.parse(await readFile(join(Migrations.folder, "meta", "_journal.json"), "utf8")) as { entries: unknown[] };
 
     expect(await columnsOf(database, "app_user")).not.toContain("legacy_email");
-    expect(await database.sql`SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations`).toEqual([{ n: 3 }]);
+    expect(await database.sql`SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations`).toEqual([{ n: journal.entries.length }]);
   });
 });
