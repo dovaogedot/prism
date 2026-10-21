@@ -80,9 +80,60 @@ jobs: # The work this workflow does.
           build-args: | # Build-time values, one per line.
             VITE_RECAPTCHA_SITE_KEY=${{ secrets.RECAPTCHA_SITE_KEY }}
 
+  # The browser suite, against the very images build pushed: they start with
+  # the suite's overlay under a project of their own, take the seed's
+  # catalog the way the server does, and Playwright checks every page in both
+  # themes. A deploy waits for it.
+  e2e: # Runs the browser suite against this commit's images.
+    name: Browser suite # The name shown in the run's graph.
+    needs: [build] # The images exist once build has pushed them.
+    runs-on: ubuntu-latest # A fresh GitHub-hosted Linux machine with Docker.
+    permissions: # This job's rights, in place of the ones above.
+      contents: read # Enough to check out the code.
+      packages: read # Pulls this commit's images.
+    env: # Variables every step can read.
+      E2E_COMPOSE: docker compose -p prism-e2e -f docker-compose.yml -f docker-compose.e2e.yml # The suite's stack, never the shop's.
+    steps: # The steps run in order; a failing step stops the job.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; pinned the same way.
+        with: # Settings for the checkout.
+          persist-credentials: false # Leaves no GitHub token in .git for later steps.
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0; pinned the same way.
+        with: # Settings for the sign-in.
+          registry: ghcr.io # The GitHub container registry.
+          username: ${{ github.actor }} # The account that started the run.
+          password: ${{ secrets.GITHUB_TOKEN }} # This job's token; it expires with the job.
+      - name: Start the stack from this commit's images # Named as the project would name its own builds, so nothing is built.
+        run: | # A bash script.
+          printf 'JWT_SECRET=%s\nDATA_ENCRYPTION_KEY=%s\n' "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" > .env # Throwaway keys for a stack that lives as long as this job.
+          docker pull "$API_IMAGE" # The API, which also runs the migrations and the seed.
+          docker pull "$WEB_IMAGE" # The storefront.
+          docker tag "$API_IMAGE" prism-e2e-api
+          docker tag "$API_IMAGE" prism-e2e-migrate
+          docker tag "$WEB_IMAGE" prism-e2e-web
+          $E2E_COMPOSE up --no-build --detach # Returns once the migrations ran and the API started.
+      - name: Seed the shop # The seed the API image carries, with the data unzipped beside it, as on the server.
+        run: | # A bash script.
+          mkdir seed
+          unzip -q apps/api/seed/data.zip -d seed
+          $E2E_COMPOSE run --rm --no-deps --pull never -T \
+            -v "$PWD/seed/catalog.json:/app/apps/api/seed/catalog.json:ro" \
+            -v "$PWD/seed/media:/app/apps/api/seed/media:ro" \
+            api node seed/seed.ts < /dev/null
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0; pinned the same way.
+        with: # Settings for Node.
+          node-version-file: .nvmrc # Uses the same Node version as local work.
+          cache: npm # Caches npm downloads between runs.
+      - run: npm ci --workspace @prism/e2e # Installs only the suite's packages.
+      - run: npx playwright install --with-deps chromium # The browser this Playwright version drives, with its system libraries.
+        working-directory: apps/e2e # The suite's workspace.
+      - run: npx playwright test # Every page in both themes, the keyboard journeys and the admin's gate.
+        working-directory: apps/e2e # The suite's workspace.
+        env: # The address the suite opens.
+          E2E_BASE_URL: https://localhost:3200 # The e2e overlay's port; the certificate is self-signed, which the suite accepts.
+
   deploy: # Sends the settings to the VPS and restarts the shop on the new images.
     name: Pull and restart on the server # The name shown in the run's graph.
-    needs: [verify, build] # Starts only when the tests pass and both images are in the registry.
+    needs: [verify, build, e2e] # Starts only when the tests pass, both images are in the registry, and the browser suite passed on them.
     runs-on: ubuntu-latest # A fresh GitHub-hosted Linux machine with ssh and scp.
     environment: production # Runs only on main, the one branch this environment allows, and reads its secrets.
     permissions: # This job's rights, in place of the ones above.
@@ -134,11 +185,10 @@ jobs: # The work this workflow does.
           RABBITMQ_UI_PORT: ${{ vars.RABBITMQ_UI_PORT || '15672' }} # The loopback port of the RabbitMQ management UI.
           PUBLIC_WEB_URL: ${{ vars.PUBLIC_WEB_URL }} # The address people type; reset links and OAuth redirects are built from it.
           MAIL_FROM: ${{ vars.MAIL_FROM || 'Prism <noreply@localhost>' }} # The sender of reset mail.
-          AUTH_RATE_LIMIT_PER_MINUTE: ${{ vars.AUTH_RATE_LIMIT_PER_MINUTE || '60' }} # Requests per address per minute on /auth/*.
           LOG_LEVEL: info # The lowest level the API logs.
           JWT_SECRET: ${{ secrets.JWT_SECRET }} # Signs the sessions.
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }} # Read only when the database is first created.
-          DATA_ENCRYPTION_KEY: ${{ secrets.DATA_ENCRYPTION_KEY }} # Encrypts the order contact, address and payment records at rest.
+          DATA_ENCRYPTION_KEY: ${{ secrets.DATA_ENCRYPTION_KEY }} # Encrypts at rest every column that identifies a person, and keys the indexes that find them; losing it loses that data.
           RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }} # Read only when RabbitMQ first initializes its volume.
           MAILPIT_PASSWORD: ${{ secrets.MAILPIT_PASSWORD }} # The Mailpit inbox's login, as prism / this.
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }} # Set with the publishable key, the shop takes payments.
@@ -149,12 +199,18 @@ jobs: # The work this workflow does.
           OAUTH_GOOGLE_CLIENT_SECRET: ${{ secrets.OAUTH_GOOGLE_CLIENT_SECRET }} # The other half of Google's pair.
           OAUTH_GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }} # Set with its secret, GitHub sign-in is real.
           OAUTH_GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }} # The other half of GitHub's pair.
+          SUPPORT_EMAIL: ${{ vars.SUPPORT_EMAIL || 'support@localhost' }} # The inbox the contact form writes to.
+          ADMIN_EMAIL: ${{ vars.ADMIN_EMAIL }} # The first admin's sign-in, made at start when no account holds the role.
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }} # The first admin's password, at least 12 characters.
+          ADMIN_TOTP_SECRET: ${{ secrets.ADMIN_TOTP_SECRET }} # The first admin's 2FA key, base32 of 32 characters or more, as an authenticator app takes it.
         run: | # A bash script.
           # Stops before the server is touched when a value with no safe
           # default is missing. An empty POSTGRES_PASSWORD would fall back to
-          # the public local one, and a wrong PUBLIC_WEB_URL breaks every
-          # reset link and OAuth redirect.
-          for name in DEPLOY_PATH PUBLIC_WEB_URL JWT_SECRET POSTGRES_PASSWORD DATA_ENCRYPTION_KEY RABBITMQ_PASSWORD MAILPIT_PASSWORD; do
+          # the public local one, a wrong PUBLIC_WEB_URL breaks every reset
+          # link and OAuth redirect, and without the three admin values the
+          # shop starts with nobody who can run it.
+          for name in DEPLOY_PATH PUBLIC_WEB_URL JWT_SECRET POSTGRES_PASSWORD DATA_ENCRYPTION_KEY RABBITMQ_PASSWORD MAILPIT_PASSWORD \
+            ADMIN_EMAIL ADMIN_PASSWORD ADMIN_TOTP_SECRET; do
             if [ -z "${!name}" ]; then
               echo "$name is not set." >&2
               exit 1
@@ -175,9 +231,10 @@ jobs: # The work this workflow does.
           # written that way, so either one stops the deploy.
           settings=''
           for name in COMPOSE_FILE API_IMAGE WEB_IMAGE WEB_PORT MAILPIT_PORT RABBITMQ_UI_PORT PUBLIC_WEB_URL MAIL_FROM \
-            AUTH_RATE_LIMIT_PER_MINUTE LOG_LEVEL JWT_SECRET POSTGRES_PASSWORD RECAPTCHA_SECRET_KEY \
+            LOG_LEVEL JWT_SECRET POSTGRES_PASSWORD RECAPTCHA_SECRET_KEY \
             OAUTH_GOOGLE_CLIENT_ID OAUTH_GOOGLE_CLIENT_SECRET OAUTH_GITHUB_CLIENT_ID OAUTH_GITHUB_CLIENT_SECRET \
-            DATA_ENCRYPTION_KEY RABBITMQ_PASSWORD MAILPIT_PASSWORD STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET; do
+            DATA_ENCRYPTION_KEY RABBITMQ_PASSWORD MAILPIT_PASSWORD STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET \
+            SUPPORT_EMAIL ADMIN_EMAIL ADMIN_PASSWORD ADMIN_TOTP_SECRET; do
             value=${!name} # The value of the variable with that name.
             if [[ $value == *"'"* || $value == *$'\n'* ]]; then
               echo "$name holds a single quote or a line break, which a .env line cannot carry." >&2

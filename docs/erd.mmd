@@ -2,17 +2,24 @@
 erDiagram
   app_user {
     uuid id PK
-    text email UK "lowercase"
+    bytea email "encrypted"
+    bytea email_index UK "blind index of the email"
     text password_hash "null for a provider-only account"
-    text totp_secret "null until 2FA setup starts"
+    bytea totp_secret "encrypted; null until 2FA setup starts"
     timestamptz totp_enabled_at "null until a code confirms the secret"
+    bigint totp_last_step "the last accepted code's time step"
+    text[] roles "staff roles; empty for a customer"
+    bytea full_name "encrypted; null until set"
+    bytea phone "encrypted; null until set"
+    timestamptz disabled_at "set while an admin has it disabled"
     timestamptz created_at
   }
   oauth_identity {
     uuid id PK
     uuid user_id FK
-    text provider "unique with subject"
-    text subject "the provider's own user id"
+    text provider "unique with subject_index"
+    bytea subject "encrypted; the provider's own user id"
+    bytea subject_index "blind index of the subject"
     timestamptz created_at
   }
   session {
@@ -22,8 +29,9 @@ erDiagram
     timestamptz expires_at
     timestamptz revoked_at "null while live"
     text revoked_reason "set exactly when revoked_at is"
-    text user_agent
-    text ip_address
+    bytea user_agent "encrypted"
+    bytea ip_address "encrypted"
+    timestamptz second_factor_at "when it last passed a TOTP check"
   }
   refresh_token {
     uuid id PK
@@ -41,10 +49,31 @@ erDiagram
     timestamptz expires_at
     timestamptz used_at
   }
+  address {
+    uuid id PK
+    uuid user_id FK
+    bytea details "encrypted: label, name, phone and address"
+    boolean is_default "at most one per user"
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  audit_event {
+    bigint id PK
+    uuid actor_id FK "null for the system"
+    text[] actor_roles "the actor's roles at the time"
+    text action "such as product.update"
+    text target_type
+    text target_id "null without a single target"
+    text summary "one line a person reads"
+    jsonb changes "fields before and after, no personal values"
+    bytea ip "encrypted"
+    timestamptz created_at "rows are never updated or deleted"
+  }
   category {
     uuid id PK
     text slug UK
     text name
+    text description "null until written"
   }
   brand {
     uuid id PK
@@ -54,7 +83,7 @@ erDiagram
   product {
     uuid id PK
     text slug UK
-    text name
+    text name "trigram index for similar names"
     text description
     integer price_cents "not negative"
     integer stock "not negative"
@@ -64,7 +93,9 @@ erDiagram
     integer width_mm "positive"
     integer height_mm "positive"
     integer depth_mm "positive"
+    timestamptz featured_at "null when not on the home page"
     timestamptz created_at
+    timestamptz updated_at
     tsvector search "generated from name and description"
   }
   product_property {
@@ -75,16 +106,45 @@ erDiagram
   product_image {
     uuid id PK
     uuid product_id FK
-    text file "name under the media directory"
+    text file "the source file under the media directory"
     text alt
     integer position "unique per product"
+    integer width "null until the smaller copies exist"
+    integer height "set exactly when width is"
+    boolean is_pixel_art "scaled without smoothing"
   }
   product_review {
     uuid id PK
     uuid product_id FK
     uuid user_id FK "unique with product_id"
     smallint rating "1 to 5"
+    text author_name "2 to 40 characters"
+    text title "null, or 1 to 120 characters"
+    text body "null, or 1 to 2000 characters"
+    text status "pending, approved or rejected"
+    text rejection_reason "set exactly when rejected"
+    integer helpful_count "not negative"
+    uuid moderated_by FK "null until moderated"
+    timestamptz moderated_at
     timestamptz created_at
+    timestamptz updated_at
+  }
+  review_vote {
+    uuid review_id PK, FK
+    uuid user_id PK, FK
+    timestamptz created_at
+  }
+  shipping_method {
+    text code PK "a slug"
+    text name
+    integer price_cents "not negative"
+    integer free_from_cents "null when it never ships free"
+    integer min_days "business days, at least 1"
+    integer max_days "from min_days to 30"
+    boolean is_active
+    integer position "where the checkout lists it"
+    timestamptz created_at
+    timestamptz updated_at
   }
   cart {
     uuid id PK
@@ -105,15 +165,20 @@ erDiagram
     integer number UK "from 100001"
     uuid user_id FK "null for a guest order"
     uuid cart_id FK "the cart it was placed from"
-    text status "one of the seven statuses"
-    text shipping_method "standard or express"
+    text status "one of the eight statuses"
+    text shipping_method FK "the delivery option's code"
+    text shipping_method_name "as chosen"
+    date estimated_delivery_from
+    date estimated_delivery_to "not before the first day"
     integer subtotal_cents
     integer shipping_cents
     integer total_cents "subtotal plus shipping"
     bytea contact "encrypted: name, email, phone"
     bytea shipping_address "encrypted"
+    bytea billing_address "encrypted; null when it is the shipping address"
+    bytea email_index "blind index of the contact email"
     bytea access_key "encrypted; guest orders only"
-    text tracking_number "set exactly when shipped or delivered"
+    text tracking_number "required once shipped"
     timestamptz refunded_at
     timestamptz payment_due_at
     timestamptz created_at
@@ -162,7 +227,12 @@ erDiagram
   app_user ||--o{ session : "opens"
   session ||--o{ refresh_token : "issues"
   app_user ||--o{ password_reset_token : "requests"
+  app_user ||--o{ address : "saves"
+  app_user ||--o{ audit_event : "acts in"
   app_user ||--o{ product_review : "writes"
+  app_user ||--o{ product_review : "moderates"
+  app_user ||--o{ review_vote : "casts"
+  product_review ||--o{ review_vote : "earns"
   category ||--o{ product : "files"
   brand ||--o{ product : "makes"
   product ||--o{ product_property : "carries"
@@ -172,6 +242,7 @@ erDiagram
   product ||--o{ cart_item : "is in"
   app_user ||--o{ customer_order : "places"
   cart ||--o{ customer_order : "is checked out as"
+  shipping_method ||--o{ customer_order : "delivers"
   customer_order ||--o{ order_line : "lists"
   product ||--o{ order_line : "is sold as"
   customer_order ||--o{ order_event : "records"

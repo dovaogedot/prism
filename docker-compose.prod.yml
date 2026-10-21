@@ -5,12 +5,13 @@
 #
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
-# Three things differ. The images are pulled rather than built, because a
+# Four things differ. The images are pulled rather than built, because a
 # server small enough to be cheap is not big enough to run a Vite build.
 # Nothing binds a public address, because a reverse proxy in front of this
 # owns 80 and 443 and forwards to these loopback ports. And every service
 # restarts by itself, because a reboot should bring the shop back up without
-# anyone logging in.
+# anyone logging in. And the storefront serves plain HTTP, because that proxy
+# terminates TLS with the server's real certificate.
 #
 # Nothing here knows where it is deployed. The image references, the ports and
 # every credential arrive as environment variables, so the same two files run
@@ -55,5 +56,9 @@ services:
     image: ${WEB_IMAGE:?set WEB_IMAGE}
     pull_policy: always
     restart: unless-stopped
+    environment:
+      # The server's own proxy terminates TLS with its real certificate and
+      # forwards plain HTTP to the loopback port below.
+      WEB_TLS: "off"
     ports: !override
       - "127.0.0.1:${WEB_PORT:?set WEB_PORT}:3000"

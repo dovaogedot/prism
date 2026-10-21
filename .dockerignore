@@ -4,3 +4,6 @@
 apps/api/seed/data.zip
 apps/api/seed/catalog.json
 apps/api/seed/media
+apps/e2e/test-results
+apps/e2e/playwright-report
+loadtest/results

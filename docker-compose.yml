@@ -11,7 +11,7 @@ services:
       POSTGRES_DB: prism
     volumes:
       # One mount above the data directory, not on it. Postgres 18 keeps its
-      # data in a major-version subdirectory — /var/lib/postgresql/18/docker —
+      # data in a major-version subdirectory, /var/lib/postgresql/18/docker,
       # so a volume mounted at .../data is a volume the database never writes
       # to, and 18.6 refuses to start rather than let that pass unnoticed.
       - postgres-data:/var/lib/postgresql
@@ -32,7 +32,7 @@ services:
       # The inbox's page and API ask for this login; sending mail to it needs none.
       MP_UI_AUTH: prism:${MAILPIT_PASSWORD:-prism}
     ports:
-      # Order and password-reset emails land here — this is the inbox a reviewer opens.
+      # Order and password-reset emails land here: this is the inbox a reviewer opens.
       - "8025:8025"
     healthcheck:
       test: ["CMD", "/mailpit", "readyz"]
@@ -61,8 +61,9 @@ services:
       retries: 30
       start_period: 10s
 
-  # One-shot: applies migrations. The api waits for this to exit 0, so it
-  # never serves a request against a half-built schema.
+  # One-shot: applies migrations, and seals what an older schema kept in
+  # plain text, which is why it needs the key. The api waits for this to exit
+  # 0, so it never serves a request against a half-built schema.
   migrate:
     build:
       context: .
@@ -70,6 +71,7 @@ services:
     command: ["node", "src/db/migrate.ts"]
     environment:
       DATABASE_URL: postgres://prism:${POSTGRES_PASSWORD:-prism}@postgres:5432/prism
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:?set DATA_ENCRYPTION_KEY in .env}
     depends_on:
       postgres:
         condition: service_healthy
@@ -84,17 +86,19 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       PORT: 8080
       DATABASE_URL: postgres://prism:${POSTGRES_PASSWORD:-prism}@postgres:5432/prism
-      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:3000}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-https://localhost:3000}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
-      # Per address per minute on /auth/*, which includes the refresh every
-      # page load makes to restore the session.
-      AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-60}
+      # Multiplies every rate limit's capacity and refill rate. 1 everywhere
+      # but the browser suite's and the load test's stacks.
+      RATE_LIMIT_SCALE: ${RATE_LIMIT_SCALE:-1}
       SMTP_HOST: ${SMTP_HOST:-mailpit}
       SMTP_PORT: ${SMTP_PORT:-1025}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_SECURE: ${SMTP_SECURE:-false}
       MAIL_FROM: ${MAIL_FROM:-Prism <noreply@prism.test>}
+      # The inbox the contact form writes to; Mailpit catches it locally.
+      SUPPORT_EMAIL: ${SUPPORT_EMAIL:-support@prism.test}
       MEDIA_DIR: /srv/media
       # Supplying a key is what turns each of these on; there is no mode to
       # set alongside it and therefore no way for the two to disagree.
@@ -116,7 +120,14 @@ services:
       STRIPE_TIMEOUT_MS: ${STRIPE_TIMEOUT_MS:-10000}
       ADDRESS_LOOKUP_URL: ${ADDRESS_LOOKUP_URL-https://nominatim.openstreetmap.org}
       PAYMENT_WINDOW_SECONDS: ${PAYMENT_WINDOW_SECONDS:-1800}
-      FULFILLMENT_STEP_SECONDS: ${FULFILLMENT_STEP_SECONDS:-600}
+      # The shop's first admin, made at start when no account holds the role.
+      # The three go together; empty, the shop starts without an admin.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_TOTP_SECRET: ${ADMIN_TOTP_SECRET:-}
+      # stripe takes payments once both keys are set; simulated settles every
+      # payment on the server, and the API allows it only on localhost.
+      PAYMENTS_MODE: ${PAYMENTS_MODE:-stripe}
     volumes:
       - media:/srv/media
       - stripe-secret:/run/stripe:ro
@@ -146,13 +157,30 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         VITE_RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-}
+    environment:
+      # self-signed: HTTPS with a certificate the container makes for
+      # localhost. off: plain HTTP behind a proxy that holds a real one.
+      WEB_TLS: ${WEB_TLS:-self-signed}
+    volumes:
+      # The self-signed certificate and its key, kept across restarts so the
+      # browser's exception for it keeps working.
+      - web-tls:/tls
+      # The product pictures the API writes, served from here without Node.
+      # The volume is the API's: nocopy keeps the image's own /media folders,
+      # and their owner, out of it.
+      - type: volume
+        source: media
+        target: /media
+        read_only: true
+        volume:
+          nocopy: true
     ports:
       - "${WEB_PORT:-3000}:3000"
     depends_on:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/"]
+      test: ["CMD", "/usr/local/bin/healthcheck"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -197,13 +225,17 @@ services:
     network_mode: bridge
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      # The build context leaves the seed's archive out for its size, and the
+      # web's SEO test reads the seeded catalog from it.
+      - ./apps/api/seed/data.zip:/app/apps/api/seed/data.zip:ro
 
   # Placeholder products. `./start.sh` runs it once the shop is up, and
   # `./start.sh seed` runs it alone. The profile keeps it out of `up`, so the
   # shop never depends on it and the production stack never sees it. A run
   # that finds no unpacked data in apps/api/seed unpacks data.zip there
   # first, and every run plants what is there into an empty catalog. Unpacked
-  # files get the owner of the folder they land in, not root.
+  # files get the owner of the folder they land in, not root, and the media
+  # volume ends up owned by the API's user.
   seed:
     profiles: [seed]
     build:
@@ -220,8 +252,12 @@ services:
           chown -R "$$(stat -c %u:%g seed)" seed/catalog.json seed/media
         fi
         node seed/seed.ts
+        # The API runs as node and writes uploads and their smaller copies
+        # here too, so it owns what the seed wrote as root.
+        chown -R node:node /srv/media
     environment:
       DATABASE_URL: postgres://prism:${POSTGRES_PASSWORD:-prism}@postgres:5432/prism
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:?set DATA_ENCRYPTION_KEY in .env}
       MEDIA_DIR: /srv/media
     volumes:
       - ./apps/api/seed:/app/apps/api/seed
@@ -234,5 +270,6 @@ volumes:
   postgres-data:
   media:
   rabbitmq-data:
+  web-tls:
   # The webhook signing secret the stripe service writes and the api reads.
   stripe-secret:

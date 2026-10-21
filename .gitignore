@@ -13,3 +13,10 @@ coverage/
 # The seed's data, unpacked from apps/api/seed/data.zip.
 apps/api/seed/catalog.json
 apps/api/seed/media/
+
+# Load runs: k6 summaries, samples, container stats and the tables made from them.
+loadtest/results/
+
+# The browser suite's output from a local run.
+apps/e2e/test-results/
+apps/e2e/playwright-report/
