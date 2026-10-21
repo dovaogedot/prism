@@ -5,7 +5,7 @@
 
 import { z } from "zod";
 import { ProductId, type ProductImage, type Slug } from "./catalog.ts";
-import type { Contact, PaymentFailure, ShippingAddress, ShippingMethod } from "./checkout.ts";
+import type { Contact, PaymentFailure, ShippingAddress, ShippingMethodCode } from "./checkout.ts";
 
 /** The identity of an order, as the database assigns it. */
 export type OrderId = z.infer<typeof OrderId.schema>;
@@ -46,6 +46,7 @@ export const OrderStatus = {
     "shipped",
     "delivered",
     "canceled",
+    "refunded",
   ] as const,
   schema: z.enum([
     "pending_payment",
@@ -55,6 +56,7 @@ export const OrderStatus = {
     "shipped",
     "delivered",
     "canceled",
+    "refunded",
   ]),
   label: {
     pending_payment: "Pending payment",
@@ -64,13 +66,30 @@ export const OrderStatus = {
     shipped: "Shipped",
     delivered: "Delivered",
     canceled: "Canceled",
+    refunded: "Refunded",
   } as const satisfies Record<
-    "pending_payment" | "payment_successful" | "payment_failed" | "processing" | "shipped" | "delivered" | "canceled",
+    | "pending_payment"
+    | "payment_successful"
+    | "payment_failed"
+    | "processing"
+    | "shipped"
+    | "delivered"
+    | "canceled"
+    | "refunded",
     string
   >,
   /** The statuses a customer may still cancel from: nothing has left the warehouse. */
   CANCELABLE: ["pending_payment", "payment_successful"] as const,
   isCancelable: (status: string): boolean => (OrderStatus.CANCELABLE as readonly string[]).includes(status),
+  /** The statuses the shop may still cancel from: the parcel has not shipped. */
+  STAFF_CANCELABLE: ["pending_payment", "payment_successful", "processing"] as const,
+  /** The statuses a refund takes an order from: it shipped, so canceling is too late. */
+  REFUNDABLE: ["shipped", "delivered"] as const,
+  /** Each step of fulfillment and the status before it. Staff move an order one step at a time. */
+  PREVIOUS: { processing: "payment_successful", shipped: "processing", delivered: "shipped" } as const satisfies Record<
+    "processing" | "shipped" | "delivered",
+    "payment_successful" | "processing" | "shipped"
+  >,
 } as const;
 
 /** The orders a list can come in. */
@@ -95,7 +114,7 @@ export const OrderQueryParams = {
   schema: z
     .object({
       status: z
-        .union([OrderStatus.schema, z.array(OrderStatus.schema).max(7)])
+        .union([OrderStatus.schema, z.array(OrderStatus.schema).max(8)])
         .transform((value) => (typeof value === "string" ? [value] : value))
         .optional(),
       from: CalendarDay.schema.optional(),
@@ -113,6 +132,8 @@ export const OrderQueryParams = {
 /** How a payment stands, as the order page shows it. */
 export type PaymentSummary = Readonly<{
   status: "pending" | "succeeded" | "failed" | "canceled";
+  /** The provider's id of the payment, which support and the provider find it by. Present once it answered. */
+  reference?: string;
   /** Present once the provider has told which card paid. */
   card?: Readonly<{ brand: string; last4: string }>;
   failure?: PaymentFailure;
@@ -169,7 +190,13 @@ export type OrderDetail = Readonly<{
   createdAt: string;
   contact: Contact;
   address: ShippingAddress;
-  shippingMethod: ShippingMethod;
+  /** Where the bill went; absent when it went to the shipping address. */
+  billingAddress?: ShippingAddress;
+  shippingMethod: ShippingMethodCode;
+  /** The method's name when the order was placed. */
+  shippingMethodName: string;
+  /** The first and last day the parcel is expected, as `YYYY-MM-DD`. */
+  estimatedDelivery: Readonly<{ from: string; to: string }>;
   lines: readonly OrderLine[];
   subtotalCents: number;
   shippingCents: number;

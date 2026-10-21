@@ -101,19 +101,38 @@ export const ShippingAddress = {
     }),
 } as const;
 
-/** How the parcel travels, and what that costs. */
-export type ShippingMethod = (typeof ShippingMethod.NAMES)[number];
-export const ShippingMethod = {
-  NAMES: ["standard", "express"] as const,
-  schema: z.enum(["standard", "express"], { error: "Choose a shipping method." }),
-  label: { standard: "Standard", express: "Express" } as const satisfies Record<"standard" | "express", string>,
-  priceCents: { standard: 490, express: 990 } as const satisfies Record<"standard" | "express", number>,
-  /** The subtotal from which the method ships free; a method absent here always costs its price. */
-  freeFromCents: { standard: 5000 } as Readonly<Partial<Record<"standard" | "express", number>>>,
-  estimate: {
-    standard: "2 to 4 business days",
-    express: "1 to 2 business days",
-  } as const satisfies Record<"standard" | "express", string>,
+/** The code a delivery option is stored and chosen by. Only the schema makes one. */
+export type ShippingMethodCode = z.infer<typeof ShippingMethodCode.schema>;
+export const ShippingMethodCode = {
+  schema: z
+    .string({ error: "Choose a shipping method." })
+    .trim()
+    .min(1, "Choose a shipping method.")
+    .max(40, "Use at most 40 characters.")
+    .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Use lowercase letters, digits and single dashes.")
+    .brand<"ShippingMethodCode">(),
+} as const;
+
+/** A delivery option as checkout offers it and an order is priced with. */
+export type ShippingOption = Readonly<{
+  code: ShippingMethodCode;
+  name: string;
+  priceCents: number;
+  /** The subtotal from which it ships free; absent when it never does. */
+  freeFromCents?: number;
+  /** The delivery window in business days after the order day, both ends counted. */
+  minDays: number;
+  maxDays: number;
+}>;
+
+export const ShippingOption = {
+  /** The delivery window in words, such as "2 to 4 business days". */
+  windowOf: (option: Readonly<{ minDays: number; maxDays: number }>): string => {
+    if (option.minDays === option.maxDays) {
+      return `${option.minDays} business ${option.minDays === 1 ? "day" : "days"}`;
+    }
+    return `${option.minDays} to ${option.maxDays} business days`;
+  },
 } as const;
 
 /**
@@ -126,7 +145,11 @@ export const PlaceOrderInput = {
   schema: z.strictObject({
     contact: Contact.schema,
     address: ShippingAddress.schema,
-    shippingMethod: ShippingMethod.schema,
+    /** Where the bill goes; absent when it goes to the shipping address. */
+    billingAddress: ShippingAddress.schema.optional(),
+    shippingMethod: ShippingMethodCode.schema,
+    /** Saves the shipping address to the signed-in customer's account. */
+    shouldSaveAddress: z.boolean().optional(),
     expectedTotalCents: z.number().int().min(0),
   }),
 } as const;
@@ -137,18 +160,26 @@ export const CheckoutForm = {
   schema: PlaceOrderInput.schema.omit({ expectedTotalCents: true }),
 } as const;
 
-/** What a signed-in customer's checkout form starts with. */
+/**
+ * What a signed-in customer's checkout form starts with: the profile's name
+ * and phone, else the last order's contact; the default saved address, else
+ * the last order's address; and the last order's delivery option. Each is
+ * absent when neither source has it.
+ */
 export type CheckoutPrefill = Readonly<{
   email: Email;
-  /** These three come from the most recent order, and are absent before the first. */
   contact?: Contact;
   address?: ShippingAddress;
-  shippingMethod?: ShippingMethod;
+  shippingMethod?: ShippingMethodCode;
 }>;
 
-/** Whether the browser can take a card, and with which key. */
+/**
+ * Whether the browser can take a card, and with which key. `simulated`
+ * takes no card: the server settles every payment itself, for test stacks.
+ */
 export type PaymentsConfig =
   | Readonly<{ provider: "stripe"; publishableKey: string }>
+  | Readonly<{ provider: "simulated" }>
   | Readonly<{ provider: "unavailable" }>;
 
 /** What `POST /checkout/address` found. `unavailable` means only the format was checked. */

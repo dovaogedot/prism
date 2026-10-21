@@ -5,6 +5,7 @@
  */
 
 import { z } from "zod";
+import type { StaffRole } from "./staff.ts";
 
 /**
  * Every structured value here is opaque: only its schema makes one, so a
@@ -228,6 +229,10 @@ export type SessionUser = Readonly<{
   hasPassword: boolean;
   /** Linked providers, alphabetically. */
   providers: readonly OAuthProvider[];
+  /** The account's staff roles; empty for a customer. */
+  roles: readonly StaffRole[];
+  /** Whether this session passed a TOTP check recently enough to open the admin. */
+  isSecondFactorVerified: boolean;
 }>;
 
 /**

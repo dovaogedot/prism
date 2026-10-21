@@ -62,3 +62,24 @@ describe("DomainError.toResponse", () => {
     expect(DomainError.httpStatus(error)).toBe(409);
   });
 });
+
+describe("RateLimited", () => {
+  it("says how long to wait, and carries the seconds for the browser", () => {
+    expect(DomainError.toResponse({ _tag: "RateLimited", retryAfterSeconds: 30 })).toEqual({
+      error: {
+        code: "RateLimited",
+        message: "Too many attempts. Try again in 30 seconds.",
+        issues: [],
+        retryAfterSeconds: 30,
+      },
+    });
+    expect(DomainError.httpStatus({ _tag: "RateLimited", retryAfterSeconds: 30 })).toBe(429);
+  });
+
+  it("words short and long waits for a person", () => {
+    expect(DomainError.durationOf(1)).toBe("a second");
+    expect(DomainError.durationOf(89)).toBe("89 seconds");
+    expect(DomainError.durationOf(90)).toBe("2 minutes");
+    expect(DomainError.durationOf(300)).toBe("5 minutes");
+  });
+});

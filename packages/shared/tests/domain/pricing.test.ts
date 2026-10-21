@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { ShippingMethod } from "../../src/contracts/checkout.ts";
 import { Pricing } from "../../src/domain/pricing.ts";
 
 describe("Pricing.lineTotal", () => {
@@ -33,41 +32,58 @@ describe("Pricing.subtotal", () => {
   });
 });
 
+/** Options shaped like the two the shop starts with, and one that is always free. */
+const standard = { priceCents: 490, freeFromCents: 5000 };
+const express = { priceCents: 990 };
+const pickup = { priceCents: 0 };
+
 describe("Pricing.shipping", () => {
-  it("charges standard shipping under the free-from threshold", () => {
-    expect(Pricing.shipping("standard", 4999)).toBe(ShippingMethod.priceCents.standard);
+  it("charges the price below the free-from threshold", () => {
+    expect(Pricing.shipping(standard, 4999)).toBe(490);
   });
 
-  it("ships standard free from the threshold itself", () => {
-    expect(Pricing.shipping("standard", 5000)).toBe(0);
-    expect(Pricing.shipping("standard", 12_000)).toBe(0);
+  it("ships free at the threshold itself and above it", () => {
+    expect(Pricing.shipping(standard, 5000)).toBe(0);
+    expect(Pricing.shipping(standard, 12_000)).toBe(0);
   });
 
-  it("always charges express", () => {
-    expect(Pricing.shipping("express", 100)).toBe(ShippingMethod.priceCents.express);
-    expect(Pricing.shipping("express", 100_000)).toBe(ShippingMethod.priceCents.express);
+  it("always charges an option without a threshold", () => {
+    expect(Pricing.shipping(express, 100)).toBe(990);
+    expect(Pricing.shipping(express, 100_000)).toBe(990);
+  });
+
+  it("charges nothing for a free option", () => {
+    expect(Pricing.shipping(pickup, 100)).toBe(0);
+  });
+});
+
+describe("Pricing.untilFree", () => {
+  it("says how far a subtotal is from free shipping, and never below zero", () => {
+    expect(Pricing.untilFree(standard, 4000)).toBe(1000);
+    expect(Pricing.untilFree(standard, 6000)).toBe(0);
+    expect(Pricing.untilFree(express, 4000)).toBeUndefined();
   });
 });
 
 describe("Pricing.totals", () => {
   it("adds shipping to the subtotal", () => {
-    expect(Pricing.totals([{ unitPriceCents: 1500, quantity: 2 }], "standard")).toEqual({
+    expect(Pricing.totals([{ unitPriceCents: 1500, quantity: 2 }], standard)).toEqual({
       subtotalCents: 3000,
       shippingCents: 490,
       totalCents: 3490,
     });
   });
 
-  it("drops standard shipping once the subtotal reaches the threshold", () => {
-    expect(Pricing.totals([{ unitPriceCents: 2500, quantity: 2 }], "standard")).toEqual({
+  it("drops shipping once the subtotal reaches the threshold", () => {
+    expect(Pricing.totals([{ unitPriceCents: 2500, quantity: 2 }], standard)).toEqual({
       subtotalCents: 5000,
       shippingCents: 0,
       totalCents: 5000,
     });
   });
 
-  it("keeps express shipping above the threshold", () => {
-    expect(Pricing.totals([{ unitPriceCents: 2500, quantity: 2 }], "express")).toEqual({
+  it("keeps the price of an option without a threshold", () => {
+    expect(Pricing.totals([{ unitPriceCents: 2500, quantity: 2 }], express)).toEqual({
       subtotalCents: 5000,
       shippingCents: 990,
       totalCents: 5990,

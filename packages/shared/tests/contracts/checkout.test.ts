@@ -90,9 +90,12 @@ describe("PlaceOrderInput", () => {
     expect(PlaceOrderInput.schema.safeParse({ ...order, cardNumber: "4242424242424242" }).success).toBe(false);
   });
 
-  it("refuses an unknown shipping method", () => {
-    expect(issuesOf(PlaceOrderInput.schema.safeParse({ ...order, shippingMethod: "drone" }))).toEqual({
+  it("refuses a missing shipping method, and a code of the wrong shape", () => {
+    expect(issuesOf(PlaceOrderInput.schema.safeParse({ contact, address, expectedTotalCents: 3490 }))).toEqual({
       shippingMethod: "Choose a shipping method.",
+    });
+    expect(issuesOf(PlaceOrderInput.schema.safeParse({ ...order, shippingMethod: "Drone Delivery" }))).toEqual({
+      shippingMethod: "Use lowercase letters, digits and single dashes.",
     });
   });
 });

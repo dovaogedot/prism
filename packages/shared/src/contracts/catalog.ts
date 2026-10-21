@@ -25,17 +25,36 @@ export const ProductId = {
   schema: z.uuid().brand<"ProductId">(),
 } as const;
 
+/** The identity of a category, as the database assigns it. */
+export type CategoryId = z.infer<typeof CategoryId.schema>;
+export const CategoryId = {
+  schema: z.uuid().brand<"CategoryId">(),
+} as const;
+
+/** The identity of a brand, as the database assigns it. */
+export type BrandId = z.infer<typeof BrandId.schema>;
+export const BrandId = {
+  schema: z.uuid().brand<"BrandId">(),
+} as const;
+
+/** The identity of a product image, as the database assigns it. */
+export type ImageId = z.infer<typeof ImageId.schema>;
+export const ImageId = {
+  schema: z.uuid().brand<"ImageId">(),
+} as const;
+
 /** The orders a result list can come in. */
 export type ProductSort = (typeof ProductSort.NAMES)[number];
 export const ProductSort = {
-  NAMES: ["relevance", "price_asc", "price_desc", "rating"] as const,
-  schema: z.enum(["relevance", "price_asc", "price_desc", "rating"]),
+  NAMES: ["relevance", "price_asc", "price_desc", "rating", "newest"] as const,
+  schema: z.enum(["relevance", "price_asc", "price_desc", "rating", "newest"]),
   label: {
     relevance: "Relevance",
     price_asc: "Price: low to high",
     price_desc: "Price: high to low",
     rating: "Top rated",
-  } as const satisfies Record<"relevance" | "price_asc" | "price_desc" | "rating", string>,
+    newest: "Newest",
+  } as const satisfies Record<"relevance" | "price_asc" | "price_desc" | "rating" | "newest", string>,
 } as const;
 
 /** Free text as a person typed it, trimmed and without control characters. */
@@ -151,8 +170,14 @@ export const SuggestParams = {
   }),
 } as const;
 
-/** One product a typed prefix could mean. */
-export type Suggestion = Readonly<{ slug: Slug; name: string }>;
+/** One product a typed prefix could mean, with what the suggestion list shows of it. */
+export type Suggestion = Readonly<{
+  slug: Slug;
+  name: string;
+  priceCents: number;
+  /** The first picture; absent for a product without one. */
+  image?: ProductImage;
+}>;
 
 /** A name a product is filed under: a category or a brand. */
 export type Named = Readonly<{ slug: Slug; name: string }>;
@@ -160,8 +185,23 @@ export type Named = Readonly<{ slug: Slug; name: string }>;
 /** How shoppers have rated a product. `average` is 0 while `count` is 0. */
 export type Rating = Readonly<{ average: number; count: number }>;
 
+/** A smaller copy of a picture, for `srcset`. */
+export type ImageSource = Readonly<{ width: number; url: string }>;
+
 /** One picture of a product, served from `/media`. */
-export type ProductImage = Readonly<{ url: string; alt: string }>;
+export type ProductImage = Readonly<{
+  id: ImageId;
+  /** The picture as uploaded, for the full-size view. */
+  url: string;
+  alt: string;
+  /** The picture's size in pixels; absent until its smaller copies exist. */
+  width?: number;
+  height?: number;
+  /** Shown with its pixels repeated rather than blended, so hard edges stay hard. */
+  isPixelArt: boolean;
+  /** Smaller WebP copies, narrowest first; empty until they exist. */
+  sources: readonly ImageSource[];
+}>;
 
 /** A mass in both unit systems. */
 export type Weight = Readonly<{ grams: number; ounces: number }>;
@@ -224,6 +264,8 @@ export type ProductDetail = ProductSummary &
     properties: readonly ProductProperty[];
     weight: Weight;
     dimensions: Dimensions;
+    /** Whether another product in the same category has the same name, ignoring case. */
+    isNameShared: boolean;
   }>;
 
 /** One selectable value of a facet and how many matching products carry it. */
@@ -249,12 +291,37 @@ export type ProductFacets = Readonly<{
   properties: readonly PropertyFacet[];
 }>;
 
-/** One page of results with the facets that apply to the whole match. */
+/**
+ * One page of results with the facets that apply to the whole match.
+ * `matched` says how the text matched: `exact` for words and substrings,
+ * `similar` when nothing did and the results are names that look like the
+ * text, as a misspelling would.
+ */
 export type ProductSearchResult = Readonly<{
+  matched: "exact" | "similar";
   items: readonly ProductSummary[];
   facets: ProductFacets;
   total: number;
   page: number;
   perPage: number;
   totalPages: number;
+}>;
+
+/** A category as its tile and its page show it. */
+export type CategorySummary = Readonly<{
+  slug: Slug;
+  name: string;
+  /** What the category page says about it; absent until written. */
+  description?: string;
+  productCount: number;
+  /** A picture from one of its products; absent while it has none with a picture. */
+  image?: ProductImage;
+}>;
+
+/** What the home page shows. A row with no products is left out of the page. */
+export type HomeView = Readonly<{
+  featured: readonly ProductSummary[];
+  topRated: readonly ProductSummary[];
+  newest: readonly ProductSummary[];
+  categories: readonly CategorySummary[];
 }>;
