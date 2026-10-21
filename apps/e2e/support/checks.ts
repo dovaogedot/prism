@@ -5,7 +5,7 @@
  */
 
 import { AxeBuilder } from "@axe-core/playwright";
-import type { BrowserContext, ConsoleMessage, Page } from "@playwright/test";
+import type { BrowserContext, ConsoleMessage, Locator, Page } from "@playwright/test";
 
 declare global {
   // The one place an interface is unavoidable: merging into the DOM's declaration.
@@ -17,6 +17,9 @@ declare global {
 
 /** One of the two looks the shop is drawn in. */
 export type Theme = "light" | "dark";
+
+/** Where an element sits on the page, in CSS pixels. */
+export type Box = Readonly<{ x: number; y: number; width: number; height: number }>;
 
 /** What a page says about itself in its head and headings. */
 export type PageFacts = Readonly<{
@@ -31,6 +34,18 @@ export const Checks = {
   /** The widths every page must fit without spilling sideways; 640 is a 1,280-pixel window at 200% zoom. */
   WIDTHS: [320, 640, 768, 1024, 1440],
   THEMES: ["light", "dark"] as const satisfies readonly Theme[],
+  /** How far apart, in CSS pixels, two middles or edges may be and still count as lined up: layout rounds to whole pixels. */
+  TOLERANCE: 1,
+
+  /** The box `locator` takes up on the page. */
+  boxOf: async (locator: Locator): Promise<Box> => {
+    const box = await locator.boundingBox();
+    if (box === null) throw new Error(`${locator.toString()} takes up no space on the page`);
+    return box;
+  },
+
+  /** How far apart the vertical middles of two boxes are. */
+  middleGap: (first: Box, second: Box): number => Math.abs(first.y + first.height / 2 - (second.y + second.height / 2)),
 
   /** Stores the theme before any page script runs, as the theme switch does. */
   useTheme: async (context: BrowserContext, theme: Theme): Promise<void> => {

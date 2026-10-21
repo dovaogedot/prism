@@ -10,11 +10,16 @@ export const RatingSummary = ({ average, count, distribution }: RatingSummaryPro
 
   return (
     <div className="space-y-4">
-      <div className="flex items-baseline gap-3">
-        <span className="text-4xl font-semibold tabular-nums text-ink">{count === 0 ? "-" : average.toFixed(1)}</span>
-        <div className="space-y-0.5">
-          <Stars rating={average} count={count} />
-          <p className="text-sm text-ink-soft">{count === 1 ? "1 review" : `${count} reviews`}</p>
+      {/* The stars speak the average and the count, so the figures beside them are for the eye only. */}
+      <div className="flex items-center gap-3">
+        <span className="text-4xl font-semibold tabular-nums text-ink" aria-hidden="true">
+          {count === 0 ? "-" : average.toFixed(1)}
+        </span>
+        <div className="flex flex-col items-start gap-1">
+          <Stars rating={average} count={count} isTextShown={false} />
+          <p className="text-sm text-ink-soft" aria-hidden="true">
+            {count === 1 ? "1 review" : `${count} reviews`}
+          </p>
         </div>
       </div>
 

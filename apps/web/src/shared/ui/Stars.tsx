@@ -7,13 +7,15 @@ export type StarsProps = Readonly<{
   count: number;
   /** False for one review's own rating, where a count says nothing. */
   isCountShown?: boolean;
+  /** False where the average and the count are written beside the stars already. */
+  isTextShown?: boolean;
 }>;
 
 /**
  * Five stars, filled to the rating. The stars are drawn for the eye; a
  * screen reader hears the rating in words instead.
  */
-export const Stars = ({ rating, count, isCountShown = true }: StarsProps) => {
+export const Stars = ({ rating, count, isCountShown = true, isTextShown = true }: StarsProps) => {
   // Each star's gradient needs an id no other element on the page has.
   const gradientId = useId();
 
@@ -38,7 +40,7 @@ export const Stars = ({ rating, count, isCountShown = true }: StarsProps) => {
         ))}
       </span>
       <span className="sr-only">{spoken}</span>
-      {isCountShown ? (
+      {isCountShown && isTextShown ? (
         <span className="text-xs text-ink-faint" aria-hidden="true">
           {count === 0 ? "No reviews" : `${rating.toFixed(1)} (${count})`}
         </span>
