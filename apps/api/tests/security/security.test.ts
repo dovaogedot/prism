@@ -2,19 +2,24 @@
  * Security tests.
  *
  * Injection and malformed input, against the running application and a real
- * database — so a payload that got through would actually do damage, and the
+ * database, so a payload that got through would actually do damage, and the
  * assertions afterwards check that it did not.
  */
 
-import type { FastifyInstance } from "fastify";
+import { randomBytes, randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { Permission } from "@prism/shared";
 import { SignJWT } from "jose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { App } from "../../src/app.ts";
+import { App, type Application } from "../../src/app.ts";
 import { Config } from "../../src/config.ts";
 import { Topology } from "../../src/messaging/topology.ts";
 import { MessageQueue } from "../../src/platform/queue.ts";
+import { RateLimitPolicy } from "../../src/platform/rate-limit.ts";
+import { Staff } from "../support/staff.ts";
 import { CHECKOUT, Shop } from "../support/commerce.ts";
 import {
+  emailIndexOf,
   jsonOf,
   registerUser,
   seedCatalog,
@@ -98,7 +103,7 @@ describe("SQL injection through catalog filters", () => {
 
   it("treats a payload in the free-text search as a search term", async () => {
     // `q` is genuinely free text, so it must be accepted and bound, not
-    // rejected — the protection is parameterization, not a blocklist.
+    // rejected: the protection is parameterization, not a blocklist.
     for (const payload of SQL_PAYLOADS) {
       const response = await get(`/api/v1/products?q=${encodeURIComponent(payload)}`);
 
@@ -235,7 +240,7 @@ describe("JWT tampering", () => {
   });
 
   it("refuses a correctly signed token for a session that never existed", async () => {
-    // Signature valid, issuer valid, audience valid — but the session id
+    // Signature valid, issuer valid, audience valid, but the session id
     // resolves to nothing, so the guard's database check refuses it.
     const invented = await new SignJWT({
       sub: "00000000-0000-4000-8000-000000000000",
@@ -349,7 +354,8 @@ describe("malformed input", () => {
 });
 
 describe("path traversal in media", () => {
-  it("serves nothing outside the media directory", async () => {
+  // The web container serves /media from the volume; the API serves no file at all.
+  it("serves no file under /media, whatever the path", async () => {
     const attempts = [
       "..%2f..%2fetc%2fpasswd",
       "%2e%2e%2f%2e%2e%2fetc%2fpasswd",
@@ -368,88 +374,240 @@ describe("path traversal in media", () => {
 });
 
 /**
- * The shared harness runs with throttling effectively disabled, because the
+ * The shared harness runs with the limits scaled out of reach, because the
  * limiter keys on the client address and cannot tell one test from the next.
- * These build a second application over the same database with a real budget.
+ * These build a second application over the same database and clock, with
+ * the real budgets. Each test starts an hour later, so every bucket is full.
  */
 describe("rate limiting", () => {
-  const LIMIT = 5;
-  let throttled: FastifyInstance;
+  let throttled: Application;
 
   beforeAll(async () => {
-    const built = await App.build({
-      config: Config.fromEnvironment(testEnvironment(harness.config.database.url, harness.mediaDirectory, LIMIT)),
+    throttled = await App.build({
+      config: Config.fromEnvironment(testEnvironment(harness.config.database.url, harness.mediaDirectory, 1)),
       database: harness.database,
       overrides: { clock: harness.clock, mailer: harness.mailer, queue: MessageQueue.memory(Topology.declarations()) },
     });
-    throttled = built.app;
   });
 
   afterAll(async () => {
-    await throttled.close();
+    await throttled.app.close();
   });
 
-  const attempt = (address: string) =>
-    throttled.inject({
-      method: "POST",
-      url: "/api/v1/auth/login",
-      payload: { email: "target@example.com", password: "guess number one here" },
-      headers: { "x-forwarded-for": address },
+  /** A request from a public address, so no proxy header is trusted. */
+  const fromAddress = (address: string, method: "GET" | "POST", url: string, payload?: object) =>
+    throttled.app.inject({
+      method,
+      url,
+      remoteAddress: address,
+      ...(payload === undefined ? {} : { payload }),
     });
 
-  it("lets the budget through and then refuses", async () => {
+  const guess = (address: string, email = "target@example.com") =>
+    fromAddress(address, "POST", "/api/v1/auth/login", { email, password: "guess number one here" });
+
+  it("lets a burst up to the capacity through, then refuses with Retry-After", async () => {
+    const credentials = RateLimitPolicy.table.credentials;
     const statuses: number[] = [];
 
-    for (let index = 0; index < LIMIT + 3; index += 1) {
-      statuses.push((await attempt("203.0.113.9")).statusCode);
+    // Each guess names another account, so only the address's bucket runs dry.
+    for (let index = 0; index < credentials.capacity; index += 1) {
+      statuses.push((await guess("203.0.113.9", `target-${index}@example.com`)).statusCode);
     }
+    const refused = await guess("203.0.113.9", "one-more@example.com");
 
-    expect(statuses.slice(0, LIMIT).every((status) => status !== 429)).toBe(true);
-    expect(statuses).toContain(429);
+    expect(statuses.every((status) => status === 401)).toBe(true);
+    expect(refused.statusCode).toBe(429);
+    expect(refused.headers["retry-after"]).toBe("6");
+    expect(refused.headers["ratelimit-remaining"]).toBe("0");
+    expect(jsonOf(refused)["error"]).toMatchObject({
+      code: "RateLimited",
+      retryAfterSeconds: 6,
+      message: "Too many attempts. Try again in 6 seconds.",
+    });
   });
 
-  it("reports throttling with the documented error code", async () => {
-    for (let index = 0; index < LIMIT + 3; index += 1) {
-      await attempt("203.0.113.10");
+  it("lets exactly one more through after one refill interval", async () => {
+    for (let index = 0; index < RateLimitPolicy.table.credentials.capacity; index += 1) {
+      await guess("203.0.113.10", `target-${index}@example.com`);
     }
 
-    const refused = await attempt("203.0.113.10");
+    harness.clock.advanceSeconds(6);
 
-    expect(refused.statusCode).toBe(429);
-    expect(jsonOf(refused)["error"]).toMatchObject({ code: "RateLimited" });
+    expect((await guess("203.0.113.10", "after-wait@example.com")).statusCode).toBe(401);
+    expect((await guess("203.0.113.10", "after-wait-2@example.com")).statusCode).toBe(429);
+  });
+
+  it("budgets each client address separately", async () => {
+    for (let index = 0; index <= RateLimitPolicy.table.credentials.capacity; index += 1) {
+      await guess("203.0.113.11", `target-${index}@example.com`);
+    }
+
+    // One noisy address must not lock everybody else out.
+    expect((await guess("203.0.113.12", "elsewhere@example.com")).statusCode).toBe(401);
+  });
+
+  it("stops guessing at one account from many addresses", async () => {
+    const accountLogin = RateLimitPolicy.table["account-login"];
+    const statuses: number[] = [];
+
+    for (let index = 0; index <= accountLogin.capacity; index += 1) {
+      statuses.push((await guess(`198.51.100.${10 + index}`)).statusCode);
+    }
+
+    expect(statuses.slice(0, accountLogin.capacity).every((status) => status === 401)).toBe(true);
+    expect(statuses[accountLogin.capacity]).toBe(429);
+    // Another account from the same addresses is still open.
+    expect((await guess("198.51.100.10", "someone-else@example.com")).statusCode).toBe(401);
   });
 
   it("ignores a forwarded address the caller made up", async () => {
-    // The whole point of the budget is that it cannot be reset at will. With
-    // the entire X-Forwarded-For chain trusted, a caller could name a new
-    // address on every request and never spend the same budget twice; the
+    // With the whole X-Forwarded-For chain trusted, a caller could name a new
+    // address on every request and never spend the same budget twice. The
     // address that counts is the one no proxy on this network vouched for.
-    const spoofed = (claimed: string) =>
-      throttled.inject({
+    const spoofed = (claimed: string, index: number) =>
+      throttled.app.inject({
         method: "POST",
         url: "/api/v1/auth/login",
-        payload: { email: "target@example.com", password: "guess number one here" },
+        payload: { email: `target-${index}@example.com`, password: "guess number one here" },
         // A public address, so nothing about this request is trusted.
         remoteAddress: "198.51.100.7",
         headers: { "x-forwarded-for": claimed },
       });
 
     const statuses: number[] = [];
-
-    for (let index = 0; index < LIMIT + 3; index += 1) {
-      statuses.push((await spoofed(`203.0.113.${120 + index}`)).statusCode);
+    for (let index = 0; index <= RateLimitPolicy.table.credentials.capacity; index += 1) {
+      statuses.push((await spoofed(`203.0.113.${120 + index}`, index)).statusCode);
     }
 
     expect(statuses).toContain(429);
   });
 
-  it("budgets each client address separately", async () => {
-    for (let index = 0; index < LIMIT + 3; index += 1) {
-      await attempt("203.0.113.11");
+  it("budgets each signed-in user separately, even behind one address", async () => {
+    const first = await registerUser(harness, "first-writer@example.com");
+    const second = await registerUser(harness, "second-writer@example.com");
+    const vote = (token: string) =>
+      throttled.app.inject({
+        method: "PUT",
+        url: `/api/v1/reviews/${randomUUID()}/vote`,
+        remoteAddress: "203.0.113.15",
+        headers: { authorization: `Bearer ${token}` },
+      });
+
+    for (let index = 0; index < RateLimitPolicy.table["member-write"].capacity; index += 1) {
+      expect((await vote(first.accessToken)).statusCode).toBe(404);
     }
 
-    // One noisy address must not lock everybody else out.
-    expect((await attempt("203.0.113.12")).statusCode).not.toBe(429);
+    expect((await vote(first.accessToken)).statusCode).toBe(429);
+    expect((await vote(second.accessToken)).statusCode).toBe(404);
+  });
+
+  it("reports what is left on every limited answer", async () => {
+    const response = await fromAddress("203.0.113.14", "GET", "/api/v1/products");
+
+    expect(response.headers["ratelimit-remaining"]).toBe(String(RateLimitPolicy.table.default.capacity - 1));
+  });
+
+  it("puts every route under a named policy, and exempts only the webhook and the health check", async () => {
+    const api = throttled.routes.filter((route) => route.url.startsWith("/api/v1") && route.method !== "HEAD");
+    const exempt = api.filter((route) => route.config.rateLimit === "none").map((route) => `${route.method} ${route.url}`);
+
+    expect(exempt.sort()).toEqual(["GET /api/v1/health", "POST /api/v1/payments/webhook"]);
+    for (const route of api) {
+      const name = route.config.rateLimit ?? "default";
+      expect(name === "none" || RateLimitPolicy.NAMES.includes(name), `${route.method} ${route.url}`).toBe(true);
+    }
+    expect(api.length).toBeGreaterThan(20);
+  });
+});
+
+describe("admin routes", () => {
+  /** Every admin route as a request: path parameters filled with ids that match nothing. */
+  const adminRequests = () =>
+    harness.routes
+      .filter((route) => route.url.startsWith("/api/v1/admin") && route.method !== "HEAD")
+      .map((route) => ({
+        method: route.method as "GET" | "POST" | "PUT" | "DELETE",
+        url: route.url
+          .replace("/api/v1", "")
+          .replace(/:(id|imageId)\b/g, randomUUID())
+          .replace(/:code\b/g, "no-such-method"),
+        requirement: route.config.permission,
+      }));
+
+  it("names a staff requirement on every admin route", () => {
+    const requests = adminRequests();
+
+    expect(requests.length).toBeGreaterThan(5);
+    for (const request of requests) expect(request.requirement, `${request.method} ${request.url}`).toBeDefined();
+  });
+
+  it("lets each staff role, alone or with another, through exactly where its permissions allow", async () => {
+    const accounts = [
+      ["moderator"],
+      ["content_manager"],
+      ["delivery_manager"],
+      ["support"],
+      ["admin"],
+      ["moderator", "content_manager"],
+    ] as const;
+
+    for (const [index, roles] of accounts.entries()) {
+      const account = await Staff.account(harness, `staff-${index}@example.com`, roles);
+
+      for (const request of adminRequests()) {
+        const response = await Staff.call(harness, account, request.method, request.url, request.method === "GET" ? undefined : {});
+        const isAllowed =
+          request.requirement === "any-staff" || (request.requirement !== undefined && Permission.can(roles, request.requirement));
+        const label = `${roles.join("+")} ${request.method} ${request.url}`;
+
+        if (isAllowed) {
+          expect([401, 403], label).not.toContain(response.statusCode);
+        } else {
+          expect(response.statusCode, label).toBe(403);
+          expect(jsonOf(response)["error"], label).toMatchObject({ code: "Forbidden" });
+        }
+      }
+    }
+  });
+
+  it("answers a customer 403 and a guest 401 on every admin route", async () => {
+    const customer = await Staff.account(harness, "customer@example.com", []);
+
+    for (const request of adminRequests()) {
+      const payload = request.method === "GET" ? undefined : {};
+      const asCustomer = await Staff.call(harness, customer, request.method, request.url, payload);
+      const asGuest = await Staff.call(harness, undefined, request.method, request.url, payload);
+
+      expect(asCustomer.statusCode, `customer ${request.method} ${request.url}`).toBe(403);
+      expect(asGuest.statusCode, `guest ${request.method} ${request.url}`).toBe(401);
+    }
+  });
+});
+
+describe("markup in reviews", () => {
+  it("is stored and served as text, never as HTML", async () => {
+    const { accessToken } = await registerUser(harness, "markup@example.com");
+    await seedCatalog(harness, [{ slug: "desk-lamp", name: "Desk Lamp", priceCents: 2500 }]);
+    const placed = await Shop.placed(harness, await Shop.fill(harness, [["desk-lamp", 1]], { token: accessToken }));
+    await harness.database.sql`
+      UPDATE customer_order SET status = 'delivered', tracking_number = 'PR000000001EE' WHERE id = ${placed.orderId}`;
+    const moderator = await Staff.account(harness, "moderator@example.com", ["moderator"]);
+
+    for (const payload of XSS_PAYLOADS) {
+      const saved = await Shop.call(harness, "PUT", "/products/desk-lamp/reviews/mine", { token: accessToken }, {
+        rating: 3,
+        authorName: "Mallory",
+        title: payload.slice(0, 120),
+        body: payload,
+      });
+      await Staff.call(harness, moderator, "POST", `/admin/reviews/${String(jsonOf(saved)["id"])}/approve`);
+
+      const page = await get("/api/v1/products/desk-lamp/reviews");
+      expect(page.headers["content-type"]).toMatch(/^application\/json/);
+      expect(page.headers["x-content-type-options"]).toBe("nosniff");
+      expect((jsonOf(page)["items"] as { body: string }[])[0]?.body).toBe(payload);
+    }
   });
 });
 
@@ -646,3 +804,127 @@ describe("markup in order emails", () => {
   });
 });
 
+
+describe("the Content-Security-Policy the web server sends", () => {
+  const caddyfile = readFileSync(new URL("../../../web/Caddyfile", import.meta.url), "utf8");
+  const policy = /Content-Security-Policy "([^"]+)"/.exec(caddyfile)?.[1] ?? "";
+  const directives = new Map(
+    policy
+      .split(";")
+      .map((part) => part.trim().split(/\s+/))
+      .map(([name = "", ...sources]) => [name, sources]),
+  );
+
+  it("allows scripts only from the shop, Stripe and Google's CAPTCHA, and never inline", () => {
+    const scripts = directives.get("script-src") ?? [];
+
+    expect(directives.get("default-src")).toEqual(["'self'"]);
+    expect(scripts).toContain("'self'");
+    expect(scripts).not.toContain("'unsafe-inline'");
+    expect(scripts).not.toContain("'unsafe-eval'");
+    expect(scripts.filter((source) => source.startsWith("https://")).every((source) => /stripe\.com|google\.com\/recaptcha|gstatic\.com\/recaptcha/.test(source))).toBe(true);
+  });
+
+  it("refuses plugins, foreign base URLs, foreign form targets and every frame around the shop", () => {
+    expect(directives.get("object-src")).toEqual(["'none'"]);
+    expect(directives.get("base-uri")).toEqual(["'self'"]);
+    expect(directives.get("form-action")).toEqual(["'self'"]);
+    expect(directives.get("frame-ancestors")).toEqual(["'none'"]);
+  });
+
+  it("goes with every answer, the not-found page included", () => {
+    const site = caddyfile.slice(caddyfile.indexOf(":3000 {"));
+    const errors = site.slice(site.indexOf("handle_errors"));
+
+    expect(site).toMatch(/^:3000 \{\n\timport tls-\{\$WEB_TLS\}\n\timport security-headers/);
+    expect(errors).toContain("import security-headers");
+  });
+});
+
+describe("bulk import limits", () => {
+  const send = async (content: Buffer | string, filename: string) => {
+    const manager = await Staff.account(harness, "content@example.com", ["content_manager"]);
+    const boundary = `prism${randomBytes(8).toString("hex")}`;
+    const body = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: text/csv\r\n\r\n`),
+      Buffer.isBuffer(content) ? content : Buffer.from(content),
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]);
+
+    return harness.app.inject({
+      method: "POST",
+      // A real import, not a check: a check reports problems, an import refuses the file.
+      url: "/api/v1/admin/products/import?dryRun=false",
+      headers: { authorization: `Bearer ${manager.accessToken}`, "content-type": `multipart/form-data; boundary=${boundary}` },
+      payload: body,
+    });
+  };
+
+  it("refuses a file over 2 MB before reading it", async () => {
+    expect((await send(randomBytes(2 * 1024 * 1024 + 1), "big.csv")).statusCode).toBe(413);
+  });
+
+  it("refuses more than 5,000 rows", async () => {
+    const header = "slug,name,description,price,stock,category,brand,weight_g,width_mm,height_mm,depth_mm,featured";
+    const rows = Array.from({ length: 5001 }, (_, index) => `p-${index},P ${index},D,1.00,1,c,b,1,1,1,1,false`);
+
+    const response = await send([header, ...rows].join("\n"), "many.csv");
+
+    expect(response.statusCode).toBe(422);
+    expect(jsonOf(response)["error"]).toMatchObject({ code: "ImportInvalid", issues: [{ path: "0:" }] });
+  });
+
+  it("refuses a column it does not know, rather than writing it anywhere", async () => {
+    await seedCatalog(harness, [{ slug: "lamp", name: "Lamp", priceCents: 100, category: "C", brand: "B" }]);
+    const response = await send("slug,name,description,price,stock,category,brand,weight_g,width_mm,height_mm,depth_mm,featured,is_admin\nlamp,Lamp,D,1.00,1,c,b,1,1,1,1,false,true\n", "extra.csv");
+    const [product] = await harness.database.sql`SELECT price_cents FROM product WHERE slug = 'lamp'`;
+
+    expect(response.statusCode).toBe(422);
+    expect(JSON.stringify(jsonOf(response)["error"])).toContain("is_admin");
+    expect(product?.["price_cents"]).toBe(100);
+  });
+
+  it("refuses a file that is neither CSV nor JSON", async () => {
+    const response = await send(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), "picture.png");
+
+    expect(response.statusCode).toBe(422);
+  });
+});
+
+describe("saved addresses of other customers", () => {
+  const address = { label: "Home", fullName: "Mari Maasikas", phone: "+372 5123 4567", address: { line1: "Narva mnt 7", city: "Tallinn", postalCode: "10117", country: "EE" } };
+
+  it("cannot be read, changed or deleted by another account", async () => {
+    const owner = await registerUser(harness, "owner@example.com");
+    const other = await registerUser(harness, "other@example.com");
+    const created = await Shop.call(harness, "POST", "/account/addresses", { token: owner.accessToken }, address);
+    const id = String(jsonOf(created)["id"]);
+
+    const listed = await Shop.call(harness, "GET", "/account/addresses", { token: other.accessToken });
+    const changed = await Shop.call(harness, "PUT", `/account/addresses/${id}`, { token: other.accessToken }, { ...address, label: "Mine now" });
+    const deleted = await Shop.call(harness, "DELETE", `/account/addresses/${id}`, { token: other.accessToken });
+
+    expect(jsonOf(listed)).toEqual({ items: [] });
+    expect(changed.statusCode).toBe(404);
+    expect(deleted.statusCode).toBe(404);
+    expect(jsonOf(await Shop.call(harness, "GET", "/account/addresses", { token: owner.accessToken }))).toMatchObject({ items: [{ id, label: "Home" }] });
+  });
+
+  it("cannot be reached without signing in", async () => {
+    expect((await Shop.call(harness, "GET", "/account/addresses", {})).statusCode).toBe(401);
+    expect((await Shop.call(harness, "GET", "/account/profile", {})).statusCode).toBe(401);
+  });
+});
+
+describe("staff roles in a profile update", () => {
+  it("are refused, and the account stays a customer", async () => {
+    const { accessToken } = await registerUser(harness, "climber@example.com");
+
+    const response = await Shop.call(harness, "PUT", "/account/profile", { token: accessToken }, { fullName: "Climber", roles: ["admin"] });
+    const [row] = await harness.database.sql`SELECT roles FROM app_user WHERE email_index = ${emailIndexOf(harness, "climber@example.com")}`;
+
+    expect(response.statusCode).toBe(422);
+    expect(row?.["roles"]).toEqual([]);
+    expect(jsonOf(await Shop.call(harness, "GET", "/admin/summary", { token: accessToken }))["error"]).toMatchObject({ code: "Forbidden" });
+  });
+});

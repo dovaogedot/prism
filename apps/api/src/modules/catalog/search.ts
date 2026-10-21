@@ -18,6 +18,13 @@ export type LiftedFacet = "none" | "brand" | "price" | "rating" | "property";
 /** The per-product rating aggregate, as the queries alias it. */
 export type RatingColumns = Readonly<{ average: SQL; count: SQL }>;
 
+/**
+ * How the search text matches: `exact` finds its words and its substring;
+ * `similar` finds names whose trigrams resemble it, which is what catches a
+ * misspelling once nothing matched exactly.
+ */
+export type TextMatch = "exact" | "similar";
+
 export const ProductSearch = {
   RATING_THRESHOLDS: [5, 4, 3, 2, 1] as const,
 
@@ -37,10 +44,13 @@ export const ProductSearch = {
 
   /**
    * Full-text search matches whole words and stems, never a fragment, so the
-   * name is also matched as a substring.
+   * name is also matched as a substring. A similar match uses pg_trgm's `%`,
+   * which the trigram index of the name answers.
    */
-  textCondition: (text: string): SQL =>
-    sql`(${products.search} @@ ${ProductSearch.tsQuery(text)} OR ${products.name} ILIKE ${ProductSearch.likePattern(text)})`,
+  textCondition: (text: string, match: TextMatch = "exact"): SQL =>
+    match === "similar"
+      ? sql`${products.name} % ${text}`
+      : sql`(${products.search} @@ ${ProductSearch.tsQuery(text)} OR ${products.name} ILIKE ${ProductSearch.likePattern(text)})`,
 
   /** A product carries `filter.name` with one of `filter.values`. */
   propertyCondition: (filter: PropertyFilter): SQL =>
@@ -51,10 +61,10 @@ export const ProductSearch = {
    * facet but the categories lists its values over the shelf, so a value
    * stays in view when a filter of the rail excludes it.
    */
-  shelf: (query: ProductQuery): SQL[] => {
+  shelf: (query: ProductQuery, match: TextMatch = "exact"): SQL[] => {
     const where: SQL[] = [];
 
-    if (query.text !== undefined) where.push(ProductSearch.textCondition(query.text));
+    if (query.text !== undefined) where.push(ProductSearch.textCondition(query.text, match));
     if (query.category !== undefined) where.push(eq(categories.slug, query.category));
 
     return where;
@@ -92,8 +102,8 @@ export const ProductSearch = {
   },
 
   /** Every active filter as a condition, except the one named by `lifted`. */
-  conditions: (query: ProductQuery, rating: RatingColumns, lifted: LiftedFacet = "none"): SQL[] => [
-    ...ProductSearch.shelf(query),
+  conditions: (query: ProductQuery, rating: RatingColumns, lifted: LiftedFacet = "none", match: TextMatch = "exact"): SQL[] => [
+    ...ProductSearch.shelf(query, match),
     ...ProductSearch.narrowing(query, rating, lifted),
   ],
 
@@ -105,8 +115,10 @@ export const ProductSearch = {
     conditions.length === 0 ? undefined : and(...conditions),
 
   /** Every sort ends in the slug, so paging is stable when keys tie. */
-  orderBy: (query: ProductQuery, rating: RatingColumns): SQL[] => {
+  orderBy: (query: ProductQuery, rating: RatingColumns, match: TextMatch = "exact"): SQL[] => {
     switch (query.sort) {
+      case "newest":
+        return [desc(products.createdAt), asc(products.slug)];
       case "price_asc":
         return [asc(products.priceCents), asc(products.slug)];
       case "price_desc":
@@ -114,9 +126,14 @@ export const ProductSearch = {
       case "rating":
         return [desc(rating.average), desc(rating.count), asc(products.slug)];
       case "relevance":
+        if (query.text !== undefined && match === "similar") {
+          return [desc(sql`similarity(${products.name}, ${query.text})`), asc(products.name), asc(products.slug)];
+        }
         return query.text === undefined
           ? [asc(products.name), asc(products.slug)]
           : [
+              // A product named exactly what was typed comes first, then the best full-text matches.
+              desc(sql`lower(${products.name}) = lower(${query.text})`),
               desc(sql`ts_rank(${products.search}, ${ProductSearch.tsQuery(query.text)})`),
               asc(products.name),
               asc(products.slug),

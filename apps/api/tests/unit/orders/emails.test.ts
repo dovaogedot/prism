@@ -1,4 +1,4 @@
-import { Contact, OrderId, OrderKey, OrderNumber, ShippingAddress, Slug } from "@prism/shared";
+import { Contact, OrderId, OrderKey, OrderNumber, ShippingAddress, ShippingMethodCode, Slug } from "@prism/shared";
 import { describe, expect, it } from "vitest";
 import { Html } from "../../../src/http/html.ts";
 import { OrderEmail } from "../../../src/modules/orders/emails.ts";
@@ -10,7 +10,9 @@ const order: OrderRecord = {
   id: OrderId.schema.parse("6f1c2a52-3b8e-4f43-9a6e-1c2d3e4f5a6b"),
   number: OrderNumber.schema.parse(100001),
   status: "payment_successful",
-  shippingMethod: "standard",
+  shippingMethod: ShippingMethodCode.schema.parse("standard"),
+  shippingMethodName: "Standard",
+  estimatedDelivery: { from: "2026-08-11", to: "2026-08-13" },
   subtotalCents: 5000,
   shippingCents: 0,
   totalCents: 5000,

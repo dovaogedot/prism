@@ -35,6 +35,7 @@ import {
 } from "../../platform/oauth.ts";
 import { OpaqueToken, RefreshToken, TokenId, type TokenService } from "../../platform/tokens.ts";
 import type { TotpService } from "../../platform/totp.ts";
+import type { AuditEntry } from "../staff/audit.ts";
 import { PasswordResetEmail } from "./emails.ts";
 import { UserRecord, type AuthRepository } from "./repository.ts";
 
@@ -52,10 +53,23 @@ export type AuthDependencies = Readonly<{
   accessTtlSeconds: number;
   refreshTtlSeconds: number;
   passwordResetTtlSeconds: number;
+  /** How long a session's TOTP check counts as recent. */
+  staffVerificationTtlSeconds: number;
 }>;
 
 /** What the caller learns about the browser, for the session audit trail. */
-export type RequestContext = Readonly<{ userAgent: string; ipAddress: string }>;
+export type RequestContext = Readonly<{
+  /** Left out when the browser sent none. */
+  userAgent?: string;
+  ipAddress: string;
+}>;
+
+/** The session a request arrived in, as far as the second factor is concerned. */
+export type SessionContext = Readonly<{
+  id: SessionId;
+  /** When the session last passed a TOTP check; absent when it never did. */
+  secondFactorAt?: Date;
+}>;
 
 /** The refresh token travels in a cookie, so it leaves the service separately. */
 export type IssuedSession = Readonly<{
@@ -84,18 +98,40 @@ export type AuthService = Readonly<{
   }) => ResultAsync<IssuedSession, DomainError>;
   refresh: (presentedToken: RefreshToken) => ResultAsync<IssuedSession, DomainError>;
   logout: (sessionId: SessionId) => ResultAsync<void, DomainError>;
-  currentUser: (userId: UserId) => ResultAsync<SessionUser, DomainError>;
+  currentUser: (userId: UserId, session: SessionContext) => ResultAsync<SessionUser, DomainError>;
   /** Succeeds whether or not the address exists, so it is not an oracle. */
   requestPasswordReset: (email: Email) => ResultAsync<void, DomainError>;
   changePassword: (input: {
     userId: UserId;
+    session: SessionContext;
     currentPassword?: string;
     password: string;
   }) => ResultAsync<SessionUser, DomainError>;
   resetPassword: (input: { token: ResetToken; password: string }) => ResultAsync<void, DomainError>;
   beginTwoFactorSetup: (userId: UserId) => ResultAsync<TwoFactorSetup, DomainError>;
-  enableTwoFactor: (input: { userId: UserId; code: TotpCode }) => ResultAsync<SessionUser, DomainError>;
-  disableTwoFactor: (input: { userId: UserId; code: TotpCode }) => ResultAsync<SessionUser, DomainError>;
+  /** Turns 2FA on with a code from the enrolled secret; the session counts as checked. */
+  enableTwoFactor: (input: {
+    userId: UserId;
+    session: SessionContext;
+    code: TotpCode;
+    ipAddress: string;
+  }) => ResultAsync<SessionUser, DomainError>;
+  /** Refused for an account with a staff role, which keeps 2FA on. */
+  disableTwoFactor: (input: {
+    userId: UserId;
+    session: SessionContext;
+    code: TotpCode;
+  }) => ResultAsync<SessionUser, DomainError>;
+  /**
+   * The step-up: a code from the account's authenticator marks the session
+   * as checked now. A staff account's check is written to the audit log.
+   */
+  verifyTwoFactor: (input: {
+    userId: UserId;
+    session: SessionContext;
+    code: TotpCode;
+    ipAddress: string;
+  }) => ResultAsync<SessionUser, DomainError>;
   availableProviders: () => AvailableProviders;
   oauthAuthorizationUrl: (input: {
     provider: OAuthProvider;
@@ -114,6 +150,36 @@ export const AuthService = {
   create: (deps: AuthDependencies): AuthService => {
     const { repository, clock, hasher, tokens, totp, mailer, captcha, oauth } = deps;
 
+    /** Whether a check made at `at` still counts. */
+    const isRecent = (at: Date | undefined): boolean =>
+      at !== undefined && clock.now().getTime() - at.getTime() < deps.staffVerificationTtlSeconds * 1000;
+
+    /**
+     * Accepts `code` for the account once: a live code from a step after the
+     * last one accepted, recorded so a second request with it fails.
+     */
+    const acceptCode = (user: UserRecord, code: TotpCode): ResultAsync<void, DomainError> => {
+      if (user.totpSecret === undefined) return errAsync({ _tag: "TwoFactorNotInitialized" });
+
+      const step = totp.acceptedStep(user.totpSecret, code, user.totpLastStep);
+      if (step === undefined) return errAsync({ _tag: "TwoFactorCodeInvalid" });
+
+      return ResultAsync.fromSafePromise(repository.acceptTotpStep(user.id, step)).andThen((accepted) =>
+        accepted ? okAsync<void, DomainError>(undefined) : errAsync<void, DomainError>({ _tag: "TwoFactorCodeInvalid" }),
+      );
+    };
+
+    /** The audit entry of a staff account passing a TOTP check; none for a customer. */
+    const checkEntry = (user: UserRecord, ipAddress: string): AuditEntry | undefined =>
+      user.roles.length === 0
+        ? undefined
+        : {
+            actor: { id: user.id, roles: user.roles, ip: ipAddress },
+            action: "staff.verify",
+            target: { type: "user", id: user.id },
+            summary: "Passed a two-factor check, which opens the admin",
+          };
+
     const requireUser = (userId: UserId, missing: DomainError): ResultAsync<UserRecord, DomainError> =>
       ResultAsync.fromSafePromise(repository.findUserById(userId)).andThen((found) =>
         found === undefined ? errAsync<UserRecord, DomainError>(missing) : okAsync<UserRecord, DomainError>(found),
@@ -124,17 +190,31 @@ export const AuthService = {
       sessionId: SessionId,
       refreshToken: RefreshToken,
       refreshExpiresAt: Date,
+      secondFactorAt: Date | undefined,
     ): ResultAsync<IssuedSession, DomainError> =>
       tokens
         .issueAccessToken({ subject: user.id, sessionId, tokenId: TokenId.fresh() })
         .map((accessToken) => ({
-          grant: { accessToken, expiresInSeconds: deps.accessTtlSeconds, user: UserRecord.toSessionUser(user) },
+          grant: {
+            accessToken,
+            expiresInSeconds: deps.accessTtlSeconds,
+            user: UserRecord.toSessionUser(user, isRecent(secondFactorAt)),
+          },
           refreshToken,
           refreshExpiresAt,
         }));
 
-    /** Mints a session: one row, one opaque refresh token, one JWT. */
-    const issueSession = (user: UserRecord, context: RequestContext): ResultAsync<IssuedSession, DomainError> => {
+    /**
+     * Mints a session: one row, one opaque refresh token, one JWT. A sign-in
+     * that passed a TOTP check marks the session as checked from the start.
+     */
+    const issueSession = (
+      user: UserRecord,
+      context: RequestContext,
+      secondFactorAt?: Date,
+    ): ResultAsync<IssuedSession, DomainError> => {
+      if (user.disabledAt !== undefined) return errAsync({ _tag: "AccountDisabled" });
+
       const refresh = OpaqueToken.create(RefreshToken.schema);
       const refreshExpiresAt = Clock.after(clock, deps.refreshTtlSeconds);
 
@@ -142,12 +222,13 @@ export const AuthService = {
         repository.createSession({
           userId: user.id,
           expiresAt: refreshExpiresAt,
-          userAgent: context.userAgent,
+          ...(context.userAgent === undefined ? {} : { userAgent: context.userAgent }),
           ipAddress: context.ipAddress,
           refreshTokenDigest: refresh.digest,
           refreshExpiresAt,
+          ...(secondFactorAt === undefined ? {} : { secondFactorAt }),
         }),
-      ).andThen((session) => grantFor(user, session.id, refresh.plaintext, refreshExpiresAt));
+      ).andThen((session) => grantFor(user, session.id, refresh.plaintext, refreshExpiresAt, secondFactorAt));
     };
 
     const challenge = (user: UserRecord): ResultAsync<TwoFactorChallenge, DomainError> =>
@@ -162,8 +243,10 @@ export const AuthService = {
     const signInOAuth = (
       user: UserRecord,
       context: RequestContext,
-    ): ResultAsync<TwoFactorChallenge | IssuedSession, DomainError> =>
-      user.totpEnabledAt === undefined ? issueSession(user, context) : challenge(user);
+    ): ResultAsync<TwoFactorChallenge | IssuedSession, DomainError> => {
+      if (user.disabledAt !== undefined) return errAsync({ _tag: "AccountDisabled" });
+      return user.totpEnabledAt === undefined ? issueSession(user, context) : challenge(user);
+    };
 
     const linkAndSignIn = (
       user: UserRecord,
@@ -197,6 +280,10 @@ export const AuthService = {
 
           return ResultAsync.fromSafePromise(hasher.verify(user.passwordHash, password)).andThen((matches) => {
             if (!matches) return errAsync<LoginOutcome | IssuedSession, DomainError>({ _tag: "InvalidCredentials" });
+            // Told only to someone who knows the password.
+            if (user.disabledAt !== undefined) {
+              return errAsync<LoginOutcome | IssuedSession, DomainError>({ _tag: "AccountDisabled" });
+            }
             // The password was right, but it is not sufficient on its own.
             return user.totpEnabledAt === undefined ? issueSession(user, context) : challenge(user);
           });
@@ -210,9 +297,7 @@ export const AuthService = {
             if (user.totpSecret === undefined || user.totpEnabledAt === undefined) {
               return errAsync<IssuedSession, DomainError>({ _tag: "TwoFactorNotEnabled" });
             }
-            return totp.verify(user.totpSecret, code)
-              ? issueSession(user, context)
-              : errAsync<IssuedSession, DomainError>({ _tag: "TwoFactorCodeInvalid" });
+            return acceptCode(user, code).andThen(() => issueSession(user, context, clock.now()));
           }),
 
       refresh: (presentedToken) => {
@@ -230,8 +315,10 @@ export const AuthService = {
           switch (outcome._tag) {
             case "Rotated":
               return requireUser(outcome.userId, { _tag: "RefreshTokenInvalid" }).andThen((user) =>
-                grantFor(user, outcome.sessionId, replacement.plaintext, replacementExpiresAt),
+                grantFor(user, outcome.sessionId, replacement.plaintext, replacementExpiresAt, outcome.secondFactorAt),
               );
+            case "AccountDisabled":
+              return errAsync<IssuedSession, DomainError>({ _tag: "AccountDisabled" });
             case "Replayed":
               return errAsync<IssuedSession, DomainError>({ _tag: "RefreshTokenReused" });
             case "SessionEnded":
@@ -244,7 +331,10 @@ export const AuthService = {
 
       logout: (sessionId) => ResultAsync.fromSafePromise(repository.revokeSession(sessionId, "logout")),
 
-      currentUser: (userId) => requireUser(userId, { _tag: "Unauthenticated" }).map(UserRecord.toSessionUser),
+      currentUser: (userId, session) =>
+        requireUser(userId, { _tag: "Unauthenticated" }).map((user) =>
+          UserRecord.toSessionUser(user, isRecent(session.secondFactorAt)),
+        ),
 
       requestPasswordReset: (email) =>
         ResultAsync.fromSafePromise(
@@ -271,7 +361,7 @@ export const AuthService = {
        * provider has nothing to prove. Other sessions are left alone: the
        * reset-by-email flow is the one that assumes compromise.
        */
-      changePassword: ({ userId, currentPassword, password }) =>
+      changePassword: ({ userId, session, currentPassword, password }) =>
         requireUser(userId, { _tag: "Unauthenticated" }).andThen((user) => {
           const confirmed: ResultAsync<boolean, DomainError> =
             user.passwordHash === undefined
@@ -286,7 +376,7 @@ export const AuthService = {
               : ResultAsync.fromSafePromise(
                   hasher.hash(password).then(async (passwordHash) => {
                     await repository.setPasswordHash(userId, passwordHash);
-                    return UserRecord.toSessionUser({ ...user, passwordHash });
+                    return UserRecord.toSessionUser({ ...user, passwordHash }, isRecent(session.secondFactorAt));
                   }),
                 ),
           );
@@ -325,40 +415,57 @@ export const AuthService = {
           );
         }),
 
-      enableTwoFactor: ({ userId, code }) =>
+      enableTwoFactor: ({ userId, session, code, ipAddress }) =>
         requireUser(userId, { _tag: "Unauthenticated" }).andThen((user) => {
           if (user.totpEnabledAt !== undefined) {
             return errAsync<SessionUser, DomainError>({ _tag: "TwoFactorAlreadyEnabled" });
           }
-          if (user.totpSecret === undefined) {
-            return errAsync<SessionUser, DomainError>({ _tag: "TwoFactorNotInitialized" });
-          }
+
           // One live code proves the secret reached the phone.
-          if (!totp.verify(user.totpSecret, code)) {
-            return errAsync<SessionUser, DomainError>({ _tag: "TwoFactorCodeInvalid" });
-          }
+          return acceptCode(user, code).andThen(() => {
+            const enabledAt = clock.now();
 
-          const enabledAt = clock.now();
-
-          return ResultAsync.fromSafePromise(
-            repository.enableTotp(userId, enabledAt).then(() => UserRecord.toSessionUser({ ...user, totpEnabledAt: enabledAt })),
-          );
+            return ResultAsync.fromSafePromise(
+              repository
+                .enableTotp(userId, enabledAt)
+                .then(() => repository.markSecondFactor(session.id, enabledAt, checkEntry(user, ipAddress)))
+                .then(() => UserRecord.toSessionUser({ ...user, totpEnabledAt: enabledAt }, true)),
+            );
+          });
         }),
 
-      disableTwoFactor: ({ userId, code }) =>
+      disableTwoFactor: ({ userId, session, code }) =>
         requireUser(userId, { _tag: "Unauthenticated" }).andThen((user) => {
           if (user.totpEnabledAt === undefined || user.totpSecret === undefined) {
             return errAsync<SessionUser, DomainError>({ _tag: "TwoFactorNotEnabled" });
           }
-          // Turning the second factor off is itself a sensitive action.
-          if (!totp.verify(user.totpSecret, code)) {
-            return errAsync<SessionUser, DomainError>({ _tag: "TwoFactorCodeInvalid" });
+          // Neither a role nor a password alone may open the admin.
+          if (user.roles.length > 0) {
+            return errAsync<SessionUser, DomainError>({ _tag: "TwoFactorRequiredForStaff" });
           }
 
-          const { totpSecret: _secret, totpEnabledAt: _enabledAt, ...rest } = user;
+          const { totpSecret: _secret, totpEnabledAt: _enabledAt, totpLastStep: _step, ...rest } = user;
 
-          return ResultAsync.fromSafePromise(
-            repository.disableTotp(userId).then(() => UserRecord.toSessionUser(rest)),
+          // Turning the second factor off is itself a sensitive action.
+          return acceptCode(user, code).andThen(() =>
+            ResultAsync.fromSafePromise(
+              repository.disableTotp(userId).then(() => UserRecord.toSessionUser(rest, isRecent(session.secondFactorAt))),
+            ),
+          );
+        }),
+
+      verifyTwoFactor: ({ userId, session, code, ipAddress }) =>
+        requireUser(userId, { _tag: "Unauthenticated" }).andThen((user) => {
+          if (user.totpEnabledAt === undefined) {
+            return errAsync<SessionUser, DomainError>({ _tag: "TwoFactorNotEnabled" });
+          }
+
+          return acceptCode(user, code).andThen(() =>
+            ResultAsync.fromSafePromise(
+              repository
+                .markSecondFactor(session.id, clock.now(), checkEntry(user, ipAddress))
+                .then(() => UserRecord.toSessionUser(user, true)),
+            ),
           );
         }),
 

@@ -17,6 +17,8 @@ type Letter = Readonly<{
   paragraphs: readonly string[];
   order: OrderRecord;
   orderUrl: string;
+  /** Further links under the summary, each on its own line. */
+  links?: readonly Readonly<{ label: string; url: string }>[];
 }>;
 
 export const OrderEmail = {
@@ -62,6 +64,7 @@ export const OrderEmail = {
       ...OrderEmail.summaryText(letter.order),
       "",
       `See your order: ${letter.orderUrl}`,
+      ...(letter.links ?? []).map((link) => `${link.label}: ${link.url}`),
     ].join("\n"),
     html: `<!doctype html>
 <html lang="en">
@@ -75,6 +78,12 @@ export const OrderEmail = {
          style="display:inline-block;margin-top:16px;background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">
         View your order
       </a>
+      ${(letter.links ?? [])
+        .map(
+          (link) =>
+            `<p style="margin:16px 0 0"><a href="${Html.escape(link.url)}" style="color:#2563eb">${Html.escape(link.label)}</a></p>`,
+        )
+        .join("\n      ")}
     </div>
   </body>
 </html>`,
@@ -128,6 +137,25 @@ export const OrderEmail = {
       order,
       orderUrl,
     }),
+
+  /** The parcel arrived: a thank-you, with a link to review each product still in the catalog. */
+  delivered: (order: OrderRecord, orderUrl: string, webOrigin: string): OutboundEmail => {
+    const links = order.lines
+      .filter((line) => line.productId !== undefined)
+      .map((line) => ({ label: `Review ${line.name}`, url: `${webOrigin}/products/${line.slug}#review` }));
+
+    return OrderEmail.compose({
+      subject: `Order ${OrderEmail.numberOf(order.number)} delivered`,
+      heading: "Your order has arrived",
+      paragraphs: [
+        `Hi ${order.contact.fullName}, your order was delivered. We hope you like it.`,
+        ...(links.length === 0 ? [] : ["Tell other shoppers what you think: each link below opens a review form."]),
+      ],
+      order,
+      orderUrl,
+      links,
+    });
+  },
 
   /** The parcel left the warehouse. */
   shipped: (order: OrderRecord, orderUrl: string, trackingNumber: string): OutboundEmail =>

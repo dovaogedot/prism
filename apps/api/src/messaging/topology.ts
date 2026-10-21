@@ -1,7 +1,7 @@
 /**
  * Every exchange, routing key and queue the shop uses. The payment service
  * publishes payment outcomes for the order service; the order service
- * publishes cancellations for the payment service. Anything that keeps
+ * publishes cancellations and refund requests for the payment service. Anything that keeps
  * failing ends up in `dead-letter`, which nothing consumes and the RabbitMQ
  * management UI shows.
  */
@@ -15,11 +15,14 @@ export const Topology = {
 
   PAYMENT_STATUS_KEY: "payment.status",
   ORDER_CANCELED_KEY: "order.canceled",
+  REFUND_REQUESTED_KEY: "order.refund-requested",
 
   /** Consumed by the order service. */
   PAYMENT_STATUS_QUEUE: "orders.payment-status",
   /** Consumed by the payment service. */
   ORDER_CANCELED_QUEUE: "payments.order-canceled",
+  /** Consumed by the payment service. */
+  REFUND_REQUESTED_QUEUE: "payments.refund-requested",
   DEAD_LETTER_QUEUE: "dead-letter",
 
   /** How many times a message may be returned before it is dead-lettered. */
@@ -44,6 +47,13 @@ export const Topology = {
         name: Topology.ORDER_CANCELED_QUEUE,
         exchange: Topology.ORDERS_EXCHANGE,
         routingKey: Topology.ORDER_CANCELED_KEY,
+        deadLetterExchange: Topology.DEAD_LETTER_EXCHANGE,
+        deliveryLimit: Topology.DELIVERY_LIMIT,
+      },
+      {
+        name: Topology.REFUND_REQUESTED_QUEUE,
+        exchange: Topology.ORDERS_EXCHANGE,
+        routingKey: Topology.REFUND_REQUESTED_KEY,
         deadLetterExchange: Topology.DEAD_LETTER_EXCHANGE,
         deliveryLimit: Topology.DELIVERY_LIMIT,
       },

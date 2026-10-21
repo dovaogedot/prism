@@ -3,7 +3,7 @@
  * webhooks Stripe would send, signed the way Stripe signs them.
  */
 
-import { Pricing, type ShippingMethod } from "@prism/shared";
+import { Pricing, type ShippingOption } from "@prism/shared";
 import { and, eq } from "drizzle-orm";
 import { payments, products } from "../../src/db/schema.ts";
 import { PaymentGateway } from "../../src/platform/payment-gateway.ts";
@@ -74,12 +74,20 @@ export const Shop = {
     return current;
   },
 
+  /** The delivery option with `code`, as checkout offers it. */
+  optionOf: async (harness: Harness, code: string): Promise<ShippingOption> => {
+    const { items } = JSON.parse((await Shop.call(harness, "GET", "/shipping-methods")).body) as { items: ShippingOption[] };
+    const option = items.find((item) => item.code === code);
+    if (option === undefined) throw new Error(`no active shipping method ${code}`);
+    return option;
+  },
+
   /** What the order page would show as the total of the caller's cart. */
-  totalOf: async (harness: Harness, caller: Caller, method: ShippingMethod = "standard"): Promise<number> => {
+  totalOf: async (harness: Harness, caller: Caller, method = "standard"): Promise<number> => {
     const view = JSON.parse((await Shop.call(harness, "GET", "/cart", caller)).body) as {
       lines: { unitPriceCents: number; quantity: number }[];
     };
-    return Pricing.totals(view.lines, method).totalCents;
+    return Pricing.totals(view.lines, await Shop.optionOf(harness, method)).totalCents;
   },
 
   /** Places an order from the caller's cart at the total the cart shows. */

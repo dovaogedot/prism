@@ -7,6 +7,7 @@
 import { Email, UserId, type OAuthProvider } from "@prism/shared";
 import { describe, expect, it } from "vitest";
 import { UserRecord } from "../../../src/modules/auth/repository.ts";
+import { FieldCipher } from "../../../src/platform/cipher.ts";
 import { PasswordHash } from "../../../src/platform/hasher.ts";
 import { TotpSecret } from "../../../src/platform/totp.ts";
 
@@ -16,6 +17,7 @@ const EMAIL = Email.schema.parse("a@example.com");
 const account = (providers: readonly OAuthProvider[]): UserRecord => ({
   id: ID,
   email: EMAIL,
+  roles: [],
   providers,
   createdAt: new Date(0),
 });
@@ -57,21 +59,36 @@ describe("UserRecord.toSessionUser", () => {
       twoFactorEnabled: true,
       hasPassword: true,
       providers: ["google"],
+      roles: [],
+      isSecondFactorVerified: false,
     });
   });
 
-  it("maps a null column to an absent field", () => {
-    const record = UserRecord.fromRow({
-      id: ID,
-      email: EMAIL,
-      passwordHash: null,
-      totpSecret: null,
-      totpEnabledAt: null,
-      createdAt: new Date(0),
-      providers: [],
-    });
+  it("maps a null column to an absent field, and opens the sealed ones", () => {
+    const cipher = FieldCipher.create(Buffer.alloc(32, 7));
+    const record = UserRecord.fromRow(
+      {
+        id: ID,
+        email: cipher.seal(EMAIL),
+        emailIndex: cipher.index("account-email", EMAIL),
+        passwordHash: null,
+        totpSecret: null,
+        totpEnabledAt: null,
+        totpLastStep: null,
+        roles: [],
+        fullName: null,
+        phone: null,
+        disabledAt: null,
+        createdAt: new Date(0),
+        providers: [],
+      },
+      cipher,
+    );
 
+    expect(record.email).toBe(EMAIL);
     expect(record).not.toHaveProperty("passwordHash");
+    expect(record).not.toHaveProperty("totpSecret");
+    expect(record).not.toHaveProperty("disabledAt");
     expect(UserRecord.toSessionUser(record).hasPassword).toBe(false);
   });
 });

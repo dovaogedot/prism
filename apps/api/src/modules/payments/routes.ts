@@ -20,7 +20,8 @@ export const PaymentRoutes = {
       scope.removeContentTypeParser("application/json");
       scope.addContentTypeParser("application/json", { parseAs: "buffer" }, (_request, body, done) => done(null, body));
 
-      scope.post("/payments/webhook", async (request, reply) => {
+      // Stripe signs every call, and a refused one is retried for days, so it has no budget.
+      scope.post("/payments/webhook", { config: { rateLimit: "none" } }, async (request, reply) => {
         const signature = request.headers[PaymentRoutes.SIGNATURE_HEADER];
         const body = Buffer.isBuffer(request.body) ? request.body : Buffer.alloc(0);
 

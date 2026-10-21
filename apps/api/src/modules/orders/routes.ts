@@ -20,16 +20,16 @@ import type { Guards } from "../../http/guard.ts";
 import { CartRoutes } from "../cart/routes.ts";
 import type { CartService } from "../cart/service.ts";
 import type { OrderAccess, OrderService } from "./service.ts";
+import type { ShippingMethods } from "./shipping.ts";
 
 /** What the order routes are served from. */
 export type OrderRouteDependencies = Readonly<{
   service: OrderService;
   carts: CartService;
+  shipping: ShippingMethods;
   guards: Guards;
   cookies: CookieOptions;
   payments: PaymentsConfig;
-  /** Per-address budget for placing orders and checking addresses. */
-  checkoutRateLimitPerMinute: number;
 }>;
 
 export const OrderRoutes = {
@@ -42,11 +42,13 @@ export const OrderRoutes = {
   register: (app: FastifyInstance, deps: OrderRouteDependencies): void => {
     const routes = app.withTypeProvider<ZodTypeProvider>();
     const { service, guards } = deps;
-    const limited = { rateLimit: { max: deps.checkoutRateLimitPerMinute, timeWindow: "1 minute" } };
+    const limited = { rateLimit: "checkout" } as const;
     const orderParams = z.object({ id: OrderId.schema });
     const keyQuery = z.object({ key: OrderKey.schema.optional() });
 
     routes.get("/checkout/config", async () => deps.payments);
+
+    routes.get("/shipping-methods", { config: { cache: "public" } }, async () => ({ items: await deps.shipping.active() }));
 
     routes.get("/checkout/prefill", { preHandler: guards.requireUser }, async (request, reply) => {
       if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });

@@ -3,12 +3,13 @@
  * from the product, so a cart shows today's price and today's stock.
  */
 
-import { Cart, Pricing, type CartLine, type CartView, type ProductId, type ProductImage, type UserId } from "@prism/shared";
+import { Cart, Pricing, type CartLine, type CartView, type ProductId, type UserId } from "@prism/shared";
 import { and, asc, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
 import type { Database } from "../../db/client.ts";
 import type { CartId } from "../../db/ids.ts";
 import { cartItems, carts, products } from "../../db/schema.ts";
 import type { Digest } from "../../platform/tokens.ts";
+import { ImageRows, type ImageRow } from "../catalog/images.ts";
 
 /** A product as the cart checks it before changing a line. */
 export type StockedProduct = Readonly<{ id: ProductId; stock: number }>;
@@ -174,8 +175,8 @@ export const CartRepository = {
           unitPriceCents: products.priceCents,
           stock: products.stock,
           quantity: cartItems.quantity,
-          image: sql<ProductImage | null>`(
-            SELECT json_build_object('url', '/media/' || i.file, 'alt', i.alt)
+          image: sql<ImageRow | null>`(
+            SELECT ${ImageRows.json("i")}
             FROM product_image i WHERE i.product_id = ${products.id}
             ORDER BY i.position LIMIT 1
           )`,
@@ -191,7 +192,7 @@ export const CartRepository = {
             productId: row.productId,
             slug: row.slug,
             name: row.name,
-            ...(row.image === null ? {} : { image: row.image }),
+            ...(row.image === null ? {} : { image: ImageRows.view(row.image) }),
             unitPriceCents: row.unitPriceCents,
             quantity: row.quantity,
             stock: row.stock,

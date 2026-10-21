@@ -1,13 +1,14 @@
 /**
  * After the sale: listing and filtering orders, who may read one, canceling
- * with a refund through the queue, the simulated warehouse, expiry of unpaid
- * orders, and the checkout prefill. Time moves through the harness clock;
- * nothing waits.
+ * with a refund through the queue, expiry of unpaid orders, and the checkout
+ * prefill. Time moves through the harness clock; nothing waits. The staff's
+ * side of an order is in `fulfillment.test.ts`.
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Shop, type Caller } from "../support/commerce.ts";
 import { jsonOf, registerUser, seedCatalog, startHarness, VALID_PASSWORD, type Harness } from "../support/harness.ts";
+import { Staff } from "../support/staff.ts";
 
 let harness: Harness;
 
@@ -242,8 +243,8 @@ describe("POST /orders/:id/cancel", () => {
   it("refuses an order that is already processing", async () => {
     const { accessToken } = await registerUser(harness, "buyer@example.com");
     const placed = await paidOrder({ token: accessToken });
-    harness.clock.advanceSeconds(harness.config.commerce.fulfillmentStepSeconds ?? 0);
-    await harness.jobs.housekeeping.run();
+    const delivery = await Staff.account(harness, "delivery@example.com", ["delivery_manager"]);
+    await Staff.call(harness, delivery, "POST", `/admin/orders/${placed.orderId}/status`, { status: "processing" });
 
     const response = await Shop.call(harness, "POST", `/orders/${placed.orderId}/cancel`, { token: accessToken });
 
@@ -295,34 +296,6 @@ describe("housekeeping", () => {
       status: "canceled",
       payment: { status: "succeeded", refund: "succeeded" },
     });
-  });
-
-  it("walks a paid order through the warehouse, one step per interval, with tracking and an email", async () => {
-    const placed = await paidOrder({});
-    const step = harness.config.commerce.fulfillmentStepSeconds ?? 0;
-    harness.mailer.clear();
-
-    const statuses: string[] = [];
-    for (let pass = 0; pass < 4; pass += 1) {
-      harness.clock.advanceSeconds(step);
-      await harness.jobs.housekeeping.run();
-      statuses.push((await detailOf(placed.orderId, {}, placed.key)).status);
-    }
-
-    expect(statuses).toEqual(["processing", "shipped", "delivered", "delivered"]);
-    const detail = await detailOf(placed.orderId, {}, placed.key);
-    expect(detail.trackingNumber).toMatch(/^PR\d{9}EE$/);
-    expect(harness.mailer.sent.map((email) => email.subject)).toEqual(["Order #100001 shipped"]);
-    expect(harness.mailer.sent[0]?.text).toContain(detail.trackingNumber);
-  });
-
-  it("does not move an order twice when two passes run at once", async () => {
-    await paidOrder({});
-    harness.clock.advanceSeconds(harness.config.commerce.fulfillmentStepSeconds ?? 0);
-
-    const reports = await Promise.all([harness.jobs.housekeeping.run(), harness.jobs.housekeeping.run()]);
-
-    expect(reports.reduce((sum, report) => sum + report.advanced, 0)).toBe(1);
   });
 });
 

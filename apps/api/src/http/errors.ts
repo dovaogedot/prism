@@ -5,12 +5,19 @@
 
 import { DomainError, type ValidationIssue } from "@prism/shared";
 import type { FastifyInstance, FastifyReply } from "fastify";
+import type { ResultAsync } from "neverthrow";
 import { hasZodFastifySchemaValidationErrors } from "fastify-type-provider-zod";
 
 export const HttpErrors = {
   /** Answers a request with the status and body an error is defined to carry. */
   send: (reply: FastifyReply, error: DomainError): FastifyReply =>
     reply.status(DomainError.httpStatus(error)).send(DomainError.toResponse(error)),
+
+  /** Answers a result: its value as JSON with 200, or its error as that error's status. */
+  answer: async <T>(reply: FastifyReply, result: ResultAsync<T, DomainError>): Promise<FastifyReply> => {
+    const settled = await result;
+    return settled.isErr() ? HttpErrors.send(reply, settled.error) : reply.status(200).send(settled.value);
+  },
 
   /** Fastify reports `/email`; the browser's form fields are named `email`. */
   issuesOf: (
@@ -52,8 +59,6 @@ export const HttpErrors = {
       }
 
       const status = HttpErrors.statusOf(error);
-
-      if (status === 429) return HttpErrors.send(reply, { _tag: "RateLimited" });
 
       if (status !== undefined && status < 500) {
         return HttpErrors.send(reply, {

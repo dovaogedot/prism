@@ -5,6 +5,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { Email } from "@prism/shared";
 import { Hasher } from "../../src/platform/hasher.ts";
 import { Shop } from "../support/commerce.ts";
 import { cookieValue, jsonOf, seedCatalog, startHarness, VALID_PASSWORD, type Harness } from "../support/harness.ts";
@@ -50,9 +51,11 @@ describe("a guest who registers", () => {
     });
     expect(jsonOf(me)).toMatchObject({ email: "new.shopper@example.com", hasPassword: true, twoFactorEnabled: false });
 
-    // What was stored: a lowercase address and an Argon2id hash, never the password.
+    // What was stored: the lowercase address sealed, and an Argon2id hash, never the password.
     const [stored] = await harness.database.sql`SELECT email, password_hash FROM app_user`;
-    expect(stored?.["email"]).toBe("new.shopper@example.com");
+    const sealed = Buffer.from(stored?.["email"] as Uint8Array);
+    expect(harness.cipher.open(sealed, Email.schema)).toBe("new.shopper@example.com");
+    expect(sealed.toString("latin1")).not.toContain("new.shopper");
     expect(stored?.["password_hash"]).toMatch(/^\$argon2id\$v=19\$m=19456,p=1,t=2\$/);
     expect(stored?.["password_hash"]).not.toContain(VALID_PASSWORD);
 

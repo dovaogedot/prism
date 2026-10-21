@@ -100,7 +100,7 @@ describe("guest cart", () => {
         productId: await idOf("desk-lamp"),
         slug: "desk-lamp",
         name: "Desk Lamp",
-        image: { url: "/media/lamp.png", alt: "Desk Lamp" },
+        image: { id: expect.any(String), url: "/media/lamp.png", alt: "Desk Lamp", isPixelArt: false, sources: [] },
         unitPriceCents: 2500,
         quantity: 2,
         stock: 5,

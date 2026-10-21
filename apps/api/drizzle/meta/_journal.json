@@ -15,6 +15,13 @@
       "when": 1790846120266,
       "tag": "0001_commerce",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792481667467,
+      "tag": "0002_experience",
+      "breakpoints": true
     }
   ]
 }

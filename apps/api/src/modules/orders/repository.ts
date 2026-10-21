@@ -8,9 +8,14 @@
 import {
   Cart,
   Contact,
+  Delivery,
   OrderKey,
   OrderStatus,
+  Page,
   ShippingAddress,
+  type AdminOrderQuery,
+  type AdminOrderSummary,
+  type DeliveryEstimate,
   type OrderEvent,
   type OrderId,
   type OrderLine,
@@ -18,18 +23,19 @@ import {
   type OrderNumber,
   type OrderSort,
   type ProductId,
-  type ProductImage,
-  type ShippingMethod,
+  type ShippingMethodCode,
   type Totals,
   type UserId,
   type ValidationIssue,
 } from "@prism/shared";
-import { and, asc, count, desc, eq, gte, inArray, isNull, lt, lte, sql, TransactionRollbackError } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull, lt, lte, sql, TransactionRollbackError, type SQL } from "drizzle-orm";
 import type { Database, Transaction } from "../../db/client.ts";
 import type { CartId } from "../../db/ids.ts";
 import { cartItems, orderEvents, orderLines, orders, products } from "../../db/schema.ts";
 import { Outbox, type OutboxEntry } from "../../messaging/outbox.ts";
 import type { FieldCipher } from "../../platform/cipher.ts";
+import type { AuditEntry, AuditLog } from "../staff/audit.ts";
+import { ImageRows, type ImageRow } from "../catalog/images.ts";
 
 /** An order, opened. */
 export type OrderRecord = Readonly<{
@@ -39,12 +45,18 @@ export type OrderRecord = Readonly<{
   userId?: UserId;
   cartId?: CartId;
   status: OrderStatus;
-  shippingMethod: ShippingMethod;
+  shippingMethod: ShippingMethodCode;
+  /** The method's name when the order was placed. */
+  shippingMethodName: string;
+  /** The first and last day the parcel is expected, as `YYYY-MM-DD`. */
+  estimatedDelivery: Readonly<{ from: string; to: string }>;
   subtotalCents: number;
   shippingCents: number;
   totalCents: number;
   contact: Contact;
   address: ShippingAddress;
+  /** Present when the bill went elsewhere than the parcel. */
+  billingAddress?: ShippingAddress;
   /** Present for a guest's order. */
   key?: OrderKey;
   trackingNumber?: string;
@@ -64,7 +76,10 @@ export type PlaceRequest = Readonly<{
   userId?: UserId;
   contact: Contact;
   address: ShippingAddress;
-  shippingMethod: ShippingMethod;
+  /** Absent when the bill goes to the shipping address. */
+  billingAddress?: ShippingAddress;
+  /** The delivery option as the order keeps it: its code, its name now, and the dates it promises. */
+  shipping: Readonly<{ code: ShippingMethodCode; name: string; estimate: DeliveryEstimate }>;
   lines: readonly ReservedLine[];
   totals: Totals;
   key?: OrderKey;
@@ -92,6 +107,8 @@ export type OrderTransition = Readonly<{
   clearFromCart?: boolean;
   trackingNumber?: string;
   message?: OutboxEntry;
+  /** Written in the same transaction, when staff made the move. */
+  audit?: AuditEntry;
 }>;
 
 /** The filters of a list, already parsed. Both days are whole UTC days and count. */
@@ -127,19 +144,27 @@ export type OrderRepository = Readonly<{
   overdue: (now: Date) => Promise<readonly OrderId[]>;
   /** Orders that have had `status` since `before` or longer. */
   stale: (status: OrderStatus, before: Date) => Promise<readonly OrderId[]>;
+  /** How many orders have one of `statuses`. */
+  countInStatus: (statuses: readonly OrderStatus[]) => Promise<number>;
+  /** How many orders placed on `day` (`YYYY-MM-DD` in the shop's time zone) were paid for. */
+  countPaidOn: (day: string) => Promise<number>;
+  /** Every order, filtered and sorted for staff, a page at a time. */
+  adminList: (query: AdminOrderQuery) => Promise<Page<AdminOrderSummary>>;
 }>;
 
 export const OrderRepository = {
   REFUND_NOTE: "Refund issued",
+  /** The statuses of an order whose payment went through. */
+  PAID: ["payment_successful", "processing", "shipped", "delivered", "refunded"] as const satisfies readonly OrderStatus[],
 
-  create: (db: Database, cipher: FieldCipher): OrderRepository => {
+  create: (db: Database, cipher: FieldCipher, audit: AuditLog): OrderRepository => {
     type Row = typeof orders.$inferSelect;
 
     // The outer row is named as the table plus a literal column: drizzle
     // renders a column bare in a single-table select, where the subquery
     // would read it as its own.
-    const lineImage = sql<ProductImage | null>`(
-      SELECT json_build_object('url', '/media/' || i.file, 'alt', i.alt)
+    const lineImage = sql<ImageRow | null>`(
+      SELECT ${ImageRows.json("i")}
       FROM product_image i WHERE i.product_id = ${orderLines}."product_id"
       ORDER BY i.position LIMIT 1
     )`;
@@ -163,7 +188,7 @@ export const OrderRepository = {
         ...(row.productId === null ? {} : { productId: row.productId }),
         slug: row.slug,
         name: row.name,
-        ...(row.image === null ? {} : { image: row.image }),
+        ...(row.image === null ? {} : { image: ImageRows.view(row.image) }),
         unitPriceCents: row.unitPriceCents,
         quantity: row.quantity,
         lineTotalCents: row.lineTotalCents,
@@ -177,11 +202,14 @@ export const OrderRepository = {
       ...(row.cartId === null ? {} : { cartId: row.cartId }),
       status: row.status,
       shippingMethod: row.shippingMethod,
+      shippingMethodName: row.shippingMethodName,
+      estimatedDelivery: { from: row.estimatedDeliveryFrom, to: row.estimatedDeliveryTo },
       subtotalCents: row.subtotalCents,
       shippingCents: row.shippingCents,
       totalCents: row.totalCents,
       contact: cipher.open(row.contact, Contact.schema),
       address: cipher.open(row.shippingAddress, ShippingAddress.schema),
+      ...(row.billingAddress === null ? {} : { billingAddress: cipher.open(row.billingAddress, ShippingAddress.schema) }),
       ...(row.accessKey === null ? {} : { key: cipher.open(row.accessKey, OrderKey.schema) }),
       ...(row.trackingNumber === null ? {} : { trackingNumber: row.trackingNumber }),
       ...(row.refundedAt === null ? {} : { refundedAt: row.refundedAt }),
@@ -206,6 +234,72 @@ export const OrderRepository = {
           .set({ stock: sql`${products.stock} + ${line.quantity}` })
           .where(eq(products.id, line.productId));
       }
+    };
+
+    /** The status and date filters of a list. Both days are whole UTC days and count. */
+    const periodOf = (statuses: readonly OrderStatus[], from: string | undefined, to: string | undefined) => [
+      statuses.length === 0 ? undefined : inArray(orders.status, [...statuses]),
+      from === undefined ? undefined : gte(orders.createdAt, sql`(${from}::date)::timestamp AT TIME ZONE 'UTC'`),
+      // The end day counts, so the bound is the start of the next one.
+      to === undefined ? undefined : lt(orders.createdAt, sql`((${to}::date + 1)::timestamp) AT TIME ZONE 'UTC'`),
+    ];
+
+    const lifecycle = sql`array_position(ARRAY[${sql.join(
+      OrderStatus.NAMES.map((name) => sql`${name}`),
+      sql`, `,
+    )}]::text[], ${orders.status})`;
+
+    const ordering = {
+      newest: [desc(orders.createdAt), desc(orders.number)],
+      oldest: [asc(orders.createdAt), asc(orders.number)],
+      status: [asc(lifecycle), desc(orders.createdAt), desc(orders.number)],
+    } as const;
+
+    /** One page of orders matching `conditions`, with the sealed contact each list opens as it needs. */
+    const summaries = async (conditions: SQL | undefined, sort: OrderSort, page: number, perPage: number) => {
+      const rows = await db
+        .select({
+          id: orders.id,
+          number: orders.number,
+          status: orders.status,
+          createdAt: orders.createdAt,
+          totalCents: orders.totalCents,
+          contact: orders.contact,
+          userId: orders.userId,
+          itemCount: sql<number>`(SELECT COALESCE(sum(l.quantity), 0)::int FROM order_line l WHERE l.order_id = ${orders}."id")`,
+          image: sql<ImageRow | null>`(
+            SELECT ${ImageRows.json("i")}
+            FROM order_line l JOIN product_image i ON i.product_id = l.product_id
+            WHERE l.order_id = ${orders}."id"
+            ORDER BY l.product_name, i.position LIMIT 1
+          )`,
+          total: sql<number>`(count(*) OVER ())::int`,
+        })
+        .from(orders)
+        .where(conditions)
+        .orderBy(...ordering[sort])
+        .limit(perPage)
+        .offset((page - 1) * perPage);
+
+      const total = rows[0]?.total ?? (await db.select({ total: count() }).from(orders).where(conditions))[0]?.total ?? 0;
+
+      return {
+        items: rows.map((row) => ({
+          id: row.id,
+          number: row.number,
+          status: row.status,
+          createdAt: row.createdAt.toISOString(),
+          totalCents: row.totalCents,
+          itemCount: row.itemCount,
+          ...(row.image === null ? {} : { image: ImageRows.view(row.image) }),
+          contact: row.contact,
+          isGuest: row.userId === null,
+        })),
+        total,
+        page,
+        perPage,
+        totalPages: Page.count(total, perPage),
+      };
     };
 
     return {
@@ -256,12 +350,17 @@ export const OrderRepository = {
                 ...(request.userId === undefined ? {} : { userId: request.userId }),
                 cartId: request.cartId,
                 status: "pending_payment",
-                shippingMethod: request.shippingMethod,
+                shippingMethod: request.shipping.code,
+                shippingMethodName: request.shipping.name,
+                estimatedDeliveryFrom: request.shipping.estimate.from,
+                estimatedDeliveryTo: request.shipping.estimate.to,
                 subtotalCents: request.totals.subtotalCents,
                 shippingCents: request.totals.shippingCents,
                 totalCents: request.totals.totalCents,
                 contact: cipher.seal(request.contact),
                 shippingAddress: cipher.seal(request.address),
+                billingAddress: request.billingAddress === undefined ? null : cipher.seal(request.billingAddress),
+                emailIndex: cipher.index("order-email", request.contact.email),
                 ...(request.key === undefined ? {} : { accessKey: cipher.seal(request.key) }),
                 paymentDueAt: request.paymentDueAt,
                 createdAt: request.now,
@@ -338,65 +437,34 @@ export const OrderRepository = {
       },
 
       list: async (userId, filter) => {
-        const conditions = and(
-          eq(orders.userId, userId),
-          filter.statuses.length === 0 ? undefined : inArray(orders.status, [...filter.statuses]),
-          filter.from === undefined ? undefined : gte(orders.createdAt, sql`(${filter.from}::date)::timestamp AT TIME ZONE 'UTC'`),
-          // The end day counts, so the bound is the start of the next one.
-          filter.to === undefined
-            ? undefined
-            : lt(orders.createdAt, sql`((${filter.to}::date + 1)::timestamp) AT TIME ZONE 'UTC'`),
+        const page = await summaries(
+          and(eq(orders.userId, userId), ...periodOf(filter.statuses, filter.from, filter.to)),
+          filter.sort,
+          filter.page,
+          filter.perPage,
         );
 
-        const lifecycle = sql`array_position(ARRAY[${sql.join(
-          OrderStatus.NAMES.map((name) => sql`${name}`),
-          sql`, `,
-        )}]::text[], ${orders.status})`;
+        return { ...page, items: page.items.map(({ contact: _contact, isGuest: _isGuest, ...summary }) => summary) };
+      },
 
-        const ordering = {
-          newest: [desc(orders.createdAt), desc(orders.number)],
-          oldest: [asc(orders.createdAt), asc(orders.number)],
-          status: [asc(lifecycle), desc(orders.createdAt), desc(orders.number)],
-        } as const;
-
-        const rows = await db
-          .select({
-            id: orders.id,
-            number: orders.number,
-            status: orders.status,
-            createdAt: orders.createdAt,
-            totalCents: orders.totalCents,
-            itemCount: sql<number>`(SELECT COALESCE(sum(l.quantity), 0)::int FROM order_line l WHERE l.order_id = ${orders}."id")`,
-            image: sql<ProductImage | null>`(
-              SELECT json_build_object('url', '/media/' || i.file, 'alt', i.alt)
-              FROM order_line l JOIN product_image i ON i.product_id = l.product_id
-              WHERE l.order_id = ${orders}."id"
-              ORDER BY l.product_name, i.position LIMIT 1
-            )`,
-            total: sql<number>`(count(*) OVER ())::int`,
-          })
-          .from(orders)
-          .where(conditions)
-          .orderBy(...ordering[filter.sort])
-          .limit(filter.perPage)
-          .offset((filter.page - 1) * filter.perPage);
-
-        const total = rows[0]?.total ?? (await db.select({ total: count() }).from(orders).where(conditions))[0]?.total ?? 0;
+      adminList: async (query) => {
+        const page = await summaries(
+          and(
+            ...periodOf(query.status ?? [], query.from, query.to),
+            query.number === undefined ? undefined : eq(orders.number, query.number as OrderNumber),
+            query.email === undefined ? undefined : eq(orders.emailIndex, cipher.index("order-email", query.email)),
+          ),
+          query.sort,
+          query.page,
+          query.perPage,
+        );
 
         return {
-          items: rows.map((row) => ({
-            id: row.id,
-            number: row.number,
-            status: row.status,
-            createdAt: row.createdAt.toISOString(),
-            totalCents: row.totalCents,
-            itemCount: row.itemCount,
-            ...(row.image === null ? {} : { image: row.image }),
-          })),
-          total,
-          page: filter.page,
-          perPage: filter.perPage,
-          totalPages: Math.max(1, Math.ceil(total / filter.perPage)),
+          ...page,
+          items: page.items.map(({ contact, isGuest, ...summary }) => {
+            const opened = cipher.open(contact, Contact.schema);
+            return { ...summary, customerName: opened.fullName, customerEmail: opened.email, isGuest };
+          }),
         };
       },
 
@@ -441,6 +509,7 @@ export const OrderRepository = {
           }
 
           if (transition.message !== undefined) await Outbox.enqueue(tx, transition.message);
+          if (transition.audit !== undefined) await audit.record(tx, transition.audit);
 
           return true;
         }),
@@ -478,6 +547,25 @@ export const OrderRepository = {
           .from(orders)
           .where(and(eq(orders.status, status), lte(orders.statusChangedAt, before)));
         return rows.map((row) => row.id);
+      },
+
+      countInStatus: async (statuses) => {
+        const [row] = await db.select({ total: count() }).from(orders).where(inArray(orders.status, [...statuses]));
+        return row?.total ?? 0;
+      },
+
+      countPaidOn: async (day) => {
+        const [row] = await db
+          .select({ total: count() })
+          .from(orders)
+          .where(
+            and(
+              inArray(orders.status, [...OrderRepository.PAID]),
+              gte(orders.createdAt, sql`(${day}::date)::timestamp AT TIME ZONE ${Delivery.TIME_ZONE}`),
+              lt(orders.createdAt, sql`((${day}::date + 1)::timestamp) AT TIME ZONE ${Delivery.TIME_ZONE}`),
+            ),
+          );
+        return row?.total ?? 0;
       },
     };
   },

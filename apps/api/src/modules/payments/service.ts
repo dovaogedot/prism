@@ -1,8 +1,9 @@
 /**
  * The payment service. It starts a charge when the order service asks,
  * records what the provider's webhooks say, and publishes every outcome to
- * the queue for the order service. It consumes cancellations, and cancels
- * the intent or refunds the charge.
+ * the queue for the order service. It consumes cancellations and refund
+ * requests, and cancels the intent or refunds the charge, through the
+ * provider the charge went through.
  *
  * Every status change is conditional, so a webhook or a message delivered
  * twice changes the row once and publishes once.
@@ -10,16 +11,18 @@
 
 import type { ClientSecret, DomainError, OrderId, PaymentSummary } from "@prism/shared";
 import { err, errAsync, ok, ResultAsync, type Result } from "neverthrow";
-import { Messages, type OrderCanceled } from "../../messaging/messages.ts";
+import { Messages, type OrderCanceled, type OrderRefundRequested } from "../../messaging/messages.ts";
 import type { Clock } from "../../platform/clock.ts";
-import type { GatewayEvent, PaymentGateway } from "../../platform/payment-gateway.ts";
-import type { PaymentRepository } from "./repository.ts";
+import type { GatewayEvent, PaymentGateway, ProviderName } from "../../platform/payment-gateway.ts";
+import type { PaymentRecord, PaymentRepository } from "./repository.ts";
 
 /** The ports the payment service works through. */
 export type PaymentDependencies = Readonly<{
   repository: PaymentRepository;
-  /** Absent when payments are not configured. */
+  /** The provider new charges go through; absent when payments are not configured. */
   gateway?: PaymentGateway;
+  /** Every provider a stored payment may have gone through, by name, the one above included. */
+  gateways: Readonly<Partial<Record<ProviderName, PaymentGateway>>>;
   clock: Clock;
   /** Asks the outbox relay to publish soon. */
   kick: () => void;
@@ -35,6 +38,8 @@ export type PaymentService = Readonly<{
   handleWebhook: (rawBody: Buffer, signature: string | undefined) => ResultAsync<void, DomainError>;
   /** Consumes `order.canceled`. Rejects when the provider cannot be reached, so the message is retried. */
   onOrderCanceled: (message: OrderCanceled) => Promise<void>;
+  /** Consumes `order.refund-requested`: refunds the charge in full. Rejects like `onOrderCanceled`. */
+  onRefundRequested: (message: OrderRefundRequested) => Promise<void>;
   /** The charge and refund of an order, as its page shows them. */
   summaryOf: (orderId: OrderId) => Promise<PaymentSummary | undefined>;
 }>;
@@ -42,6 +47,9 @@ export type PaymentService = Readonly<{
 export const PaymentService = {
   create: (deps: PaymentDependencies): PaymentService => {
     const { repository, gateway, clock } = deps;
+
+    /** The provider a stored payment went through, when this instance can reach it. */
+    const gatewayOf = (payment: PaymentRecord): PaymentGateway | undefined => deps.gateways[payment.provider];
 
     const transition = async (input: Parameters<PaymentRepository["transition"]>[0]): Promise<boolean> => {
       const moved = await repository.transition(input);
@@ -106,7 +114,8 @@ export const PaymentService = {
 
           // A declined intent stays confirmable; canceling it means this order
           // can never be charged later. A failure here changes nothing above.
-          if (moved && gateway !== undefined) await gateway.cancelIntent(event.reference);
+          const provider = gatewayOf(payment);
+          if (moved && provider !== undefined) await provider.cancelIntent(event.reference);
           return;
         }
 
@@ -139,16 +148,52 @@ export const PaymentService = {
       }
     };
 
+    /**
+     * Gives a succeeded charge back in full, through the provider it went
+     * through. Its refund row's id is the idempotency key, so a message
+     * delivered twice asks once.
+     */
+    const refundInFull = async (charge: PaymentRecord): Promise<void> => {
+      const refund = await repository.ensureRefund(charge.orderId, charge.amountCents, charge.provider, clock.now());
+      if (refund.status !== "pending") return;
+
+      const provider = gatewayOf(charge);
+      if (provider === undefined || charge.reference === undefined) {
+        throw new Error(`A ${charge.provider} charge cannot be refunded without that provider.`);
+      }
+
+      const created = await provider.refund({ refundId: refund.id, intent: charge.reference, amountCents: refund.amountCents });
+      if (created.isErr()) throw new Error(`The refund failed: ${created.error}`);
+
+      if (created.value.status === "pending") {
+        await repository.attachReference(refund.id, created.value.reference, clock.now());
+        return;
+      }
+
+      await transition({
+        paymentId: refund.id,
+        from: ["pending"],
+        to: created.value.status === "succeeded" ? "succeeded" : "failed",
+        reference: created.value.reference,
+        ...(created.value.status === "succeeded"
+          ? { message: Messages.paymentStatus({ orderId: charge.orderId, paymentId: refund.id, outcome: "refunded" }) }
+          : {}),
+        now: clock.now(),
+      });
+    };
+
     return {
       startCharge: ({ orderId, amountCents }) => {
         if (gateway === undefined) return errAsync({ _tag: "PaymentsUnavailable" });
 
         const run = async (): Promise<Result<ClientSecret, DomainError>> => {
-          const paymentId = await repository.createCharge(orderId, amountCents, clock.now());
+          const paymentId = await repository.createCharge(orderId, amountCents, gateway.name, clock.now());
           const intent = await gateway.createIntent({ paymentId, orderId, amountCents });
 
           if (intent.isOk()) {
             await repository.attachReference(paymentId, intent.value.reference, clock.now());
+            // A settled intent is recorded the way its webhook would have been.
+            if (intent.value.settlement !== undefined) await record(intent.value.settlement);
             return ok(intent.value.clientSecret);
           }
 
@@ -170,9 +215,11 @@ export const PaymentService = {
       },
 
       handleWebhook: (rawBody, signature) => {
-        if (gateway === undefined) return errAsync({ _tag: "PaymentsUnavailable" });
+        // Only Stripe sends webhooks.
+        const stripe = deps.gateways.stripe;
+        if (stripe === undefined) return errAsync({ _tag: "PaymentsUnavailable" });
 
-        return gateway
+        return stripe
           .parseWebhook(rawBody, signature)
           .andThen((event) => ResultAsync.fromSafePromise(record(event)));
       },
@@ -182,8 +229,9 @@ export const PaymentService = {
         if (charge === undefined) return;
 
         if (charge.status === "pending") {
-          if (charge.reference !== undefined && gateway !== undefined) {
-            const canceled = await gateway.cancelIntent(charge.reference);
+          const provider = gatewayOf(charge);
+          if (charge.reference !== undefined && provider !== undefined) {
+            const canceled = await provider.cancelIntent(charge.reference);
             if (canceled.isErr()) throw new Error(`Canceling the intent failed: ${canceled.error}`);
           }
 
@@ -191,34 +239,14 @@ export const PaymentService = {
           return;
         }
 
-        if (charge.status !== "succeeded") return;
+        if (charge.status === "succeeded") await refundInFull(charge);
+      },
 
-        const refund = await repository.ensureRefund(orderId, charge.amountCents, clock.now());
-        if (refund.status !== "pending") return;
+      onRefundRequested: async ({ orderId }) => {
+        const charge = await repository.findOf(orderId, "charge");
+        if (charge === undefined || charge.status !== "succeeded") return;
 
-        if (gateway === undefined || charge.reference === undefined) {
-          throw new Error("A succeeded charge cannot be refunded without the payment provider.");
-        }
-
-        // The refund row id is the idempotency key, so a retried message asks once.
-        const created = await gateway.refund({ refundId: refund.id, intent: charge.reference, amountCents: refund.amountCents });
-        if (created.isErr()) throw new Error(`The refund failed: ${created.error}`);
-
-        if (created.value.status === "pending") {
-          await repository.attachReference(refund.id, created.value.reference, clock.now());
-          return;
-        }
-
-        await transition({
-          paymentId: refund.id,
-          from: ["pending"],
-          to: created.value.status === "succeeded" ? "succeeded" : "failed",
-          reference: created.value.reference,
-          ...(created.value.status === "succeeded"
-            ? { message: Messages.paymentStatus({ orderId, paymentId: refund.id, outcome: "refunded" }) }
-            : {}),
-          now: clock.now(),
-        });
+        await refundInFull(charge);
       },
 
       summaryOf: async (orderId) => {
@@ -230,6 +258,7 @@ export const PaymentService = {
 
         return {
           status: charge.status,
+          ...(charge.reference === undefined ? {} : { reference: charge.reference }),
           ...(charge.details.card === undefined ? {} : { card: charge.details.card }),
           ...(charge.details.failure === undefined ? {} : { failure: charge.details.failure }),
           ...(refundState === undefined ? {} : { refund: refundState }),

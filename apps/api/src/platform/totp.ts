@@ -14,6 +14,21 @@ import type { Clock } from "./clock.ts";
 export type TotpSecret = z.infer<typeof TotpSecret.schema>;
 export const TotpSecret = {
   schema: z.string().min(1).brand<"TotpSecret">(),
+  /**
+   * A secret typed by a person, as the first admin's: base32 of at least 32
+   * characters, which is 160 bits. Spaces, lowercase and `=` padding are
+   * forgiven, as authenticator apps forgive them.
+   */
+  base32: z
+    .string()
+    .transform((value) => value.replace(/[\s=]/g, "").toUpperCase())
+    .pipe(
+      z
+        .string()
+        .regex(/^[A-Z2-7]+$/, "ADMIN_TOTP_SECRET must be base32: letters A to Z and digits 2 to 7.")
+        .min(32, "ADMIN_TOTP_SECRET must be at least 32 base32 characters (160 bits)."),
+    )
+    .brand<"TotpSecret">(),
 } as const;
 
 /** Enrolling a second factor, and checking the codes it produces. */
@@ -21,7 +36,12 @@ export type TotpService = Readonly<{
   generateSecret: () => TotpSecret;
   /** The URI an authenticator app consumes. */
   keyUri: (accountEmail: Email, secret: TotpSecret) => OtpauthUri;
-  verify: (secret: TotpSecret, code: TotpCode) => boolean;
+  /**
+   * The time step `code` belongs to, when it is a live code for `secret` from
+   * a step after `afterStep`; `undefined` otherwise. A caller stores the step
+   * it accepted, so each code works once.
+   */
+  acceptedStep: (secret: TotpSecret, code: TotpCode, afterStep?: number) => number | undefined;
   qrCodeSvg: (uri: OtpauthUri) => Promise<string>;
 }>;
 
@@ -45,8 +65,8 @@ export const TotpService = {
         }),
       ),
 
-    verify: (secret, code) =>
-      verifySync({
+    acceptedStep: (secret, code, afterStep) => {
+      const result = verifySync({
         secret,
         token: code,
         strategy: "totp",
@@ -54,7 +74,11 @@ export const TotpService = {
         digits: 6,
         epoch: Math.floor(clock.now().getTime() / 1000),
         epochTolerance: TotpService.PERIOD_SECONDS,
-      }).valid,
+        ...(afterStep === undefined ? {} : { afterTimeStep: afterStep }),
+      });
+
+      return result.valid && "timeStep" in result ? result.timeStep : undefined;
+    },
 
     qrCodeSvg: (uri) =>
       QRCode.toString(uri, {

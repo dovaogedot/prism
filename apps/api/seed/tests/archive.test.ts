@@ -30,6 +30,17 @@ describe("Archive", () => {
     expect([...(await readFile(join(target, "media", "b.png")))]).toEqual([4, 5]);
   });
 
+  it("reads one file out of the zip, and nothing for a name the zip does not hold", async () => {
+    await mkdir(join(directory, "media"), { recursive: true });
+    await writeFile(join(directory, "catalog.json"), '{"categories":[]}');
+    await writeFile(join(directory, "media", "a.png"), new Uint8Array([1, 2, 3]));
+    const bytes = await Archive.pack(directory);
+
+    expect(new TextDecoder().decode(Archive.read(bytes, "catalog.json"))).toBe('{"categories":[]}');
+    expect(Archive.read(bytes, "media/a.png")).toEqual(new Uint8Array([1, 2, 3]));
+    expect(Archive.read(bytes, "missing.json")).toBeUndefined();
+  });
+
   it("replaces a file that is already there", async () => {
     const source = join(directory, "source");
     await mkdir(join(source, "media"), { recursive: true });

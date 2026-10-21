@@ -13,19 +13,25 @@
 import { relations, sql } from "drizzle-orm";
 import {
   OrderStatus,
-  ShippingMethod,
-  type Email,
+  ReviewStatus,
+  StaffRole,
+  type AddressId,
+  type ImageId,
   type OAuthProvider,
   type OrderId,
   type OrderNumber,
   type ProductId,
+  type ReviewId,
+  type ShippingMethodCode,
   type Slug,
   type UserId,
 } from "@prism/shared";
 import {
   bigint,
+  boolean,
   check,
   customType,
+  date,
   index,
   integer,
   jsonb,
@@ -37,18 +43,17 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { BlindIndex } from "../platform/cipher.ts";
 import type { PasswordHash } from "../platform/hasher.ts";
-import type { ProviderSubject } from "../platform/oauth.ts";
 import type { Digest } from "../platform/tokens.ts";
-import type { TotpSecret } from "../platform/totp.ts";
-import type { BrandId, CartId, CategoryId, PaymentId, SessionId } from "./ids.ts";
+import type { AuditEventId, BrandId, CartId, CategoryId, PaymentId, SessionId } from "./ids.ts";
 
 /** Postgres full-text search vectors, which drizzle has no built-in for. */
 const tsvector = customType<{ data: string; driverData: string }>({
   dataType: () => "tsvector",
 });
 
-/** Raw bytes, which drizzle has no built-in for. Every encrypted column is one. */
+/** Raw bytes, which drizzle has no built-in for. Every encrypted column and blind index is one. */
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   dataType: () => "bytea",
 });
@@ -64,27 +69,43 @@ export type PaymentStatus = "pending" | "succeeded" | "failed" | "canceled";
 
 /* ----------------------------------------------------------------- identity */
 
-/** Accounts. `user` is reserved in Postgres, hence `app_user`. */
+/**
+ * Accounts. `user` is reserved in Postgres, hence `app_user`. Every value
+ * that identifies the person is sealed; the email is found through its
+ * blind index, which also keeps it unique. The email's shape and case are
+ * the shared schema's to check, because ciphertext cannot be checked here.
+ */
 export const users = pgTable(
   "app_user",
   {
     id: uuid("id").primaryKey().defaultRandom().$type<UserId>(),
-    email: text("email").notNull().$type<Email>(),
+    /** Sealed `Email`. */
+    email: bytea("email").notNull(),
+    emailIndex: bytea("email_index").notNull().$type<BlindIndex>(),
     /** Null for an account that only ever signed in through a provider. */
     passwordHash: text("password_hash").$type<PasswordHash>(),
-    /** Present once setup begins; confirmed only when `totpEnabledAt` is set. */
-    totpSecret: text("totp_secret").$type<TotpSecret>(),
+    /** Sealed. Present once setup begins; confirmed only when `totpEnabledAt` is set. */
+    totpSecret: bytea("totp_secret"),
     totpEnabledAt: timestamp("totp_enabled_at", { withTimezone: true }),
+    /** The time step of the last code accepted, so each code signs in once. */
+    totpLastStep: bigint("totp_last_step", { mode: "number" }),
+    /** The account's staff roles; empty for a customer. */
+    roles: text("roles").array().notNull().default([]).$type<StaffRole[]>(),
+    /** Sealed; null until the customer sets it. */
+    fullName: bytea("full_name"),
+    /** Sealed; null until the customer sets it. */
+    phone: bytea("phone"),
+    /** Set while an admin has the account disabled. */
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex("app_user_email_key").on(table.email),
-    check("app_user_email_lowercase", sql`${table.email} = lower(${table.email})`),
-    check("app_user_email_shape", sql`${table.email} LIKE '%_@_%'`),
+    uniqueIndex("app_user_email_index_key").on(table.emailIndex),
     check(
       "app_user_totp_needs_secret",
       sql`${table.totpEnabledAt} IS NULL OR ${table.totpSecret} IS NOT NULL`,
     ),
+    check("app_user_roles_known", sql`${table.roles} <@ ARRAY[${literals(StaffRole.NAMES)}]::text[]`),
   ],
 );
 
@@ -98,18 +119,25 @@ export const oauthIdentities = pgTable(
       .references(() => users.id, { onDelete: "cascade" })
       .$type<UserId>(),
     provider: text("provider").notNull().$type<OAuthProvider>(),
-    /** The provider's immutable user identifier, never the email. */
-    subject: text("subject").notNull().$type<ProviderSubject>(),
+    /** Sealed: the provider's immutable user identifier, never the email. */
+    subject: bytea("subject").notNull(),
+    subjectIndex: bytea("subject_index").notNull().$type<BlindIndex>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex("oauth_identity_provider_subject_key").on(table.provider, table.subject),
+    uniqueIndex("oauth_identity_provider_subject_index_key").on(table.provider, table.subjectIndex),
     index("oauth_identity_user_idx").on(table.userId),
   ],
 );
 
 /** Why a session ended, so an investigation can tell logout from attack. */
-export type RevocationReason = "logout" | "token_reuse" | "password_reset";
+export type RevocationReason =
+  | "logout"
+  | "token_reuse"
+  | "password_reset"
+  | "account_disabled"
+  | "signed_out_by_staff"
+  | "two_factor_reset";
 
 /**
  * A session is both the revocation unit and the refresh-token family. The
@@ -129,8 +157,12 @@ export const sessions = pgTable(
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     /** Why the session ended; null while it is live. */
     revokedReason: text("revoked_reason").$type<RevocationReason>(),
-    userAgent: text("user_agent").notNull().default(""),
-    ipAddress: text("ip_address").notNull().default(""),
+    /** Sealed; null when the request sent none. */
+    userAgent: bytea("user_agent"),
+    /** Sealed. */
+    ipAddress: bytea("ip_address"),
+    /** When the session last passed a TOTP check; null when it never did. */
+    secondFactorAt: timestamp("second_factor_at", { withTimezone: true }),
   },
   (table) => [
     index("session_user_idx").on(table.userId),
@@ -196,6 +228,8 @@ export const categories = pgTable(
     id: uuid("id").primaryKey().defaultRandom().$type<CategoryId>(),
     slug: text("slug").notNull().$type<Slug>(),
     name: text("name").notNull(),
+    /** What the category page says about it; null until written. */
+    description: text("description"),
   },
   (table) => [uniqueIndex("category_slug_key").on(table.slug)],
 );
@@ -233,7 +267,10 @@ export const products = pgTable(
     widthMm: integer("width_mm").notNull(),
     heightMm: integer("height_mm").notNull(),
     depthMm: integer("depth_mm").notNull(),
+    /** When staff put it on the home page; null when it is not featured. */
+    featuredAt: timestamp("featured_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     /** What full-text search matches: the name weighted above the description. */
     search: tsvector("search")
       .notNull()
@@ -247,6 +284,9 @@ export const products = pgTable(
     index("product_brand_idx").on(table.brandId),
     index("product_price_idx").on(table.priceCents),
     index("product_search_idx").using("gin", table.search),
+    // Substring matches and the similar-name fallback both read trigrams of the name.
+    index("product_name_trgm_idx").using("gin", table.name.op("gin_trgm_ops")),
+    index("product_featured_idx").on(table.featuredAt).where(sql`${table.featuredAt} IS NOT NULL`),
     check("product_price_not_negative", sql`${table.priceCents} >= 0`),
     check("product_stock_not_negative", sql`${table.stock} >= 0`),
     check(
@@ -280,24 +320,36 @@ export const productProperties = pgTable(
 export const productImages = pgTable(
   "product_image",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: uuid("id").primaryKey().defaultRandom().$type<ImageId>(),
     productId: uuid("product_id")
       .notNull()
       .references(() => products.id, { onDelete: "cascade" })
       .$type<ProductId>(),
-    /** The file's name under the media directory. */
+    /** The source file's name under the media directory. */
     file: text("file").notNull(),
     alt: text("alt").notNull().default(""),
     position: integer("position").notNull().default(0),
+    /** The source's size in pixels; null until its smaller variants exist. */
+    width: integer("width"),
+    height: integer("height"),
+    /** Scaled by repeating pixels rather than blending them, so hard edges stay hard. */
+    isPixelArt: boolean("is_pixel_art").notNull().default(false),
   },
-  (table) => [uniqueIndex("product_image_position_key").on(table.productId, table.position)],
+  (table) => [
+    uniqueIndex("product_image_position_key").on(table.productId, table.position),
+    check("product_image_size_whole", sql`(${table.width} IS NULL) = (${table.height} IS NULL)`),
+    check("product_image_size_positive", sql`${table.width} > 0 AND ${table.height} > 0`),
+  ],
 );
 
-/** What shoppers said. One review per person per product. */
+/**
+ * What shoppers said. One review per person per product. A review counts
+ * toward the product's rating only once a moderator approves it.
+ */
 export const productReviews = pgTable(
   "product_review",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: uuid("id").primaryKey().defaultRandom().$type<ReviewId>(),
     productId: uuid("product_id")
       .notNull()
       .references(() => products.id, { onDelete: "cascade" })
@@ -308,16 +360,95 @@ export const productReviews = pgTable(
       .$type<UserId>(),
     /** Whole stars, 1 to 5. */
     rating: smallint("rating").notNull(),
+    /** The name the author signs with, which keeps the account's own name private. */
+    authorName: text("author_name").notNull(),
+    title: text("title"),
+    body: text("body"),
+    status: text("status").notNull().$type<ReviewStatus>(),
+    /** Why a moderator rejected it; set exactly when rejected. */
+    rejectionReason: text("rejection_reason"),
+    /** How many people found it helpful, kept with the votes in one transaction. */
+    helpfulCount: integer("helpful_count").notNull().default(0),
+    moderatedBy: uuid("moderated_by")
+      .references(() => users.id, { onDelete: "set null" })
+      .$type<UserId>(),
+    moderatedAt: timestamp("moderated_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     uniqueIndex("product_review_one_per_user_key").on(table.productId, table.userId),
-    index("product_review_product_idx").on(table.productId),
+    // The product page's default order: most helpful, then newest.
+    index("product_review_listing_idx").on(
+      table.productId,
+      table.status,
+      table.helpfulCount.desc(),
+      table.createdAt.desc(),
+    ),
+    index("product_review_status_idx").on(table.status, table.createdAt),
     check("product_review_rating_range", sql`${table.rating} BETWEEN 1 AND 5`),
+    check("product_review_author_length", sql`char_length(${table.authorName}) BETWEEN 2 AND 40`),
+    check("product_review_title_length", sql`char_length(${table.title}) BETWEEN 1 AND 120`),
+    check("product_review_body_length", sql`char_length(${table.body}) BETWEEN 1 AND 2000`),
+    check("product_review_status_known", sql`${table.status} IN (${literals(ReviewStatus.NAMES)})`),
+    check(
+      "product_review_reason_when_rejected",
+      sql`(${table.rejectionReason} IS NOT NULL) = (${table.status} = 'rejected')`,
+    ),
+    check("product_review_helpful_not_negative", sql`${table.helpfulCount} >= 0`),
   ],
 );
 
+/** One person finding one review helpful. */
+export const reviewVotes = pgTable(
+  "review_vote",
+  {
+    reviewId: uuid("review_id")
+      .notNull()
+      .references(() => productReviews.id, { onDelete: "cascade" })
+      .$type<ReviewId>(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" })
+      .$type<UserId>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.reviewId, table.userId] }), index("review_vote_user_idx").on(table.userId)],
+);
+
 /* ----------------------------------------------------------------- commerce */
+
+/**
+ * The delivery options delivery managers offer. An order keeps its own copy
+ * of the name, the cost and the dates, so changing a method leaves placed
+ * orders as they were.
+ */
+export const shippingMethods = pgTable(
+  "shipping_method",
+  {
+    code: text("code").primaryKey().$type<ShippingMethodCode>(),
+    name: text("name").notNull(),
+    priceCents: integer("price_cents").notNull(),
+    /** The subtotal from which it ships free; null when it never does. */
+    freeFromCents: integer("free_from_cents"),
+    /** The delivery window in business days after the order day, both ends counted. */
+    minDays: integer("min_days").notNull(),
+    maxDays: integer("max_days").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    /** Where the checkout lists it; lower first. */
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("shipping_method_price_not_negative", sql`${table.priceCents} >= 0`),
+    check("shipping_method_free_from_positive", sql`${table.freeFromCents} IS NULL OR ${table.freeFromCents} > 0`),
+    check(
+      "shipping_method_days_range",
+      sql`1 <= ${table.minDays} AND ${table.minDays} <= ${table.maxDays} AND ${table.maxDays} <= 30`,
+    ),
+  ],
+);
 
 /**
  * A cart belongs to a user or to a guest's cookie, never both. A guest cart
@@ -390,7 +521,15 @@ export const orders = pgTable(
       .references(() => carts.id, { onDelete: "set null" })
       .$type<CartId>(),
     status: text("status").notNull().$type<OrderStatus>(),
-    shippingMethod: text("shipping_method").notNull().$type<ShippingMethod>(),
+    shippingMethod: text("shipping_method")
+      .notNull()
+      .references(() => shippingMethods.code, { onDelete: "restrict" })
+      .$type<ShippingMethodCode>(),
+    /** The method's name when the order was placed. */
+    shippingMethodName: text("shipping_method_name").notNull(),
+    /** The first and last day the parcel is expected, from the method's window at placement. */
+    estimatedDeliveryFrom: date("estimated_delivery_from", { mode: "string" }).notNull(),
+    estimatedDeliveryTo: date("estimated_delivery_to", { mode: "string" }).notNull(),
     subtotalCents: integer("subtotal_cents").notNull(),
     shippingCents: integer("shipping_cents").notNull(),
     totalCents: integer("total_cents").notNull(),
@@ -398,6 +537,10 @@ export const orders = pgTable(
     contact: bytea("contact").notNull(),
     /** Sealed. */
     shippingAddress: bytea("shipping_address").notNull(),
+    /** Sealed; null when the bill goes to the shipping address. */
+    billingAddress: bytea("billing_address"),
+    /** The blind index of the contact email, so staff can find a customer's orders. */
+    emailIndex: bytea("email_index").notNull().$type<BlindIndex>(),
     /** Sealed, not hashed: the emails sent later carry it in their links. Guest orders only. */
     accessKey: bytea("access_key"),
     trackingNumber: text("tracking_number"),
@@ -413,8 +556,9 @@ export const orders = pgTable(
     index("customer_order_user_created_idx").on(table.userId, table.createdAt.desc()),
     // Housekeeping finds orders by status and how long they have had it.
     index("customer_order_status_changed_idx").on(table.status, table.statusChangedAt),
+    index("customer_order_email_index_idx").on(table.emailIndex),
+    index("customer_order_created_idx").on(table.createdAt.desc()),
     check("customer_order_status_known", sql`${table.status} IN (${literals(OrderStatus.NAMES)})`),
-    check("customer_order_shipping_known", sql`${table.shippingMethod} IN (${literals(ShippingMethod.NAMES)})`),
     check(
       "customer_order_money_not_negative",
       sql`${table.subtotalCents} >= 0 AND ${table.shippingCents} >= 0 AND ${table.totalCents} >= 0`,
@@ -423,7 +567,15 @@ export const orders = pgTable(
     check("customer_order_has_owner", sql`${table.userId} IS NOT NULL OR ${table.accessKey} IS NOT NULL`),
     check(
       "customer_order_tracking_when_shipped",
-      sql`(${table.trackingNumber} IS NOT NULL) = (${table.status} IN ('shipped', 'delivered'))`,
+      sql`${table.status} NOT IN ('shipped', 'delivered') OR ${table.trackingNumber} IS NOT NULL`,
+    ),
+    check(
+      "customer_order_tracking_after_shipping",
+      sql`${table.trackingNumber} IS NULL OR ${table.status} IN ('shipped', 'delivered', 'refunded')`,
+    ),
+    check(
+      "customer_order_delivery_window",
+      sql`${table.estimatedDeliveryFrom} <= ${table.estimatedDeliveryTo}`,
     ),
   ],
 );
@@ -530,6 +682,66 @@ export const outboxMessages = pgTable(
   (table) => [index("outbox_message_unpublished_idx").on(table.createdAt).where(sql`${table.publishedAt} IS NULL`)],
 );
 
+/* ---------------------------------------------------------------- accounts */
+
+/** A customer's saved addresses. One of them may be the default. */
+export const addresses = pgTable(
+  "address",
+  {
+    id: uuid("id").primaryKey().defaultRandom().$type<AddressId>(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" })
+      .$type<UserId>(),
+    /** Sealed: the label, the recipient's name and phone, and the address itself. */
+    details: bytea("details").notNull(),
+    isDefault: boolean("is_default").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("address_user_idx").on(table.userId),
+    uniqueIndex("address_one_default_key").on(table.userId).where(sql`${table.isDefault}`),
+  ],
+);
+
+/* -------------------------------------------------------------------- staff */
+
+/**
+ * What staff did, and what the system did on their behalf. Append-only: a
+ * trigger refuses every UPDATE and DELETE. Each row is written in the same
+ * transaction as the change it records.
+ */
+export const auditEvents = pgTable(
+  "audit_event",
+  {
+    id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity().$type<AuditEventId>(),
+    /** Null for the system, such as the first admin's creation. */
+    actorId: uuid("actor_id")
+      .references(() => users.id, { onDelete: "restrict" })
+      .$type<UserId>(),
+    /** The actor's staff roles when it acted. */
+    actorRoles: text("actor_roles").array().notNull().default([]).$type<StaffRole[]>(),
+    /** What happened, such as `product.update`. */
+    action: text("action").notNull(),
+    targetType: text("target_type").notNull(),
+    /** Null for an action without a single target. */
+    targetId: text("target_id"),
+    /** One line a person reads. */
+    summary: text("summary").notNull(),
+    /** `{ field: [before, after] }` of the fields that changed, without personal values. */
+    changes: jsonb("changes"),
+    /** Sealed client address. */
+    ip: bytea("ip"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("audit_event_created_idx").on(table.createdAt.desc()),
+    index("audit_event_actor_created_idx").on(table.actorId, table.createdAt.desc()),
+    index("audit_event_target_idx").on(table.targetType, table.targetId),
+  ],
+);
+
 /* ---------------------------------------------------------------- relations */
 
 /** What `db.query.products` can join in one call. */
@@ -566,6 +778,8 @@ export const schema = {
   productProperties,
   productImages,
   productReviews,
+  reviewVotes,
+  shippingMethods,
   carts,
   cartItems,
   orders,
@@ -573,6 +787,8 @@ export const schema = {
   orderEvents,
   payments,
   outboxMessages,
+  addresses,
+  auditEvents,
   productRelations,
   productImageRelations,
   productPropertyRelations,

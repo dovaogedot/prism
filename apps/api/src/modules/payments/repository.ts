@@ -13,7 +13,7 @@ import type { PaymentId } from "../../db/ids.ts";
 import { payments, type PaymentKind, type PaymentStatus } from "../../db/schema.ts";
 import { Outbox, type OutboxEntry } from "../../messaging/outbox.ts";
 import type { FieldCipher } from "../../platform/cipher.ts";
-import { ProviderReference } from "../../platform/payment-gateway.ts";
+import { ProviderReference, type ProviderName } from "../../platform/payment-gateway.ts";
 
 /** What a payment row keeps about how it went, sealed. */
 export type PaymentDetails = z.infer<typeof PaymentDetails.schema>;
@@ -33,6 +33,8 @@ export type PaymentRecord = Readonly<{
   kind: PaymentKind;
   status: PaymentStatus;
   amountCents: number;
+  /** The provider the payment went through, which its cancel or refund goes through too. */
+  provider: ProviderName;
   /** Absent until the provider has answered. */
   reference?: ProviderReference;
   details: PaymentDetails;
@@ -54,9 +56,9 @@ export type PaymentTransition = Readonly<{
 
 /** Every read and write the payment service makes. */
 export type PaymentRepository = Readonly<{
-  createCharge: (orderId: OrderId, amountCents: number, now: Date) => Promise<PaymentId>;
-  /** The order's refund row, created pending if it has none. */
-  ensureRefund: (orderId: OrderId, amountCents: number, now: Date) => Promise<PaymentRecord>;
+  createCharge: (orderId: OrderId, amountCents: number, provider: ProviderName, now: Date) => Promise<PaymentId>;
+  /** The order's refund row through `provider`, created pending if it has none. */
+  ensureRefund: (orderId: OrderId, amountCents: number, provider: ProviderName, now: Date) => Promise<PaymentRecord>;
   find: (paymentId: PaymentId) => Promise<PaymentRecord | undefined>;
   findOf: (orderId: OrderId, kind: PaymentKind) => Promise<PaymentRecord | undefined>;
   /** Stores the reference without moving the status. */
@@ -66,6 +68,9 @@ export type PaymentRepository = Readonly<{
 }>;
 
 export const PaymentRepository = {
+  /** The provider a row names. Rows from before the simulated provider existed name Stripe. */
+  providerOf: (stored: string): ProviderName => (stored === "simulated" ? "simulated" : "stripe"),
+
   create: (db: Database, cipher: FieldCipher): PaymentRepository => {
     type Row = typeof payments.$inferSelect;
 
@@ -75,6 +80,7 @@ export const PaymentRepository = {
       kind: row.kind,
       status: row.status,
       amountCents: row.amountCents,
+      provider: PaymentRepository.providerOf(row.provider),
       ...(row.reference === null ? {} : { reference: cipher.open(row.reference, ProviderReference.schema) }),
       details: row.details === null ? {} : cipher.open(row.details, PaymentDetails.schema),
     });
@@ -89,20 +95,20 @@ export const PaymentRepository = {
     };
 
     return {
-      createCharge: async (orderId, amountCents, now) => {
+      createCharge: async (orderId, amountCents, provider, now) => {
         const [row] = await db
           .insert(payments)
-          .values({ orderId, kind: "charge", status: "pending", amountCents, createdAt: now, updatedAt: now })
+          .values({ orderId, kind: "charge", status: "pending", amountCents, provider, createdAt: now, updatedAt: now })
           .returning({ id: payments.id });
         if (row === undefined) throw new Error("payment insert returned no row");
 
         return row.id;
       },
 
-      ensureRefund: async (orderId, amountCents, now) => {
+      ensureRefund: async (orderId, amountCents, provider, now) => {
         await db
           .insert(payments)
-          .values({ orderId, kind: "refund", status: "pending", amountCents, createdAt: now, updatedAt: now })
+          .values({ orderId, kind: "refund", status: "pending", amountCents, provider, createdAt: now, updatedAt: now })
           .onConflictDoNothing({ target: [payments.orderId, payments.kind] });
 
         const refund = await findOf(orderId, "refund");

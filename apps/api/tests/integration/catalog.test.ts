@@ -218,9 +218,11 @@ describe("GET /api/v1/products", () => {
     expect((second["items"] as { slug: string }[]).map((item) => item.slug)).toEqual(["oak-chair"]);
   });
 
-  it("serves the image URLs under /media", async () => {
+  it("serves the image URLs under /media, with no smaller copies before housekeeping makes them", async () => {
     const [item] = jsonOf(await get("/api/v1/products?q=desk"))["items"] as { images: { url: string; alt: string }[] }[];
-    expect(item?.images).toEqual([{ url: "/media/desk-lamp-1.svg", alt: "Desk Lamp" }]);
+    expect(item?.images).toEqual([
+      { id: expect.any(String), url: "/media/desk-lamp-1.svg", alt: "Desk Lamp", isPixelArt: false, sources: [] },
+    ]);
   });
 
   it("rejects a malformed query", async () => {
@@ -232,14 +234,10 @@ describe("GET /api/v1/products", () => {
 
 describe("GET /api/v1/products/suggest", () => {
   it("offers names starting with the text before names containing it", async () => {
-    const body = jsonOf(await get("/api/v1/products/suggest?q=la"));
-    expect(body["items"]).toEqual([
-      { slug: "desk-lamp", name: "Desk Lamp" },
-      { slug: "floor-lamp", name: "Floor Lamp" },
-    ]);
+    const slugsOf = (body: Record<string, unknown>) => (body["items"] as { slug: string }[]).map((item) => item.slug);
 
-    const prefixed = jsonOf(await get("/api/v1/products/suggest?q=fl"));
-    expect(prefixed["items"]).toEqual([{ slug: "floor-lamp", name: "Floor Lamp" }]);
+    expect(slugsOf(jsonOf(await get("/api/v1/products/suggest?q=la")))).toEqual(["desk-lamp", "floor-lamp"]);
+    expect(slugsOf(jsonOf(await get("/api/v1/products/suggest?q=fl")))).toEqual(["floor-lamp"]);
   });
 
   it("caps the list at the requested limit", async () => {
@@ -275,6 +273,13 @@ describe("GET /api/v1/products/:slug", () => {
         inches: { width: 10, height: 5, depth: 0.98 },
       },
     });
+  });
+
+  it("says when another product of the category has the same name", async () => {
+    await seedCatalog(harness, [{ slug: "desk-lamp-2", name: "desk lamp", priceCents: 900, category: "Lighting" }]);
+
+    expect(jsonOf(await get("/api/v1/products/desk-lamp"))["isNameShared"]).toBe(true);
+    expect(jsonOf(await get("/api/v1/products/floor-lamp"))["isNameShared"]).toBe(false);
   });
 
   it("answers 404 for a slug nothing carries", async () => {

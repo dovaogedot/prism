@@ -12,17 +12,8 @@ export const SessionId = {
   schema: z.uuid().brand<"SessionId">(),
 } as const;
 
-/** The identity of a category. */
-export type CategoryId = z.infer<typeof CategoryId.schema>;
-export const CategoryId = {
-  schema: z.uuid().brand<"CategoryId">(),
-} as const;
-
-/** The identity of a brand. */
-export type BrandId = z.infer<typeof BrandId.schema>;
-export const BrandId = {
-  schema: z.uuid().brand<"BrandId">(),
-} as const;
+/** Categories and brands are named on the wire too, so their ids live with the shared contracts. */
+export { BrandId, CategoryId } from "@prism/shared";
 
 /** The identity of a cart. */
 export type CartId = z.infer<typeof CartId.schema>;
@@ -34,4 +25,10 @@ export const CartId = {
 export type PaymentId = z.infer<typeof PaymentId.schema>;
 export const PaymentId = {
   schema: z.uuid().brand<"PaymentId">(),
+} as const;
+
+/** The identity of an audit log entry. Increasing, so it also orders entries written in one instant. */
+export type AuditEventId = z.infer<typeof AuditEventId.schema>;
+export const AuditEventId = {
+  schema: z.number().int().positive().brand<"AuditEventId">(),
 } as const;

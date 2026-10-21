@@ -3,10 +3,16 @@
  * to Stripe's own fields, and the API only ever sees an intent, its client
  * secret, and the events Stripe signs and sends back.
  *
+ * The simulated provider stands in for Stripe on test and load-test stacks:
+ * it settles every payment as it creates it, and the settlement takes the
+ * same path through the outbox, the queue and the order service as Stripe's
+ * webhook would. Stripe forbids load-testing its API.
+ *
  * Every call that can fail answers with a `PaymentFailure` code, never a
  * rejection, so a timeout is a value the order flow handles like a decline.
  */
 
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { ClientSecret, DeclineCodes, type DomainError, type OrderId, type PaymentFailure } from "@prism/shared";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
@@ -55,13 +61,22 @@ export type GatewayEvent =
   | Readonly<{ _tag: "Ignored"; type: string }>;
 
 /** An intent the browser can confirm. */
-export type CreatedIntent = Readonly<{ reference: ProviderReference; clientSecret: ClientSecret }>;
+export type CreatedIntent = Readonly<{
+  reference: ProviderReference;
+  clientSecret: ClientSecret;
+  /** Present when the provider settled the payment as it created it, as the simulated one does. */
+  settlement?: GatewayEvent;
+}>;
+
+/** Which provider a payment went through, as its row records it. */
+export type ProviderName = "stripe" | "simulated";
 
 /** A refund as the provider first answered it. */
 export type CreatedRefund = Readonly<{ reference: ProviderReference; status: RefundStatus }>;
 
 /** Everything the shop asks of a payment provider. */
 export type PaymentGateway = Readonly<{
+  name: ProviderName;
   /** The payment row id is the idempotency key, so a retried call creates one intent. */
   createIntent: (input: {
     paymentId: PaymentId;
@@ -268,6 +283,8 @@ export const PaymentGateway = {
         .catch(() => undefined);
 
     return {
+      name: "stripe",
+
       createIntent: ({ paymentId, orderId, amountCents }) =>
         ResultAsync.fromPromise(
           stripe.paymentIntents.create(
@@ -323,6 +340,35 @@ export const PaymentGateway = {
   },
 
   /**
+   * The simulated provider: every intent is settled as it is created, every
+   * refund succeeds at once, and no webhook ever arrives.
+   */
+  simulated: (): PaymentGateway => ({
+    name: "simulated",
+
+    createIntent: ({ paymentId, amountCents }) => {
+      const reference = ProviderReference.schema.parse(`pi_simulated_${randomUUID().replaceAll("-", "")}`);
+
+      return okAsync({
+        reference,
+        clientSecret: ClientSecret.schema.parse(`${reference}_secret_simulated`),
+        settlement: { _tag: "ChargeSucceeded", paymentId, reference, amountCents, card: PaymentGateway.FAKE_CARD },
+      });
+    },
+
+    cancelIntent: () => okAsync(undefined),
+
+    refund: () =>
+      okAsync({
+        reference: ProviderReference.schema.parse(`re_simulated_${randomUUID().replaceAll("-", "")}`),
+        status: "succeeded",
+      }),
+
+    // Nothing signs webhooks for a provider that does not exist.
+    parseWebhook: () => errAsync({ _tag: "WebhookSignatureInvalid" }),
+  }),
+
+  /**
    * A gateway for tests. Intents are `pi_fake_<n>`, refunds succeed at once,
    * and webhooks are checked with the real signature code against a fixed
    * secret that `sign` uses too.
@@ -342,6 +388,8 @@ export const PaymentGateway = {
     };
 
     return {
+      // The fake stands in for Stripe, so its payments are recorded as Stripe's.
+      name: "stripe",
       calls: { createIntent, cancelIntent, refund },
 
       failNext: (operation, failure) => {

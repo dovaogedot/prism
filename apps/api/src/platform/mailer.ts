@@ -11,6 +11,8 @@ import { createTransport } from "nodemailer";
 /** One message, carrying both bodies so a client can take either. */
 export type OutboundEmail = Readonly<{
   to: Email;
+  /** Where a reply goes, when not to the sender. */
+  replyTo?: Email;
   subject: string;
   text: string;
   html: string;
@@ -59,6 +61,7 @@ export const Mailer = {
           .sendMail({
             from: options.from,
             to: email.to,
+            ...(email.replyTo === undefined ? {} : { replyTo: email.replyTo }),
             subject: email.subject,
             text: email.text,
             html: email.html,

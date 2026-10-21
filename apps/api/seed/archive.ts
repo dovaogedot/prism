@@ -24,6 +24,9 @@ export const Archive = {
     return zipSync({ "catalog.json": await readFile(join(directory, "catalog.json")), media }, { level: 9 });
   },
 
+  /** The file `name` in the zip `bytes`, read without unpacking the others; absent when the zip has no such file. */
+  read: (bytes: Uint8Array, name: string): Uint8Array | undefined => unzipSync(bytes, { filter: (file) => file.name === name })[name],
+
   /** Writes every file of the zip `bytes` under `directory`, replacing the files already there. */
   unpack: async (bytes: Uint8Array, directory: string): Promise<void> => {
     for (const [name, content] of Object.entries(unzipSync(bytes))) {

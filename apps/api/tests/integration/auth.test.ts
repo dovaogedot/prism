@@ -6,6 +6,7 @@
  * back rather than trusting the response.
  */
 
+import { Email } from "@prism/shared";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   cookieValue,
@@ -59,11 +60,11 @@ describe("POST /auth/register", () => {
     await registerUser(harness, "a@example.com");
 
     const rows = await harness.database.sql<
-      { email: string; password_hash: string }[]
+      { email: Uint8Array; password_hash: string }[]
     >`SELECT email, password_hash FROM app_user`;
 
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.email).toBe("a@example.com");
+    expect(harness.cipher.open(Buffer.from(rows[0]?.email ?? []), Email.schema)).toBe("a@example.com");
     expect(rows[0]?.password_hash).not.toBe(VALID_PASSWORD);
   });
 

@@ -6,9 +6,10 @@
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Email, OAuthProvider } from "@prism/shared";
-import { MockAuthorizationCode } from "../../src/platform/oauth.ts";
+import { MockAuthorizationCode, ProviderSubject } from "../../src/platform/oauth.ts";
 import {
   cookieValue,
+  emailIndexOf,
   jsonOf,
   registerUser,
   startHarness,
@@ -102,16 +103,18 @@ describe.each(OAuthProvider.NAMES)("signing in with %s", (provider) => {
     });
   });
 
-  it("records the identity against the provider", async () => {
+  it("records the identity against the provider, with the subject sealed", async () => {
     await signInWith(provider, `${provider}-linked@example.com`);
 
     const rows = await harness.database.sql<
-      { provider: string; subject: string }[]
+      { provider: string; subject: Uint8Array }[]
     >`SELECT provider, subject FROM oauth_identity`;
+    const subject = harness.cipher.open(Buffer.from(rows[0]?.subject ?? []), ProviderSubject.schema);
 
     expect(rows).toHaveLength(1);
     expect(rows[0]?.provider).toBe(provider);
-    expect(rows[0]?.subject).not.toBe(`${provider}-linked@example.com`);
+    expect(subject).not.toBe(`${provider}-linked@example.com`);
+    expect(Buffer.from(rows[0]?.subject ?? []).toString("latin1")).not.toContain(subject);
   });
 
   it("reuses the same account on a second sign-in", async () => {
@@ -119,7 +122,7 @@ describe.each(OAuthProvider.NAMES)("signing in with %s", (provider) => {
     await signInWith(provider, `${provider}-repeat@example.com`);
 
     const users = await harness.database
-      .sql`SELECT id FROM app_user WHERE email = ${`${provider}-repeat@example.com`}`;
+      .sql`SELECT id FROM app_user WHERE email_index = ${emailIndexOf(harness, `${provider}-repeat@example.com`)}`;
     const identities = await harness.database.sql`SELECT id FROM oauth_identity`;
 
     expect(users).toHaveLength(1);
@@ -131,7 +134,7 @@ describe.each(OAuthProvider.NAMES)("signing in with %s", (provider) => {
     await signInWith(provider, `${provider}-existing@example.com`);
 
     const users = await harness.database
-      .sql`SELECT id FROM app_user WHERE email = ${`${provider}-existing@example.com`}`;
+      .sql`SELECT id FROM app_user WHERE email_index = ${emailIndexOf(harness, `${provider}-existing@example.com`)}`;
 
     expect(users).toHaveLength(1);
 
@@ -224,7 +227,7 @@ describe("an account with more than one provider", () => {
     const { refreshToken } = await signInWith("github", "both@example.com");
 
     const users = await harness.database
-      .sql`SELECT id FROM app_user WHERE email = 'both@example.com'`;
+      .sql`SELECT id FROM app_user WHERE email_index = ${emailIndexOf(harness, "both@example.com")}`;
 
     const grant = await harness.app.inject({
       method: "POST",
@@ -296,7 +299,7 @@ describe("adding a password to a provider account", () => {
 
     const { callback } = await signInWith("google", "keeps-provider@example.com");
     const users = await harness.database
-      .sql`SELECT id FROM app_user WHERE email = 'keeps-provider@example.com'`;
+      .sql`SELECT id FROM app_user WHERE email_index = ${emailIndexOf(harness, "keeps-provider@example.com")}`;
 
     expect(callback.statusCode).toBe(302);
     expect(users).toHaveLength(1);
@@ -425,6 +428,9 @@ describe("a provider sign-in into an account with two-factor", () => {
     const { callback } = await signInWith("google", "finishes@example.com");
     const challenge = cookieValue(callback, "prism_2fa_challenge");
 
+    // A code is accepted once, so the sign-in waits for the next one.
+    harness.clock.advanceSeconds(30);
+
     // No challenge token in the body: the page that collects the code cannot
     // read an httpOnly cookie, so the server finds it.
     const done = await harness.app.inject({
@@ -482,7 +488,7 @@ describe("provider isolation", () => {
     await signInWith("github", "both@example.com");
 
     const users = await harness.database
-      .sql`SELECT id FROM app_user WHERE email = 'both@example.com'`;
+      .sql`SELECT id FROM app_user WHERE email_index = ${emailIndexOf(harness, "both@example.com")}`;
     const identities = await harness.database
       .sql<{ provider: string }[]>`SELECT provider FROM oauth_identity ORDER BY provider`;
 

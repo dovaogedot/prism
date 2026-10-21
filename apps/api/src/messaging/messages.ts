@@ -27,6 +27,12 @@ export const OrderCanceled = {
   schema: z.object({ orderId: OrderId.schema }),
 } as const;
 
+/** A shipped or delivered order the shop refunds in full. */
+export type OrderRefundRequested = z.infer<typeof OrderRefundRequested.schema>;
+export const OrderRefundRequested = {
+  schema: z.object({ orderId: OrderId.schema }),
+} as const;
+
 /** Each message as the outbox entry that publishes it. */
 export const Messages = {
   paymentStatus: (message: PaymentStatusChanged): OutboxEntry => ({
@@ -38,6 +44,12 @@ export const Messages = {
   orderCanceled: (message: OrderCanceled): OutboxEntry => ({
     exchange: Topology.ORDERS_EXCHANGE,
     routingKey: Topology.ORDER_CANCELED_KEY,
+    body: message,
+  }),
+
+  refundRequested: (message: OrderRefundRequested): OutboxEntry => ({
+    exchange: Topology.ORDERS_EXCHANGE,
+    routingKey: Topology.REFUND_REQUESTED_KEY,
     body: message,
   }),
 } as const;

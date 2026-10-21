@@ -128,7 +128,7 @@ describe("ProductSearch.shelf and narrowing", () => {
 
 describe("ProductSearch.orderBy", () => {
   it("ends every order in the slug so pages are stable", () => {
-    for (const sort of ["relevance", "price_asc", "price_desc", "rating"] as const) {
+    for (const sort of ["relevance", "price_asc", "price_desc", "rating", "newest"] as const) {
       const order = ProductSearch.orderBy(query({ sort, text: "lamp" }), rating);
       const last = order[order.length - 1];
       if (last === undefined) throw new Error("expected an order");
@@ -137,13 +137,23 @@ describe("ProductSearch.orderBy", () => {
     }
   });
 
-  it("ranks by the bound search text for relevance", () => {
-    const [first] = ProductSearch.orderBy(query({ text: PAYLOAD }), rating);
+  it("puts an exact name first for relevance, then ranks by the bound search text", () => {
+    const [exact, rank] = ProductSearch.orderBy(query({ text: PAYLOAD }), rating);
+    if (exact === undefined || rank === undefined) throw new Error("expected an order");
+
+    expect(render(exact).sql).toContain("lower(");
+    expect(render(exact).params).toEqual([PAYLOAD]);
+    expect(render(rank).sql).toContain("ts_rank");
+    expect(render(rank).params).toEqual([PAYLOAD]);
+  });
+
+  it("ranks by how alike the names are once the search fell back to similar names", () => {
+    const [first] = ProductSearch.orderBy(query({ text: PAYLOAD }), rating, "similar");
     if (first === undefined) throw new Error("expected an order");
 
     const rendered = render(first);
 
-    expect(rendered.sql).toContain("ts_rank");
+    expect(rendered.sql).toContain("similarity(");
     expect(rendered.params).toEqual([PAYLOAD]);
   });
 

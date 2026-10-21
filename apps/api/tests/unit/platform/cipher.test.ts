@@ -58,3 +58,43 @@ describe("FieldCipher", () => {
     expect(() => FieldCipher.create(randomBytes(16))).toThrow();
   });
 });
+
+describe("FieldCipher.index", () => {
+  it("gives one input the same index every time", () => {
+    expect(cipher.index("account-email", "mari@example.com").equals(cipher.index("account-email", "mari@example.com"))).toBe(
+      true,
+    );
+  });
+
+  it("gives different inputs different indexes", () => {
+    expect(cipher.index("account-email", "mari@example.com").equals(cipher.index("account-email", "jaan@example.com"))).toBe(
+      false,
+    );
+  });
+
+  it("gives one input a different index for each purpose", () => {
+    const account = cipher.index("account-email", "mari@example.com");
+    const order = cipher.index("order-email", "mari@example.com");
+
+    expect(account.equals(order)).toBe(false);
+  });
+
+  it("gives one input a different index under another key", () => {
+    const other = FieldCipher.create(randomBytes(32));
+
+    expect(cipher.index("account-email", "mari@example.com").equals(other.index("account-email", "mari@example.com"))).toBe(
+      false,
+    );
+  });
+
+  it("never shows the value in the index", () => {
+    const index = cipher.index("account-email", "mari@example.com");
+
+    expect(index).toHaveLength(32);
+    expect(index.toString("latin1")).not.toContain("mari");
+  });
+
+  it("indexes the composed and decomposed forms of a character alike", () => {
+    expect(cipher.index("oauth-subject", "é").equals(cipher.index("oauth-subject", "é"))).toBe(true);
+  });
+});
