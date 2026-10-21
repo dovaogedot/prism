@@ -11,6 +11,7 @@ const Tones = {
   shipped: "border-accent/40 text-accent",
   delivered: "border-line-strong text-ink",
   canceled: "border-line text-ink-faint",
+  refunded: "border-line text-ink-faint",
 } as const satisfies Record<OrderStatus, string>;
 
 /** An order's status as a small outlined label, colored by how it went. */

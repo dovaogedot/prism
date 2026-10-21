@@ -7,36 +7,48 @@ import {
   type CartView,
   type CheckoutPrefill,
   type PlaceOrderResult,
+  type SavedAddress,
+  type ShippingOption,
 } from "@prism/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Stripe, StripeElements } from "@stripe/stripe-js";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { useForm, useWatch } from "react-hook-form";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { match } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { useWide } from "../../../shared/layout/use-wide.ts";
 import { Alert, Button, Card, IssueList } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
-import { CheckoutDefaults, CheckoutIssues, PaymentErrors } from "../checkout.ts";
+import { CheckoutDefaults, CheckoutIssues, PaymentErrors, PaymentMode } from "../checkout.ts";
+import { NextPath } from "../../auth/next-path.ts";
 import { AddressFields } from "./AddressFields.tsx";
+import { BillingFields } from "./BillingFields.tsx";
 import { ContactFields } from "./ContactFields.tsx";
 import { OrderSummary } from "./OrderSummary.tsx";
 import { PaymentFields } from "./PaymentFields.tsx";
+import { SavedAddressPicker } from "./SavedAddressPicker.tsx";
 import { ShippingOptions } from "./ShippingOptions.tsx";
 
-/** Whether a card can be taken, and the Stripe objects to take it with. */
+/**
+ * Whether a card can be taken, and the Stripe objects to take it with. A
+ * simulated provider takes no card: placing the order pays for it.
+ */
 export type CheckoutPayments =
   | Readonly<{ status: "unavailable" }>
+  | Readonly<{ status: "simulated" }>
   | Readonly<{ status: "loading" }>
   | Readonly<{ status: "ready"; stripe: Stripe; elements: StripeElements }>;
 
-/** The cart being bought, how it is paid for, and what a signed-in customer starts with. */
+/** The cart being bought, the delivery options, how it is paid for, and what a signed-in customer starts with. */
 export type CheckoutBodyProps = Readonly<{
   cart: CartView;
+  options: readonly [ShippingOption, ...ShippingOption[]];
   payments: CheckoutPayments;
   prefill?: CheckoutPrefill;
+  /** The signed-in customer's saved addresses; absent for a guest. */
+  savedAddresses?: readonly SavedAddress[];
 }>;
 
 /**
@@ -45,7 +57,7 @@ export type CheckoutBodyProps = Readonly<{
  * places the order, then confirms the payment with Stripe, stopping at the
  * first step that fails and saying why where it happened.
  */
-export const CheckoutBody = ({ cart, payments, prefill }: CheckoutBodyProps) => {
+export const CheckoutBody = ({ cart, options, payments, prefill, savedAddresses }: CheckoutBodyProps) => {
   const navigate = useNavigate();
 
   const client = useQueryClient();
@@ -60,12 +72,14 @@ export const CheckoutBody = ({ cart, payments, prefill }: CheckoutBodyProps) => 
 
   const form = useForm({
     resolver: zodResolver(CheckoutForm.schema),
-    defaultValues: prefill === undefined ? CheckoutDefaults.empty() : CheckoutDefaults.fromPrefill(prefill),
+    defaultValues:
+      prefill === undefined ? CheckoutDefaults.empty(options[0].code) : CheckoutDefaults.fromPrefill(prefill, options),
   });
 
   const method = useWatch({ control: form.control, name: "shippingMethod" });
 
-  const totals = Pricing.totals(cart.lines, method);
+  const option = options.find((candidate) => candidate.code === method) ?? options[0];
+  const totals = Pricing.totals(cart.lines, option);
   const blocked = Cart.issues(cart.lines).length > 0;
   // Which products the cart holds and how many; a refreshed price or stock leaves it as it is.
   const contents = cart.lines.map((line) => `${line.productId}:${line.quantity}`).join(",");
@@ -107,6 +121,19 @@ export const CheckoutBody = ({ cart, payments, prefill }: CheckoutBodyProps) => 
     setProblem(undefined);
     setCartProblem(undefined);
     setPaymentError(undefined);
+
+    if (payments.status === "simulated") {
+      const placed = await Api.post<PlaceOrderResult>("/orders", { ...values, expectedTotalCents: totals.totalCents }).catch(
+        (reason: unknown) => {
+          refused(reason);
+          return undefined;
+        },
+      );
+      if (placed !== undefined) {
+        void navigate(`/orders/${placed.orderId}?placed=1${placed.key === undefined ? "" : `&key=${placed.key}`}`);
+      }
+      return;
+    }
 
     if (payments.status !== "ready") {
       setPaymentError(DomainError.message.PaymentsUnavailable);
@@ -173,11 +200,33 @@ export const CheckoutBody = ({ cart, payments, prefill }: CheckoutBodyProps) => 
       <form onSubmit={(event) => void submit(event)} noValidate className="space-y-8">
         {problem === undefined ? null : <Alert>{problem}</Alert>}
 
+        {savedAddresses === undefined ? (
+          <p className="rounded-lg border border-line bg-surface px-4 py-3 text-sm text-ink-soft">
+            Have an account?{" "}
+            <Link className="font-medium text-accent underline underline-offset-2" to={`/login${NextPath.query("/checkout")}`}>
+              Sign in for faster checkout
+            </Link>
+            .
+          </p>
+        ) : null}
+
         <ContactFields form={form} />
-        <AddressFields form={form} />
-        <ShippingOptions form={form} subtotalCents={totals.subtotalCents} />
+
+        <div className="space-y-4">
+          {savedAddresses === undefined || savedAddresses.length === 0 ? null : <SavedAddressPicker form={form} addresses={savedAddresses} />}
+          <AddressFields form={form} />
+          {savedAddresses === undefined ? null : (
+            <label className="flex items-center gap-2.5 text-sm text-ink">
+              <input className="size-4 accent-[var(--color-accent)]" type="checkbox" {...form.register("shouldSaveAddress")} />
+              Save this address to my account
+            </label>
+          )}
+        </div>
+
+        <BillingFields form={form} />
+        <ShippingOptions form={form} options={options} subtotalCents={totals.subtotalCents} />
         <PaymentFields
-          available={payments.status !== "unavailable"}
+          mode={PaymentMode.of[payments.status]}
           {...(paymentError === undefined ? {} : { error: paymentError })}
         />
 
@@ -188,7 +237,7 @@ export const CheckoutBody = ({ cart, payments, prefill }: CheckoutBodyProps) => 
         <Button
           type="submit"
           busy={form.formState.isSubmitting}
-          disabled={blocked || payments.status !== "ready"}
+          disabled={blocked || (payments.status !== "ready" && payments.status !== "simulated")}
           className="w-full py-3 text-base"
         >
           Place order

@@ -11,7 +11,7 @@ const TONES: Record<ButtonTone, string> = {
   quiet:
     "bg-sunken text-ink border border-line hover:border-line-strong active:scale-[.98]",
   ghost: "text-ink-soft hover:text-ink hover:bg-sunken",
-  danger: "bg-danger text-white hover:opacity-90 active:scale-[.98]",
+  danger: "bg-danger text-danger-ink hover:opacity-90 active:scale-[.98]",
 };
 
 /** Everything a `<button>` takes, plus its tone and whether it is working. */

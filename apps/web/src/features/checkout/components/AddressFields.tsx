@@ -5,7 +5,7 @@ import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { Field } from "../../../shared/ui/index.ts";
 import type { CheckoutFormApi } from "../checkout.ts";
-import { useDebounced } from "../use-debounced.ts";
+import { useDebounced } from "../../../shared/hooks/use-debounced.ts";
 
 /** The form the fields belong to. */
 export type AddressFieldsProps = Readonly<{ form: CheckoutFormApi }>;

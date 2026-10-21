@@ -1,74 +1,30 @@
 import { Price, type ProductDetail } from "@prism/shared";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect } from "react";
 import { Link, useParams } from "react-router";
 import { match, P } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
+import { Api, ApiError } from "../../../shared/api/client.ts";
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { Alert, Card, Skeleton, Stars } from "../../../shared/ui/index.ts";
 import { AddToCart } from "../../cart/components/index.ts";
-import { Picture, Stock } from "../components/ProductCard.tsx";
+import { NotFoundPage } from "../../pages/pages/NotFoundPage.tsx";
+import { ReviewsSection } from "../../reviews/components/ReviewsSection.tsx";
+import { CatalogSeo } from "../catalog-seo.ts";
+import { Gallery } from "../components/Gallery.tsx";
+import { Measurements } from "../components/Measurements.tsx";
+import { ProductJsonLd } from "../components/ProductJsonLd.tsx";
+import { RecentlyViewedRow } from "../components/RecentlyViewedRow.tsx";
+import { RelatedProducts } from "../components/RelatedProducts.tsx";
+import { SpecRow } from "../components/SpecRow.tsx";
+import { Stock } from "../components/Stock.tsx";
+import { RecentlyViewed } from "../recently-viewed.ts";
 
-/** One row of a specification list. */
-const Spec = ({ label, value }: Readonly<{ label: string; value: string }>) => (
-  <div className="flex items-baseline justify-between gap-4 py-2">
-    <dt className="text-sm capitalize text-ink-soft">{label}</dt>
-    <dd className="text-sm font-medium tabular-nums text-ink">{value}</dd>
-  </div>
-);
-
-/** The weight and the box, read in either unit system. */
-const Measurements = ({ product }: Readonly<{ product: ProductDetail }>) => {
-  const [system, setSystem] = useState<"metric" | "imperial">("metric");
-
-  const rows = match(system)
-    .with("metric", () => {
-      const { width, height, depth } = product.dimensions.millimeters;
-      return [
-        { label: "Weight", value: `${product.weight.grams} g` },
-        { label: "Size", value: `${width} × ${height} × ${depth} mm` },
-      ];
-    })
-    .with("imperial", () => {
-      const { width, height, depth } = product.dimensions.inches;
-      return [
-        { label: "Weight", value: `${product.weight.ounces} oz` },
-        { label: "Size", value: `${width} × ${height} × ${depth} in` },
-      ];
-    })
-    .exhaustive();
-
-  return (
-    <div>
-      <div className="mb-1 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-ink">Measurements</h2>
-
-        <div role="group" aria-label="Unit system" className="flex rounded-lg border border-line p-0.5">
-          {(["metric", "imperial"] as const).map((option) => (
-            <button
-              key={option}
-              type="button"
-              onClick={() => setSystem(option)}
-              aria-pressed={system === option}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-colors ${
-                system === option ? "bg-accent text-accent-ink" : "text-ink-soft hover:text-ink"
-              }`}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <dl className="divide-y divide-line">
-        {rows.map((row) => (
-          <Spec key={row.label} label={row.label} value={row.value} />
-        ))}
-      </dl>
-    </div>
-  );
-};
-
-/** One product's page, reached by its slug. */
+/**
+ * One product's page: the breadcrumb trail, the pictures, the price and
+ * stock with the way to the cart, the description and the details, the
+ * reviews, more from the same category, and what this browser viewed last.
+ * A slug no product carries gets the "not found" page.
+ */
 export const ProductPage = () => {
   const { slug = "" } = useParams();
 
@@ -78,16 +34,28 @@ export const ProductPage = () => {
     retry: false,
   });
 
-  return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <Link to="/" className="mb-6 inline-flex items-center gap-1.5 text-sm text-ink-soft hover:text-ink">
-        <span aria-hidden="true">←</span> Back to the shop
-      </Link>
+  const shown = product.data?.slug;
 
+  useEffect(() => {
+    if (shown !== undefined) {
+      RecentlyViewed.remember(shown);
+    }
+  }, [shown]);
+
+  if (product.error instanceof ApiError && product.error.status === 404) return <NotFoundPage heading="Product not found" />;
+
+  return (
+    <div className="mx-auto max-w-6xl space-y-14 px-4 py-8 sm:px-6">
       {match(product)
-        .with({ status: "error" }, () => <Alert title="No such product">We could not find that one.</Alert>)
+        .with({ status: "error" }, () => (
+          <div className="space-y-4">
+            <h1 className="text-2xl font-semibold tracking-tight text-ink">This product did not load</h1>
+            <Alert>Something went wrong at our end. Try again in a moment.</Alert>
+          </div>
+        ))
         .with({ data: P.nullish }, () => (
           <div className="grid gap-10 lg:grid-cols-2">
+            <h1 className="sr-only">Loading the product</h1>
             <Skeleton className="aspect-square w-full" />
             <div className="space-y-4">
               <Skeleton className="h-8 w-2/3" />
@@ -97,64 +65,80 @@ export const ProductPage = () => {
           </div>
         ))
         .otherwise(({ data }) => (
-          <article className="grid gap-10 lg:grid-cols-2">
-            <div className="space-y-3">
-              <Picture image={data.images[0]} name={data.name} className="aspect-square w-full rounded-lg border border-line" />
-
-              {match(data.images.length > 1)
-                .with(true, () => (
-                  <div className="grid grid-cols-4 gap-3">
-                    {data.images.slice(1).map((image) => (
-                      <img key={image.url} src={image.url} alt={image.alt} className="aspect-square w-full rounded-lg border border-line object-cover" />
-                    ))}
-                  </div>
-                ))
-                .with(false, () => null)
-                .exhaustive()}
-            </div>
+          <>
+            <PageMeta
+              title={CatalogSeo.productTitle(data)}
+              description={CatalogSeo.productDescription(data)}
+              canonicalPath={`/products/${data.slug}`}
+            />
+            <ProductJsonLd product={data} />
 
             <div className="space-y-6">
-              <header className="space-y-2">
-                <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-ink-faint">
-                  <Link to={`/?brand=${data.brand.slug}`} className="hover:text-accent">
-                    {data.brand.name}
-                  </Link>
-                  <span aria-hidden="true">·</span>
-                  <Link to={`/?category=${data.category.slug}`} className="hover:text-accent">
-                    {data.category.name}
-                  </Link>
-                </div>
-                <h1 className="text-3xl font-semibold tracking-tight text-ink">{data.name}</h1>
-                <Stars rating={data.rating.average} count={data.rating.count} />
-              </header>
+              <nav aria-label="Breadcrumb">
+                <ol className="flex flex-wrap items-center gap-1.5 text-sm text-ink-soft">
+                  <li>
+                    <Link className="hover:text-ink hover:underline" to="/">
+                      Home
+                    </Link>
+                  </li>
+                  <li aria-hidden="true">/</li>
+                  <li>
+                    <Link className="hover:text-ink hover:underline" to={`/categories/${data.category.slug}`}>
+                      {data.category.name}
+                    </Link>
+                  </li>
+                  <li aria-hidden="true">/</li>
+                  <li className="truncate text-ink" aria-current="page">
+                    {data.name}
+                  </li>
+                </ol>
+              </nav>
 
-              <div className="flex items-baseline gap-3">
-                <span className="text-3xl font-semibold tabular-nums text-ink">{Price.format(data.priceCents)}</span>
-                <Stock count={data.stock} className="text-sm" />
-              </div>
+              <article className="grid gap-10 lg:grid-cols-2">
+                <Gallery images={data.images} name={data.name} />
 
-              <AddToCart product={data} />
+                <div className="space-y-6">
+                  <header className="space-y-2">
+                    <p className="text-xs font-medium uppercase tracking-wider text-ink-faint">
+                      {data.brand.name} · {data.category.name}
+                    </p>
+                    <h1 className="text-3xl font-semibold tracking-tight text-ink">{data.name}</h1>
+                    <a className="inline-block rounded hover:opacity-80" href="#reviews-heading">
+                      <Stars rating={data.rating.average} count={data.rating.count} />
+                    </a>
+                  </header>
 
-              <p className="leading-relaxed text-ink-soft">{data.description}</p>
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-3xl font-semibold tabular-nums text-ink">{Price.format(data.priceCents)}</span>
+                    <Stock className="text-sm" count={data.stock} />
+                  </div>
 
-              {match(data.properties.length)
-                .with(0, () => null)
-                .otherwise(() => (
+                  <AddToCart product={data} />
+
+                  <p className="whitespace-pre-line leading-relaxed text-ink-soft">{data.description}</p>
+
+                  {data.properties.length === 0 ? null : (
+                    <Card className="p-4">
+                      <h2 className="mb-1 text-sm font-semibold text-ink">Details</h2>
+                      <dl className="divide-y divide-line">
+                        {data.properties.map((property) => (
+                          <SpecRow key={property.name} label={property.name} value={property.value} />
+                        ))}
+                      </dl>
+                    </Card>
+                  )}
+
                   <Card className="p-4">
-                    <h2 className="mb-1 text-sm font-semibold text-ink">Details</h2>
-                    <dl className="divide-y divide-line">
-                      {data.properties.map((property) => (
-                        <Spec key={property.name} label={property.name} value={property.value} />
-                      ))}
-                    </dl>
+                    <Measurements product={data} />
                   </Card>
-                ))}
-
-              <Card className="p-4">
-                <Measurements product={data} />
-              </Card>
+                </div>
+              </article>
             </div>
-          </article>
+
+            <ReviewsSection slug={data.slug} />
+            <RelatedProducts slug={data.slug} categoryName={data.category.name} />
+            <RecentlyViewedRow exclude={data.slug} />
+          </>
         ))}
     </div>
   );

@@ -1,4 +1,3 @@
-export { AccountPage } from "./AccountPage.tsx";
 export { ForgotPasswordPage } from "./ForgotPasswordPage.tsx";
 export { LoginPage } from "./LoginPage.tsx";
 export { OAuthCompletePage } from "./OAuthCompletePage.tsx";

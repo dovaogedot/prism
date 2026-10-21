@@ -2,7 +2,7 @@ import { Password, RegisterForm, type AccessGrant } from "@prism/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { useTheme } from "../../../shared/theme/use-theme.ts";
@@ -10,12 +10,17 @@ import { Alert, Button, Field } from "../../../shared/ui/index.ts";
 import { AuthShell } from "../components/AuthShell.tsx";
 import { Captcha } from "../components/Captcha.tsx";
 import { Failure } from "../components/failure.tsx";
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
+import { PageText } from "../../../shared/seo/page-text.ts";
 import { ProviderButtons } from "../components/ProviderButtons.tsx";
+import { NextPath } from "../next-path.ts";
 import { TokenStore } from "../token-store.ts";
 
 /** Opening an account, which signs in on success. */
 export const RegisterPage = () => {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const next = NextPath.of(params.get("next"));
   const { theme } = useTheme();
   const [failure, setFailure] = useState<ReactNode | undefined>(undefined);
 
@@ -36,7 +41,7 @@ export const RegisterPage = () => {
     })
       .then((grant) => {
         TokenStore.set(grant.accessToken, grant.user);
-        void navigate("/");
+        void navigate(next, { replace: true });
       })
       .catch((reason: unknown) => setFailure(Failure.describe(reason)));
   });
@@ -48,13 +53,14 @@ export const RegisterPage = () => {
       footer={
         <>
           Already have one?{" "}
-          <Link to="/login" className="font-medium text-accent hover:underline">
+          <Link to={`/login${NextPath.query(next)}`} className="font-medium text-accent underline underline-offset-2">
             Sign in
           </Link>
         </>
       }
     >
-      <ProviderButtons />
+      <PageMeta title={PageText.register.title} description={PageText.register.description} isIndexed={false} />
+      <ProviderButtons next={next} />
 
       <form onSubmit={(event) => void submit(event)} className="space-y-4" noValidate>
         {match(failure)

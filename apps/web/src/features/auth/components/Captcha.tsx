@@ -23,6 +23,7 @@ type Grecaptcha = Readonly<{
       callback: (token: string) => void;
       "expired-callback": () => void;
       theme: string;
+      size: "normal" | "compact";
     }>,
   ) => number;
   reset: (widgetId: number) => void;
@@ -110,6 +111,8 @@ export const Captcha = ({ onToken, dark }: CaptchaProps) => {
           callback: onToken,
           "expired-callback": () => onToken(""),
           theme: dark ? "dark" : "light",
+          // The normal widget is 304 pixels wide, wider than a phone's form; the compact one fits.
+          size: container.clientWidth < 304 ? "compact" : "normal",
         });
 
         setState("ready");
@@ -128,7 +131,8 @@ export const Captcha = ({ onToken, dark }: CaptchaProps) => {
 
   return (
     <div className="space-y-2">
-      <div ref={containerRef} />
+      {/* A widget drawn wide keeps its width when the window narrows; the page itself never scrolls sideways. */}
+      <div className="max-w-full overflow-x-auto" ref={containerRef} />
 
       {match(state)
         .with("loading", () => <p className="text-sm text-ink-faint">Loading the human check…</p>)

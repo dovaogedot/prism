@@ -11,9 +11,13 @@ import {
   type CheckoutPrefill,
   type PaymentsConfig,
   type PlaceOrderInput,
+  type ShippingMethodCode,
+  type ShippingOption,
   type ValidationIssue,
 } from "@prism/shared";
-import { loadStripe, type Stripe } from "@stripe/stripe-js";
+// The pure entry loads Stripe.js when checkout asks for it, not on every page that imports this module.
+import { loadStripe } from "@stripe/stripe-js/pure";
+import type { Stripe } from "@stripe/stripe-js";
 import { useQuery } from "@tanstack/react-query";
 import type { UseFormReturn } from "react-hook-form";
 import { Api } from "../../shared/api/client.ts";
@@ -58,6 +62,11 @@ export const CheckoutField = {
     "address.city",
     "address.postalCode",
     "address.country",
+    "billingAddress.line1",
+    "billingAddress.line2",
+    "billingAddress.city",
+    "billingAddress.postalCode",
+    "billingAddress.country",
     "shippingMethod",
   ] as const,
 } as const;
@@ -82,24 +91,47 @@ export const CheckoutIssues = {
 } as const;
 
 export const CheckoutDefaults = {
-  /** The form before anyone typed, shipping to the first country on the list. */
-  empty: (): CheckoutForm => ({
+  /** The form before anyone typed, shipping to the first country on the list with `method`. */
+  empty: (method: ShippingMethodCode): CheckoutForm => ({
     contact: { fullName: "", email: "", phone: "" },
     address: { line1: "", line2: "", city: "", postalCode: "", country: "EE" },
-    shippingMethod: "standard",
+    shippingMethod: method,
   }),
 
-  /** The form a signed-in customer starts with: the account email, and the last order's details. */
-  fromPrefill: (prefill: CheckoutPrefill): CheckoutForm => {
-    const empty = CheckoutDefaults.empty();
+  /**
+   * The form a signed-in customer starts with: the account email, and the
+   * last order's details. The last order's method is kept only while
+   * `options` still offers it; otherwise the first option is chosen.
+   */
+  fromPrefill: (prefill: CheckoutPrefill, options: readonly [ShippingOption, ...ShippingOption[]]): CheckoutForm => {
+    const empty = CheckoutDefaults.empty(options[0].code);
+    const offered = options.find((option) => option.code === prefill.shippingMethod);
 
     return {
       contact: prefill.contact ?? { ...empty.contact, email: prefill.email },
       address: prefill.address === undefined ? empty.address : { ...prefill.address, line2: prefill.address.line2 ?? "" },
-      shippingMethod: prefill.shippingMethod ?? empty.shippingMethod,
+      shippingMethod: offered?.code ?? empty.shippingMethod,
     };
   },
 } as const;
+
+/** What the payment section shows for each state of the payment provider. */
+export const PaymentMode = {
+  of: {
+    unavailable: "unavailable",
+    simulated: "simulated",
+    loading: "card",
+    ready: "card",
+  } as const satisfies Record<"unavailable" | "simulated" | "loading" | "ready", "card" | "simulated" | "unavailable">,
+} as const;
+
+/** The delivery options checkout offers, in their order. */
+export const useShippingOptions = () =>
+  useQuery({
+    queryKey: ["shipping-methods"],
+    queryFn: async ({ signal }) => (await Api.get<{ items: readonly ShippingOption[] }>("/shipping-methods", signal)).items,
+    staleTime: 60_000,
+  });
 
 export const StripeLoader = {
   /** Stripe.js once per publishable key, so a second visit to checkout reuses the first load. */

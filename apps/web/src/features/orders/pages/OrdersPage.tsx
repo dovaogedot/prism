@@ -1,11 +1,14 @@
-import { Link, Navigate, useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { Alert, Button, Card, Skeleton } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
+import { SignInFirst } from "../../auth/components/SignInFirst.tsx";
 import { useSession } from "../../auth/session.ts";
 import { CatalogParams } from "../../catalog/filters.ts";
 import { OrderFilters, OrderRow } from "../components/index.ts";
 import { OrderParams, useOrders } from "../orders.ts";
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
+import { PageText } from "../../../shared/seo/page-text.ts";
 
 /** The signed-in customer's orders, filtered by status and date and sorted as the URL says. */
 export const OrdersPage = () => {
@@ -17,10 +20,11 @@ export const OrdersPage = () => {
 
   const orders = useOrders(query, session !== undefined);
 
-  if (session === undefined) return <Navigate to="/login" replace />;
+  if (session === undefined) return <SignInFirst />;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6">
+      <PageMeta title={PageText.orders.title} description={PageText.orders.description} isIndexed={false} />
       <h1 className="text-2xl font-semibold tracking-tight text-ink">Your orders</h1>
 
       <OrderFilters />

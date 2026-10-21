@@ -2,9 +2,44 @@
 	admin off
 	auto_https off
 	persist_config off
+
+	servers {
+		# A request that arrives from a private address came through a proxy
+		# of this deployment: Docker's port forwarding, or the server's own
+		# reverse proxy. Trusting those keeps the visitor's address in
+		# X-Forwarded-For, which the API's rate limits key on, instead of
+		# replacing it with the proxy's.
+		trusted_proxies static private_ranges
+	}
+}
+
+# The entrypoint sets WEB_TLS to one of these two, and refuses anything else.
+(tls-self-signed) {
+	tls /tls/cert.pem /tls/key.pem
+}
+
+(tls-off) {
+}
+
+# Sent with every answer, the error pages included.
+(security-headers) {
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Cross-Origin-Opener-Policy same-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# Only this origin, Stripe's payment fields and Google's CAPTCHA. No inline
+		# script anywhere; inline styles stay, because both widgets set them.
+		Content-Security-Policy "default-src 'self'; script-src 'self' https://js.stripe.com https://*.js.stripe.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/; frame-src https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/; connect-src 'self' https://api.stripe.com; img-src 'self' data: https://*.stripe.com; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		-Server
+	}
 }
 
 :3000 {
+	import tls-{$WEB_TLS}
+	import security-headers
+
 	encode zstd gzip
 
 	# The API and the storefront share an origin, which is what lets the refresh
@@ -13,8 +48,43 @@
 		reverse_proxy api:8080
 	}
 
-	handle /media/* {
+	# What search engines read at the site's root, which the API builds.
+	handle /robots.txt {
+		rewrite * /api/v1/seo/robots.txt
 		reverse_proxy api:8080
+	}
+
+	handle /sitemap.xml {
+		rewrite * /api/v1/seo/sitemap.xml
+		reverse_proxy api:8080
+	}
+
+	# Product pictures, straight from the media volume. A variant's name never
+	# changes what it holds, so browsers and CDNs keep it for a year. Only a
+	# picture that exists is kept: a 404 must not outlive the file's arrival.
+	handle_path /media/* {
+		root * /media
+		@variants path /variants/*
+		header @variants {
+			Cache-Control "public, max-age=31536000, immutable"
+			match status 2xx
+		}
+		@sources not path /variants/*
+		header @sources {
+			Cache-Control "public, max-age=86400"
+			match status 2xx
+		}
+		file_server
+	}
+
+	# The storefront's own pages: the same list as the route table in
+	# src/app/main.tsx. Each is index.html, and the app draws the page.
+	@app path_regexp ^/(|shop|search|cart|checkout|orders|orders/[^/]+|about|contact|faq|terms|privacy|login|login/2fa|register|forgot-password|reset-password|oauth/complete|account|account/addresses|admin(/.*)?|categories/[a-z0-9-]+|products/[a-z0-9-]+|item/[a-z0-9-]+)/?$
+	handle @app {
+		root * /srv
+		header Cache-Control "no-cache"
+		rewrite * /index.html
+		file_server
 	}
 
 	handle {
@@ -24,19 +94,29 @@
 		@immutable path /assets/*
 		header @immutable Cache-Control "public, max-age=31536000, immutable"
 
-		# index.html must not be, or a deploy never reaches anyone.
-		@html path / /index.html
+		# These keep their names across deploys, so a browser asks again each time.
+		@html path /index.html /theme.js /zod-config.js
 		header @html Cache-Control "no-cache"
 
-		try_files {path} /index.html
 		file_server
 	}
 
-	header {
-		X-Content-Type-Options nosniff
-		X-Frame-Options DENY
-		Referrer-Policy strict-origin-when-cross-origin
-		-Server
+	# Any other address is no page: the app's own "not found" page, with the
+	# status a search engine needs to drop it. A missing picture is just a 404.
+	handle_errors 404 {
+		import security-headers
+
+		@media path /media/*
+		handle @media {
+			respond 404
+		}
+
+		handle {
+			root * /srv
+			header Cache-Control "no-cache"
+			rewrite * /index.html
+			file_server
+		}
 	}
 
 	log {

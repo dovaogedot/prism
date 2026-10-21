@@ -13,8 +13,8 @@ import { match } from "ts-pattern";
 export type ActiveFilter = Readonly<{ key: string; value: string; label: string; next: URLSearchParams }>;
 
 export const CatalogParams = {
-  /** Keys that shape the list without narrowing it: the shelf, the order and the paging. */
-  UNFILTERED: new Set(["q", "category", "sort", "page", "perPage"]),
+  /** Keys that shape the list without narrowing it: the shelf, the order, the paging and how it is drawn. */
+  UNFILTERED: new Set(["q", "category", "sort", "page", "perPage", "view"]),
 
   /** The query key for a filter on the property of that name. */
   propertyKey: (name: string): string => `${ProductQuery.PROPERTY_PREFIX}${name}`,

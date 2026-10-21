@@ -1,12 +1,15 @@
-import { Country, OrderStatus, PaymentFailure, Price, ShippingMethod } from "@prism/shared";
+import { Country, OrderStatus, PaymentFailure, Price } from "@prism/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { Alert, Card, Skeleton } from "../../../shared/ui/index.ts";
-import { Picture } from "../../catalog/components/ProductCard.tsx";
+import { Picture } from "../../catalog/components/Picture.tsx";
+import { DeliveryDates } from "../../../shared/format/delivery-dates.ts";
 import { CancelOrderButton, OrderConfirmation, OrderTimeline, StatusBadge } from "../components/index.ts";
 import { OrderPolling, OrderTime, useOrder } from "../orders.ts";
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
+import { PageText } from "../../../shared/seo/page-text.ts";
 
 /**
  * One order: its status and history, what is in it, where it goes and how it
@@ -37,13 +40,21 @@ export const OrderPage = () => {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
+      <PageMeta
+        title={order.data === undefined ? PageText.order.title : `Order #${order.data.number}`}
+        description={PageText.order.description}
+        isIndexed={false}
+      />
       {match(order)
         .with({ status: "error" }, () => (
-          <Alert title="No such order">We could not find that order. Check the link from your email.</Alert>
+          <>
+            <h1 className="text-2xl font-semibold tracking-tight text-ink">Order not found</h1>
+            <Alert title="No such order">We could not find that order. Check the link from your email.</Alert>
+          </>
         ))
         .with({ data: P.nullish }, () => (
           <div className="space-y-4">
-            <Skeleton className="h-10 w-1/2" />
+            <h1 className="text-2xl font-semibold tracking-tight text-ink">Your order</h1>
             <Skeleton className="h-64 w-full" />
           </div>
         ))
@@ -73,12 +84,17 @@ export const OrderPage = () => {
                   <ul className="divide-y divide-line">
                     {data.lines.map((line) => (
                       <li key={`${line.slug}:${line.name}`} className="flex items-center gap-3 py-3">
-                        <Picture image={line.image} name={line.name} className="size-14 shrink-0 rounded-lg border border-line" />
+                        <Picture
+                          image={line.image}
+                          name={line.name}
+                          className="size-14 shrink-0 rounded-lg border border-line"
+                          sizes="3.5rem"
+                        />
                         <div className="min-w-0 flex-1">
                           {line.productId === undefined ? (
                             <p className="truncate text-sm font-medium text-ink">{line.name}</p>
                           ) : (
-                            <Link to={`/item/${line.slug}`} className="truncate text-sm font-medium text-ink hover:text-accent">
+                            <Link to={`/products/${line.slug}`} className="truncate text-sm font-medium text-ink hover:text-accent">
                               {line.name}
                             </Link>
                           )}
@@ -97,7 +113,7 @@ export const OrderPage = () => {
                       <dd className="tabular-nums text-ink">{Price.format(data.subtotalCents)}</dd>
                     </div>
                     <div className="flex justify-between">
-                      <dt className="text-ink-soft">Shipping ({ShippingMethod.label[data.shippingMethod]})</dt>
+                      <dt className="text-ink-soft">Shipping ({data.shippingMethodName})</dt>
                       <dd className="tabular-nums text-ink">{data.shippingCents === 0 ? "Free" : Price.format(data.shippingCents)}</dd>
                     </div>
                     <div className="flex justify-between text-base font-semibold">
@@ -120,6 +136,14 @@ export const OrderPage = () => {
 
               <div className="space-y-6">
                 <Card className="space-y-1 p-5 text-sm">
+                  <h2 className="mb-2 text-base font-semibold text-ink">Delivery</h2>
+                  <p className="text-ink">{data.shippingMethodName}</p>
+                  <p className="text-ink-soft">
+                    Expected <span className="font-medium text-ink">{DeliveryDates.format(data.estimatedDelivery)}</span>
+                  </p>
+                </Card>
+
+                <Card className="space-y-1 p-5 text-sm">
                   <h2 className="mb-2 text-base font-semibold text-ink">Shipping to</h2>
                   <p className="font-medium text-ink">{data.contact.fullName}</p>
                   <p className="text-ink-soft">{data.address.line1}</p>
@@ -131,6 +155,18 @@ export const OrderPage = () => {
                   <p className="pt-2 text-ink-soft">{data.contact.email}</p>
                   <p className="text-ink-soft">{data.contact.phone}</p>
                 </Card>
+
+                {data.billingAddress === undefined ? null : (
+                  <Card className="space-y-1 p-5 text-sm">
+                    <h2 className="mb-2 text-base font-semibold text-ink">Billing address</h2>
+                    <p className="text-ink-soft">{data.billingAddress.line1}</p>
+                    {data.billingAddress.line2 === undefined ? null : <p className="text-ink-soft">{data.billingAddress.line2}</p>}
+                    <p className="text-ink-soft">
+                      {data.billingAddress.postalCode} {data.billingAddress.city}
+                    </p>
+                    <p className="text-ink-soft">{Country.name[data.billingAddress.country]}</p>
+                  </Card>
+                )}
 
                 <Card className="space-y-1 p-5 text-sm">
                   <h2 className="mb-2 text-base font-semibold text-ink">Payment</h2>
@@ -147,6 +183,11 @@ export const OrderPage = () => {
                             .exhaustive()}
                           {payment.card === undefined ? "" : ` · ${payment.card.brand.toUpperCase()} •••• ${payment.card.last4}`}
                         </p>
+                        {payment.reference === undefined ? null : (
+                          <p className="text-ink-soft">
+                            Reference <span className="break-all font-mono text-ink">{payment.reference}</span>
+                          </p>
+                        )}
                         {payment.failure === undefined ? null : (
                           <p className="text-danger">{PaymentFailure.message[payment.failure]}</p>
                         )}

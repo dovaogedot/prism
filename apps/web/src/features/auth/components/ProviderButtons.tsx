@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
+import { NextPath } from "../next-path.ts";
 
 /** Each provider's mark, as its button shows it. */
 const ProviderMark = {
@@ -21,11 +22,14 @@ const ProviderMark = {
   ),
 } as const satisfies Record<OAuthProvider, ReactNode>;
 
+/** Where the sign-in returns to once the provider sends the visitor back. */
+export type ProviderButtonsProps = Readonly<{ next: string }>;
+
 /**
  * The buttons come from `GET /auth/oauth/providers`, so an instance configured
  * with only GitHub credentials does not offer a Google button that cannot work.
  */
-export const ProviderButtons = () => {
+export const ProviderButtons = ({ next }: ProviderButtonsProps) => {
   const available = useQuery({
     queryKey: ["oauth-providers"],
     queryFn: ({ signal }) => Api.get<AvailableProviders>("/auth/oauth/providers", signal),
@@ -45,6 +49,8 @@ export const ProviderButtons = () => {
             <a
               key={provider}
               href={`${Api.BASE}/auth/oauth/${provider}`}
+              // The provider's sign-in leaves the site; the path waits for the return.
+              onClick={() => NextPath.remember(next)}
               className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-line bg-surface px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-line-strong hover:bg-sunken"
             >
               {ProviderMark[provider]}

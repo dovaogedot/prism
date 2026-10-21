@@ -27,7 +27,14 @@ RUN npm run build --workspace @prism/web
 
 FROM caddy:2-alpine AS runtime
 
+# openssl makes the self-signed certificate on the first start; /tls is where
+# it is kept, a volume in Compose.
+RUN apk add --no-cache openssl && mkdir -p /tls
+
+COPY --chmod=755 apps/web/entrypoint.sh /usr/local/bin/entrypoint
+COPY --chmod=755 apps/web/healthcheck.sh /usr/local/bin/healthcheck
 COPY apps/web/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /app/apps/web/dist /srv
 
 EXPOSE 3000
+ENTRYPOINT ["/usr/local/bin/entrypoint"]

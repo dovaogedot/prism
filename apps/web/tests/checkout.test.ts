@@ -1,4 +1,4 @@
-import { Email, PaymentFailure } from "@prism/shared";
+import { Email, PaymentFailure, ShippingMethodCode } from "@prism/shared";
 import { describe, expect, it } from "vitest";
 import { CheckoutDefaults, CheckoutIssues, PaymentErrors } from "../src/features/checkout/checkout.ts";
 
@@ -63,10 +63,12 @@ describe("CheckoutIssues.split", () => {
 
 describe("CheckoutDefaults.fromPrefill", () => {
   const email = Email.schema.parse("buyer@example.com");
+  const standard = { code: ShippingMethodCode.schema.parse("standard"), name: "Standard", priceCents: 490, minDays: 2, maxDays: 4 };
+  const express = { code: ShippingMethodCode.schema.parse("express"), name: "Express", priceCents: 990, minDays: 1, maxDays: 2 };
 
-  it("starts a first-time customer with the account email", () => {
-    expect(CheckoutDefaults.fromPrefill({ email })).toEqual({
-      ...CheckoutDefaults.empty(),
+  it("starts a first-time customer with the account email and the first option", () => {
+    expect(CheckoutDefaults.fromPrefill({ email }, [standard, express])).toEqual({
+      ...CheckoutDefaults.empty(standard.code),
       contact: { fullName: "", email: "buyer@example.com", phone: "" },
     });
   });
@@ -75,10 +77,14 @@ describe("CheckoutDefaults.fromPrefill", () => {
     const contact = { fullName: "Mari Maasikas", email, phone: "+37251234567" };
     const address = { line1: "Narva mnt 7", city: "Tallinn", postalCode: "10117", country: "EE" as const };
 
-    expect(CheckoutDefaults.fromPrefill({ email, contact, address, shippingMethod: "express" })).toEqual({
+    expect(CheckoutDefaults.fromPrefill({ email, contact, address, shippingMethod: express.code }, [standard, express])).toEqual({
       contact,
       address: { ...address, line2: "" },
       shippingMethod: "express",
     });
+  });
+
+  it("falls back to the first option when the last order's method is no longer offered", () => {
+    expect(CheckoutDefaults.fromPrefill({ email, shippingMethod: express.code }, [standard]).shippingMethod).toBe("standard");
   });
 });

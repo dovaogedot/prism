@@ -1,6 +1,6 @@
 import { Price, type OrderSummary } from "@prism/shared";
 import { Link } from "react-router";
-import { Picture } from "../../catalog/components/ProductCard.tsx";
+import { Picture } from "../../catalog/components/Picture.tsx";
 import { OrderTime } from "../orders.ts";
 import { StatusBadge } from "./StatusBadge.tsx";
 
@@ -14,7 +14,7 @@ export const OrderRow = ({ order }: OrderRowProps) => (
       to={`/orders/${order.id}`}
       className="flex items-center gap-3 rounded-lg border border-line bg-surface p-3 transition-colors hover:border-line-strong sm:gap-4"
     >
-      <Picture image={order.image} name={`#${order.number}`} className="size-14 shrink-0 rounded-lg" />
+      <Picture image={order.image} name={`#${order.number}`} className="size-14 shrink-0 rounded-lg" sizes="3.5rem" />
 
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-ink">Order #{order.number}</p>

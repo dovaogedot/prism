@@ -2,11 +2,14 @@ import { TwoFactorLoginInput, type AccessGrant } from "@prism/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
-import { Link, useLocation, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { Alert, Button, Field } from "../../../shared/ui/index.ts";
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
+import { PageText } from "../../../shared/seo/page-text.ts";
 import { ChallengeState } from "../challenge-state.ts";
+import { NextPath } from "../next-path.ts";
 import { AuthShell } from "../components/AuthShell.tsx";
 import { Failure } from "../components/failure.tsx";
 import { TokenStore } from "../token-store.ts";
@@ -26,6 +29,8 @@ const CodeForm = {
 export const TwoFactorPage = () => {
   const navigate = useNavigate();
   const { state } = useLocation();
+  const [params] = useSearchParams();
+  const next = NextPath.of(params.get("next"));
   const [failure, setFailure] = useState<ReactNode | undefined>(undefined);
   // Read once, at mount: the token for this attempt cannot change.
   const [challengeToken] = useState(() => ChallengeState.read(state));
@@ -45,7 +50,7 @@ export const TwoFactorPage = () => {
     await Api.postWithoutRetry<{ status: "authenticated"; grant: AccessGrant }>("/auth/login/2fa", body)
       .then((outcome) => {
         TokenStore.set(outcome.grant.accessToken, outcome.grant.user);
-        void navigate("/");
+        void navigate(next, { replace: true });
       })
       .catch((reason: unknown) => setFailure(Failure.describe(reason)));
   });
@@ -55,11 +60,12 @@ export const TwoFactorPage = () => {
       title="Two-factor code"
       lede="Open your authenticator app and enter the current six digits."
       footer={
-        <Link to="/login" className="font-medium text-accent hover:underline">
+        <Link to={`/login${NextPath.query(next)}`} className="font-medium text-accent underline underline-offset-2">
           Start over
         </Link>
       }
     >
+      <PageMeta title={PageText.twoFactor.title} description={PageText.twoFactor.description} isIndexed={false} />
       <form onSubmit={(event) => void submit(event)} className="space-y-4" noValidate>
         {match(failure)
           .with(P.nullish, () => null)

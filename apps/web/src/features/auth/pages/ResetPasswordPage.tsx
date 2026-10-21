@@ -9,6 +9,8 @@ import { Alert, Button, Field } from "../../../shared/ui/index.ts";
 import { AuthShell } from "../components/AuthShell.tsx";
 import { Failure } from "../components/failure.tsx";
 import { TokenStore } from "../token-store.ts";
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
+import { PageText } from "../../../shared/seo/page-text.ts";
 
 /** Choosing a new password against a token from an email. */
 export const ResetPasswordPage = () => {
@@ -41,6 +43,7 @@ export const ResetPasswordPage = () => {
 
   return (
     <AuthShell title="Choose a new password" lede="This also signs you out everywhere else.">
+      <PageMeta title={PageText.resetPassword.title} description={PageText.resetPassword.description} isIndexed={false} />
       {match(done)
         .with(true, () => (
           <Alert tone="accent" title="Password changed">

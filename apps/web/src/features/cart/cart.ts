@@ -5,11 +5,31 @@
  * the same `Pricing` the server charges with, and is rolled back if refused.
  */
 
-import { Pricing, type CartView, type ProductId, type ProductSummary, type UserId } from "@prism/shared";
+import { Price, Pricing, type CartView, type ProductId, type ProductSummary, type ShippingOption, type UserId } from "@prism/shared";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { Api } from "../../shared/api/client.ts";
 import { Failure } from "../auth/components/failure.tsx";
 import { useSession } from "../auth/session.ts";
+
+/** How far a cart is from shipping free. */
+export const FreeShipping = {
+  /** The option that ships free soonest, by its threshold; `undefined` when none ever does. */
+  nearest: (options: readonly ShippingOption[]): ShippingOption | undefined =>
+    options
+      .filter((option) => option.freeFromCents !== undefined)
+      .toSorted((a, b) => (a.freeFromCents ?? 0) - (b.freeFromCents ?? 0))[0],
+
+  /** The sentence the cart shows about free shipping; `undefined` when no option ships free. */
+  sentenceOf: (options: readonly ShippingOption[], subtotalCents: number): string | undefined => {
+    const option = FreeShipping.nearest(options);
+    if (option === undefined) return undefined;
+
+    const missing = Pricing.untilFree(option, subtotalCents) ?? 0;
+    return missing > 0
+      ? `Add ${Price.format(missing)} more for free ${option.name.toLowerCase()} shipping.`
+      : `${option.name} shipping is free for this order.`;
+  },
+} as const;
 
 export const CartCache = {
   /** One cache entry per owner, so signing in fetches the merged cart rather than showing the guest's. */

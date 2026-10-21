@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { match } from "ts-pattern";
 import { Alert, Button } from "../../../shared/ui/index.ts";
+import { CartPreview } from "../cart-preview.ts";
 import { CartFailure, useCartChanges } from "../cart.ts";
 import { QuantityStepper } from "./QuantityStepper.tsx";
 
@@ -36,7 +37,7 @@ export const AddToCart = ({ product }: AddToCartProps) => {
         <Button
           type="button"
           busy={add.isPending}
-          onClick={() => add.mutate({ productId: product.id, quantity })}
+          onClick={() => add.mutate({ productId: product.id, quantity }, { onSuccess: CartPreview.open })}
           className="flex-1 sm:flex-none"
         >
           Add to cart

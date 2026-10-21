@@ -7,6 +7,8 @@ import { match } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { Alert, Button, Field } from "../../../shared/ui/index.ts";
 import { AuthShell } from "../components/AuthShell.tsx";
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
+import { PageText } from "../../../shared/seo/page-text.ts";
 
 /** Asks for an address to send a reset link to, and says the same thing either way. */
 export const ForgotPasswordPage = () => {
@@ -27,11 +29,12 @@ export const ForgotPasswordPage = () => {
       title="Reset your password"
       lede="We will email you a link if the address is registered."
       footer={
-        <Link to="/login" className="font-medium text-accent hover:underline">
+        <Link to="/login" className="font-medium text-accent underline underline-offset-2">
           Back to sign in
         </Link>
       }
     >
+      <PageMeta title={PageText.forgotPassword.title} description={PageText.forgotPassword.description} isIndexed={false} />
       {match(sent)
         .with(true, () => (
           <Alert tone="accent" title="Check your inbox">

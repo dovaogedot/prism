@@ -1,10 +1,13 @@
-import { Cart, Price, ShippingMethod } from "@prism/shared";
+import { Cart, Price } from "@prism/shared";
 import { Link } from "react-router";
 import { match, P } from "ts-pattern";
 import { Failure } from "../../auth/components/failure.tsx";
 import { Alert, Card, Skeleton } from "../../../shared/ui/index.ts";
-import { useCart } from "../cart.ts";
+import { useShippingOptions } from "../../checkout/checkout.ts";
+import { FreeShipping, useCart } from "../cart.ts";
 import { CartLineItem, Recommendations } from "../components/index.ts";
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
+import { PageText } from "../../../shared/seo/page-text.ts";
 
 /**
  * The cart: every line with its picture, price and quantity, the subtotal,
@@ -13,9 +16,12 @@ import { CartLineItem, Recommendations } from "../components/index.ts";
 export const CartPage = () => {
   const cart = useCart();
 
+  const options = useShippingOptions();
+
   return (
     <div className="mx-auto max-w-6xl space-y-12 px-4 py-8 sm:px-6">
       <div className="space-y-6">
+        <PageMeta title={PageText.cart.title} description={PageText.cart.description} isIndexed={false} />
         <h1 className="text-2xl font-semibold tracking-tight text-ink">Your cart</h1>
 
         {match(cart)
@@ -36,8 +42,7 @@ export const CartPage = () => {
           ))
           .otherwise(({ data }) => {
             const blocked = Cart.issues(data.lines).length > 0;
-            const freeFrom = ShippingMethod.freeFromCents.standard ?? 0;
-            const missing = freeFrom - data.subtotalCents;
+            const freeShipping = FreeShipping.sentenceOf(options.data ?? [], data.subtotalCents);
 
             return (
               <div className="grid gap-8 lg:grid-cols-[1fr_20rem] lg:items-start">
@@ -56,9 +61,7 @@ export const CartPage = () => {
                   </div>
 
                   <p className="text-sm text-ink-soft">
-                    {missing > 0
-                      ? `Add ${Price.format(missing)} more for free standard shipping.`
-                      : "Standard shipping is free for this order."}{" "}
+                    {freeShipping === undefined ? null : `${freeShipping} `}
                     Prices include VAT.
                   </p>
 

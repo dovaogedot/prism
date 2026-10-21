@@ -33,7 +33,7 @@ export const OrderSummary = ({ cart, totals, problem }: OrderSummaryProps) => (
         <dt className="text-ink">Total</dt>
         <dd className="tabular-nums text-ink">{Price.format(totals.totalCents)}</dd>
       </div>
-      <p className="text-xs text-ink-faint">Prices include VAT.</p>
     </dl>
+    <p className="text-xs text-ink-faint">Prices include VAT.</p>
   </div>
 );

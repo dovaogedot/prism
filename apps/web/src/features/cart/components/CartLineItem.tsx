@@ -1,7 +1,7 @@
 import { Cart, Price, Quantity, type CartLine } from "@prism/shared";
 import { Link } from "react-router";
 import { match, P } from "ts-pattern";
-import { Picture } from "../../catalog/components/ProductCard.tsx";
+import { Picture } from "../../catalog/components/Picture.tsx";
 import { CartFailure, useCartChanges } from "../cart.ts";
 import { QuantityStepper } from "./QuantityStepper.tsx";
 
@@ -20,18 +20,19 @@ export const CartLineItem = ({ line, compact = false }: CartLineItemProps) => {
 
   return (
     <li className="flex gap-3 py-4 sm:gap-4">
-      <Link to={`/item/${line.slug}`} className="shrink-0">
+      <Link to={`/products/${line.slug}`} className="shrink-0">
         <Picture
           image={line.image}
           name={line.name}
           className={`${compact ? "size-14" : "size-20 sm:size-24"} rounded-lg border border-line`}
+          sizes={compact ? "3.5rem" : "6rem"}
         />
       </Link>
 
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <Link to={`/item/${line.slug}`} className="line-clamp-2 text-sm font-semibold text-ink hover:text-accent">
+            <Link to={`/products/${line.slug}`} className="line-clamp-2 text-sm font-semibold text-ink hover:text-accent">
               {line.name}
             </Link>
             <p className="text-sm tabular-nums text-ink-soft">{Price.format(line.unitPriceCents)} each</p>

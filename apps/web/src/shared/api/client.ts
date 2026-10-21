@@ -27,6 +27,7 @@ export class ApiError extends Error {
 /** What a request may carry beyond its path. */
 export type RequestOptions = Readonly<{
   method?: string;
+  /** Sent as JSON, except form data, which goes as `multipart/form-data`. */
   body?: unknown;
   /** False for endpoints where a 401 is the answer, like sign-in. */
   retryOnUnauthorized?: boolean;
@@ -60,12 +61,21 @@ export const Api = {
     issues: [],
   } satisfies ErrorResponse["error"],
 
+  /** The request body as fetch takes it: form data as it is, anything else as JSON, nothing as null. */
+  bodyOf: (body: unknown): BodyInit | null => {
+    if (body === undefined) return null;
+    return body instanceof FormData ? body : JSON.stringify(body);
+  },
+
   /** Sends one request with the bearer token, if any. */
   send: async (path: string, options: RequestOptions): Promise<Response> => {
     const token = TokenStore.get();
     const headers: Record<string, string> = {};
 
-    if (options.body !== undefined) headers["content-type"] = "application/json";
+    const isForm = options.body instanceof FormData;
+
+    // A form's content type carries its boundary, which the browser writes.
+    if (options.body !== undefined && !isForm) headers["content-type"] = "application/json";
     if (token !== undefined) headers["authorization"] = `Bearer ${token}`;
 
     return fetch(`${Api.BASE}${path}`, {
@@ -73,7 +83,7 @@ export const Api = {
       headers,
       // The refresh and cart cookies are same-origin; Caddy puts the API behind /api.
       credentials: "same-origin",
-      body: options.body === undefined ? null : JSON.stringify(options.body),
+      body: Api.bodyOf(options.body),
       ...(options.signal === undefined ? {} : { signal: options.signal }),
     });
   },
@@ -88,6 +98,7 @@ export const Api = {
     const attempt = fetch(`${Api.BASE}/auth/refresh`, { method: "POST", credentials: "same-origin" })
       .then(async (response) => {
         if (!response.ok) {
+          await Api.discard(response);
           TokenStore.clear();
           return false;
         }
@@ -110,7 +121,10 @@ export const Api = {
 
     if (response.status === 401 && options.retryOnUnauthorized !== false) {
       const refreshed = await Api.refresh();
-      if (refreshed) response = await Api.send(path, options);
+      if (refreshed) {
+        await Api.discard(response);
+        response = await Api.send(path, options);
+      }
     }
 
     if (!response.ok) {
@@ -127,9 +141,17 @@ export const Api = {
     return response.json();
   },
 
-  /** A request whose 204 has no body to decode. */
+  /** A request whose answer carries nothing the caller reads. */
   requestEmpty: async (path: string, options: RequestOptions = {}): Promise<void> => {
-    await Api.exchange(path, options);
+    await Api.discard(await Api.exchange(path, options));
+  },
+
+  /**
+   * Closes a response whose body is not read. An unread body keeps its
+   * request open in the browser until it is collected.
+   */
+  discard: async (response: Response): Promise<void> => {
+    await response.body?.cancel();
   },
 
   get: <A>(path: string, signal?: AbortSignal): Promise<A> =>

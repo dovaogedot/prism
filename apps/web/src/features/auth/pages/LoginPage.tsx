@@ -8,13 +8,17 @@ import { Api } from "../../../shared/api/client.ts";
 import { Alert, Button, Field } from "../../../shared/ui/index.ts";
 import { AuthShell } from "../components/AuthShell.tsx";
 import { Failure } from "../components/failure.tsx";
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
+import { PageText } from "../../../shared/seo/page-text.ts";
 import { ProviderButtons } from "../components/ProviderButtons.tsx";
+import { NextPath } from "../next-path.ts";
 import { TokenStore } from "../token-store.ts";
 
-/** Sign-in, which lands either on the catalog or on the second-factor page. */
+/** Sign-in, which returns to the page named in `?next=`, or goes on to the second-factor page first. */
 export const LoginPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const next = NextPath.of(params.get("next"));
   // The OAuth callback redirects here with a reason when it fails.
   const [failure, setFailure] = useState<ReactNode | undefined>(() => {
     const code = params.get("error");
@@ -34,12 +38,12 @@ export const LoginPage = () => {
         match(outcome)
           .with({ status: "authenticated" }, ({ grant }) => {
             TokenStore.set(grant.accessToken, grant.user);
-            void navigate("/");
+            void navigate(next, { replace: true });
           })
           .with({ status: "two_factor_required" }, ({ challengeToken }) => {
             // The challenge is short-lived and single-purpose; the history
             // entry is replaced so Back does not return to a spent form.
-            void navigate("/login/2fa", { state: { challengeToken }, replace: true });
+            void navigate(`/login/2fa${NextPath.query(next)}`, { state: { challengeToken }, replace: true });
           })
           .exhaustive(),
       )
@@ -53,13 +57,14 @@ export const LoginPage = () => {
       footer={
         <>
           No account yet?{" "}
-          <Link to="/register" className="font-medium text-accent hover:underline">
+          <Link to={`/register${NextPath.query(next)}`} className="font-medium text-accent underline underline-offset-2">
             Create one
           </Link>
         </>
       }
     >
-      <ProviderButtons />
+      <PageMeta title={PageText.login.title} description={PageText.login.description} isIndexed={false} />
+      <ProviderButtons next={next} />
 
       <form onSubmit={(event) => void submit(event)} className="space-y-4" noValidate>
         {match(failure)
@@ -83,7 +88,7 @@ export const LoginPage = () => {
         />
 
         <div className="flex justify-end">
-          <Link to="/forgot-password" className="text-sm font-medium text-accent hover:underline">
+          <Link to="/forgot-password" className="text-sm font-medium text-accent underline underline-offset-2">
             Forgot your password?
           </Link>
         </div>
