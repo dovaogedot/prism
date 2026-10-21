@@ -555,7 +555,7 @@ data:
 - Payments are simulated, because Stripe forbids load-testing its API. The CAPTCHA is in test
   mode, and `RATE_LIMIT_SCALE` is 1000, so the limits do not cap the load.
 - Postgres records every statement in `pg_stat_statements`, and a sampler records each
-  container's CPU and memory every second.
+  container's CPU and memory every few seconds.
 
 Each user follows one scenario with 1 to 3 seconds between steps: browse (home, a category, a
 second page, a product, its reviews and related products), search (three suggestions as a name
@@ -570,13 +570,14 @@ transaction.
 | `baseline` | 1 user per scenario for 2 minutes | p90 under 2 s, under 5% errors, at least 98% of transactions succeed |
 | `normal` | 20 users of the mixed workload for 5 minutes | the same |
 | `peak` | 50 users for 5 minutes | the same, and at least 10 transactions per second |
-| `stress` | 25, 50, 100, 150, 200, 300 and 400 users, each step held for a minute | stops when p95 passes 5 s or errors pass 5% |
+| `stress` | 25, 50, 100, 150, 200, 300, 400, 500, 600, 800 and 1,000 users, each step held for a minute | stops when p95 over the whole run passes 5 s or errors pass 5% |
 
-`./start.sh loadtest <run>` starts and seeds `prism-load` if needed, runs one run, and leaves
-in `loadtest/results/` the k6 summary, the CPU and memory samples, Postgres's costliest
+`./start.sh loadtest <run>` starts and seeds `prism-load` if needed, gives every product a
+million in stock so that checkouts never sell out, runs one run, and leaves in
+`loadtest/results/` the k6 summary, the CPU and memory samples, Postgres's costliest
 statements, and `<run>.md`: the tables of the run, which it also prints. For the stress run
-they include the response times step by step and the most users served before p95 passed
-5 seconds. A run loads the machine heavily, so run them one at a time.
+they include the users, p95 and errors of each half-minute, and the most users served with
+p95 under 5 seconds. A run loads the machine heavily, so run them one at a time.
 `./start.sh loadtest down` removes the stack.
 
 ## Testing

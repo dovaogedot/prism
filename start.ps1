@@ -84,9 +84,9 @@ if ($action -eq "seed") {
 }
 
 # Runs one load run against the prism-load stack, which it starts and seeds
-# first, while the stats service samples every container each second. Leaves
-# the k6 summary, the samples, the costliest statements and the report's
-# tables in loadtest\results. The stack stays up for the next run.
+# first, while the stats service samples every container every few seconds.
+# Leaves the k6 summary, the samples, the costliest statements and the
+# report's tables in loadtest\results. The stack stays up for the next run.
 if ($action -eq "loadtest") {
   $run = if ($args.Count -gt 1) { $args[1] } else { "" }
 
@@ -105,7 +105,9 @@ if ($action -eq "loadtest") {
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   # The seed plants into an empty catalog only, so a stack seeded before is left as it is.
   Invoke-LoadCompose run --rm --build seed
-  Invoke-LoadCompose exec -T postgres psql -U prism -d prism -q -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements" -c "SELECT pg_stat_statements_reset()" | Out-Null
+  # Plenty of stock first, so the run's own checkouts never sell out what a
+  # later step adds to a cart, and a sold-out product never counts as a failure.
+  Invoke-LoadCompose exec -T postgres psql -U prism -d prism -q -c "UPDATE product SET stock = 1000000" -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements" -c "SELECT pg_stat_statements_reset()" | Out-Null
 
   # The stress run keeps every sample, so the report can read it step by step.
   $samples = if ($run -eq "stress") { @("--out", "csv=/loadtest/results/stress-samples.csv") } else { @() }

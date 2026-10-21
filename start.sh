@@ -57,9 +57,9 @@ readonly COSTLIEST_STATEMENTS="SELECT calls, round(total_exec_time) AS total_ms,
   ORDER BY total_exec_time DESC LIMIT 10"
 
 # Runs one load run against the prism-load stack, which it starts and seeds
-# first, while the stats service samples every container each second. Leaves
-# the k6 summary, the samples, the costliest statements and the report's
-# tables in loadtest/results. The stack stays up for the next run.
+# first, while the stats service samples every container every few seconds.
+# Leaves the k6 summary, the samples, the costliest statements and the
+# report's tables in loadtest/results. The stack stays up for the next run.
 run_load() {
   local run="${1:-}"
   local status=0
@@ -81,7 +81,9 @@ run_load() {
   load_compose up --build --detach
   # The seed plants into an empty catalog only, so a stack seeded before is left as it is.
   load_compose run --rm --build seed
-  load_compose exec -T postgres psql -U prism -d prism -q \
+  # Plenty of stock first, so the run's own checkouts never sell out what a
+  # later step adds to a cart, and a sold-out product never counts as a failure.
+  load_compose exec -T postgres psql -U prism -d prism -q -c "UPDATE product SET stock = 1000000" \
     -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements" -c "SELECT pg_stat_statements_reset()" >/dev/null
 
   # The stress run keeps every sample, so the report can read it step by step.
@@ -95,7 +97,7 @@ run_load() {
   load_compose rm --stop --force stats >/dev/null
 
   load_compose exec -T postgres psql -U prism -d prism --csv -c "$COSTLIEST_STATEMENTS" >"loadtest/results/queries-$run.csv"
-  docker run --rm -v "$PWD/loadtest:/loadtest" node:26-slim node /loadtest/report.ts "$run" || status=$?
+  docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/loadtest:/loadtest" node:26-slim node /loadtest/report.ts "$run" || status=$?
   return "$status"
 }
 

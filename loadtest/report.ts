@@ -1,7 +1,7 @@
 /**
  * Turns one load run's results into the tables of the README's performance
  * report: the k6 summary, every container's peak CPU and memory from the
- * per-second samples, and Postgres's costliest statements. For the stress
+ * stats samples, and Postgres's costliest statements. For the stress
  * run, also the response times step by step, from k6's own samples, and the
  * most users served before p95 passed 5 seconds. Prints the tables, and
  * writes them beside the results as `<run>.md`.

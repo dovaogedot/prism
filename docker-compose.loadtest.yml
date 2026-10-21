@@ -66,7 +66,7 @@ services:
       web:
         condition: service_healthy
 
-  # Prints every container of this project's CPU and memory once a second,
+  # Prints every container of this project's CPU and memory every few seconds,
   # as `seconds,name,cpu,memory used / limit,memory share` lines; the start
   # script saves them as loadtest/results/stats-<run>.csv.
   stats:

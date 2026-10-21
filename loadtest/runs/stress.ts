@@ -1,7 +1,8 @@
 /**
- * The breaking point: the mixed workload in steps from 25 to 400 users, a
- * minute at each, which stops once p95 passes 5 seconds or errors pass 5%.
- * The last step before it stopped is the most users the stack serves.
+ * The breaking point: the mixed workload in steps from 25 to 1,000 users, a
+ * minute at each. It stops once p95 over the whole run passes 5 seconds or
+ * errors pass 5%. The report reads the samples half a minute at a time for
+ * the most users served with p95 under 5 seconds.
  */
 
 import { Mix } from "../lib/mix.ts";
@@ -28,7 +29,7 @@ export const options = {
     mixed: {
       executor: "ramping-vus",
       startVUs: 0,
-      stages: [25, 50, 100, 150, 200, 300, 400].flatMap(Stress.stepTo),
+      stages: [25, 50, 100, 150, 200, 300, 400, 500, 600, 800, 1000].flatMap(Stress.stepTo),
       exec: "mixed",
     },
   },

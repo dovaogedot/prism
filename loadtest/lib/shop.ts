@@ -63,9 +63,9 @@ export const Shop = {
     http.cookieJar().clear(Shop.BASE);
   },
 
-  /** Reads the catalog the scenarios pick from. Runs once, before any user starts. */
+  /** Reads the catalog the scenarios pick from: the best rated page of the largest size the API serves. Runs once, before any user starts. */
   load: (): ShopData => {
-    const products = JSON.parse(Shop.call("GET", "/products?perPage=100&sort=rating", "setup").body as string) as Readonly<{
+    const products = JSON.parse(Shop.call("GET", "/products?perPage=60&sort=rating", "setup").body as string) as Readonly<{
       items: readonly Readonly<{ id: string; slug: string; name: string }>[];
     }>;
     const categories = JSON.parse(Shop.call("GET", "/categories", "setup").body as string) as Readonly<{ items: readonly Readonly<{ slug: string }>[] }>;
