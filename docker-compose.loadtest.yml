@@ -1,0 +1,85 @@
+# The load test's stack, layered over `docker-compose.yml` under a project of
+# its own, so its data, images and containers never touch the everyday
+# stack's:
+#
+#   COMPOSE_PROFILES= docker compose -p prism-load \
+#     -f docker-compose.yml -f docker-compose.loadtest.yml up --build --detach
+#
+# `./start.sh loadtest <run>` runs one load run against it, and
+# `./start.sh loadtest down` removes it with its volumes.
+#
+# The API and Postgres are held to 2 CPUs and 1 GB each, so the numbers
+# describe a known server size and the machine's other cores are left to k6.
+# Payments are simulated, because Stripe forbids load tests against its API.
+# The CAPTCHA runs in its test mode, addresses are checked for their format
+# only, and the rate limits are scaled out of the way: the point is what the
+# server can carry, not whom it refuses. Postgres records the cost of every
+# statement in pg_stat_statements.
+
+services:
+  postgres:
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.track=all"]
+    cpus: 2
+    mem_limit: 1g
+
+  mailpit:
+    ports: !override
+      - "8325:8025"
+
+  rabbitmq:
+    ports: !override
+      - "15972:15672"
+
+  api:
+    cpus: 2
+    mem_limit: 1g
+    environment:
+      PUBLIC_WEB_URL: https://localhost:3300
+      PAYMENTS_MODE: simulated
+      STRIPE_SECRET_KEY: ""
+      STRIPE_PUBLISHABLE_KEY: ""
+      STRIPE_WEBHOOK_SECRET: ""
+      RECAPTCHA_SECRET_KEY: ""
+      OAUTH_GOOGLE_CLIENT_ID: ""
+      OAUTH_GOOGLE_CLIENT_SECRET: ""
+      OAUTH_GITHUB_CLIENT_ID: ""
+      OAUTH_GITHUB_CLIENT_SECRET: ""
+      RATE_LIMIT_SCALE: "1000"
+      ADDRESS_LOOKUP_URL: ""
+
+  web:
+    ports: !override
+      - "3300:3000"
+
+  # The load generator, on the stack's network. The profile keeps it out of
+  # `up`. It runs as the user who started the run, so the results it writes
+  # into loadtest/results belong to them.
+  k6:
+    profiles: [loadtest]
+    image: grafana/k6:2.3.0
+    user: "${LOAD_UID:-1000}:${LOAD_GID:-1000}"
+    volumes:
+      - ./loadtest:/loadtest
+    environment:
+      BASE_URL: https://web:3000
+    depends_on:
+      web:
+        condition: service_healthy
+
+  # Prints every container of this project's CPU and memory once a second,
+  # as `seconds,name,cpu,memory used / limit,memory share` lines; the start
+  # script saves them as loadtest/results/stats-<run>.csv.
+  stats:
+    profiles: [loadtest]
+    image: docker:29.7.2-cli
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        while true; do
+          now=$$(date +%s)
+          docker stats --no-stream --format '{{.Name}},{{.CPUPerc}},{{.MemUsage}},{{.MemPerc}}' \
+            $$(docker ps -q --filter label=com.docker.compose.project=prism-load) | sed "s/^/$$now,/"
+          sleep 1
+        done
