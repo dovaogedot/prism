@@ -1,0 +1,16 @@
+{
+  "name": "@prism/e2e",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The browser suite: every page in both themes against a running stack.",
+  "scripts": {
+    "e2e": "playwright test",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.63.0",
+    "playwright-core": "1.63.0"
+  }
+}
