@@ -57,7 +57,7 @@ test("a guest is sent to sign in, and comes back to the admin afterwards", async
   await expect(page).toHaveURL(/\/login\?next=%2Fadmin%2Forders$/);
 });
 
-test("new staff set up a second factor before the admin opens, and see only their sections", async ({ context, page }) => {
+test("new staff are sent to their account to set up a second factor, then the admin opens with only their sections", async ({ context, page }) => {
   const email = await Stack.registerCustomer(context.request, "moderator");
   await Stack.grantRoles(admin.request, adminToken, email, ["moderator"]);
 
@@ -65,12 +65,16 @@ test("new staff set up a second factor before the admin opens, and see only thei
   await expect(page.getByRole("heading", { level: 1, name: "Set up two-factor authentication" })).toBeVisible();
   expect(await Checks.axe(page)).toEqual([]);
 
+  await page.getByRole("link", { name: "Go to account" }).click();
+  await expect(page).toHaveURL(/\/account$/);
   await page.getByRole("button", { name: "Set up two-factor authentication" }).click();
   const uri = await page.locator("code").filter({ hasText: "otpauth://" }).innerText();
   const secret = new URL(uri).searchParams.get("secret") ?? "";
   await page.getByLabel("Code from the app").fill(Totp.code(secret, 0));
   await page.getByRole("button", { name: "Turn it on" }).click();
+  await expect(page.getByText("Two-factor authentication is now on.")).toBeVisible();
 
+  await Checks.open(page, "/admin");
   await expect(page.getByRole("heading", { level: 1, name: "Dashboard" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Admin" }).getByRole("link")).toHaveText(["Dashboard", "Reviews"]);
 });

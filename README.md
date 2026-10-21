@@ -276,8 +276,8 @@ customer; staff roles add what each job needs, and one account can hold several.
 | Support | Find accounts and orders; cancel orders that have not shipped; refund |
 | Admin | All of the above, plus staff roles, disabling accounts, resetting 2FA, signing accounts out, and the audit log |
 
-A staff account needs 2FA. The admin asks a staff member without it to set it up first, and
-asks every session for a code before it opens, and again after 8 hours. The navigation shows
+A staff account needs 2FA. The admin sends a staff member without it to the account page to
+set it up, and asks every session for a code before it opens, and again after 8 hours. The navigation shows
 only the sections the account's roles allow, and every delete, cancellation and refund asks
 first.
 

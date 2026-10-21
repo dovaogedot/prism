@@ -8,7 +8,6 @@ import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Card, Spinner } from "../../../shared/ui/index.ts";
 import { SignInFirst } from "../../auth/components/SignInFirst.tsx";
-import { TwoFactorSetupFlow } from "../../auth/components/TwoFactorSetupFlow.tsx";
 import { useSession } from "../../auth/session.ts";
 import { AdminAccess, AdminKeys } from "../admin.ts";
 import { StepUpForm } from "./StepUpForm.tsx";
@@ -18,9 +17,10 @@ export type StaffGateProps = Readonly<{ children: ReactNode }>;
 
 /**
  * Lets a staff member into the admin. A guest is sent to sign in. A
- * customer is told the admin is for staff. Staff without a second factor set
- * it up here, and staff whose last code is too old type a fresh one; the
- * API asks for both, and this is where the page answers.
+ * customer is told the admin is for staff. Staff without a second factor are
+ * sent to their account page to set one up, and staff whose last code is too
+ * old type a fresh one; the API asks for both, and this is where the page
+ * answers.
  */
 export const StaffGate = ({ children }: StaffGateProps) => {
   const session = useSession();
@@ -48,10 +48,13 @@ export const StaffGate = ({ children }: StaffGateProps) => {
       <div className={frameClass}>
         <PageMeta title={PageText.adminSetup.title} description={PageText.adminSetup.description} isIndexed={false} />
         <h1 className="text-2xl font-semibold tracking-tight text-ink">Set up two-factor authentication</h1>
-        <p className="text-ink-soft">Staff accounts need a second factor. Set one up once, and the admin opens.</p>
-        <Card className="p-5">
-          <TwoFactorSetupFlow onDone={reopen} />
-        </Card>
+        <p className="text-ink-soft">Staff accounts need a second factor. Set one up on your account page, and the admin opens.</p>
+        <Link
+          className="inline-flex rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink transition-colors hover:bg-accent-hover"
+          to="/account"
+        >
+          Go to account
+        </Link>
       </div>
     ))
     .with({ gate: "verify" }, () => (
