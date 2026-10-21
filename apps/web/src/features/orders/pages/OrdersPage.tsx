@@ -7,8 +7,8 @@ import { useSession } from "../../auth/session.ts";
 import { CatalogParams } from "../../catalog/filters.ts";
 import { OrderFilters, OrderRow } from "../components/index.ts";
 import { OrderParams, useOrders } from "../orders.ts";
-import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
+import { AccountPage } from "../../account/components/AccountPage.tsx";
 
 /** The signed-in customer's orders, filtered by status and date and sorted as the URL says. */
 export const OrdersPage = () => {
@@ -23,9 +23,7 @@ export const OrdersPage = () => {
   if (session === undefined) return <SignInFirst />;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6">
-      <PageMeta title={PageText.orders.title} description={PageText.orders.description} isIndexed={false} />
-      <h1 className="text-2xl font-semibold tracking-tight text-ink">Your orders</h1>
+    <AccountPage text={PageText.orders} heading="Your orders">
 
       <OrderFilters />
 
@@ -81,6 +79,6 @@ export const OrdersPage = () => {
             )}
           </div>
         ))}
-    </div>
+    </AccountPage>
   );
 };

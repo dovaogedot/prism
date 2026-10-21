@@ -43,7 +43,7 @@ export const FaqPage = () => {
         <summary>How do I track my order?</summary>
         <p>
           Once your order ships, its page shows the carrier's tracking number, and we email you. Signed-in customers find every order
-          under <Link to="/orders">Orders</Link>; a guest opens the order from the link in the confirmation email.
+          under <Link to="/account/orders">Orders</Link>; a guest opens the order from the link in the confirmation email.
         </p>
       </details>
 

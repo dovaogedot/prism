@@ -224,7 +224,7 @@ A declined order releases its stock and mails the reason; the cart keeps its ite
 
 ### Orders
 
-- **Orders** (signed in): status chips, any number at once, a date range whose ends both
+- **Orders** (`/account/orders`, signed in): status chips, any number at once, a date range whose ends both
   count, and newest, oldest or status order. The filters live in the URL.
 - **Order page**: status, a timeline of every change, the tracking number once shipped, the
   items, totals, delivery option and expected dates, the addresses, and how it was paid. A
@@ -243,6 +243,7 @@ A declined order releases its stock and mails the reason; the cart keeps its ite
   back to it afterwards.
 - **Password reset**: "Forgot your password?" mails a link to the Mailpit inbox. Setting the
   new password signs every session out.
+- **The account** has three tabs of one width: Profile, Addresses and Orders.
 - **Profile** (`/account`): full name and phone, which checkout fills in. The email is shown
   but stays as it is. The password and 2FA live here too.
 - **Addresses** (`/account/addresses`): up to 10 saved addresses. One is the default, which
@@ -599,7 +600,7 @@ then the browser suite against the commit's own images.
 | Integration | `apps/api/tests/integration` | Every auth, catalog, cart, checkout, order, review, account and webhook endpoint; staff routes, roles, the 2FA gates and the audit log; bulk import; fulfillment, cancellations and refunds; pictures; the upgrade of a part 2 database; overselling under ten concurrent checkouts; encryption at rest; the database's constraints; RabbitMQ itself, with its dead-letter queue |
 | Security | `apps/api/tests/security` | Injection, forged tokens and webhooks, other customers' orders and addresses, prices in request bodies, mass assignment and roles in a profile, path traversal, a rate limit on every route, every admin route for every role, script payloads in pages, reviews and mail, the Content-Security-Policy, import limits |
 | Flows | `apps/api/tests/flows` | Registration, a guest checkout, a member checkout, and product search: what it finds, whether counts and pages agree, and whether every query uses the indexes |
-| Browser | `apps/e2e` | Every page in both themes: axe (WCAG 2.1 A and AA contrast), one h1, title and description lengths and uniqueness, canonical or `noindex`, no sideways scroll at 320, 640, 768, 1,024 and 1,440 pixels, no CSP violation or console error. The skip link, Tab order, quick search, the cart preview, focus after a page change, the 404 status, robots and sitemap. The admin's gates and every admin page. Rows meant to line up, measured to the pixel. |
+| Browser | `apps/e2e` | Every page in both themes: axe (WCAG 2.1 A and AA contrast), one h1, title and description lengths and uniqueness, canonical or `noindex`, no sideways scroll at 320, 640, 768, 1,024 and 1,440 pixels, no CSP violation or console error. The skip link, Tab order, quick search, the cart preview, focus after a page change, the 404 status, robots and sitemap. The admin's gates and every admin page. Rows meant to line up, and the account pages' shared width, measured to the pixel. |
 | Load | `loadtest` | Response times, throughput and the breaking point; see [Performance](#performance) |
 
 Checked by hand, because a third party's screen is involved: the CAPTCHA, a provider sign-in

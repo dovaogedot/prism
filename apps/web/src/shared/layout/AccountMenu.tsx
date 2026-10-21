@@ -69,7 +69,7 @@ export const AccountMenu = () => {
         <p className="truncate border-b border-line px-5 py-3 text-sm text-ink-soft">{session.email}</p>
         <ul className="p-2">
           <li>
-            <Link className={itemClass} to="/orders">
+            <Link className={itemClass} to="/account/orders">
               Orders
             </Link>
           </li>

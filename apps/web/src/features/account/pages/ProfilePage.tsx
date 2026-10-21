@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from "react";
 import { match, P } from "ts-pattern";
-import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Card, Skeleton } from "../../../shared/ui/index.ts";
 import { PasswordFlow } from "../../auth/components/PasswordFlow.tsx";
@@ -9,7 +8,7 @@ import { TwoFactorDisableFlow } from "../../auth/components/TwoFactorDisableFlow
 import { TwoFactorSetupFlow } from "../../auth/components/TwoFactorSetupFlow.tsx";
 import { useSession } from "../../auth/session.ts";
 import { useProfile } from "../account.ts";
-import { AccountNav } from "../components/AccountNav.tsx";
+import { AccountPage } from "../components/AccountPage.tsx";
 import { ProfileForm } from "../components/ProfileForm.tsx";
 
 /**
@@ -27,12 +26,7 @@ export const ProfilePage = () => {
   if (session === undefined) return <SignInFirst />;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 px-4 py-10 sm:px-6">
-      <PageMeta title={PageText.account.title} description={PageText.account.description} isIndexed={false} />
-      <header className="space-y-4">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">Your account</h1>
-        <AccountNav />
-      </header>
+    <AccountPage text={PageText.account} heading="Your account">
 
       {notice === undefined ? null : <Alert tone="accent">{notice}</Alert>}
 
@@ -78,6 +72,6 @@ export const ProfilePage = () => {
           onDone={() => setNotice(session.hasPassword ? "Password changed." : "Password set. You can now sign in with your email.")}
         />
       </Card>
-    </div>
+    </AccountPage>
   );
 };

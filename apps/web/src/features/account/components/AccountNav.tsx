@@ -19,7 +19,7 @@ export const AccountNav = () => {
           </NavLink>
         </li>
         <li>
-          <NavLink className={linkClass} to="/orders">
+          <NavLink className={linkClass} to="/account/orders">
             Orders
           </NavLink>
         </li>

@@ -1,14 +1,13 @@
 import { SavedAddress, type AddressId } from "@prism/shared";
 import { useState } from "react";
 import { match, P } from "ts-pattern";
-import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, ConfirmDialog, EmptyState, Skeleton, Toast } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 import { SignInFirst } from "../../auth/components/SignInFirst.tsx";
 import { useSession } from "../../auth/session.ts";
 import { useAccountChanges, useSavedAddresses } from "../account.ts";
-import { AccountNav } from "../components/AccountNav.tsx";
+import { AccountPage } from "../components/AccountPage.tsx";
 import { AddressCard } from "../components/AddressCard.tsx";
 import { AddressForm } from "../components/AddressForm.tsx";
 
@@ -38,12 +37,7 @@ export const AddressesPage = () => {
   const isFull = (addresses.data?.length ?? 0) >= SavedAddress.MAX;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 px-4 py-10 sm:px-6">
-      <PageMeta title={PageText.addresses.title} description={PageText.addresses.description} isIndexed={false} />
-      <header className="space-y-4">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">Your addresses</h1>
-        <AccountNav />
-      </header>
+    <AccountPage text={PageText.addresses} heading="Your addresses">
 
       {failure === undefined ? null : <Alert>{failure}</Alert>}
 
@@ -147,6 +141,6 @@ export const AddressesPage = () => {
       >
         Orders that went to this address keep it. Checkout will no longer offer it.
       </ConfirmDialog>
-    </div>
+    </AccountPage>
   );
 };

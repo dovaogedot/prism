@@ -22,6 +22,22 @@ test("the rating summary centers its figure on the stars and the count, and the 
   await expect(row).not.toContainText(/\d\.\d \(\d+\)/);
 });
 
+test("the profile, addresses and orders pages share one width and the same tabs, and /orders opens the orders tab", async ({ context, page }) => {
+  await Stack.registerCustomer(context.request, "widths");
+  const widths: number[] = [];
+
+  for (const path of ["/account", "/account/addresses", "/account/orders"]) {
+    await Checks.open(page, path);
+    await expect(page.getByRole("navigation", { name: "Account" }).getByRole("link")).toHaveText(["Profile", "Addresses", "Orders"]);
+    widths.push((await Checks.boxOf(page.getByRole("heading", { level: 1 }).locator("xpath=.."))).width);
+  }
+
+  expect(Math.max(...widths) - Math.min(...widths), widths.join(", ")).toBeLessThanOrEqual(Checks.TOLERANCE);
+
+  await Checks.open(page, "/orders?status=delivered");
+  await expect(page).toHaveURL(/\/account\/orders\?status=delivered$/);
+});
+
 test("the two-factor setup puts its button in the code field's row, after the field", async ({ context, page }) => {
   await Stack.registerCustomer(context.request, "two-factor-row");
   await Checks.open(page, "/account");

@@ -79,7 +79,7 @@
 
 	# The storefront's own pages: the same list as the route table in
 	# src/app/main.tsx. Each is index.html, and the app draws the page.
-	@app path_regexp ^/(|shop|search|cart|checkout|orders|orders/[^/]+|about|contact|faq|terms|privacy|login|login/2fa|register|forgot-password|reset-password|oauth/complete|account|account/addresses|admin(/.*)?|categories/[a-z0-9-]+|products/[a-z0-9-]+|item/[a-z0-9-]+)/?$
+	@app path_regexp ^/(|shop|search|cart|checkout|orders|orders/[^/]+|about|contact|faq|terms|privacy|login|login/2fa|register|forgot-password|reset-password|oauth/complete|account|account/addresses|account/orders|admin(/.*)?|categories/[a-z0-9-]+|products/[a-z0-9-]+|item/[a-z0-9-]+)/?$
 	handle @app {
 		root * /srv
 		header Cache-Control "no-cache"

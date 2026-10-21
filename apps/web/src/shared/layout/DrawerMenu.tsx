@@ -61,7 +61,7 @@ export const DrawerMenu = ({ onClose }: DrawerMenuProps) => {
         ) : (
           <ul>
             <li>
-              <Link className={LookClass.row} to="/orders">
+              <Link className={LookClass.row} to="/account/orders">
                 Orders
               </Link>
             </li>

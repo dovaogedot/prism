@@ -25,6 +25,7 @@ import { ListingPage } from "../features/catalog/pages/ListingPage.tsx";
 import { ProductPage } from "../features/catalog/pages/ProductPage.tsx";
 import { CheckoutPage } from "../features/checkout/pages/CheckoutPage.tsx";
 import { HomePage } from "../features/home/pages/HomePage.tsx";
+import { OrdersRedirect } from "../features/orders/components/OrdersRedirect.tsx";
 import { OrderPage } from "../features/orders/pages/OrderPage.tsx";
 import { OrdersPage } from "../features/orders/pages/OrdersPage.tsx";
 import { AboutPage } from "../features/pages/pages/AboutPage.tsx";
@@ -72,7 +73,7 @@ const router = createBrowserRouter([
 
       // OrdersPage sends a signed-out visitor to sign in itself. An order opens
       // for its owner, or for a guest with the key from its confirmation link.
-      { path: "orders", element: <OrdersPage /> },
+      { path: "orders", element: <OrdersRedirect /> },
       { path: "orders/:id", element: <OrderPage /> },
 
       { path: "about", element: <AboutPage /> },
@@ -102,6 +103,7 @@ const router = createBrowserRouter([
       // Both send a signed-out visitor to sign in themselves.
       { path: "account", element: <ProfilePage /> },
       { path: "account/addresses", element: <AddressesPage /> },
+      { path: "account/orders", element: <OrdersPage /> },
 
       AdminRoutes.ROUTE,
 

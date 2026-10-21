@@ -33,7 +33,7 @@ const entries: readonly Entry[] = [
   { name: "unknown product", path: "/products/no-such-product" },
   { name: "account", path: "/account", isSignedIn: true },
   { name: "addresses", path: "/account/addresses", isSignedIn: true },
-  { name: "orders", path: "/orders", isSignedIn: true },
+  { name: "orders", path: "/account/orders", isSignedIn: true },
 ];
 
 for (const theme of Checks.THEMES) {
@@ -99,7 +99,7 @@ test("each indexed page has a title and a description of its own", async ({ page
 test("search engines are asked to skip the personal pages and the results", async ({ context, page }) => {
   await Stack.registerCustomer(context.request, "robots");
 
-  for (const path of ["/cart", "/checkout", "/account", "/orders", "/search?q=sword", "/login"]) {
+  for (const path of ["/cart", "/checkout", "/account", "/account/orders", "/search?q=sword", "/login"]) {
     await Checks.open(page, path);
     expect((await Checks.facts(page)).robots, path).toBe("noindex");
   }
