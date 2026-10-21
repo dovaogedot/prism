@@ -1,4 +1,4 @@
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { match, P } from "ts-pattern";
 
 /**
@@ -10,15 +10,32 @@ export type FieldProps = ComponentProps<"input"> &
     label: string;
     hint?: string | undefined;
     error?: string | undefined;
+    /** A control in the input's row, after it, such as the button that submits it. */
+    action?: ReactNode;
   }>;
 
 /** A labelled input, with its hint and error tied to it for a screen reader. */
-export const Field = ({ label, hint, error, id, className = "", ...rest }: FieldProps) => {
+export const Field = ({ label, hint, error, action, id, className = "", ...rest }: FieldProps) => {
   const fieldId = id ?? rest.name ?? label.toLowerCase().replace(/\s+/g, "-");
   const describedBy = [
     hint === undefined ? null : `${fieldId}-hint`,
     error === undefined ? null : `${fieldId}-error`,
   ].filter((value): value is string => value !== null);
+
+  const input = (
+    <input
+      {...rest}
+      id={fieldId}
+      aria-invalid={error !== undefined}
+      aria-describedby={describedBy.length === 0 ? undefined : describedBy.join(" ")}
+      className={[
+        "w-full min-w-0 rounded-lg border bg-surface px-3 py-2.5 text-sm text-ink",
+        "placeholder:text-ink-faint transition-colors",
+        error === undefined ? "border-line hover:border-line-strong" : "border-danger",
+        className,
+      ].join(" ")}
+    />
+  );
 
   return (
     <div className="space-y-1.5">
@@ -26,18 +43,14 @@ export const Field = ({ label, hint, error, id, className = "", ...rest }: Field
         {label}
       </label>
 
-      <input
-        {...rest}
-        id={fieldId}
-        aria-invalid={error !== undefined}
-        aria-describedby={describedBy.length === 0 ? undefined : describedBy.join(" ")}
-        className={[
-          "w-full rounded-lg border bg-surface px-3 py-2.5 text-sm text-ink",
-          "placeholder:text-ink-faint transition-colors",
-          error === undefined ? "border-line hover:border-line-strong" : "border-danger",
-          className,
-        ].join(" ")}
-      />
+      {action === undefined ? (
+        input
+      ) : (
+        <div className="flex items-center gap-3">
+          {input}
+          <div className="shrink-0">{action}</div>
+        </div>
+      )}
 
       {match({ hint, error })
         .with({ error: P.string.select() }, (message) => (

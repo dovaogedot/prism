@@ -21,3 +21,15 @@ test("the rating summary centers its figure on the stars and the count, and the 
   expect(Math.abs(stars.x - count.x)).toBeLessThanOrEqual(Checks.TOLERANCE);
   await expect(row).not.toContainText(/\d\.\d \(\d+\)/);
 });
+
+test("the two-factor setup puts its button in the code field's row, after the field", async ({ context, page }) => {
+  await Stack.registerCustomer(context.request, "two-factor-row");
+  await Checks.open(page, "/account");
+  await page.getByRole("button", { name: "Set up two-factor authentication" }).click();
+
+  const field = await Checks.boxOf(page.getByLabel("Code from the app"));
+  const button = await Checks.boxOf(page.getByRole("button", { name: "Turn it on" }));
+
+  expect(button.x).toBeGreaterThanOrEqual(field.x + field.width);
+  expect(Checks.middleGap(field, button)).toBeLessThanOrEqual(Checks.TOLERANCE);
+});

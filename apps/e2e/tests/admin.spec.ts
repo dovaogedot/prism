@@ -103,6 +103,15 @@ for (const theme of Checks.THEMES) {
   }
 }
 
+test("the accounts search's Find button sits in the email field's row, after the field", async () => {
+  await Checks.open(adminPage, "/admin/users");
+  const field = await Checks.boxOf(adminPage.getByLabel("Exact email"));
+  const find = await Checks.boxOf(adminPage.getByRole("button", { name: "Find" }));
+
+  expect(find.x).toBeGreaterThanOrEqual(field.x + field.width);
+  expect(Checks.middleGap(field, find)).toBeLessThanOrEqual(Checks.TOLERANCE);
+});
+
 test("deleting asks first, and cancelling deletes nothing", async () => {
   // A name of its own, so a run against a stack an earlier run used finds no brand of that name.
   const name = `Asked First ${Date.now()}`;

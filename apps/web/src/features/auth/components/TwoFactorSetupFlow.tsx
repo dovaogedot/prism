@@ -89,7 +89,7 @@ export const TwoFactorSetupFlow = ({ onDone }: TwoFactorSetupFlowProps) => {
               </div>
             </div>
 
-            <form onSubmit={(event) => void confirm(event)} className="space-y-3" noValidate>
+            <form onSubmit={(event) => void confirm(event)} noValidate>
               <Field
                 label="Code from the app"
                 inputMode="numeric"
@@ -97,11 +97,13 @@ export const TwoFactorSetupFlow = ({ onDone }: TwoFactorSetupFlowProps) => {
                 autoComplete="one-time-code"
                 className="max-w-40 text-center font-mono text-lg tracking-[0.3em]"
                 error={form.formState.errors.code?.message}
+                action={
+                  <Button type="submit" busy={form.formState.isSubmitting}>
+                    Turn it on
+                  </Button>
+                }
                 {...form.register("code")}
               />
-              <Button type="submit" busy={form.formState.isSubmitting}>
-                Turn it on
-              </Button>
             </form>
           </div>
         ))}

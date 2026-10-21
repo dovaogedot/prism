@@ -27,19 +27,25 @@ export const UsersPage = () => {
     <AdminPage text={PageText.adminUsers} heading="Accounts">
       <div className="space-y-4 rounded-lg border border-line bg-surface p-4">
         <form
-          className="flex flex-wrap items-end gap-3"
           role="search"
           onSubmit={(event) => {
             event.preventDefault();
             setParams(CatalogParams.set(params, "email", email.trim()));
           }}
         >
-          <div className="min-w-56 flex-1">
-            <Field label="Exact email" id="user-email" type="email" hint="Emails are stored encrypted, so only an exact address finds an account." value={email} onChange={(event) => setEmail(event.target.value)} />
-          </div>
-          <Button type="submit" tone="quiet">
-            Find
-          </Button>
+          <Field
+            label="Exact email"
+            id="user-email"
+            type="email"
+            hint="Emails are stored encrypted, so only an exact address finds an account."
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            action={
+              <Button type="submit" tone="quiet">
+                Find
+              </Button>
+            }
+          />
         </form>
         <div className="flex flex-wrap items-end gap-5">
           <SelectField label="Staff role" id="user-role" value={params.get("role") ?? ""} onChange={(event) => setParams(CatalogParams.set(params, "role", event.target.value))}>
