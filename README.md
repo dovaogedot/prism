@@ -447,6 +447,11 @@ something uses refuses deletion.
   name, and says so.
 - **Facets.** The category facet counts the whole shop. Every other facet counts its values
   under every filter except its own.
+- **Ratings.** `product.rating_average` and `product.rating_count` hold the average and the
+  number of a product's approved reviews, so listings sort, filter and count by rating without
+  reading a review. The trigger `product_review_rating` counts them again for each product
+  whose reviews change: a new review, an edit, a moderation or a deletion. It locks the
+  product's row before counting, so two moderators approving at once both count.
 - **SQL.** Every value a shopper supplies is a bound parameter.
 - **Validation.** One zod schema per input, shared by the browser and the API, which checks
   every request. Formats come first: emails, phones, postal codes, prices, slugs. Then the
@@ -598,7 +603,7 @@ then the browser suite against the commit's own images.
 | Suite | Where | Covers |
 | --- | --- | --- |
 | Unit | `apps/api/tests/unit`, `apps/api/seed/tests`, `packages/shared/tests`, `apps/web/tests` | JWT creation, verification and expiry; input schemas; product conversions; the search SQL and its bindings; URL filter arithmetic; cart rules and totals; prices, shipping and delivery dates; field encryption and the blind index; the token bucket; picture copies and upload limits; order emails; Stripe error messages; titles and descriptions of every fixed page and every seeded product; the palette's contrast; font sizes; the search combobox; saved addresses; admin forms |
-| Integration | `apps/api/tests/integration` | Every auth, catalog, cart, checkout, order, review, account and webhook endpoint; staff routes, roles, the 2FA gates and the audit log; bulk import; fulfillment, cancellations and refunds; pictures; the upgrade of a part 2 database; overselling under ten concurrent checkouts; encryption at rest; the database's constraints; RabbitMQ itself, with its dead-letter queue |
+| Integration | `apps/api/tests/integration` | Every auth, catalog, cart, checkout, order, review, account and webhook endpoint; staff routes, roles, the 2FA gates and the audit log; bulk import; fulfillment, cancellations and refunds; pictures; the upgrade of a part 2 database; overselling under ten concurrent checkouts; a product's rating under two approvals at once; encryption at rest; the database's constraints; RabbitMQ itself, with its dead-letter queue |
 | Security | `apps/api/tests/security` | Injection, forged tokens and webhooks, other customers' orders and addresses, prices in request bodies, mass assignment and roles in a profile, path traversal, a rate limit on every route, every admin route for every role, script payloads in pages, reviews and mail, the Content-Security-Policy, import limits |
 | Flows | `apps/api/tests/flows` | Registration, a guest checkout, a member checkout, and product search: what it finds, whether counts and pages agree, and whether every query uses the indexes |
 | Browser | `apps/e2e` | Every page in both themes: axe (WCAG 2.1 A and AA contrast), one h1, title and description lengths and uniqueness, canonical or `noindex`, no sideways scroll at 320, 640, 768, 1,024 and 1,440 pixels, no CSP violation or console error. The skip link, Tab order, quick search, the cart preview, focus after a page change, the 404 status, robots and sitemap. The admin's gates and every admin page. Rows meant to line up, and the account pages' shared width, measured to the pixel. |

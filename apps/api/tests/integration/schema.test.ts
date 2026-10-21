@@ -237,6 +237,17 @@ describe("product_image and product_review", () => {
     await violates(review({ rejection_reason: "'Spam'" }), "product_review_reason_when_rejected");
     await violates(review({ helpful_count: "-1" }), "product_review_helpful_not_negative");
   });
+
+  it("keeps a product's rating at 0 without reviews and between 1 and 5 with them", async () => {
+    const product = await productId();
+    const rate = (average: string, count: string) =>
+      harness.database.sql.unsafe(`UPDATE product SET rating_average = ${average}, rating_count = ${count} WHERE id = '${product}'`);
+
+    await violates(rate("4.5", "0"), "product_rating_range");
+    await violates(rate("0", "2"), "product_rating_range");
+    await violates(rate("5.5", "2"), "product_rating_range");
+    await violates(rate("3", "-1"), "product_rating_range");
+  });
 });
 
 describe("shipping_method", () => {

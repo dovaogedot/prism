@@ -94,6 +94,8 @@ erDiagram
     integer height_mm "positive"
     integer depth_mm "positive"
     timestamptz featured_at "null when not on the home page"
+    float8 rating_average "of the approved reviews; 0 without any"
+    integer rating_count "approved reviews; a trigger keeps both"
     timestamptz created_at
     timestamptz updated_at
     tsvector search "generated from name and description"

@@ -32,6 +32,7 @@ import {
   check,
   customType,
   date,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -269,6 +270,14 @@ export const products = pgTable(
     depthMm: integer("depth_mm").notNull(),
     /** When staff put it on the home page; null when it is not featured. */
     featuredAt: timestamp("featured_at", { withTimezone: true }),
+    /**
+     * The average stars of the approved reviews, 0 when there are none. The
+     * trigger `product_review_rating` keeps it and the count below equal to
+     * the approved reviews, so catalog reads never aggregate reviews.
+     */
+    ratingAverage: doublePrecision("rating_average").notNull().default(0),
+    /** How many approved reviews the product has. */
+    ratingCount: integer("rating_count").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     /** What full-text search matches: the name weighted above the description. */
@@ -292,6 +301,10 @@ export const products = pgTable(
     check(
       "product_measures_positive",
       sql`${table.weightGrams} > 0 AND ${table.widthMm} > 0 AND ${table.heightMm} > 0 AND ${table.depthMm} > 0`,
+    ),
+    check(
+      "product_rating_range",
+      sql`(${table.ratingCount} = 0 AND ${table.ratingAverage} = 0) OR (${table.ratingCount} > 0 AND ${table.ratingAverage} BETWEEN 1 AND 5)`,
     ),
   ],
 );

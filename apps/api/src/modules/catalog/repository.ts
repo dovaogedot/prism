@@ -21,9 +21,9 @@ import type {
   Suggestion,
 } from "@prism/shared";
 import { Dimensions, Weight } from "@prism/shared";
-import { and, asc, count, desc, eq, gt, ilike, inArray, isNotNull, isNull, lte, max, min, not, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lte, max, min, not, sql, type SQL } from "drizzle-orm";
 import type { Database } from "../../db/client.ts";
-import { brands, categories, productImages, productProperties, productReviews, products } from "../../db/schema.ts";
+import { brands, categories, productImages, productProperties, products } from "../../db/schema.ts";
 import type { VariantSource } from "../../platform/image-store.ts";
 import { ProductSearch, type LiftedFacet, type TextMatch } from "./search.ts";
 import { ImageRows, type ImageRow } from "./images.ts";
@@ -60,22 +60,10 @@ export const CatalogRepository = {
   imageUrl: (file: string): string => `/media/${file}`,
 
   create: (db: Database): CatalogRepository => {
-    // One row per reviewed product; a product without reviews joins to nothing.
-    const rating = db
-      .select({
-        productId: productReviews.productId,
-        average: sql<number>`avg(${productReviews.rating})::float`.as("average"),
-        count: sql<number>`count(*)::int`.as("count"),
-      })
-      .from(productReviews)
-      // Only what a moderator approved counts toward a product's rating.
-      .where(eq(productReviews.status, "approved"))
-      .groupBy(productReviews.productId)
-      .as("rating");
-
+    // The product's own columns, which a trigger keeps equal to its approved reviews.
     const ratingColumns = {
-      average: sql`COALESCE(${rating.average}, 0)`,
-      count: sql`COALESCE(${rating.count}, 0)`,
+      average: sql`${products.ratingAverage}`,
+      count: sql`${products.ratingCount}`,
     };
 
     const summaryColumns = {
@@ -93,8 +81,8 @@ export const CatalogRepository = {
          FROM product_image i WHERE i.product_id = ${products.id}),
         '[]'::json
       )`,
-      average: sql<number>`COALESCE(${rating.average}, 0)`,
-      count: sql<number>`COALESCE(${rating.count}, 0)`,
+      average: products.ratingAverage,
+      count: products.ratingCount,
     };
 
     type SummaryRow = Readonly<{
@@ -150,7 +138,6 @@ export const CatalogRepository = {
         .from(products)
         .innerJoin(categories, eq(products.categoryId, categories.id))
         .innerJoin(brands, eq(products.brandId, brands.id))
-        .leftJoin(rating, eq(rating.productId, products.id))
         .where(shelf(query, match))
         .groupBy(brands.slug, brands.name)
         .orderBy(asc(brands.name));
@@ -161,7 +148,6 @@ export const CatalogRepository = {
         .from(products)
         .innerJoin(categories, eq(products.categoryId, categories.id))
         .innerJoin(brands, eq(products.brandId, brands.id))
-        .leftJoin(rating, eq(rating.productId, products.id))
         .where(shelf(query, match));
 
       return { minCents: row?.min ?? 0, maxCents: row?.max ?? 0 };
@@ -173,9 +159,8 @@ export const CatalogRepository = {
         .from(products)
         .innerJoin(categories, eq(products.categoryId, categories.id))
         .innerJoin(brands, eq(products.brandId, brands.id))
-        .leftJoin(rating, eq(rating.productId, products.id))
         .where(shelf(query, match))
-        .groupBy(rating.average);
+        .groupBy(products.ratingAverage);
 
       // Cumulative: a product rated 4.5 counts toward "4 stars & up" and below.
       return ProductSearch.RATING_THRESHOLDS.map((threshold) => ({
@@ -192,7 +177,6 @@ export const CatalogRepository = {
         .innerJoin(products, eq(productProperties.productId, products.id))
         .innerJoin(categories, eq(products.categoryId, categories.id))
         .innerJoin(brands, eq(products.brandId, brands.id))
-        .leftJoin(rating, eq(rating.productId, products.id))
         .where(shelf(query, match))
         .groupBy(productProperties.name, productProperties.value)
         .orderBy(asc(productProperties.name), asc(productProperties.value));
@@ -221,7 +205,6 @@ export const CatalogRepository = {
           .from(products)
           .innerJoin(categories, eq(products.categoryId, categories.id))
           .innerJoin(brands, eq(products.brandId, brands.id))
-          .leftJoin(rating, eq(rating.productId, products.id))
           .where(conditions(query, "none", match))
           .orderBy(...ProductSearch.orderBy(query, ratingColumns, match))
           .limit(query.perPage)
@@ -254,7 +237,6 @@ export const CatalogRepository = {
           .from(products)
           .innerJoin(categories, eq(products.categoryId, categories.id))
           .innerJoin(brands, eq(products.brandId, brands.id))
-          .leftJoin(rating, eq(rating.productId, products.id))
           .where(where)
           .orderBy(...order)
           .limit(limit)
@@ -322,7 +304,7 @@ export const CatalogRepository = {
           summaries(isNotNull(products.featuredAt), [desc(products.featuredAt), asc(products.slug)], CatalogRepository.HOME_ROW),
           // Three reviews at least, so one five-star review does not top the shop.
           summaries(
-            sql`COALESCE(${rating.count}, 0) >= 3`,
+            gte(products.ratingCount, 3),
             [desc(summaryColumns.average), desc(summaryColumns.count), asc(products.slug)],
             CatalogRepository.HOME_ROW,
           ),
@@ -365,7 +347,6 @@ export const CatalogRepository = {
           .from(products)
           .innerJoin(categories, eq(products.categoryId, categories.id))
           .innerJoin(brands, eq(products.brandId, brands.id))
-          .leftJoin(rating, eq(rating.productId, products.id))
           .where(
             productIds.length === 0
               ? gt(products.stock, 0)
@@ -412,7 +393,6 @@ export const CatalogRepository = {
           .from(products)
           .innerJoin(categories, eq(products.categoryId, categories.id))
           .innerJoin(brands, eq(products.brandId, brands.id))
-          .leftJoin(rating, eq(rating.productId, products.id))
           .where(eq(products.slug, slug))
           .limit(1);
 

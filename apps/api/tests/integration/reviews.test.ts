@@ -177,6 +177,41 @@ describe("moderation", () => {
   });
 });
 
+describe("the product's rating columns", () => {
+  /** The desk lamp's stored average and count of approved reviews. */
+  const stored = async () => {
+    const [row] = await harness.database.sql`SELECT rating_average, rating_count FROM product WHERE slug = 'desk-lamp'`;
+    return row;
+  };
+
+  it("follow the approved reviews through approval, an edit, a rejection and a deletion", async () => {
+    const first = await approvedReview("first@example.com");
+    const second = await approvedReview("second@example.com", { ...review, rating: 2 });
+    expect(await stored()).toEqual({ rating_average: 3, rating_count: 2 });
+
+    // An edit sends the review back to the queue, and out of the totals.
+    await write(second.token, { ...review, rating: 5 });
+    expect(await stored()).toEqual({ rating_average: 4, rating_count: 1 });
+
+    await Staff.call(harness, moderator, "POST", `/admin/reviews/${second.id}/reject`, { reason: "Please leave out the link." });
+    expect(await stored()).toEqual({ rating_average: 4, rating_count: 1 });
+
+    await call(first.token, "DELETE", "/products/desk-lamp/reviews/mine");
+    expect(await stored()).toEqual({ rating_average: 0, rating_count: 0 });
+  });
+
+  it("count both of two reviews approved at the same moment", async () => {
+    const ids: string[] = [];
+    for (const email of ["one@example.com", "two@example.com"]) {
+      ids.push(String(jsonOf(await write(await customer(email, "delivered")))["id"]));
+    }
+
+    await Promise.all(ids.map((id) => approve(id)));
+
+    expect(await stored()).toEqual({ rating_average: 4, rating_count: 2 });
+  });
+});
+
 describe("helpful votes", () => {
   it("count once per person, and can be taken back", async () => {
     const { id } = await approvedReview("author@example.com");
