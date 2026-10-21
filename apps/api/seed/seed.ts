@@ -3,7 +3,7 @@
  * account with a few past orders, a shelf of reviewers who review and vote
  * on each other's reviews, and the catalog beside this file, which
  * `fetch/fetch-catalog.ts` writes from its sources. Stock, sizes, reviews and
- * votes are drawn from faker under a fixed seed, so two runs against an
+ * votes are drawn from faker under fixed seeds, so two runs against an
  * empty database plant the same shop. A database that already holds
  * products is left alone. Run as a script it seeds the database named by
  * `DATABASE_URL`, sealing with `DATA_ENCRYPTION_KEY`, and copies the
@@ -13,7 +13,7 @@
 import { copyFile, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { faker } from "@faker-js/faker";
+import { base, en, Faker, faker } from "@faker-js/faker";
 import {
   Delivery,
   Email,
@@ -47,7 +47,7 @@ import { ShippingMethods } from "../src/modules/orders/shipping.ts";
 import { EncryptionKey, FieldCipher } from "../src/platform/cipher.ts";
 import { Hasher } from "../src/platform/hasher.ts";
 import { ImageStore } from "../src/platform/image-store.ts";
-import { ReviewTexts, type ReviewText } from "./review-texts.ts";
+import { ReviewTexts } from "./review-texts.ts";
 import { SeedCatalog } from "./seed-catalog.ts";
 
 /** What one run of the seed did. */
@@ -68,14 +68,20 @@ export const Seed = {
   DEMO_PHONE: "+37251234567",
   DEMO_ADDRESS: { line1: "Narva mnt 7", city: "Tallinn", postalCode: "10117", country: "EE" } satisfies ShippingAddress,
   DEMO_METHOD: ShippingMethodCode.schema.parse("standard"),
-  REVIEWER_COUNT: 10,
+  REVIEWER_COUNT: 40,
   FEATURED_COUNT: 8,
   /** How many pictures get their smaller copies made at once. */
   VARIANT_WORKERS: 4,
   /** The share of seeded reviews that get a title and a body. */
   TEXT_SHARE: 0.6,
-  /** How likely one reviewer finds another's review helpful. */
-  VOTE_CHANCE: 0.3,
+  /** The largest share of the other reviewers that find one review helpful: one with text, and one with stars only. */
+  VOTE_SHARE: { text: 0.6, bare: 0.2 },
+  /**
+   * The seed of the generator the reviewers, their reviews and their votes
+   * come from. It is apart from the catalog's, so how many there are never
+   * changes a product's stock or size.
+   */
+  REVIEW_SEED: 7,
   /** The demo shopper's past orders: how many days ago each was placed, and how far it got. */
   DEMO_ORDERS: [
     { daysAgo: 30, status: "delivered" },
@@ -117,14 +123,15 @@ export const Seed = {
     if (existing !== undefined && existing.total > 0) return { _tag: "Present", products: existing.total };
 
     faker.seed(42);
+    const draw = new Faker({ locale: [en, base], seed: Seed.REVIEW_SEED });
     await mkdir(mediaDirectory, { recursive: true });
 
     const passwordHash = await Hasher.argon2().hash(Seed.DEMO_PASSWORD);
     const people = [
       { email: Seed.DEMO_EMAIL, byline: Seed.DEMO_NAME.split(" ")[0] ?? Seed.DEMO_NAME },
       ...Array.from({ length: Seed.REVIEWER_COUNT }, () => ({
-        email: Email.schema.parse(faker.internet.email()),
-        byline: `${faker.person.firstName()} ${faker.person.lastName().slice(0, 1)}.`,
+        email: Email.schema.parse(draw.internet.email()),
+        byline: `${draw.person.firstName()} ${draw.person.lastName().slice(0, 1)}.`,
       })),
     ];
 
@@ -204,7 +211,7 @@ export const Seed = {
           .insert(productImages)
           .values({ productId: product.id, file: item.image, alt: item.name, position: 0, isPixelArt: true });
 
-        await Seed.review(db, product.id, reviewers);
+        await Seed.review(db, product.id, reviewers, draw);
         if (shopper !== undefined && (await Seed.hasReviewed(db, product.id, shopper.id))) reviewedByShopper.add(product.id);
       }
     }
@@ -261,18 +268,32 @@ export const Seed = {
   },
 
   /**
-   * Reviews from a random sample of the reviewers, skewed high like every
-   * real distribution, and the helpful votes the other reviewers give them.
+   * Reviews of one product from a sample of the reviewers, skewed high like
+   * every real distribution, and the helpful votes the other reviewers give
+   * them. Most products get a few reviews and some get many; most reviews get
+   * a few votes and some get many, a review with text more than one with
+   * stars only. No body repeats on one product. Every draw comes from `draw`.
    */
-  review: async (db: Db, productId: ProductId, reviewers: readonly Reviewer[]): Promise<void> => {
-    const sample = faker.helpers.arrayElements(reviewers, { min: 0, max: reviewers.length });
+  review: async (db: Db, productId: ProductId, reviewers: readonly Reviewer[], draw: Faker): Promise<void> => {
+    // Squaring and cubing a uniform draw keeps most results small and a few large.
+    const sample = draw.helpers.arrayElements(reviewers, Math.round(reviewers.length * draw.number.float() ** 2));
     if (sample.length === 0) return;
 
+    const bodies = new Set<string>();
     const written = sample.map((reviewer) => {
-      const rating = faker.helpers.arrayElement([2, 3, 4, 4, 5, 5, 5] as const);
-      const texts: readonly ReviewText[] = ReviewTexts.byRating[rating];
-      const text = faker.datatype.boolean(Seed.TEXT_SHARE) ? faker.helpers.arrayElement(texts) : undefined;
-      const voters = reviewers.filter((other) => other.id !== reviewer.id && faker.datatype.boolean(Seed.VOTE_CHANCE));
+      const rating = draw.helpers.arrayElement([2, 3, 4, 4, 5, 5, 5] as const);
+      const composed = draw.datatype.boolean(Seed.TEXT_SHARE)
+        ? ReviewTexts.compose(ReviewTexts.byRating[rating], (pieces) => draw.helpers.arrayElement(pieces))
+        : undefined;
+      // A body this product already shows leaves the review with stars only.
+      const text = composed === undefined || bodies.has(composed.body) ? undefined : composed;
+      if (text !== undefined) {
+        bodies.add(text.body);
+      }
+
+      const others = reviewers.filter((other) => other.id !== reviewer.id);
+      const share = text === undefined ? Seed.VOTE_SHARE.bare : Seed.VOTE_SHARE.text;
+      const voters = draw.helpers.arrayElements(others, Math.round(others.length * share * draw.number.float() ** 3));
 
       return { reviewer, rating, text, voters };
     });
