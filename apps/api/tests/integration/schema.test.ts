@@ -53,6 +53,12 @@ const violates = async (statement: Promise<unknown>, constraint: string) => {
   await expect(statement).rejects.toMatchObject({ constraint_name: constraint });
 };
 
+describe("the connection", () => {
+  it("turns JIT compilation off, which costs more than the API's short statements take", async () => {
+    expect(await harness.database.sql`SHOW jit`).toEqual([{ jit: "off" }]);
+  });
+});
+
 describe("cart", () => {
   it("has exactly one owner", async () => {
     await violates(harness.database.sql.unsafe("INSERT INTO cart (expires_at) VALUES (now())"), "cart_one_owner");

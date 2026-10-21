@@ -453,6 +453,9 @@ something uses refuses deletion.
   whose reviews change: a new review, an edit, a moderation or a deletion. It locks the
   product's row before counting, so two moderators approving at once both count.
 - **SQL.** Every value a shopper supplies is a bound parameter.
+- **JIT.** The API's database sessions turn Postgres's JIT compilation off. Postgres compiles
+  a query whose planned cost passes a threshold, and a small table without statistics is
+  planned far larger than it is, so a short query can take longer to compile than to run.
 - **Validation.** One zod schema per input, shared by the browser and the API, which checks
   every request. Formats come first: emails, phones, postal codes, prices, slugs. Then the
   rules: a review only for a delivered product, a total of at least €0.50, a delivery window

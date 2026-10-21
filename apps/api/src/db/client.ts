@@ -30,6 +30,8 @@ export const Database = {
       max: poolSize,
       // Notices are Postgres talking to itself, not application log lines.
       onnotice: () => {},
+      // Every statement here is short: compiling one with JIT costs more than running it.
+      connection: { jit: "off" },
     });
 
     return {
