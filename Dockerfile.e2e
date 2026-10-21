@@ -1,0 +1,20 @@
+# The browser suite, on the Playwright image whose browsers match the suite's
+# Playwright version: `./start.sh test e2e` runs it against the prism-e2e
+# stack. Build context is the repository root.
+
+FROM mcr.microsoft.com/playwright:v1.63.0-noble
+WORKDIR /app
+
+# Every workspace's manifest, so `npm ci` finds the lockfile in step; only the
+# suite's own dependencies are installed.
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY packages/shared/package.json ./packages/shared/
+COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
+COPY apps/e2e/package.json ./apps/e2e/
+RUN npm ci --workspace @prism/e2e
+
+COPY apps/e2e ./apps/e2e
+WORKDIR /app/apps/e2e
+
+CMD ["npx", "playwright", "test"]

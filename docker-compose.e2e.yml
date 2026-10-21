@@ -1,0 +1,69 @@
+# The browser suite's stack, layered over `docker-compose.yml` under a
+# project name of its own, so it shares no container, volume or image with
+# the stack `./start.sh` runs:
+#
+#   COMPOSE_PROFILES= docker compose -p prism-e2e \
+#     -f docker-compose.yml -f docker-compose.e2e.yml up --build --detach
+#
+# `./start.sh test e2e` runs exactly that, seeds, runs the suite in the `e2e`
+# service, and removes the project with its volumes. The empty
+# COMPOSE_PROFILES keeps the stripe service down even when `.env` turns it on.
+#
+# Payments are simulated, so the Stripe keys in `.env` are never used. The
+# OAuth credentials are blanked, so sign-in through a provider runs against
+# the offline stand-in, and nothing leaves the machine to check an address.
+# The admin has a known password and 2FA key, which the suite signs in with.
+# The rate limits are scaled up, because the suite signs in far more often
+# than a person does. Every port moves, so this stack runs beside the everyday
+# one.
+
+services:
+  mailpit:
+    ports: !override
+      - "8125:8025"
+
+  rabbitmq:
+    ports: !override
+      - "15772:15672"
+
+  api:
+    environment:
+      PUBLIC_WEB_URL: https://localhost:3200
+      PAYMENTS_MODE: simulated
+      STRIPE_SECRET_KEY: ""
+      STRIPE_PUBLISHABLE_KEY: ""
+      STRIPE_WEBHOOK_SECRET: ""
+      RECAPTCHA_SECRET_KEY: ""
+      OAUTH_GOOGLE_CLIENT_ID: ""
+      OAUTH_GOOGLE_CLIENT_SECRET: ""
+      OAUTH_GITHUB_CLIENT_ID: ""
+      OAUTH_GITHUB_CLIENT_SECRET: ""
+      RATE_LIMIT_SCALE: "1000"
+      # Addresses are checked for their format only, so no test sends anything
+      # to OpenStreetMap's public geocoder.
+      ADDRESS_LOOKUP_URL: ""
+      ADMIN_EMAIL: admin@prism.test
+      ADMIN_PASSWORD: e2e admin password
+      ADMIN_TOTP_SECRET: EZEPRISMADMINTOTPSECRETFORTHESUITE
+
+  web:
+    build:
+      args:
+        # Empty, so the widget uses Google's always-pass test key, which the
+        # API's test secret accepts.
+        VITE_RECAPTCHA_SITE_KEY: ""
+    ports: !override
+      - "3200:3000"
+
+  # The suite itself, on the project's network, so it reaches the storefront
+  # by the web service's name. The profile keeps it out of `up`.
+  e2e:
+    profiles: [e2e]
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    environment:
+      E2E_BASE_URL: https://web:3000
+    depends_on:
+      web:
+        condition: service_healthy
