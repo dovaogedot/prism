@@ -116,11 +116,16 @@ export type AuthService = Readonly<{
     code: TotpCode;
     ipAddress: string;
   }) => ResultAsync<SessionUser, DomainError>;
-  /** Refused for an account with a staff role, which keeps 2FA on. */
+  /**
+   * Turns 2FA off with a current code. Staff keep 2FA on, so an account with
+   * staff roles loses all of them with it, recorded in the audit log; the
+   * shop's last admin gets `LastAdmin`.
+   */
   disableTwoFactor: (input: {
     userId: UserId;
     session: SessionContext;
     code: TotpCode;
+    ipAddress: string;
   }) => ResultAsync<SessionUser, DomainError>;
   /**
    * The step-up: a code from the account's authenticator marks the session
@@ -434,22 +439,21 @@ export const AuthService = {
           });
         }),
 
-      disableTwoFactor: ({ userId, session, code }) =>
+      disableTwoFactor: ({ userId, session, code, ipAddress }) =>
         requireUser(userId, { _tag: "Unauthenticated" }).andThen((user) => {
           if (user.totpEnabledAt === undefined || user.totpSecret === undefined) {
             return errAsync<SessionUser, DomainError>({ _tag: "TwoFactorNotEnabled" });
           }
-          // Neither a role nor a password alone may open the admin.
-          if (user.roles.length > 0) {
-            return errAsync<SessionUser, DomainError>({ _tag: "TwoFactorRequiredForStaff" });
-          }
 
           const { totpSecret: _secret, totpEnabledAt: _enabledAt, totpLastStep: _step, ...rest } = user;
 
-          // Turning the second factor off is itself a sensitive action.
+          // Turning the second factor off is itself a sensitive action. Neither a
+          // role nor a password alone may open the admin, so the roles go with it.
           return acceptCode(user, code).andThen(() =>
-            ResultAsync.fromSafePromise(
-              repository.disableTotp(userId).then(() => UserRecord.toSessionUser(rest, isRecent(session.secondFactorAt))),
+            ResultAsync.fromSafePromise(repository.disableTotp(userId, ipAddress)).andThen((outcome) =>
+              outcome._tag === "LastAdmin"
+                ? errAsync<SessionUser, DomainError>({ _tag: "LastAdmin" })
+                : okAsync<SessionUser, DomainError>(UserRecord.toSessionUser({ ...rest, roles: [] }, isRecent(session.secondFactorAt))),
             ),
           );
         }),

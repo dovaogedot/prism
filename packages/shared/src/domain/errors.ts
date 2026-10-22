@@ -44,7 +44,6 @@ export type DomainError =
   | Readonly<{ _tag: "Forbidden" }>
   | Readonly<{ _tag: "TwoFactorSetupRequired" }>
   | Readonly<{ _tag: "TwoFactorVerificationRequired" }>
-  | Readonly<{ _tag: "TwoFactorRequiredForStaff" }>
   | Readonly<{ _tag: "AccountDisabled" }>
   | Readonly<{ _tag: "LastAdmin" }>
   | Readonly<{ _tag: "SelfChangeNotAllowed" }>
@@ -125,7 +124,6 @@ export const DomainError = {
     Forbidden: 403,
     TwoFactorSetupRequired: 403,
     TwoFactorVerificationRequired: 403,
-    TwoFactorRequiredForStaff: 409,
     AccountDisabled: 403,
     LastAdmin: 409,
     SelfChangeNotAllowed: 409,
@@ -189,7 +187,6 @@ export const DomainError = {
     Forbidden: "Your account cannot do that.",
     TwoFactorSetupRequired: "Staff accounts need two-factor authentication. Turn it on to continue.",
     TwoFactorVerificationRequired: "Enter a code from your authenticator app to continue.",
-    TwoFactorRequiredForStaff: "Staff accounts keep two-factor authentication on. An admin can reset it.",
     AccountDisabled: "This account is disabled. Contact us if you think that is a mistake.",
     LastAdmin: "The shop needs at least one admin. Make another account an admin first.",
     SelfChangeNotAllowed: "You cannot change your own roles, status or two-factor authentication here. Ask another admin.",

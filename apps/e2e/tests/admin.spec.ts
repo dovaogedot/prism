@@ -1,7 +1,8 @@
 /**
  * The admin: its gate, which keeps customers out and makes staff set up a
- * second factor before anything opens, and every admin page in both themes
- * held to the same checks as the storefront.
+ * second factor before anything opens, what staff lose by turning it off,
+ * and every admin page in both themes held to the same checks as the
+ * storefront.
  *
  * The admin signs in once for the whole file: a TOTP code works once, and
  * the refresh cookie rotates with every use, so the pages share one session.
@@ -43,6 +44,18 @@ test.afterAll(async () => {
   await admin.close();
 });
 
+/** Sets up a second factor on the account page `page` shows, as a person does. Resolves to the secret. */
+const turnOnTwoFactor = async (page: Page): Promise<string> => {
+  await page.getByRole("button", { name: "Set up two-factor authentication" }).click();
+  const uri = await page.locator("code").filter({ hasText: "otpauth://" }).innerText();
+  const secret = new URL(uri).searchParams.get("secret") ?? "";
+  await page.getByLabel("Code from the app").fill(Totp.code(secret, 0));
+  await page.getByRole("button", { name: "Turn it on" }).click();
+  await expect(page.getByText("Two-factor authentication is now on.")).toBeVisible();
+
+  return secret;
+};
+
 test("a customer is told the admin is for staff", async ({ context, page }) => {
   await Stack.registerCustomer(context.request, "customer");
 
@@ -67,16 +80,37 @@ test("new staff are sent to their account to set up a second factor, then the ad
 
   await page.getByRole("link", { name: "Go to account" }).click();
   await expect(page).toHaveURL(/\/account$/);
-  await page.getByRole("button", { name: "Set up two-factor authentication" }).click();
-  const uri = await page.locator("code").filter({ hasText: "otpauth://" }).innerText();
-  const secret = new URL(uri).searchParams.get("secret") ?? "";
-  await page.getByLabel("Code from the app").fill(Totp.code(secret, 0));
-  await page.getByRole("button", { name: "Turn it on" }).click();
-  await expect(page.getByText("Two-factor authentication is now on.")).toBeVisible();
+  await turnOnTwoFactor(page);
 
   await Checks.open(page, "/admin");
   await expect(page.getByRole("heading", { level: 1, name: "Dashboard" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Admin" }).getByRole("link")).toHaveText(["Dashboard", "Reviews"]);
+});
+
+test("staff who turn their second factor off are told which roles they lose and asked first, then the admin closes to them", async ({ context, page }) => {
+  const email = await Stack.registerCustomer(context.request, "staff");
+  await Stack.grantRoles(admin.request, adminToken, email, ["moderator", "support"]);
+  await Checks.open(page, "/account");
+  const secret = await turnOnTwoFactor(page);
+  const turnOff = page.getByRole("button", { name: "Turn off two-factor" });
+
+  // The code for the next time step: the current one turned 2FA on, and a code works once.
+  await page.getByLabel("Code from the app").fill(Totp.code(secret, 1));
+  await turnOff.click();
+  const confirm = page.getByRole("dialog", { name: "Turn off two-factor?" });
+  await expect(confirm).toContainText("your Moderator and Support statuses will be revoked");
+  await expect(confirm.getByRole("button", { name: "Cancel" })).toBeFocused();
+  expect(await Checks.axe(page)).toEqual([]);
+  await confirm.getByRole("button", { name: "Cancel" }).click();
+  await expect(confirm).toBeHidden();
+  await expect(turnOff).toBeVisible();
+
+  await turnOff.click();
+  await confirm.getByRole("button", { name: "Turn off two-factor" }).click();
+  await expect(page.getByText("Two-factor authentication is now off, and your Moderator and Support statuses are revoked.")).toBeVisible();
+
+  await Checks.open(page, "/admin");
+  await expect(page.getByRole("heading", { level: 1, name: "Staff only" })).toBeVisible();
 });
 
 for (const theme of Checks.THEMES) {

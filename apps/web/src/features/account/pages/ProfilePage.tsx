@@ -47,7 +47,7 @@ export const ProfilePage = () => {
         </div>
 
         {session.twoFactorEnabled ? (
-          <TwoFactorDisableFlow onDone={() => setNotice("Two-factor authentication is now off.")} />
+          <TwoFactorDisableFlow roles={session.roles} onDone={setNotice} />
         ) : (
           <TwoFactorSetupFlow onDone={() => setNotice("Two-factor authentication is now on.")} />
         )}

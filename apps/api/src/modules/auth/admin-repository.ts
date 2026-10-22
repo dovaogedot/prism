@@ -108,25 +108,6 @@ export const AccountAdminRepository = {
       providers: AuthRepository.linkedProviders,
     };
 
-    /**
-     * Locks every enabled admin and the target, in one id order so two
-     * changes never wait on each other in a cycle. Resolves to the enabled
-     * admins and the target as they stand once locked.
-     */
-    const lockAdminsAnd = async (tx: Transaction, userId: UserId) => {
-      const locked = await tx
-        .select({ id: users.id, roles: users.roles, disabledAt: users.disabledAt, email: users.email })
-        .from(users)
-        .where(sql`(${users.id} = ${userId} OR ('admin' = ANY(${users.roles}) AND ${users.disabledAt} IS NULL))`)
-        .orderBy(users.id)
-        .for("update");
-
-      return {
-        admins: locked.filter((row) => row.roles.includes("admin") && row.disabledAt === null),
-        target: locked.find((row) => row.id === userId),
-      };
-    };
-
     const revokeAll = (tx: Transaction, userId: UserId, now: Date, reason: RevocationReason) =>
       tx
         .update(sessions)
@@ -196,7 +177,7 @@ export const AccountAdminRepository = {
 
       setRoles: ({ userId, roles, actor }) =>
         db.transaction(async (tx): Promise<RolesOutcome> => {
-          const { admins, target } = await lockAdminsAnd(tx, userId);
+          const { admins, target } = await AuthRepository.lockAdminsAnd(tx, userId);
           if (target === undefined) return { _tag: "NotFound" };
 
           const before = target.roles;
@@ -225,7 +206,7 @@ export const AccountAdminRepository = {
 
       setDisabled: ({ userId, isDisabled, actor, now }) =>
         db.transaction(async (tx): Promise<AccountOutcome> => {
-          const { admins, target } = await lockAdminsAnd(tx, userId);
+          const { admins, target } = await AuthRepository.lockAdminsAnd(tx, userId);
           if (target === undefined) return { _tag: "NotFound" };
           if ((target.disabledAt !== null) === isDisabled) return { _tag: "Unchanged" };
 

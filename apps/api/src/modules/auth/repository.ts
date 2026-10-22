@@ -7,7 +7,7 @@
 import { and, eq, getTableColumns, gt, isNull, lt, or, sql } from "drizzle-orm";
 import { Email, type DomainError, type OAuthProvider, type SessionUser, type StaffRole, type UserId } from "@prism/shared";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
-import type { Database } from "../../db/client.ts";
+import type { Database, Transaction } from "../../db/client.ts";
 import type { SessionId } from "../../db/ids.ts";
 import {
   oauthIdentities,
@@ -109,6 +109,12 @@ export type RotationOutcome =
   | Readonly<{ _tag: "SessionEnded" }>
   | Readonly<{ _tag: "AccountDisabled" }>;
 
+/** What turning an account's own 2FA off did. */
+export type TotpOffOutcome =
+  /** `revoked` holds the staff roles the account lost with it; it is empty for a customer. */
+  | Readonly<{ _tag: "Disabled"; revoked: readonly StaffRole[] }>
+  | Readonly<{ _tag: "LastAdmin" }>;
+
 /** The outcome of presenting a password-reset token with a replacement password. */
 export type PasswordResetOutcome = Readonly<{ _tag: "Reset" }> | Readonly<{ _tag: "TokenInvalid" }>;
 
@@ -122,7 +128,12 @@ export type AuthRepository = Readonly<{
   setPasswordHash: (userId: UserId, passwordHash: PasswordHash) => Promise<void>;
   setTotpSecret: (userId: UserId, secret: TotpSecret) => Promise<void>;
   enableTotp: (userId: UserId, enabledAt: Date) => Promise<void>;
-  disableTotp: (userId: UserId) => Promise<void>;
+  /**
+   * Turns the account's 2FA off. Staff keep 2FA on, so the account loses
+   * every staff role in the same transaction, recorded in the audit log as
+   * its own act from `ipAddress`. Refused for the shop's last admin.
+   */
+  disableTotp: (userId: UserId, ipAddress: string) => Promise<TotpOffOutcome>;
   createSession: (input: {
     userId: UserId;
     expiresAt: Date;
@@ -176,6 +187,27 @@ export const AuthRepository = {
      FROM oauth_identity link WHERE link.user_id = ${users}."id"),
     ARRAY[]::text[]
   )`,
+
+  /**
+   * Locks every enabled admin and the account `userId`, in one id order so
+   * two changes never wait on each other in a cycle. Resolves to the enabled
+   * admins and the account as they stand once locked. Every change that
+   * could take the shop's last admin away takes this lock first, so two such
+   * changes at once cannot both see another admin left.
+   */
+  lockAdminsAnd: async (tx: Transaction, userId: UserId) => {
+    const locked = await tx
+      .select({ id: users.id, roles: users.roles, disabledAt: users.disabledAt, email: users.email })
+      .from(users)
+      .where(sql`(${users.id} = ${userId} OR ('admin' = ANY(${users.roles}) AND ${users.disabledAt} IS NULL))`)
+      .orderBy(users.id)
+      .for("update");
+
+    return {
+      admins: locked.filter((row) => row.roles.includes("admin") && row.disabledAt === null),
+      target: locked.find((row) => row.id === userId),
+    };
+  },
 
   /** Postgres unique-violation, read one level down from drizzle's wrapper. */
   isUniqueViolation: (reason: unknown): boolean => {
@@ -292,12 +324,28 @@ export const AuthRepository = {
         await db.update(users).set({ totpEnabledAt: enabledAt }).where(eq(users.id, userId));
       },
 
-      disableTotp: async (userId) => {
-        await db
-          .update(users)
-          .set({ totpSecret: null, totpEnabledAt: null, totpLastStep: null })
-          .where(eq(users.id, userId));
-      },
+      disableTotp: (userId, ipAddress) =>
+        db.transaction(async (tx): Promise<TotpOffOutcome> => {
+          const { admins, target } = await AuthRepository.lockAdminsAnd(tx, userId);
+          const revoked = target?.roles ?? [];
+          if (revoked.includes("admin") && target?.disabledAt === null && admins.length <= 1) return { _tag: "LastAdmin" };
+
+          await tx
+            .update(users)
+            .set({ totpSecret: null, totpEnabledAt: null, totpLastStep: null, roles: [] })
+            .where(eq(users.id, userId));
+          if (revoked.length > 0) {
+            await audit.record(tx, {
+              actor: { id: userId, roles: revoked, ip: ipAddress },
+              action: "user.roles",
+              target: { type: "user", id: userId },
+              summary: "Turned off two-factor authentication, which took every staff role from the account",
+              changes: { roles: [revoked, []] },
+            });
+          }
+
+          return { _tag: "Disabled", revoked };
+        }),
 
       // The session and its first refresh token are one unit.
       createSession: (input) =>

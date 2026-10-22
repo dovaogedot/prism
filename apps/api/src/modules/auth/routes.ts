@@ -244,6 +244,7 @@ export const AuthRoutes = {
           userId: request.authenticated.id,
           session: AuthRoutes.sessionOf(request.authenticated),
           code: request.body.code,
+          ipAddress: request.ip,
         });
         return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(200).send(result.value);
       },

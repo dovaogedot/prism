@@ -250,7 +250,8 @@ A declined order releases its stock and mails the reason; the cart keeps its ite
   checkout starts with.
 - **Two-factor authentication**: on the account page, scan the QR code with an
   authenticator app and confirm a code. Sign-in then asks for a code, and so does turning
-  it off. Each code works once. Staff cannot turn it off.
+  it off. Each code works once. Staff who turn it off lose every staff role with it, after a
+  dialog that names the roles asks first; the last admin cannot turn it off.
 - **Sign out** revokes the session. The account menu holds Orders, Account, Admin for staff,
   and Sign out.
 
@@ -336,7 +337,7 @@ is `429` with `Retry-After`.
 | `POST /auth/2fa/setup` | Starts enrollment: an `otpauth://` URI and a QR code. |
 | `POST /auth/2fa/enable` | Confirms enrollment with a live code. |
 | `POST /auth/2fa/verify` | Confirms the session with a live code, as the admin asks. |
-| `POST /auth/2fa/disable` | Turns 2FA off with a live code. Refused for staff. |
+| `POST /auth/2fa/disable` | Turns 2FA off with a live code. Staff lose every staff role with it; the last admin is refused. |
 | `GET /auth/oauth/providers` | Which provider buttons to show. |
 | `GET /auth/oauth/:provider` | Starts a provider sign-in. |
 | `GET /auth/oauth/:provider/callback` | Where the provider returns. |
@@ -433,8 +434,9 @@ something uses refuses deletion.
 - **2FA for staff.** An account with a staff role and no 2FA gets `TwoFactorSetupRequired`
   from the admin API, and a session that has not passed a code check in 8 hours gets
   `TwoFactorVerificationRequired`. The session records the check in `second_factor_at`: at a
-  2FA sign-in, when 2FA is turned on, and at a step-up. Staff cannot turn 2FA off, and the
-  last admin can be neither disabled nor stripped of the role.
+  2FA sign-in, when 2FA is turned on, and at a step-up. Staff who turn 2FA off lose every
+  staff role in the same transaction, which the audit log records. The last admin can be
+  neither disabled nor stripped of the role, so keeps 2FA on too.
 - **Audit log.** Every staff change, role change, account action, refund, import and step-up
   writes one `audit_event` row in the same transaction as the change, so no change exists
   without its record. A trigger refuses `UPDATE` and `DELETE` on the table. A row names the

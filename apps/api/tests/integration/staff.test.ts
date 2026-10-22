@@ -168,26 +168,73 @@ describe("TOTP codes", () => {
     expect(jsonOf(replayed)["error"]).toMatchObject({ code: "TwoFactorCodeInvalid" });
   });
 
-  it("cannot be turned off by an account with a staff role", async () => {
+  it("takes every staff role when staff turn it off, in one change the audit log records", async () => {
+    await Staff.account(harness, "other-admin@example.com", ["admin"]);
+    const staff = await Staff.account(harness, "staff@example.com", ["support", "admin"]);
+    if (staff.secret === undefined) throw new Error("no secret");
+
+    Staff.nextCode(harness);
+    const response = await Staff.call(harness, staff, "POST", "/auth/2fa/disable", { code: harness.totpCodeFor(staff.secret) });
+
+    expect(response.statusCode).toBe(200);
+    expect(jsonOf(response)).toMatchObject({ twoFactorEnabled: false, roles: [] });
+    expect(await harness.database.sql`SELECT roles, totp_secret, totp_enabled_at FROM app_user WHERE id = ${staff.userId}`).toEqual([
+      { roles: [], totp_secret: null, totp_enabled_at: null },
+    ]);
+    const [row] = await harness.database.sql`
+      SELECT actor_id, actor_roles, action, target_id, changes FROM audit_event ORDER BY id DESC LIMIT 1`;
+    expect(row).toEqual({
+      actor_id: staff.userId,
+      actor_roles: ["support", "admin"],
+      action: "user.roles",
+      target_id: staff.userId,
+      changes: { roles: [["support", "admin"], []] },
+    });
+    expect((await Staff.call(harness, staff, "GET", "/admin/summary")).statusCode).toBe(403);
+  });
+
+  it("stays on for the last admin, who keeps the role, and records nothing", async () => {
     const admin = await Staff.account(harness, "admin@example.com", ["admin"]);
     if (admin.secret === undefined) throw new Error("no secret");
+    const before = await auditActions();
 
     Staff.nextCode(harness);
     const response = await Staff.call(harness, admin, "POST", "/auth/2fa/disable", { code: harness.totpCodeFor(admin.secret) });
 
     expect(response.statusCode).toBe(409);
-    expect(jsonOf(response)["error"]).toMatchObject({ code: "TwoFactorRequiredForStaff" });
+    expect(jsonOf(response)["error"]).toMatchObject({ code: "LastAdmin" });
+    expect(await harness.database.sql`SELECT roles, totp_enabled_at IS NOT NULL AS "isOn" FROM app_user WHERE id = ${admin.userId}`).toEqual([
+      { roles: ["admin"], isOn: true },
+    ]);
+    expect(await auditActions()).toEqual(before);
   });
 
-  it("can still be turned off by a customer", async () => {
+  it("leaves one admin when the last two turn it off at the same moment", async () => {
+    const first = await Staff.account(harness, "first@example.com", ["admin"]);
+    const second = await Staff.account(harness, "second@example.com", ["admin"]);
+    if (first.secret === undefined || second.secret === undefined) throw new Error("no secret");
+
+    Staff.nextCode(harness);
+    const results = await Promise.all([
+      Staff.call(harness, first, "POST", "/auth/2fa/disable", { code: harness.totpCodeFor(first.secret) }),
+      Staff.call(harness, second, "POST", "/auth/2fa/disable", { code: harness.totpCodeFor(second.secret) }),
+    ]);
+
+    expect(results.map((response) => response.statusCode).sort()).toEqual([200, 409]);
+    expect(await harness.database.sql`SELECT count(*)::int AS n FROM app_user WHERE 'admin' = ANY(roles)`).toEqual([{ n: 1 }]);
+  });
+
+  it("can be turned off by a customer, which the audit log leaves out", async () => {
     const customer = await Staff.account(harness, "customer@example.com", []);
     if (customer.secret === undefined) throw new Error("no secret");
+    const before = await auditActions();
 
     Staff.nextCode(harness);
     const response = await Staff.call(harness, customer, "POST", "/auth/2fa/disable", { code: harness.totpCodeFor(customer.secret) });
 
     expect(response.statusCode).toBe(200);
-    expect(jsonOf(response)).toMatchObject({ twoFactorEnabled: false });
+    expect(jsonOf(response)).toMatchObject({ twoFactorEnabled: false, roles: [] });
+    expect(await auditActions()).toEqual(before);
   });
 });
 
