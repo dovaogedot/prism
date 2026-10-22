@@ -44,6 +44,31 @@ export const Checks = {
     return box;
   },
 
+  /**
+   * The box the contents of each element of `locator` take up, rather than
+   * the element's own box: where a table cell's text sits inside the cell.
+   * An element with nothing in it is left out.
+   */
+  contentBoxesOf: (locator: Locator): Promise<readonly Box[]> =>
+    locator.evaluateAll((elements) =>
+      elements.flatMap((element) => {
+        // Each child by its own box, so a closed <details> counts its summary and not the hidden rest.
+        const rects = [...element.childNodes]
+          .flatMap((node) => {
+            if (node instanceof Element) return [node.getBoundingClientRect()];
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            return [...range.getClientRects()];
+          })
+          .filter((rect) => rect.width > 0 && rect.height > 0);
+        if (rects.length === 0) return [];
+
+        const top = Math.min(...rects.map((rect) => rect.top));
+        const left = Math.min(...rects.map((rect) => rect.left));
+        return [{ x: left, y: top, width: Math.max(...rects.map((rect) => rect.right)) - left, height: Math.max(...rects.map((rect) => rect.bottom)) - top }];
+      }),
+    ),
+
   /** How far apart the vertical middles of two boxes are. */
   middleGap: (first: Box, second: Box): number => Math.abs(first.y + first.height / 2 - (second.y + second.height / 2)),
 

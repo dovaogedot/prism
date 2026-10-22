@@ -29,7 +29,8 @@ export type DataTableProps<Row> = Readonly<{
  * A `<table>` for rows and columns of data. On a narrow screen it scrolls
  * sideways inside a region that takes keyboard focus, so the arrow keys
  * scroll it too. A sortable column's heading is a button, and the column in
- * force carries `aria-sort`.
+ * force carries `aria-sort`. Every cell sits on the middle of its row, level
+ * with the row's pictures and buttons.
  */
 export const DataTable = <Row,>({ label, columns, rows, rowKey, sort, onSort }: DataTableProps<Row>) => (
   <div className="overflow-x-auto rounded-lg border border-line bg-surface" role="region" aria-label={label} tabIndex={0}>
@@ -60,7 +61,7 @@ export const DataTable = <Row,>({ label, columns, rows, rowKey, sort, onSort }: 
         {rows.map((row) => (
           <tr className="border-b border-line last:border-b-0" key={rowKey(row)}>
             {columns.map((column) => (
-              <td className={`px-4 py-3 align-top ${column.isNumeric === true ? "text-right tabular-nums" : ""}`} key={column.key}>
+              <td className={`px-4 py-3 align-middle ${column.isNumeric === true ? "text-right tabular-nums" : ""}`} key={column.key}>
                 {column.cell(row)}
               </td>
             ))}

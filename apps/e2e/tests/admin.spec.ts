@@ -150,6 +150,17 @@ test("the accounts search's Find button sits in the email field's row, after the
   expect(Checks.middleGap(field, find)).toBeLessThanOrEqual(Checks.TOLERANCE);
 });
 
+test("every admin table centers each cell in its row, so text sits level with the pictures and buttons", async () => {
+  for (const path of ["/admin/products", "/admin/orders", "/admin/shipping", "/admin/categories", "/admin/brands", "/admin/users?staff=true", "/admin/audit"]) {
+    await Checks.open(adminPage, path);
+    const row = adminPage.locator("tbody tr").first();
+    const whole = await Checks.boxOf(row);
+    const gaps = (await Checks.contentBoxesOf(row.getByRole("cell"))).map((cell) => Checks.middleGap(cell, whole));
+
+    expect(Math.max(...gaps), path).toBeLessThanOrEqual(Checks.TOLERANCE);
+  }
+});
+
 test("deleting asks first, and cancelling deletes nothing", async () => {
   // A name of its own, so a run against a stack an earlier run used finds no brand of that name.
   const name = `Asked First ${Date.now()}`;
