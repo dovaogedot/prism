@@ -1,4 +1,4 @@
-import { Price, type AdminBrand, type AdminCategory, type AdminProductSummary, type Page } from "@prism/shared";
+import { AdminProductSort, Price, type AdminBrand, type AdminCategory, type AdminProductSummary, type Page } from "@prism/shared";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
@@ -71,11 +71,12 @@ export const ProductsPage = () => {
               </option>
             ))}
           </SelectField>
-          <SelectField label="Sort by" id="product-sort" value={params.get("sort") ?? "name"} onChange={(event) => setParams(CatalogParams.set(params, "sort", event.target.value))}>
-            <option value="name">Name</option>
-            <option value="newest">Newest</option>
-            <option value="stock">Stock, lowest first</option>
-            <option value="price">Price, lowest first</option>
+          <SelectField label="Sort by" id="product-sort" value={params.get("sort") ?? "name_asc"} onChange={(event) => setParams(CatalogParams.set(params, "sort", event.target.value))}>
+            {AdminProductSort.NAMES.map((sort) => (
+              <option key={sort} value={sort}>
+                {AdminProductSort.label[sort]}
+              </option>
+            ))}
           </SelectField>
         </div>
 

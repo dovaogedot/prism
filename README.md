@@ -287,7 +287,9 @@ first.
 - **Orders**: filter by status, dates, order number or customer email. An order's page moves
   it to its next status, cancels it, or refunds it in full.
 - **Products**: create, edit and delete; pictures with their alt text, which is required, and
-  their order; and whether the home page features the product.
+  their order; and whether the home page features the product. The list finds products by
+  name or slug, filters them by category, brand, low stock and featuring, and sorts them by
+  name, age, stock or price, either way.
 - **Categories** and **Brands**: create, edit and delete. One that a product uses cannot be
   deleted.
 - **Import**: one JSON or CSV file of up to 2 MB and 5,000 rows. "Check the file" shows the
@@ -390,7 +392,7 @@ permission, with 2FA on, and a session that passed a code check within 8 hours.
 | `GET /orders`, `GET /orders/:id` | `orders.view` | Every order, by status, dates, number or customer email. |
 | `POST /orders/:id/status` | `orders.fulfill` | Moves a paid order to `processing`, `shipped` (with `trackingNumber`) or `delivered`. |
 | `POST /orders/:id/cancel`, `POST /orders/:id/refund` | `orders.refund` | Cancels an order that has not shipped, or refunds a shipped or delivered one in full. |
-| `GET` and `POST /products`, `GET`, `PUT` and `DELETE /products/:id` | `catalog.manage` | Products. |
+| `GET` and `POST /products`, `GET`, `PUT` and `DELETE /products/:id` | `catalog.manage` | Products. The list reads `q`, `category`, `brand`, `featured`, `lowStock`, `sort` (`name_asc`, `name_desc`, `newest`, `oldest`, `stock_asc`, `stock_desc`, `price_asc`, `price_desc`), `page` and `perPage`. |
 | `GET`, `POST` and `PUT /products/:id/images`, `DELETE /products/:id/images/:imageId` | `catalog.manage` | Pictures: upload one (multipart), set the order and alt texts, delete one. |
 | `POST /products/import` | `catalog.import` | Imports a JSON or CSV file. `?dryRun=true` only checks it. |
 | `GET` and `POST /categories`, `PUT` and `DELETE /categories/:id` | `catalog.manage` | Categories. |

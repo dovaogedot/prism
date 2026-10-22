@@ -9,6 +9,7 @@ import {
   type AdminCategory,
   type AdminProductDetail,
   type AdminProductQuery,
+  type AdminProductSort,
   type AdminProductSummary,
   type BrandId,
   type BrandInput,
@@ -214,11 +215,15 @@ export const CatalogAdminRepository = {
     };
 
     const productOrdering = {
-      name: [asc(products.name), asc(products.slug)],
+      name_asc: [asc(products.name), asc(products.slug)],
+      name_desc: [desc(products.name), desc(products.slug)],
       newest: [desc(products.createdAt), asc(products.slug)],
-      stock: [asc(products.stock), asc(products.slug)],
-      price: [asc(products.priceCents), asc(products.slug)],
-    } as const satisfies Record<AdminProductQuery["sort"], readonly SQL[]>;
+      oldest: [asc(products.createdAt), asc(products.slug)],
+      stock_asc: [asc(products.stock), asc(products.slug)],
+      stock_desc: [desc(products.stock), asc(products.slug)],
+      price_asc: [asc(products.priceCents), asc(products.slug)],
+      price_desc: [desc(products.priceCents), asc(products.slug)],
+    } as const satisfies Record<AdminProductSort, readonly SQL[]>;
 
     const counted = <T extends { id: string }>(rows: readonly T[], used: readonly { id: string; total: number }[]) => {
       const counts = new Map(used.map((row) => [row.id, row.total]));

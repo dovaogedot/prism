@@ -345,6 +345,23 @@ export const ProductInput = {
   }),
 } as const;
 
+/** An order of the admin's product list. */
+export type AdminProductSort = (typeof AdminProductSort.NAMES)[number];
+export const AdminProductSort = {
+  NAMES: ["name_asc", "name_desc", "newest", "oldest", "stock_asc", "stock_desc", "price_asc", "price_desc"] as const,
+  schema: z.enum(["name_asc", "name_desc", "newest", "oldest", "stock_asc", "stock_desc", "price_asc", "price_desc"]),
+  label: {
+    name_asc: "Name, A to Z",
+    name_desc: "Name, Z to A",
+    newest: "Newest",
+    oldest: "Oldest",
+    stock_asc: "Stock, lowest first",
+    stock_desc: "Stock, highest first",
+    price_asc: "Price, lowest first",
+    price_desc: "Price, highest first",
+  } as const satisfies Record<"name_asc" | "name_desc" | "newest" | "oldest" | "stock_asc" | "stock_desc" | "price_asc" | "price_desc", string>,
+} as const;
+
 /** The query string of `GET /admin/products`. */
 export type AdminProductQuery = z.infer<typeof AdminProductQuery.schema>;
 export const AdminProductQuery = {
@@ -356,7 +373,7 @@ export const AdminProductQuery = {
     featured: z.stringbool().optional(),
     /** Only products with 5 or fewer in stock. */
     lowStock: z.stringbool().optional(),
-    sort: z.enum(["name", "newest", "stock", "price"]).default("name"),
+    sort: AdminProductSort.schema.default("name_asc"),
     ...Page.params,
   }),
 } as const;

@@ -32,7 +32,7 @@ export const DashboardPage = () => {
       : [{ label: "Orders to fulfill", value: counts.ordersToFulfill, href: "/admin/orders?status=payment_successful&status=processing&sort=oldest" }]),
     ...(counts.paidToday === undefined ? [] : [{ label: "Paid today", value: counts.paidToday, href: `/admin/orders?from=${today}&to=${today}` }]),
     ...(counts.reviewsWaiting === undefined ? [] : [{ label: "Reviews waiting", value: counts.reviewsWaiting, href: "/admin/reviews" }]),
-    ...(counts.lowStockProducts === undefined ? [] : [{ label: "Low on stock", value: counts.lowStockProducts, href: "/admin/products?lowStock=true&sort=stock" }]),
+    ...(counts.lowStockProducts === undefined ? [] : [{ label: "Low on stock", value: counts.lowStockProducts, href: "/admin/products?lowStock=true&sort=stock_asc" }]),
   ];
 
   return (

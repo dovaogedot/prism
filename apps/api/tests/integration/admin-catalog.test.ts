@@ -4,6 +4,7 @@
  */
 
 import { randomBytes } from "node:crypto";
+import { AdminProductSort } from "@prism/shared";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Shop } from "../support/commerce.ts";
 import { jsonOf, seedCatalog, startHarness, type Harness } from "../support/harness.ts";
@@ -144,6 +145,29 @@ describe("products", () => {
     const list = jsonOf(await Staff.call(harness, content, "GET", "/admin/products?lowStock=true"));
 
     expect((list["items"] as { slug: string }[]).map((item) => item.slug)).toEqual(["floor-lamp"]);
+  });
+
+  it("sorts products both ways by name, age, stock and price", async () => {
+    await seedCatalog(harness, [
+      { slug: "arc-lamp", name: "Arc Lamp", priceCents: 9900, stock: 3, category: "Lamps", brand: "Acme" },
+      { slug: "wall-lamp", name: "Wall Lamp", priceCents: 4500, stock: 7, category: "Lamps", brand: "Acme" },
+    ]);
+    // The desk lamp, with 10 in stock at 25.00, is the oldest, and the wall lamp the newest.
+    await harness.database.sql`
+      UPDATE product SET created_at = now() - make_interval(days => CASE slug WHEN 'desk-lamp' THEN 3 WHEN 'arc-lamp' THEN 2 ELSE 1 END)`;
+    const slugsBy = async (sort: AdminProductSort) =>
+      [sort, (jsonOf(await Staff.call(harness, content, "GET", `/admin/products?sort=${sort}`))["items"] as { slug: string }[]).map((item) => item.slug)] as const;
+
+    expect(Object.fromEntries(await Promise.all(AdminProductSort.NAMES.map(slugsBy)))).toEqual({
+      name_asc: ["arc-lamp", "desk-lamp", "wall-lamp"],
+      name_desc: ["wall-lamp", "desk-lamp", "arc-lamp"],
+      newest: ["wall-lamp", "arc-lamp", "desk-lamp"],
+      oldest: ["desk-lamp", "arc-lamp", "wall-lamp"],
+      stock_asc: ["arc-lamp", "wall-lamp", "desk-lamp"],
+      stock_desc: ["desk-lamp", "wall-lamp", "arc-lamp"],
+      price_asc: ["desk-lamp", "wall-lamp", "arc-lamp"],
+      price_desc: ["arc-lamp", "wall-lamp", "desk-lamp"],
+    });
   });
 });
 
