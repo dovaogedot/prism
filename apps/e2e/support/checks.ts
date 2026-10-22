@@ -114,10 +114,17 @@ export const Checks = {
    * Whether a console error is the shop's own: logged by a document of the
    * shop's origin, not by a third party's frame such as the CAPTCHA's. A
    * refused request is left out; the tests check statuses themselves, and a
-   * guest's session refresh is refused by design.
+   * guest's session refresh is refused by design. So is the report of a
+   * third party's page whose own report-only policy asks not to be framed,
+   * which Chrome logs in the shop's console though the policy is not the
+   * shop's and changes nothing.
    */
   isOwnError: (message: ConsoleMessage, origin: string): boolean => {
     const source = message.location().url;
-    return (source.length === 0 || source.startsWith(origin)) && !message.text().startsWith("Failed to load resource");
+    const text = message.text();
+    const framed = /^Framing '([^']+)' violates the following report-only/.exec(text)?.[1];
+    const isAnotherSitesPolicy = framed !== undefined && !framed.startsWith(origin);
+
+    return (source.length === 0 || source.startsWith(origin)) && !text.startsWith("Failed to load resource") && !isAnotherSitesPolicy;
   },
 } as const;
