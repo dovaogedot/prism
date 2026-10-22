@@ -100,12 +100,17 @@ test("adding to the cart opens its preview, and Escape closes it and gives focus
   await expect(cart).toBeFocused();
 });
 
-test("opening a page moves focus to its heading", async ({ page }) => {
-  await Checks.open(page, "/");
+test("opening a page by a click or a key moves focus to its heading, which shows no focus ring", async ({ page }) => {
+  const heading = page.getByRole("heading", { level: 1, name: "All products" });
 
-  await page.getByRole("link", { name: "Browse all products" }).click();
+  for (const open of ["click", "Enter"] as const) {
+    await Checks.open(page, "/");
+    const link = page.getByRole("link", { name: "Browse all products" });
+    await (open === "click" ? link.click() : link.press(open));
 
-  await expect(page.getByRole("heading", { level: 1, name: "All products" })).toBeFocused();
+    await expect(heading, open).toBeFocused();
+    expect(await Checks.outlineOf(heading), open).toBe("none");
+  }
 });
 
 test("an address outside the route list answers 404 with the shop's page, and a page inside it 200", async ({ request }) => {

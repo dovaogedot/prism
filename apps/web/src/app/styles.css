@@ -89,6 +89,12 @@
     border-radius: 2px;
   }
 
+  /* A page's h1 takes focus when the page opens, so a screen reader starts
+     there. Nothing on it can be pressed, so it shows no ring. */
+  h1:focus-visible {
+    outline: none;
+  }
+
   button:not(:disabled),
   label:has(> input:not(:disabled)) {
     cursor: pointer;

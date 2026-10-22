@@ -47,6 +47,9 @@ export const Checks = {
   /** How far apart the vertical middles of two boxes are. */
   middleGap: (first: Box, second: Box): number => Math.abs(first.y + first.height / 2 - (second.y + second.height / 2)),
 
+  /** The style of the outline `locator` draws, such as "solid", or "none" when it shows no focus ring. */
+  outlineOf: (locator: Locator): Promise<string> => locator.evaluate((element) => getComputedStyle(element).outlineStyle),
+
   /** Stores the theme before any page script runs, as the theme switch does. */
   useTheme: async (context: BrowserContext, theme: Theme): Promise<void> => {
     await context.addInitScript((chosen) => localStorage.setItem("prism-theme", chosen), theme);
