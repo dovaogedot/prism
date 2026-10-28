@@ -8,7 +8,7 @@ import { useTheme } from "../../../shared/theme/use-theme.ts";
 import { Alert, Card, Skeleton } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 import { useSession } from "../../auth/session.ts";
-import { useSavedAddresses } from "../../account/account.ts";
+import { AccountKeys, useSavedAddresses } from "../../account/account.ts";
 import { useCart } from "../../cart/cart.ts";
 import { StripeLoader, usePaymentsConfig, useShippingOptions } from "../checkout.ts";
 import { CheckoutBody, StripeCheckout } from "../components/index.ts";
@@ -32,7 +32,7 @@ export const CheckoutPage = () => {
   const options = useShippingOptions();
 
   const prefill = useQuery({
-    queryKey: ["checkout", "prefill", session?.id],
+    queryKey: AccountKeys.checkoutPrefill(session?.id),
     queryFn: ({ signal }) => Api.get<CheckoutPrefill>("/checkout/prefill", signal),
     enabled: session !== undefined,
     retry: false,

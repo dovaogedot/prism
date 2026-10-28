@@ -20,6 +20,8 @@ export const SavedAddresses = {
 export const AccountKeys = {
   profile: (userId: string | undefined) => ["account", userId ?? "guest", "profile"] as const,
   addresses: (userId: string | undefined) => ["account", userId ?? "guest", "addresses"] as const,
+  /** What checkout starts with, which the profile and the default address decide. */
+  checkoutPrefill: (userId: string | undefined) => ["account", userId ?? "guest", "checkout-prefill"] as const,
 } as const;
 
 /** The signed-in customer's profile; nothing is fetched for a guest. */
@@ -50,11 +52,23 @@ export const useAccountChanges = () => {
 
   const userId = useSession()?.id;
 
-  const refreshAddresses = (): Promise<void> => client.invalidateQueries({ queryKey: AccountKeys.addresses(userId) });
+  // Checkout seeds its form once, so a changed profile or address drops the
+  // prefill it would start from, and the next checkout waits for a fresh one.
+  const dropPrefill = (): void => {
+    client.removeQueries({ queryKey: AccountKeys.checkoutPrefill(userId) });
+  };
+
+  const refreshAddresses = (): Promise<void> => {
+    dropPrefill();
+    return client.invalidateQueries({ queryKey: AccountKeys.addresses(userId) });
+  };
 
   const saveProfile = useMutation({
     mutationFn: (profile: ProfileInput) => Api.put<Profile>("/account/profile", profile),
-    onSuccess: (profile) => client.setQueryData(AccountKeys.profile(userId), profile),
+    onSuccess: (profile) => {
+      dropPrefill();
+      client.setQueryData(AccountKeys.profile(userId), profile);
+    },
   });
 
   const addAddress = useMutation({
