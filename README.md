@@ -1,20 +1,10 @@
 # Prism
 
-A small business-to-consumer shop. Shoppers browse a home page of featured products, search a
-catalog with filters that forgives typos, keep a cart as guests or members, check out on one
-page with card payments through Stripe's test mode, follow and cancel their orders, and review
-what was delivered to them with stars, text and helpful votes. Staff run the shop from an admin
-area: products and bulk import, categories and brands, orders, delivery options and refunds,
-review moderation, accounts and roles, and an audit log. Every staff account signs in with
-two-factor authentication.
+A small business-to-consumer shop. Shoppers browse a home page of featured products, search a catalog with filters that forgives typos, keep a cart as guests or members, check out on one page with card payments through Stripe's test mode, follow and cancel their orders, and review what was delivered to them with stars, text and helpful votes. Staff run the shop from an admin area: products and bulk import, categories and brands, orders, delivery options and refunds, review moderation, accounts and roles, and an audit log. Every staff account signs in with two-factor authentication.
 
-The code does not know what the shop sells. Every filter comes from the products' own
-properties at query time, so the same code sells lamps, books or pet food.
+The code does not know what the shop sells. Every filter comes from the products' own properties at query time, so the same code sells lamps, books or pet food.
 
-Fastify API on Node, Postgres behind Drizzle, RabbitMQ between the order and payment services,
-React storefront built with Vite and served over HTTPS by Caddy. TypeScript end to end. Docker
-is the only thing a machine needs; taking test payments also needs a free Stripe account's test
-keys.
+Fastify API on Node, Postgres behind Drizzle, RabbitMQ between the order and payment services, React storefront built with Vite and served over HTTPS by Caddy. TypeScript end to end. Docker is the only thing a machine needs; taking test payments also needs a free Stripe account's test keys.
 
 ## Running it
 
@@ -48,66 +38,41 @@ On Windows each command is `.\start.cmd ...` with the same arguments.
 
 Both passwords are `prism` unless `.env` sets them.
 
-The storefront answers HTTPS only, with a self-signed certificate that the web container makes
-on its first start. The browser warns about it once: accept the warning to go on. The
-certificate lasts 825 days and stays in a volume, so the browser's exception keeps working
-until `./start.sh reset`. Links in mail and the provider sign-ins are built from
-`PUBLIC_WEB_URL`, which is `https://localhost:3000`; `./start.sh` says so when `.env` holds an
-`http://` address.
+The storefront answers HTTPS only, with a self-signed certificate that the web container makes on its first start. The browser warns about it once: accept the warning to go on. The certificate lasts 825 days and stays in a volume, so the browser's exception keeps working until `./start.sh reset`. Links in mail and the provider sign-ins are built from `PUBLIC_WEB_URL`, which is `https://localhost:3000`; `./start.sh` says so when `.env` holds an `http://` address.
 
 | Account | Sign-in |
 | --- | --- |
 | Demo shopper | `shopper@prism.test` / `correct horse battery staple` |
 | Admin | `ADMIN_EMAIL` / `ADMIN_PASSWORD` from `.env`, and a code from `ADMIN_TOTP_SECRET` |
 
-The API makes the admin at start when no account holds the admin role, with 2FA already on.
-`.env.example` sets `admin@prism.shop`, `admin-prism-admin` and the key
-`CFBNJ5LGD7BVFZHEQTQTFJR5CQCI6KYS`. Type the key into an authenticator app, where it is often
-called a setup key, then sign in with the password and the app's code. Once an admin exists,
-the three values change nothing.
+The API makes the admin at start when no account holds the admin role, with 2FA already on. `.env.example` sets `admin@prism.shop`, `admin-prism-admin` and the key `CFBNJ5LGD7BVFZHEQTQTFJR5CQCI6KYS`. Type the key into an authenticator app, where it is often called a setup key, then sign in with the password and the app's code. Once an admin exists, the three values change nothing.
 
-The stack runs with no external accounts: the CAPTCHA uses Google's always-pass test key, the
-provider buttons go to a built-in stand-in, and mail lands in Mailpit. Real keys go in `.env`;
-`.env.example` describes each one. Its `JWT_SECRET`, `DATA_ENCRYPTION_KEY` and admin values are
-public, so replace them anywhere but your own machine.
+The stack runs with no external accounts: the CAPTCHA uses Google's always-pass test key, the provider buttons go to a built-in stand-in, and mail lands in Mailpit. Real keys go in `.env`; `.env.example` describes each one. Its `JWT_SECRET`, `DATA_ENCRYPTION_KEY` and admin values are public, so replace them anywhere but your own machine.
 
 ### Taking test payments
 
 Without Stripe keys the cart works and checkout says that payments are not set up. To pay:
 
 1. Sign up at <https://dashboard.stripe.com>, which is free, and stay in test mode.
-2. Copy the two test keys from Developers > API keys into `.env`: `STRIPE_SECRET_KEY`
-   (`sk_test_...`) and `STRIPE_PUBLISHABLE_KEY` (`pk_test_...`).
+2. Copy the two test keys from Developers > API keys into `.env`: `STRIPE_SECRET_KEY` (`sk_test_...`) and `STRIPE_PUBLISHABLE_KEY` (`pk_test_...`).
 3. Run `./start.sh` again.
 
-Stripe tells the shop how each payment went through a webhook. `COMPOSE_PROFILES=stripe` in
-`.env` starts the Stripe CLI as a container that forwards those webhooks to the API, so the
-laptop needs no public address and no CLI of its own. To run the CLI on the host instead,
-remove that line, run
-`stripe listen --forward-to localhost:3000/api/v1/payments/webhook`, and put the `whsec_...`
-secret it prints into `STRIPE_WEBHOOK_SECRET`.
+Stripe tells the shop how each payment went through a webhook. `COMPOSE_PROFILES=stripe` in `.env` starts the Stripe CLI as a container that forwards those webhooks to the API, so the laptop needs no public address and no CLI of its own. To run the CLI on the host instead, remove that line, run `stripe listen --forward-to localhost:3000/api/v1/payments/webhook`, and put the `whsec_...` secret it prints into `STRIPE_WEBHOOK_SECRET`.
 
-`PAYMENTS_MODE=simulated` in `.env` takes payments without Stripe, on `localhost` only: checkout
-asks for no card, and every payment succeeds at once. The browser suite and the load test run
-this way.
+`PAYMENTS_MODE=simulated` in `.env` takes payments without Stripe, on `localhost` only: checkout asks for no card, and every payment succeeds at once. The browser suite and the load test run this way.
 
-The seed is separate from the shop: the shop runs without it, and a failed seed leaves an
-empty shop. Its data is one archive, `apps/api/seed/data.zip`. It plants reviews and helpful
-votes too, and gives the demo shopper three delivered orders, whose products are ready to
-review, and one shipped order. `apps/api/seed/README.md` has the details.
+The seed is separate from the shop: the shop runs without it, and a failed seed leaves an empty shop. Its data is one archive, `apps/api/seed/data.zip`. It plants reviews and helpful votes too, and gives the demo shopper three delivered orders, whose products are ready to review, and one shipped order. `apps/api/seed/README.md` has the details.
 
 ### Running it without the scripts
 
 1. Copy `.env.example` to `.env`.
 2. `docker compose up --build --detach`. If it fails, `docker compose logs migrate` says why.
-3. Open <https://localhost:3000> and accept the certificate warning. The storefront answers a
-   few seconds after step 2 returns.
+3. Open <https://localhost:3000> and accept the certificate warning. The storefront answers a few seconds after step 2 returns.
 4. `docker compose down` stops the stack. Add `--volumes` to delete the data too.
 
 Placeholder products: `docker compose run --rm --build seed`.
 
-Tests: `docker compose run --rm --build test`. Append `npm run test:unit` for the unit tests
-only.
+Tests: `docker compose run --rm --build test`. Append `npm run test:unit` for the unit tests only.
 
 ### Working on it without the containers
 
@@ -134,78 +99,42 @@ E2E_BASE_URL=https://localhost:3200 npm run e2e
 
 ### Shopping
 
-- **Home** (`/`): featured products, a tile per category, "Top rated", "New arrivals", and the
-  products this browser viewed last.
-- **The listing**: the whole shop (`/shop`), one category (`/categories/<slug>`) and search
-  results (`/search?q=`) share one page: the result count, the filters, the sort, the pages,
-  and a grid or a list. The view, the filters and the page live in the URL, so a view is a
-  link.
-- **Quick search** sits in the header of every page. From two letters it suggests products with
-  their picture and price, and "Search for ..." last. The arrow keys move, Enter opens and
-  Escape closes. `/` jumps to the box from anywhere.
-- **Typos**: when nothing matches exactly, the results show similar names under 'No exact
-  matches for "...". Showing similar names.'
-- **Filters**: brands, a price range, a minimum rating, and one group per property of the
-  matching products, each value with its count. A value the other filters leave nothing for
-  is grayed out, not removed. A narrow screen puts the filters in a drawer.
-- **Active filters** sit beside the count, each with a cross. "Clear all filters" keeps the
-  search text and the category.
+- **Home** (`/`): featured products, a tile per category, "Top rated", "New arrivals", and the products this browser viewed last.
+- **The listing**: the whole shop (`/shop`), one category (`/categories/<slug>`) and search results (`/search?q=`) share one page: the result count, the filters, the sort, the pages, and a grid or a list. The view, the filters and the page live in the URL, so a view is a link.
+- **Quick search** sits in the header of every page. From two letters it suggests products with their picture and price, and "Search for ..." last. The arrow keys move, Enter opens and Escape closes. `/` jumps to the box from anywhere.
+- **Typos**: when nothing matches exactly, the results show similar names under 'No exact matches for "...". Showing similar names.'
+- **Filters**: brands, a price range, a minimum rating, and one group per property of the matching products, each value with its count. A value the other filters leave nothing for is grayed out, not removed. A narrow screen puts the filters in a drawer.
+- **Active filters** sit beside the count, each with a cross. "Clear all filters" keeps the search text and the category.
 - **Sort**: relevance, price either way, rating, or newest.
-- **Product page**: pictures in a gallery with a full-size view, price, stock, brand, category,
-  the rating summary, description, properties, and weight and size in metric or imperial
-  units. A quantity and "Add to cart", or "Sold out" when there is no stock. Below them, the
-  reviews and related products from the same category.
+- **Product page**: pictures in a gallery with a full-size view, price, stock, brand, category, the rating summary, description, properties, and weight and size in metric or imperial units. A quantity and "Add to cart", or "Sold out" when there is no stock. Below them, the reviews and related products from the same category.
 
 ### Reviews
 
-- A product shows the average of its approved reviews, how many there are, and how many gave
-  each number of stars.
-- Reviews sort by "Most helpful", which is the default, "Newest", "Highest rating" or "Lowest
-  rating".
-- **Helpful**: a signed-in shopper marks a review helpful once, and can take it back. Nobody
-  votes for their own review.
-- **Writing a review** takes a signed-in customer with a delivered order of the product: 1 to 5
-  stars, a byline, and an optional title and text. Its author sees it as "Waiting for approval"
-  until a moderator approves it; a rejected one shows the moderator's reason. Editing an
-  approved review sends it back for approval. One review per product per person.
+- A product shows the average of its approved reviews, how many there are, and how many gave each number of stars.
+- Reviews sort by "Most helpful", which is the default, "Newest", "Highest rating" or "Lowest rating".
+- **Helpful**: a signed-in shopper marks a review helpful once, and can take it back. Nobody votes for their own review.
+- **Writing a review** takes a signed-in customer with a delivered order of the product: 1 to 5 stars, a byline, and an optional title and text. Its author sees it as "Waiting for approval" until a moderator approves it; a rejected one shows the moderator's reason. Editing an approved review sends it back for approval. One review per product per person.
 - The mail that says an order arrived links to the review form of each product in it.
 
 ### Cart
 
-- The cart button in the header shows how many items the cart holds, at every width. It opens
-  a **quick preview** with the lines, the subtotal, how far the cart is from free shipping,
-  and links to the cart and to checkout. Adding a product opens it too.
-- **Cart page**: each line with its picture, name, unit price, a quantity stepper, a remove
-  button and the line total. The subtotal changes as soon as a quantity does.
-- Asking for more than the stock says how many are left. A line the shop can no longer supply
-  in full says so, with a button that reduces it to what is left.
-- **Recommended for you**: in-stock products from the same categories as the cart, best rated
-  first.
-- **Guests** keep their cart for 30 days in the browser that made it. **Members** keep theirs
-  in the account, across devices and sign-ins. Signing in moves a guest's cart into the
-  account's.
+- The cart button in the header shows how many items the cart holds, at every width. It opens a **quick preview** with the lines, the subtotal, how far the cart is from free shipping, and links to the cart and to checkout. Adding a product opens it too.
+- **Cart page**: each line with its picture, name, unit price, a quantity stepper, a remove button and the line total. The subtotal changes as soon as a quantity does.
+- Asking for more than the stock says how many are left. A line the shop can no longer supply in full says so, with a button that reduces it to what is left.
+- **Recommended for you**: in-stock products from the same categories as the cart, best rated first.
+- **Guests** keep their cart for 30 days in the browser that made it. **Members** keep theirs in the account, across devices and sign-ins. Signing in moves a guest's cart into the account's.
 
 ### Checkout
 
-One page, in five parts, with the order summary beside it, or folded at the top on a narrow
-screen. The summary has steppers and remove buttons too.
+One page, in five parts, with the order summary beside it, or folded at the top on a narrow screen. The summary has steppers and remove buttons too.
 
 1. **Contact**: name, email, phone.
-2. **Shipping address**. Once it is complete, the page looks it up in OpenStreetMap and says
-   "Address found", or that it could not find it.
+2. **Shipping address**. Once it is complete, the page looks it up in OpenStreetMap and says "Address found", or that it could not find it.
 3. **Billing address**: "Same as the shipping address" is checked until you uncheck it.
-4. **Delivery**: the delivery options staff set, each with its price and the dates it should
-   arrive between.
+4. **Delivery**: the delivery options staff set, each with its price and the dates it should arrive between.
 5. **Payment**: Stripe's card fields.
 
-A signed-in customer starts with the name and phone of their profile, their default saved
-address and the delivery option of their last order; whatever the profile and the saved
-addresses lack comes from the last order. They can pick another saved address, and save the
-one they typed. A guest gets a "Sign in for faster checkout" link. "Place order" checks every field and the card
-before anything is sent, places the order, then has Stripe confirm the payment. The order page
-that follows is the confirmation: the order number, the payment reference, the expected
-delivery dates and the summary. It updates by itself once the payment settles, and the
-confirmation mail arrives in Mailpit.
+A signed-in customer starts with the name and phone of their profile, their default saved address and the delivery option of their last order; whatever the profile and the saved addresses lack comes from the last order. They can pick another saved address, and save the one they typed. A guest gets a "Sign in for faster checkout" link. "Place order" checks every field and the card before anything is sent, places the order, then has Stripe confirm the payment. The order page that follows is the confirmation: the order number, the payment reference, the expected delivery dates and the summary. It updates by itself once the payment settles, and the confirmation mail arrives in Mailpit.
 
 Stripe's test cards, with any future expiry and any CVC:
 
@@ -218,56 +147,35 @@ Stripe's test cards, with any future expiry and any CVC:
 | `4000 0000 0000 3220` | Asks for 3D Secure; approve or fail it |
 | `4242 4242 4242 4241` | Refused by the card field before submission: invalid number |
 
-A declined order releases its stock and mails the reason; the cart keeps its items, so
-"Place order" again tries another card. To see a gateway timeout, set `STRIPE_TIMEOUT_MS=1` in
-`.env`, run `docker compose up -d api`, and place an order.
+A declined order releases its stock and mails the reason; the cart keeps its items, so "Place order" again tries another card. To see a gateway timeout, set `STRIPE_TIMEOUT_MS=1` in `.env`, run `docker compose up -d api`, and place an order.
 
 ### Orders
 
-- **Orders** (`/account/orders`, signed in): status chips, any number at once, a date range whose ends both
-  count, and newest, oldest or status order. The filters live in the URL.
-- **Order page**: status, a timeline of every change, the tracking number once shipped, the
-  items, totals, delivery option and expected dates, the addresses, and how it was paid. A
-  guest opens it from the link in the confirmation mail.
-- **Cancel** works until the order is processing. A paid order is refunded in full, which
-  shows in the timeline and arrives as a second mail.
-- Staff move a paid order to processing, then shipped with a tracking number, then delivered.
-  The customer gets a mail when it ships and when it arrives. An order unpaid for 30 minutes
-  is canceled and its stock released.
+- **Orders** (`/account/orders`, signed in): status chips, any number at once, a date range whose ends both count, and newest, oldest or status order. The filters live in the URL.
+- **Order page**: status, a timeline of every change, the tracking number once shipped, the items, totals, delivery option and expected dates, the addresses, and how it was paid. A guest opens it from the link in the confirmation mail.
+- **Cancel** works until the order is processing. A paid order is refunded in full, which shows in the timeline and arrives as a second mail.
+- Staff move a paid order to processing, then shipped with a tracking number, then delivered. The customer gets a mail when it ships and when it arrives. An order unpaid for 30 minutes is canceled and its stock released.
 
 ### Accounts
 
 - **Register**: email address, a password of at least twelve characters, and the CAPTCHA.
-- **Sign in** with the password or a provider button. With no provider keys the button opens
-  a stand-in consent page, where any address works. A page that asks you to sign in sends you
-  back to it afterwards.
-- **Password reset**: "Forgot your password?" mails a link to the Mailpit inbox. Setting the
-  new password signs every session out.
+- **Sign in** with the password or a provider button. With no provider keys the button opens a stand-in consent page, where any address works. A page that asks you to sign in sends you back to it afterwards.
+- **Password reset**: "Forgot your password?" mails a link to the Mailpit inbox. Setting the new password signs every session out.
 - **The account** has three tabs of one width: Profile, Addresses and Orders.
-- **Profile** (`/account`): full name and phone, which checkout fills in. The email is shown
-  but stays as it is. The password and 2FA live here too.
-- **Addresses** (`/account/addresses`): up to 10 saved addresses. One is the default, which
-  checkout starts with.
-- **Two-factor authentication**: on the account page, scan the QR code with an
-  authenticator app and confirm a code. Sign-in then asks for a code, and so does turning
-  it off. Each code works once. Staff who turn it off lose every staff role with it, after a
-  dialog that names the roles asks first; the last admin cannot turn it off.
-- **Sign out** revokes the session. The account menu holds Orders, Account, Admin for staff,
-  and Sign out.
+- **Profile** (`/account`): full name and phone, which checkout fills in. The email is shown but stays as it is. The password and 2FA live here too.
+- **Addresses** (`/account/addresses`): up to 10 saved addresses. One is the default, which checkout starts with.
+- **Two-factor authentication**: on the account page, scan the QR code with an authenticator app and confirm a code. Sign-in then asks for a code, and so does turning it off. Each code works once. Staff who turn it off lose every staff role with it, after a dialog that names the roles asks first; the last admin cannot turn it off.
+- **Sign out** revokes the session. The account menu holds Orders, Account, Admin for staff, and Sign out.
 
 ### Contact and the other pages
 
-- **Contact** (`/contact`): name, email, topic, an optional order number, the message and the
-  CAPTCHA. The support inbox, `SUPPORT_EMAIL`, gets the message with Reply-To set to the
-  sender, and the sender gets a copy. Both land in Mailpit. Nothing is stored.
+- **Contact** (`/contact`): name, email, topic, an optional order number, the message and the CAPTCHA. The support inbox, `SUPPORT_EMAIL`, gets the message with Reply-To set to the sender, and the sender gets a copy. Both land in Mailpit. Nothing is stored.
 - **About**, **FAQ**, **Terms** and **Privacy**, linked from the footer.
-- An address the shop does not know shows a page with a search box and a link home, and
-  answers with status 404.
+- An address the shop does not know shows a page with a search box and a link home, and answers with status 404.
 
 ### Admin
 
-Open <https://localhost:3000/admin>, or "Admin" in the account menu. Every account is a
-customer; staff roles add what each job needs, and one account can hold several.
+Open <https://localhost:3000/admin>, or "Admin" in the account menu. Every account is a customer; staff roles add what each job needs, and one account can hold several.
 
 | Role | Can |
 | --- | --- |
@@ -277,17 +185,12 @@ customer; staff roles add what each job needs, and one account can hold several.
 | Support | Find accounts and orders; cancel orders that have not shipped; refund |
 | Admin | All of the above, plus staff roles, disabling accounts, resetting 2FA, signing accounts out, and the audit log |
 
-A staff account needs 2FA. The admin sends a staff member without it to the account page to
-set it up, and asks every session for a code before it opens, and again after 8 hours. The navigation shows
-only the sections the account's roles allow, and every delete, cancellation and refund asks
-first.
+A staff account needs 2FA. The admin sends a staff member without it to the account page to set it up, and asks every session for a code before it opens, and again after 8 hours. The navigation shows only the sections the account's roles allow, and every delete, cancellation and refund asks first.
 
-- **Dashboard**: counts that link to their lists, for the roles that act on them: orders to
-  fulfill, paid today, reviews waiting, and products with 5 or fewer in stock.
+- **Dashboard**: counts that link to their lists, for the roles that act on them: orders to fulfill, paid today, reviews waiting, and products with 5 or fewer in stock.
 - **Orders**: filter by status, dates, order number or customer email. An order's page moves it to its next status, cancels it, or refunds it in full. A refunded order shows "Refunded" once Stripe confirms the refund; until then it keeps its status, and the payment box shows the refund as pending. A refund that fails can be asked for again, also for a canceled order whose automatic refund failed.
 - **Products**: create, edit and delete; pictures with their alt text, which is required, and their order; and whether the home page features the product. Saving moves the stock by the change made in the form, so the sales made while the form was open stay counted. The list finds products by name or slug, filters them by category, brand, low stock and featuring, and sorts them by name, age, stock or price, either way.
-- **Categories** and **Brands**: create, edit and delete. One that a product uses cannot be
-  deleted.
+- **Categories** and **Brands**: create, edit and delete. One that a product uses cannot be deleted.
 - **Import**: one JSON or CSV file of up to 2 MB and 5,000 rows. "Check the file" shows the report, every problem by row and column, without writing anything; "Import" writes every row or none. A row updates the product with its slug, or creates one, and its stock replaces the product's. Categories and brands are named by slug and must exist.
 
   ```csv
@@ -296,27 +199,15 @@ first.
   lucky-chip,Lucky Chip,A poker chip that brings a little luck to every hand.,3.50,120,balatro,localthunk,10,40,40,3,true,Collectible
   ```
 
-  `price` is in euros with at most two decimals, and each `property:<name>` column is one
-  property, empty for none. A JSON file is an array of objects with the fields `slug`, `name`,
-  `description`, `priceCents`, `stock`, `category`, `brand`, `weightGrams`, `widthMm`,
-  `heightMm`, `depthMm`, `featured` and `properties` (`[{ "name", "value" }]`).
+  `price` is in euros with at most two decimals, and each `property:<name>` column is one property, empty for none. A JSON file is an array of objects with the fields `slug`, `name`, `description`, `priceCents`, `stock`, `category`, `brand`, `weightGrams`, `widthMm`, `heightMm`, `depthMm`, `featured` and `properties` (`[{ "name", "value" }]`).
 - **Reviews**: the queue of reviews waiting; approve, reject with a reason, or delete.
-- **Delivery options**: name, price, the amount from which it ships free, the delivery window
-  in business days, whether checkout offers it, and its place in the list. An option that
-  orders used can be switched off, not deleted. Placed orders keep their own copy.
-- **Accounts**: find one by exact email or by role, with its orders and reviews; give and take
-  staff roles; disable and enable it; reset its 2FA; sign it out. Nobody changes their own
-  roles or disables themselves, and the last admin keeps the role.
+- **Delivery options**: name, price, the amount from which it ships free, the delivery window in business days, whether checkout offers it, and its place in the list. An option that orders used can be switched off, not deleted. Placed orders keep their own copy.
+- **Accounts**: find one by exact email or by role, with its orders and reviews; give and take staff roles; disable and enable it; reset its 2FA; sign it out. Nobody changes their own roles or disables themselves, and the last admin keeps the role.
 - **Audit log**: every staff change, filtered by who, what, which record and when.
 
 ### The API
 
-Every route is under `/api/v1` and answers JSON. A refusal is
-`{ "error": { "code", "message", "issues" } }`, where `issues` names the rejected fields, or
-the products a stock refusal is about. Authenticated routes take
-`Authorization: Bearer <access token>`; cart and order routes take it when there is one.
-Every answer from a limited route carries `RateLimit-Remaining`; a refusal for going too fast
-is `429` with `Retry-After`.
+Every route is under `/api/v1` and answers JSON. A refusal is `{ "error": { "code", "message", "issues" } }`, where `issues` names the rejected fields, or the products a stock refusal is about. Authenticated routes take `Authorization: Bearer <access token>`; cart and order routes take it when there is one. Every answer from a limited route carries `RateLimit-Remaining`; a refusal for going too fast is `429` with `Retry-After`.
 
 | Method and path | What it does |
 | --- | --- |
@@ -369,15 +260,9 @@ is `429` with `Retry-After`.
 | `POST /payments/webhook` | Where Stripe reports payments and refunds. Checks Stripe's signature. |
 | `GET /health` | Liveness. |
 
-`GET /products` reads `q`, `category`, `brand`, `priceMin` and `priceMax` in cents, `rating`
-as a minimum, `sort` (`relevance`, `price_asc`, `price_desc`, `rating`, `newest`), `page`,
-`perPage`, and `p.<name>=<value>` for any property. `brand` and `p.<name>` repeat: values under
-one key are alternatives, and different keys all have to hold. The answer carries the page of
-items, the total, the facets, and `matched`: `exact`, or `similar` when it fell back to similar
-names.
+`GET /products` reads `q`, `category`, `brand`, `priceMin` and `priceMax` in cents, `rating` as a minimum, `sort` (`relevance`, `price_asc`, `price_desc`, `rating`, `newest`), `page`, `perPage`, and `p.<name>=<value>` for any property. `brand` and `p.<name>` repeat: values under one key are alternatives, and different keys all have to hold. The answer carries the page of items, the total, the facets, and `matched`: `exact`, or `similar` when it fell back to similar names.
 
-Staff routes are under `/api/v1/admin`. Each needs an account whose roles grant the
-permission, with 2FA on, and a session that passed a code check within 8 hours.
+Staff routes are under `/api/v1/admin`. Each needs an account whose roles grant the permission, with 2FA on, and a session that passed a code check within 8 hours.
 
 | Method and path | Permission | What it does |
 | --- | --- | --- |
@@ -400,119 +285,38 @@ permission, with 2FA on, and a session that passed a code check within 8 hours.
 
 [![Entity relationship diagram: every table with its columns, keys and relationships](docs/erd.svg)](docs/erd.svg)
 
-Open the image for full size. It is drawn from `docs/erd.mmd`: paste that into
-<https://mermaid.live> and download the SVG to redraw it.
+Open the image for full size. It is drawn from `docs/erd.mmd`: paste that into <https://mermaid.live> and download the SVG to redraw it.
 
 `outbox_message` stands alone: it holds messages on their way to RabbitMQ.
 
-The schema is `apps/api/src/db/schema.ts`, and the migrations under `apps/api/drizzle/` are
-applied at start. Deleting a user or a product cascades to the rows that hang off it, with
-these exceptions. An account with orders, or one that acted in the audit log, cannot be
-deleted. An order line keeps its snapshot when its product goes, and a review keeps its
-moderation when the moderator's account goes. A category, brand or delivery option that
-something uses refuses deletion.
+The schema is `apps/api/src/db/schema.ts`, and the migrations under `apps/api/drizzle/` are applied at start. Deleting a user or a product cascades to the rows that hang off it, with these exceptions. An account with orders, or one that acted in the audit log, cannot be deleted. An order line keeps its snapshot when its product goes, and a review keeps its moderation when the moderator's account goes. A category, brand or delivery option that something uses refuses deletion.
 
 ## Design notes
 
-- **Transactions.** Opening a session, rotating a refresh token and resetting a password
-  each run in one transaction. One conditional `UPDATE` spends a reset link, so it works
-  once however many requests carry it.
+- **Transactions.** Opening a session, rotating a refresh token and resetting a password each run in one transaction. One conditional `UPDATE` spends a reset link, so it works once however many requests carry it.
 - **Constraints** are the quoted notes in the diagram.
-- **Tokens.** The access token lives only in the tab's memory. The refresh token is an
-  httpOnly cookie scoped to the auth routes. It rotates on every use, and a reused token
-  revokes the session. A 2FA code works once: the account keeps the time step of the last
-  one accepted.
-- **Roles and permissions.** One table in `packages/shared/src/contracts/staff.ts` grants ten
-  permissions to the five staff roles. The API checks a permission on every admin route, and
-  the storefront hides what an account cannot use. The guard reads the account's roles in the
-  query that already checks the session, so a role change applies from the next request.
-- **2FA for staff.** An account with a staff role and no 2FA gets `TwoFactorSetupRequired`
-  from the admin API, and a session that has not passed a code check in 8 hours gets
-  `TwoFactorVerificationRequired`. The session records the check in `second_factor_at`: at a
-  2FA sign-in, when 2FA is turned on, and at a step-up. Staff who turn 2FA off lose every
-  staff role in the same transaction, which the audit log records. The last admin can be
-  neither disabled nor stripped of the role, so keeps 2FA on too.
-- **Audit log.** Every staff change, role change, account action, refund, import and step-up
-  writes one `audit_event` row in the same transaction as the change, so no change exists
-  without its record. A trigger refuses `UPDATE` and `DELETE` on the table. A row names the
-  actor and their roles at the time, the action, the target, a one-line summary, the changed
-  fields before and after with personal values left out, and the sealed client address.
-- **Search.** `product.search` is a generated `tsvector` under a GIN index, name weighted
-  above description, matched with `plainto_tsquery` and ranked with `ts_rank`. The name also
-  matches as a substring, through a `pg_trgm` GIN index. A product named exactly what was
-  typed comes first. When nothing matches, the search runs again by trigram similarity of the
-  name, and says so.
-- **Facets.** The category facet counts the whole shop. Every other facet counts its values
-  under every filter except its own.
-- **Ratings.** `product.rating_average` and `product.rating_count` hold the average and the
-  number of a product's approved reviews, so listings sort, filter and count by rating without
-  reading a review. The trigger `product_review_rating` counts them again for each product
-  whose reviews change: a new review, an edit, a moderation or a deletion. It locks the
-  product's row before counting, so two moderators approving at once both count.
+- **Tokens.** The access token lives only in the tab's memory. The refresh token is an httpOnly cookie scoped to the auth routes. It rotates on every use, and a reused token revokes the session. A 2FA code works once: the account keeps the time step of the last one accepted.
+- **Roles and permissions.** One table in `packages/shared/src/contracts/staff.ts` grants ten permissions to the five staff roles. The API checks a permission on every admin route, and the storefront hides what an account cannot use. The guard reads the account's roles in the query that already checks the session, so a role change applies from the next request.
+- **2FA for staff.** An account with a staff role and no 2FA gets `TwoFactorSetupRequired` from the admin API, and a session that has not passed a code check in 8 hours gets `TwoFactorVerificationRequired`. The session records the check in `second_factor_at`: at a 2FA sign-in, when 2FA is turned on, and at a step-up. Staff who turn 2FA off lose every staff role in the same transaction, which the audit log records. The last admin can be neither disabled nor stripped of the role, so keeps 2FA on too.
+- **Audit log.** Every staff change, role change, account action, refund, import and step-up writes one `audit_event` row in the same transaction as the change, so no change exists without its record. A trigger refuses `UPDATE` and `DELETE` on the table. A row names the actor and their roles at the time, the action, the target, a one-line summary, the changed fields before and after with personal values left out, and the sealed client address.
+- **Search.** `product.search` is a generated `tsvector` under a GIN index, name weighted above description, matched with `plainto_tsquery` and ranked with `ts_rank`. The name also matches as a substring, through a `pg_trgm` GIN index. A product named exactly what was typed comes first. When nothing matches, the search runs again by trigram similarity of the name, and says so.
+- **Facets.** The category facet counts the whole shop. Every other facet counts its values under every filter except its own.
+- **Ratings.** `product.rating_average` and `product.rating_count` hold the average and the number of a product's approved reviews, so listings sort, filter and count by rating without reading a review. The trigger `product_review_rating` counts them again for each product whose reviews change: a new review, an edit, a moderation or a deletion. It locks the product's row before counting, so two moderators approving at once both count.
 - **SQL.** Every value a shopper supplies is a bound parameter.
-- **JIT.** The API's database sessions turn Postgres's JIT compilation off. Postgres compiles
-  a query whose planned cost passes a threshold, and a small table without statistics is
-  planned far larger than it is, so a short query can take longer to compile than to run.
-- **Validation.** One zod schema per input, shared by the browser and the API, which checks
-  every request. Formats come first: emails, phones, postal codes, prices, slugs. Then the
-  rules: a review only for a delivered product, a total of at least €0.50, a delivery window
-  that does not end before it starts, an admin left after a role change. Objects refuse
-  unknown keys, sorts and filters are closed lists, an upload has to decode as JPEG, PNG or
-  WebP, and an import takes only the columns it knows.
-- **Images.** An upload of up to 10 MB and 40 megapixels is decoded and encoded again by
-  `sharp`, which drops its metadata, GPS included, and stored under a random name. WebP copies
-  160, 400, 800 and 1,600 pixels wide are made next to it, never wider than the source: when
-  the upload is saved, by the seed, and by a background step for older pictures. Pixel art is
-  scaled by repeating pixels, never blending them, and drawn with `image-rendering: pixelated`.
-  Pages pick the size with `srcset`. The web server sends the files from the media volume at
-  `/media/`, without the API.
-- **Caching and CDN.** Fingerprinted scripts and styles, and the picture copies, are cached for
-  a year as immutable; source pictures for a day; the page itself is checked every time.
-  Catalog reads without an `Authorization` header (home, products, categories, delivery
-  options and review lists) answer `public, max-age=60, stale-while-revalidate=300`, and
-  everything else `private, no-store`. A reader's own review and votes come from a separate
-  private route, so public answers are the same for everyone. A CDN in front of the site would
-  need no code: it caches by these headers, the assets and pictures for a year and catalog
-  reads for a minute, and passes everything else through. None is set up.
-- **Carts.** Both kinds live in Postgres, so a cart is never lost and stock is checked against
-  one truth. A guest cart belongs to an opaque cookie whose SHA-256 is stored, like a refresh
-  token. Prices are never stored in a cart: every read joins today's price and stock.
-- **Placing an order** is one transaction that reserves every line with
-  `UPDATE product SET stock = stock - q WHERE id = $1 AND stock >= q`, in product id order,
-  then writes the order, its lines and its first event. Of two checkouts racing for the last
-  unit, the second waits for the first and then finds it gone, so two payments can never be
-  taken for one item. A failed, expired or canceled order gives its stock back. The order
-  copies the delivery option's name, its price and the expected dates, counted in business
-  days in `Europe/Tallinn`, so a later change to the option leaves it as it was.
-- **Payments.** The browser sends the card to Stripe's own fields; Prism only creates a
-  PaymentIntent and reads Stripe's signed webhooks, checked against the raw body. Card data
-  never touches Prism, which keeps it in PCI DSS's smallest scope (SAQ A).
+- **JIT.** The API's database sessions turn Postgres's JIT compilation off. Postgres compiles a query whose planned cost passes a threshold, and a small table without statistics is planned far larger than it is, so a short query can take longer to compile than to run.
+- **Validation.** One zod schema per input, shared by the browser and the API, which checks every request. Formats come first: emails, phones, postal codes, prices, slugs. Then the rules: a review only for a delivered product, a total of at least €0.50, a delivery window that does not end before it starts, an admin left after a role change. Objects refuse unknown keys, sorts and filters are closed lists, an upload has to decode as JPEG, PNG or WebP, and an import takes only the columns it knows.
+- **Images.** An upload of up to 10 MB and 40 megapixels is decoded and encoded again by `sharp`, which drops its metadata, GPS included, and stored under a random name. WebP copies 160, 400, 800 and 1,600 pixels wide are made next to it, never wider than the source: when the upload is saved, by the seed, and by a background step for older pictures. Pixel art is scaled by repeating pixels, never blending them, and drawn with `image-rendering: pixelated`. Pages pick the size with `srcset`. The web server sends the files from the media volume at `/media/`, without the API.
+- **Caching and CDN.** Fingerprinted scripts and styles, and the picture copies, are cached for a year as immutable; source pictures for a day; the page itself is checked every time. Catalog reads without an `Authorization` header (home, products, categories, delivery options and review lists) answer `public, max-age=60, stale-while-revalidate=300`, and everything else `private, no-store`. A reader's own review and votes come from a separate private route, so public answers are the same for everyone. A CDN in front of the site would need no code: it caches by these headers, the assets and pictures for a year and catalog reads for a minute, and passes everything else through. None is set up.
+- **Carts.** Both kinds live in Postgres, so a cart is never lost and stock is checked against one truth. A guest cart belongs to an opaque cookie whose SHA-256 is stored, like a refresh token. Prices are never stored in a cart: every read joins today's price and stock.
+- **Placing an order** is one transaction that reserves every line with `UPDATE product SET stock = stock - q WHERE id = $1 AND stock >= q`, in product id order, then writes the order, its lines and its first event. Of two checkouts racing for the last unit, the second waits for the first and then finds it gone, so two payments can never be taken for one item. A failed, expired or canceled order gives its stock back. The order copies the delivery option's name, its price and the expected dates, counted in business days in `Europe/Tallinn`, so a later change to the option leaves it as it was.
+- **Payments.** The browser sends the card to Stripe's own fields; Prism only creates a PaymentIntent and reads Stripe's signed webhooks, checked against the raw body. Card data never touches Prism, which keeps it in PCI DSS's smallest scope (SAQ A).
 - **Messages.** The payment service publishes `payment.status`; the order service consumes it and updates the order, the stock and the customer. Cancellations go the other way as `order.canceled`, and refunds of shipped or delivered orders as `order.refund-requested`; the payment service refunds both, and a refund the provider confirms comes back as `payment.status`. A message is written to `outbox_message` in the same transaction as the change it announces, then published by a relay with a broker confirm, so a committed change always gets its message. Consumers apply every change as a conditional `UPDATE`, so a duplicate does nothing.
-- **Failed messages.** Every queue is a quorum queue with `x-delivery-limit: 5` and a
-  dead-letter exchange. A handler that fails rejects its message back to the queue; after the
-  sixth failed delivery, or at once for a malformed message, RabbitMQ moves it to the
-  `dead-letter` queue, which the management UI shows.
-- **Encryption at rest.** One rule: every column that identifies a person is sealed with
-  AES-256-GCM under `DATA_ENCRYPTION_KEY` before it reaches Postgres, and what lists filter on
-  and identifies nobody stays plain. Sealed: an account's email, TOTP secret, full name and
-  phone; a provider's user id; a session's browser and address; saved addresses; an order's
-  contact, shipping and billing addresses and guest key; a payment's Stripe id and card
-  summary; and the client address in the audit log. Passwords are argon2id hashes, and
-  refresh, reset and cart tokens SHA-256 digests. A dump or backup holds ciphertext.
-- **Blind index.** A sealed email cannot be searched, so each one also gets an HMAC-SHA256 of
-  its normalized value, under a key derived from `DATA_ENCRYPTION_KEY` with HKDF and a
-  purpose per column. Sign-in by email, provider sign-in, uniqueness and staff search by email
-  look values up by it, and it reveals nothing else.
-- **TLS.** Locally, Caddy serves HTTPS with the self-signed certificate: EC P-256, for
-  `localhost` and `127.0.0.1`. In production the server's own Caddy holds a real certificate
-  and terminates TLS, and the web container behind it serves plain HTTP (`WEB_TLS=off`).
-  Card data goes from the browser to Stripe over TLS, and the API calls Stripe over TLS.
-- **Security headers.** A Content-Security-Policy that lets scripts and frames come only from
-  the shop, Stripe and Google's CAPTCHA, with no inline script; `X-Frame-Options: DENY` and
-  `frame-ancestors 'none'`; `nosniff`; a strict referrer policy;
-  `Cross-Origin-Opener-Policy: same-origin`; and no camera, microphone or location.
-- **Rate limiting** is a token bucket per policy and key. A bucket holds a burst and refills
-  at a steady rate, so short bursts pass and sustained abuse does not.
+- **Failed messages.** Every queue is a quorum queue with `x-delivery-limit: 5` and a dead-letter exchange. A handler that fails rejects its message back to the queue; after the sixth failed delivery, or at once for a malformed message, RabbitMQ moves it to the `dead-letter` queue, which the management UI shows.
+- **Encryption at rest.** One rule: every column that identifies a person is sealed with AES-256-GCM under `DATA_ENCRYPTION_KEY` before it reaches Postgres, and what lists filter on and identifies nobody stays plain. Sealed: an account's email, TOTP secret, full name and phone; a provider's user id; a session's browser and address; saved addresses; an order's contact, shipping and billing addresses and guest key; a payment's Stripe id and card summary; and the client address in the audit log. Passwords are argon2id hashes, and refresh, reset and cart tokens SHA-256 digests. A dump or backup holds ciphertext.
+- **Blind index.** A sealed email cannot be searched, so each one also gets an HMAC-SHA256 of its normalized value, under a key derived from `DATA_ENCRYPTION_KEY` with HKDF and a purpose per column. Sign-in by email, provider sign-in, uniqueness and staff search by email look values up by it, and it reveals nothing else.
+- **TLS.** Locally, Caddy serves HTTPS with the self-signed certificate: EC P-256, for `localhost` and `127.0.0.1`. In production the server's own Caddy holds a real certificate and terminates TLS, and the web container behind it serves plain HTTP (`WEB_TLS=off`). Card data goes from the browser to Stripe over TLS, and the API calls Stripe over TLS.
+- **Security headers.** A Content-Security-Policy that lets scripts and frames come only from the shop, Stripe and Google's CAPTCHA, with no inline script; `X-Frame-Options: DENY` and `frame-ancestors 'none'`; `nosniff`; a strict referrer policy; `Cross-Origin-Opener-Policy: same-origin`; and no camera, microphone or location.
+- **Rate limiting** is a token bucket per policy and key. A bucket holds a burst and refills at a steady rate, so short bursts pass and sustained abuse does not.
 
   | Policy | Routes | Counted per | Burst | Refill |
   | --- | --- | --- | --- | --- |
@@ -527,43 +331,19 @@ something uses refuses deletion.
   | `import` | bulk import | account | 5 | 1 every 30 s |
   | `default` | every other route | client address | 120 | 20 per s |
 
-  The webhook, which Stripe signs, and the health check are not limited. The buckets live in
-  the API process's memory; several API replicas would share them through a store such as
-  Redis. `RATE_LIMIT_SCALE` multiplies every burst and rate, for the test stacks.
-- **SEO.** Every page sets its own title, "<page> | Prism" within 60 characters, a description
-  of 155 to 160 characters, and either its canonical address or `noindex`. Product
-  descriptions are built from the product's own text and its facts. Cart, checkout, account,
-  order, search and admin pages are `noindex`. The API serves `robots.txt` and a sitemap of
-  every category, product and fixed page, and product pages carry JSON-LD with the offer, the
-  rating and a breadcrumb. The storefront renders in the browser, so a crawler that runs no JavaScript
-  sees only the generic title.
-- **Accessibility.** WCAG 2.1 Level A, and AA color contrast. Landmarks and a skip link; one
-  h1 per page in every state, with h2 and h3 below it. On every page change, focus moves to
-  the new h1 and the title is announced; the h1 shows no focus ring, since nothing on it can
-  be pressed. Native `<dialog>`, `popover`, `<details>` and
-  `<table>` come first; ARIA is used for the search combobox and the live regions only. Font
-  sizes are in rem, and the layouts reflow at 320 pixels and at 200% zoom. Every meaningful
-  picture has alt text, which the admin requires; decorative ones are hidden.
+  The webhook, which Stripe signs, and the health check are not limited. The buckets live in the API process's memory; several API replicas would share them through a store such as Redis. `RATE_LIMIT_SCALE` multiplies every burst and rate, for the test stacks.
+- **SEO.** Every page sets its own title, "<page> | Prism" within 60 characters, a description of 155 to 160 characters, and either its canonical address or `noindex`. Product descriptions are built from the product's own text and its facts. Cart, checkout, account, order, search and admin pages are `noindex`. The API serves `robots.txt` and a sitemap of every category, product and fixed page, and product pages carry JSON-LD with the offer, the rating and a breadcrumb. The storefront renders in the browser, so a crawler that runs no JavaScript sees only the generic title.
+- **Accessibility.** WCAG 2.1 Level A, and AA color contrast. Landmarks and a skip link; one h1 per page in every state, with h2 and h3 below it. On every page change, focus moves to the new h1 and the title is announced; the h1 shows no focus ring, since nothing on it can be pressed. Native `<dialog>`, `popover`, `<details>` and `<table>` come first; ARIA is used for the search combobox and the live regions only. Font sizes are in rem, and the layouts reflow at 320 pixels and at 200% zoom. Every meaningful picture has alt text, which the admin requires; decorative ones are hidden.
 
 ## Performance
 
-The load test runs k6 against a stack of its own, `prism-load`, so it never touches the shop's
-data:
+The load test runs k6 against a stack of its own, `prism-load`, so it never touches the shop's data:
 
-- The API and Postgres are limited to 2 CPUs and 1 GB each, so the numbers describe a known
-  server size, and the machine's other cores run k6.
-- Payments are simulated, because Stripe forbids load-testing its API. The CAPTCHA is in test
-  mode, and `RATE_LIMIT_SCALE` is 1000, so the limits do not cap the load.
-- Postgres records every statement in `pg_stat_statements`, and a sampler records each
-  container's CPU and memory every few seconds.
+- The API and Postgres are limited to 2 CPUs and 1 GB each, so the numbers describe a known server size, and the machine's other cores run k6.
+- Payments are simulated, because Stripe forbids load-testing its API. The CAPTCHA is in test mode, and `RATE_LIMIT_SCALE` is 1000, so the limits do not cap the load.
+- Postgres records every statement in `pg_stat_statements`, and a sampler records each container's CPU and memory every few seconds.
 
-Each user follows one scenario with 1 to 3 seconds between steps: browse (home, a category, a
-second page, a product, its reviews and related products), search (three suggestions as a name
-is typed, then filtered and sorted results, then a product), cart (a guest adds one to three
-products, changes a quantity, and opens the cart), checkout (a cart, an order, and waiting for
-the payment), and account (register, sign in, read the account, refresh). A mixed workload
-draws them 50, 25, 15, 5 and 5 percent of the time. One step, such as "open product", is one
-transaction.
+Each user follows one scenario with 1 to 3 seconds between steps: browse (home, a category, a second page, a product, its reviews and related products), search (three suggestions as a name is typed, then filtered and sorted results, then a product), cart (a guest adds one to three products, changes a quantity, and opens the cart), checkout (a cart, an order, and waiting for the payment), and account (register, sign in, read the account, refresh). A mixed workload draws them 50, 25, 15, 5 and 5 percent of the time. One step, such as "open product", is one transaction.
 
 | Run | Load | Passes when |
 | --- | --- | --- |
@@ -572,18 +352,11 @@ transaction.
 | `peak` | 50 users for 5 minutes | the same, and at least 10 transactions per second |
 | `stress` | 25, 50, 100, 150, 200, 300, 400, 500, 600, 800 and 1,000 users, each step held for a minute | stops when p95 over the whole run passes 5 s or errors pass 5% |
 
-`./start.sh loadtest <run>` starts and seeds `prism-load` if needed, gives every product a
-million in stock so that checkouts never sell out, runs one run, and leaves in
-`loadtest/results/` the k6 summary, the CPU and memory samples, Postgres's costliest
-statements, and `<run>.md`: the tables of the run, which it also prints. For the stress run
-they include the users, p95 and errors of each half-minute, and the most users served with
-p95 under 5 seconds. A run loads the machine heavily, so run them one at a time.
-`./start.sh loadtest down` removes the stack.
+`./start.sh loadtest <run>` starts and seeds `prism-load` if needed, gives every product a million in stock so that checkouts never sell out, runs one run, and leaves in `loadtest/results/` the k6 summary, the CPU and memory samples, Postgres's costliest statements, and `<run>.md`: the tables of the run, which it also prints. For the stress run they include the users, p95 and errors of each half-minute, and the most users served with p95 under 5 seconds. A run loads the machine heavily, so run them one at a time. `./start.sh loadtest down` removes the stack.
 
 ### Results
 
-Measured on an Intel Core i5-12400F (6 cores, 12 threads) under WSL2, with k6 on the same
-machine, against the seeded catalog: 3,390 products, 45,751 reviews and 198,334 helpful votes.
+Measured on an Intel Core i5-12400F (6 cores, 12 threads) under WSL2, with k6 on the same machine, against the seeded catalog: 3,390 products, 45,751 reviews and 198,334 helpful votes.
 
 | Run | Requests | Requests/s | Transactions/s | p50 | p90 | p95 | p99 | Errors | Transactions successful | Peak CPU of the API / Postgres |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -592,9 +365,7 @@ machine, against the seeded catalog: 3,390 products, 45,751 reviews and 198,334 
 | `peak` | 11,320 | 36.7 | 24.7 | 6 ms | 13 ms | 16 ms | 29 ms | 0% | 100% | 35% / 57% |
 | `stress` | 170,440 | 169.0 | 113.6 | 143 ms | 2,299 ms | 3,612 ms | 7,627 ms | 0% | 100% | 134% / 215% |
 
-Every run passes its thresholds. A CPU figure of 100% is one core, and the API and Postgres
-may use two each. The stress run's rates are averages over all its steps, the slow start
-included.
+Every run passes its thresholds. A CPU figure of 100% is one core, and the API and Postgres may use two each. The stress run's rates are averages over all its steps, the slow start included.
 
 **Most users before 5 seconds.** The stress run's p95 in each half-minute held at a step:
 
@@ -607,18 +378,13 @@ included.
 | 800 | 4.8 to 5.6 s |
 | 1,000 | 7.0 to 8.6 s |
 
-600 users stay under 5 seconds for a whole step, and 800 is the edge: one half-minute at 800
-users had p95 at 4.8 s, the next at 5.6 s. The report's rule, the most users of any
-half-minute with p95 under 5 seconds, gives 800. No request failed, even at 1,000 users.
+600 users stay under 5 seconds for a whole step, and 800 is the edge: one half-minute at 800 users had p95 at 4.8 s, the next at 5.6 s. The report's rule, the most users of any half-minute with p95 under 5 seconds, gives 800. No request failed, even at 1,000 users.
 
-**Throughput** levels off from 400 users on, at 238 to 274 requests a second in each
-half-minute, as Postgres reaches its CPU limit. The best half-minute served 274 requests and
-184 transactions a second, at 500 users.
+**Throughput** levels off from 400 users on, at 238 to 274 requests a second in each half-minute, as Postgres reaches its CPU limit. The best half-minute served 274 requests and 184 transactions a second, at 500 users.
 
 ### Bottlenecks
 
-`pg_stat_statements` and the CPU samples point at Postgres. Without the three fixes below, it
-reaches 90% of its two CPUs at 79 users, while the API uses under a quarter of its own.
+`pg_stat_statements` and the CPU samples point at Postgres. Without the three fixes below, it reaches 90% of its two CPUs at 79 users, while the API uses under a quarter of its own.
 
 | Bottleneck | Cause | Fix | Without the fix | With it |
 | --- | --- | --- | --- | --- |
@@ -626,15 +392,9 @@ reaches 90% of its two CPUs at 79 users, while the API uses under a quarter of i
 | Category pictures | `/home` and `/categories` sorted every product and picture of a category to find one picture | The index `product_category_shelf_idx`, read in order up to the first product with a picture | Stress run: the category list 122 ms a call | 14 ms, and 0.65 ms with JIT off too |
 | JIT compilation | Postgres compiled short queries before running them: the category list, planned at 580 rows for a three-row table, spent 8.5 ms of its 20.9 ms compiling | JIT off in the API's sessions (see [Design notes](#design-notes)) | p95 at 400 users 1.8 to 2.3 s; Postgres's CPU at peak 67% | 0.5 to 1.1 s; 57% |
 
-The first two rows compare the code without any of the three fixes with the code that has the
-first two; the JIT row compares the first two with all three. The stress runs behind the
-category figures reach 300, 400 and 1,000 users, so the later means include more load.
+The first two rows compare the code without any of the three fixes with the code that has the first two; the JIT row compares the first two with all three. The stress runs behind the category figures reach 300, 400 and 1,000 users, so the later means include more load.
 
-All three together: at peak, p95 goes from 34 to 16 ms, p99 from 177 to 29 ms, and Postgres's
-CPU from 181% to 57%. In the stress run, Postgres passes 90% of its CPUs at 319 users instead
-of 79, 600 users stay under 5 seconds for a whole step instead of 150 (800 instead of 188 by
-the report's rule), and throughput levels off at 238 to 274 requests a second instead of 54
-to 58.
+All three together: at peak, p95 goes from 34 to 16 ms, p99 from 177 to 29 ms, and Postgres's CPU from 181% to 57%. In the stress run, Postgres passes 90% of its CPUs at 319 users instead of 79, 600 users stay under 5 seconds for a whole step instead of 150 (800 instead of 188 by the report's rule), and throughput levels off at 238 to 274 requests a second instead of 54 to 58.
 
 What binds next, and how to lift it:
 
@@ -646,9 +406,7 @@ What binds next, and how to lift it:
 | Password hashing | argon2id is slow on purpose, and runs on Node's small thread pool during sign-in and registration | A larger `UV_THREADPOOL_SIZE` and more API processes; the rate limits already cap guessing |
 | Checkout of one popular product | Placing an order locks each product row it reserves, so checkouts of the same product take turns | Keep the transaction short, as it is; a queue in front of very hot products |
 
-RabbitMQ shows a few samples of up to 283% CPU in every run, while its median stays under 1%.
-It has no CPU limit in the load stack, and every checkout, whose payment passes through it,
-succeeded.
+RabbitMQ shows a few samples of up to 283% CPU in every run, while its median stays under 1%. It has no CPU limit in the load stack, and every checkout, whose payment passes through it, succeeded.
 
 ## Testing
 
@@ -658,12 +416,7 @@ succeeded.
 ./start.sh test e2e                   # the browser suite, against a stack of its own
 ```
 
-This needs only Docker. The integration, security and flow suites run the real application
-on a real Postgres, started through Testcontainers. Only what would reach the outside world
-is substituted: the clock, the mailer, the password hasher, the message queue, Stripe and the
-address lookup. Stripe's stand-in signs its webhooks the way Stripe does. The browser suite
-drives Chromium through every page of a running stack. CI runs every suite before each deploy,
-then the browser suite against the commit's own images.
+This needs only Docker. The integration, security and flow suites run the real application on a real Postgres, started through Testcontainers. Only what would reach the outside world is substituted: the clock, the mailer, the password hasher, the message queue, Stripe and the address lookup. Stripe's stand-in signs its webhooks the way Stripe does. The browser suite drives Chromium through every page of a running stack. CI runs every suite before each deploy, then the browser suite against the commit's own images.
 
 | Suite | Where | Covers |
 | --- | --- | --- |
@@ -674,13 +427,7 @@ then the browser suite against the commit's own images.
 | Browser | `apps/e2e` | Every page in both themes: axe (WCAG 2.1 A and AA contrast), one h1, title and description lengths and uniqueness, canonical or `noindex`, no sideways scroll at 320, 640, 768, 1,024 and 1,440 pixels, no CSP violation or console error. The skip link, Tab order, quick search, the cart preview, focus after a page change with no ring on the heading, the 404 status, robots and sitemap. The admin's gates and every admin page. Rows meant to line up, every admin table's cells on the middle of their row, and the account pages' shared width, measured to the pixel. |
 | Load | `loadtest` | Response times, throughput and the breaking point; see [Performance](#performance) |
 
-Checked by hand, because a third party's screen is involved: the CAPTCHA, a provider sign-in
-with real Google or GitHub keys, 2FA enrollment with a phone app, and payments and refunds
-with Stripe's test cards. Encryption is checked by hand too:
+Checked by hand, because a third party's screen is involved: the CAPTCHA, a provider sign-in with real Google or GitHub keys, 2FA enrollment with a phone app, and payments and refunds with Stripe's test cards. Encryption is checked by hand too:
 
-- At rest: `docker compose exec postgres psql -U prism -c "select email, totp_secret, full_name from app_user limit 3"`
-  and `docker compose exec postgres psql -U prism -c "select contact, shipping_address from customer_order limit 1"`
-  show bytes, not text, while the account and order pages show the values.
-- In transit: `openssl s_client -connect localhost:3000 </dev/null | openssl x509 -noout -issuer -subject`
-  shows the self-signed certificate. In the browser's network tab, the card number is only
-  ever sent to Stripe's domains, over HTTPS, and `POST /orders` carries no card field.
+- At rest: `docker compose exec postgres psql -U prism -c "select email, totp_secret, full_name from app_user limit 3"` and `docker compose exec postgres psql -U prism -c "select contact, shipping_address from customer_order limit 1"` show bytes, not text, while the account and order pages show the values.
+- In transit: `openssl s_client -connect localhost:3000 </dev/null | openssl x509 -noout -issuer -subject` shows the self-signed certificate. In the browser's network tab, the card number is only ever sent to Stripe's domains, over HTTPS, and `POST /orders` carries no card field.

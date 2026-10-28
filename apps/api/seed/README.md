@@ -1,9 +1,6 @@
 # Seed
 
-Placeholder data for the shop. The application never imports from this folder, and the
-stack starts without it. `./start.sh` runs the seed once the shop is up, and `./start.sh seed`
-(`.\start.cmd seed` on Windows) runs it alone. On the server, the Seed workflow runs it,
-started by hand from the Actions tab.
+Placeholder data for the shop. The application never imports from this folder, and the stack starts without it. `./start.sh` runs the seed once the shop is up, and `./start.sh seed` (`.\start.cmd seed` on Windows) runs it alone. On the server, the Seed workflow runs it, started by hand from the Actions tab.
 
 | Path | What it is |
 | --- | --- |
@@ -15,13 +12,9 @@ started by hand from the Actions tab.
 | `fetch/` | The tools that write `catalog.json` and `media/` from their sources. |
 | `tests/` | Unit tests of the code above. They run with the API's unit tests. |
 
-The seed needs only Docker and no network. When `catalog.json` is missing it first unpacks
-`data.zip` into this folder. Then it plants the data.
+The seed needs only Docker and no network. When `catalog.json` is missing it first unpacks `data.zip` into this folder. Then it plants the data.
 
-The data is the items of three games: Balatro (from the Balatro wiki), The Binding of Isaac
-(from tboi.com) and Minecraft (from the Minecraft wiki). The pictures and texts belong to the
-games' makers and stand in as placeholder data. Stock, sizes and reviews come from a fixed
-random seed, so the same data always plants the same shop.
+The data is the items of three games: Balatro (from the Balatro wiki), The Binding of Isaac (from tboi.com) and Minecraft (from the Minecraft wiki). The pictures and texts belong to the games' makers and stand in as placeholder data. Stock, sizes and reviews come from a fixed random seed, so the same data always plants the same shop.
 
 ## Commands on a host with Node
 
@@ -35,5 +28,4 @@ node seed/archive.ts pack           # packs them into data.zip, the archive the 
 
 ## Another shop
 
-Pack a `catalog.json` and a `media/` of the same shape into `data.zip`. Nothing else
-changes: the filters come from the products' properties.
+Pack a `catalog.json` and a `media/` of the same shape into `data.zip`. Nothing else changes: the filters come from the products' properties.
