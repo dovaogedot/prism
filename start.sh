@@ -152,16 +152,18 @@ if ! docker compose up --build --detach "$@"; then
   exit 1
 fi
 
-admin_email="$(grep -E '^ADMIN_EMAIL=' .env | cut -d= -f2-)"
+# Each `|| true` keeps a setting that .env lacks from ending the script:
+# grep finds no line and fails, and the default below applies instead.
+admin_email="$(grep -E '^ADMIN_EMAIL=' .env | cut -d= -f2- || true)"
 if [ -n "$admin_email" ]; then
   admin="    Admin           ${admin_email} / ADMIN_PASSWORD, with a code from ADMIN_TOTP_SECRET in an authenticator app"
 else
   admin="    Admin           none: set ADMIN_EMAIL, ADMIN_PASSWORD and ADMIN_TOTP_SECRET in .env (see .env.example)"
 fi
 
-web_port="$(grep -E '^WEB_PORT=' .env | cut -d= -f2)"
+web_port="$(grep -E '^WEB_PORT=' .env | cut -d= -f2 || true)"
 web_port="${web_port:-$WEB_PORT_DEFAULT}"
-rabbit_port="$(grep -E '^RABBITMQ_UI_PORT=' .env | cut -d= -f2)"
+rabbit_port="$(grep -E '^RABBITMQ_UI_PORT=' .env | cut -d= -f2 || true)"
 rabbit_port="${rabbit_port:-$RABBITMQ_UI_PORT_DEFAULT}"
 
 if [ -n "$(grep -E '^STRIPE_SECRET_KEY=' .env | cut -d= -f2)" ]; then
