@@ -41,7 +41,7 @@ import "./styles.css";
 
 const queryClient: QueryClient = new QueryClient({
   // A second factor that expires while the admin is open sends staff back to its gate.
-  queryCache: new QueryCache({ onError: (reason) => AdminAccess.onFailure(queryClient, reason) }),
+  queryCache: new QueryCache({ onError: (reason, query) => AdminAccess.onFailure(queryClient, reason, query.queryKey) }),
   mutationCache: new MutationCache({ onError: (reason) => AdminAccess.onFailure(queryClient, reason) }),
   defaultOptions: {
     queries: {

@@ -7,7 +7,7 @@
  */
 
 import { Permission, type ErrorResponse, type StaffRole } from "@prism/shared";
-import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { hashKey, keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { Api } from "../../shared/api/client.ts";
 
 /** What stands between a staff member and the admin. */
@@ -50,11 +50,15 @@ export const AdminAccess = {
   },
 
   /**
-   * Called with every failed request. A second factor that expired while a
-   * page was open makes the gate ask for it again, instead of every section
-   * failing on its own.
+   * Called with every failed request, and with the key of the query that
+   * failed, when a query did. A second factor that expired while a page was
+   * open makes the gate ask for it again, instead of every section failing on
+   * its own. The summary's own refusal is left alone: the gate already reads
+   * it, and fetching it again would only be refused again.
    */
-  onFailure: (client: QueryClient, reason: unknown): void => {
+  onFailure: (client: QueryClient, reason: unknown, failedKey?: readonly unknown[]): void => {
+    if (failedKey !== undefined && hashKey(failedKey) === hashKey(AdminKeys.summary)) return;
+
     if (AdminAccess.gateOf(Api.failureOf(reason)) === "verify") {
       void client.invalidateQueries({ queryKey: AdminKeys.summary });
     }
