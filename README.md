@@ -322,6 +322,7 @@ The schema is `apps/api/src/db/schema.ts`, and the migrations under `apps/api/dr
   | --- | --- | --- | --- | --- |
   | `credentials` | everything that checks a password or a code | client address | 10 | 1 every 6 s |
   | `account-login` | sign-in, besides `credentials` | account | 5 | 1 every 60 s |
+| `account-code` | every 2FA code check of one account, besides `credentials` | account | 5 | 1 every 60 s |
   | `session` | refresh, provider sign-in | client address | 30 | 1 per s |
   | `checkout` | placing an order, the address lookup | client address | 10 | 1 every 6 s |
   | `contact` | the contact form | client address | 3 | 1 every 5 min |

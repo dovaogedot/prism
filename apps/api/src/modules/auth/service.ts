@@ -26,6 +26,7 @@ import type { CaptchaVerifier } from "../../platform/captcha.ts";
 import { Clock } from "../../platform/clock.ts";
 import type { Hasher } from "../../platform/hasher.ts";
 import type { Mailer } from "../../platform/mailer.ts";
+import type { TakeResult } from "../../platform/rate-limit.ts";
 import {
   OAuthState,
   type AuthorizationCode,
@@ -55,6 +56,8 @@ export type AuthDependencies = Readonly<{
   passwordResetTtlSeconds: number;
   /** How long a session's TOTP check counts as recent. */
   staffVerificationTtlSeconds: number;
+  /** Takes one TOTP check from the account's budget, which every code check of that account shares. */
+  limitCodeChecks: (userId: UserId) => TakeResult;
 }>;
 
 /** What the caller learns about the browser, for the session audit trail. */
@@ -165,6 +168,9 @@ export const AuthService = {
      */
     const acceptCode = (user: UserRecord, code: TotpCode): ResultAsync<void, DomainError> => {
       if (user.totpSecret === undefined) return errAsync({ _tag: "TwoFactorNotInitialized" });
+
+      const taken = deps.limitCodeChecks(user.id);
+      if (!taken.allowed) return errAsync({ _tag: "RateLimited", retryAfterSeconds: taken.retryAfterSeconds });
 
       const step = totp.acceptedStep(user.totpSecret, code, user.totpLastStep);
       if (step === undefined) return errAsync({ _tag: "TwoFactorCodeInvalid" });

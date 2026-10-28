@@ -70,6 +70,7 @@ export type RateLimitPolicy = BucketShape & Readonly<{ key: RateLimitKey }>;
 export type RateLimitPolicyName =
   | "credentials"
   | "account-login"
+  | "account-code"
   | "session"
   | "checkout"
   | "contact"
@@ -86,6 +87,8 @@ export const RateLimitPolicy = {
     credentials: { key: "address", capacity: 10, refillPerSecond: 1 / 6 },
     // One account guessed at from many addresses still runs dry.
     "account-login": { key: "account", capacity: 5, refillPerSecond: 1 / 60 },
+    // Every TOTP check of one account, from any address and any route, takes from one bucket.
+    "account-code": { key: "account", capacity: 5, refillPerSecond: 1 / 60 },
     // Every page load refreshes the session, so this is roomier.
     session: { key: "address", capacity: 30, refillPerSecond: 1 },
     checkout: { key: "address", capacity: 10, refillPerSecond: 1 / 6 },
@@ -101,6 +104,7 @@ export const RateLimitPolicy = {
   NAMES: [
     "credentials",
     "account-login",
+    "account-code",
     "session",
     "checkout",
     "contact",

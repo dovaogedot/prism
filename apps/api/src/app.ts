@@ -249,6 +249,7 @@ export const App = {
       refreshTtlSeconds: config.tokens.refreshTtlSeconds,
       passwordResetTtlSeconds: config.tokens.passwordResetTtlSeconds,
       staffVerificationTtlSeconds: config.staff.verificationTtlSeconds,
+      limitCodeChecks: (userId) => limiter.take("account-code", `user:${userId}`),
     });
 
     const accountAdminRepository = AccountAdminRepository.create(database.db, cipher, audit);

@@ -10,8 +10,11 @@ import { hasZodFastifySchemaValidationErrors } from "fastify-type-provider-zod";
 
 export const HttpErrors = {
   /** Answers a request with the status and body an error is defined to carry. */
-  send: (reply: FastifyReply, error: DomainError): FastifyReply =>
-    reply.status(DomainError.httpStatus(error)).send(DomainError.toResponse(error)),
+  send: (reply: FastifyReply, error: DomainError): FastifyReply => {
+    if (error._tag === "RateLimited") reply.header("Retry-After", error.retryAfterSeconds);
+
+    return reply.status(DomainError.httpStatus(error)).send(DomainError.toResponse(error));
+  },
 
   /** Answers a result: its value as JSON with 200, or its error as that error's status. */
   answer: async <T>(reply: FastifyReply, result: ResultAsync<T, DomainError>): Promise<FastifyReply> => {

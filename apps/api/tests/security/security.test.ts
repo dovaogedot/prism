@@ -476,6 +476,30 @@ describe("rate limiting", () => {
     expect((await guess("198.51.100.10", "someone-else@example.com")).statusCode).toBe(401);
   });
 
+  it("stops guessing at one account's 2FA codes from many addresses", async () => {
+    const account = await Staff.account(harness, "code-target@example.com", []);
+    const verify = (address: string, code: string) =>
+      throttled.app.inject({
+        method: "POST",
+        url: "/api/v1/auth/2fa/verify",
+        remoteAddress: address,
+        headers: { authorization: `Bearer ${account.accessToken}` },
+        payload: { code },
+      });
+    const statuses: number[] = [];
+
+    for (let index = 0; index < RateLimitPolicy.table["account-code"].capacity; index += 1) {
+      statuses.push((await verify(`198.51.100.${40 + index}`, "000000")).statusCode);
+    }
+    Staff.nextCode(harness);
+    const refused = await verify("198.51.100.60", harness.totpCodeFor(String(account.secret)));
+
+    expect(statuses.every((status) => status === 401)).toBe(true);
+    expect(refused.statusCode).toBe(429);
+    // Half of the minute a check takes to refill went by with the next code.
+    expect(refused.headers["retry-after"]).toBe("30");
+  });
+
   it("ignores a forwarded address the caller made up", async () => {
     // With the whole X-Forwarded-For chain trusted, a caller could name a new
     // address on every request and never spend the same budget twice. The

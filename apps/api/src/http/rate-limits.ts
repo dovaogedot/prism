@@ -40,7 +40,6 @@ export const RateLimits = {
 
     if (result.allowed) return undefined;
 
-    reply.header("Retry-After", result.retryAfterSeconds);
     return HttpErrors.send(reply, { _tag: "RateLimited", retryAfterSeconds: result.retryAfterSeconds });
   },
 
