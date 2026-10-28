@@ -217,6 +217,16 @@ jobs: # The work this workflow does.
             fi
           done
 
+          # Both passwords go into a connection URL as they are, where a `/`,
+          # `#`, `%` or `@` breaks the URL, so only the characters a URL
+          # never escapes pass.
+          for name in POSTGRES_PASSWORD RABBITMQ_PASSWORD; do
+            if [[ ! ${!name} =~ ^[A-Za-z0-9._~-]+$ ]]; then
+              echo "$name may hold only letters, digits and - . _ ~." >&2
+              exit 1
+            fi
+          done
+
           # A server has no Stripe CLI to hand the API a signing secret, so
           # payments without the dashboard endpoint's secret would refuse
           # every webhook.
