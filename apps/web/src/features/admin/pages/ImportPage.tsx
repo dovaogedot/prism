@@ -1,5 +1,5 @@
 import type { ImportReport } from "@prism/shared";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { match } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
@@ -20,11 +20,16 @@ const Report = {
 /**
  * Bulk import from a CSV or JSON file. A check reads the whole file and
  * lists every problem by row and column without writing anything; only a
- * file that passed its check can be imported, and then all of it is written
- * at once or none of it.
+ * file that passed its check can be imported, and then the bytes that were
+ * checked are written, all at once or none of them.
  */
 export const ImportPage = () => {
+  const input = useRef<HTMLInputElement>(null);
+
   const [file, setFile] = useState<File | undefined>(undefined);
+
+  /** The bytes of the file as its last check read them, which an import sends. */
+  const [checked, setChecked] = useState<File | undefined>(undefined);
 
   const [report, setReport] = useState<ImportReport | undefined>(undefined);
 
@@ -38,13 +43,31 @@ export const ImportPage = () => {
     return Api.post<ImportReport>(`/admin/products/import?dryRun=${change.isDryRun}`, form);
   });
 
-  const check = (chosen: File): void => {
+  const check = async (chosen: File): Promise<void> => {
     setFailure(undefined);
     setReport(undefined);
+    setChecked(undefined);
+
+    // Read now, so a file saved again since it was chosen, which a browser may refuse to send, is caught here.
+    const snapshot = await chosen.arrayBuffer().then(
+      (bytes) => new File([bytes], chosen.name, { type: chosen.type }),
+      () => undefined,
+    );
+
+    if (snapshot === undefined) {
+      setFile(undefined);
+      if (input.current !== null) input.current.value = "";
+      setFailure("The file changed after it was chosen. Choose it again.");
+      return;
+    }
+
     send.mutate(
-      { file: chosen, isDryRun: true },
+      { file: snapshot, isDryRun: true },
       {
-        onSuccess: setReport,
+        onSuccess: (found) => {
+          setReport(found);
+          setChecked(snapshot);
+        },
         onError: (reason) => {
           const found = Api.failureOf(reason);
           if (found?.code === "ImportInvalid") {
@@ -57,7 +80,7 @@ export const ImportPage = () => {
     );
   };
 
-  const isClean = report !== undefined && report.dryRun && report.issues.length === 0;
+  const isClean = checked !== undefined && report !== undefined && report.dryRun && report.issues.length === 0;
 
   return (
     <AdminPage text={PageText.adminImport} heading="Import products">
@@ -68,6 +91,7 @@ export const ImportPage = () => {
           </label>
           <input
             className="block w-full text-sm text-ink-soft file:mr-3 file:rounded-lg file:border file:border-line file:bg-sunken file:px-3 file:py-2 file:text-sm file:font-medium file:text-ink"
+            ref={input}
             id="import-file"
             type="file"
             accept=".csv,.json,text/csv,application/json"
@@ -75,6 +99,7 @@ export const ImportPage = () => {
             onChange={(event) => {
               setFile(event.target.files?.[0]);
               setReport(undefined);
+              setChecked(undefined);
             }}
           />
           <p className="text-sm text-ink-faint" id="import-file-hint">
@@ -82,7 +107,7 @@ export const ImportPage = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button tone="quiet" type="button" disabled={file === undefined} busy={send.isPending && !isConfirming} onClick={() => file !== undefined && check(file)}>
+          <Button tone="quiet" type="button" disabled={file === undefined} busy={send.isPending && !isConfirming} onClick={() => file !== undefined && void check(file)}>
             Check the file
           </Button>
           <Button type="button" disabled={!isClean} onClick={() => setConfirming(true)}>
@@ -104,7 +129,7 @@ export const ImportPage = () => {
         )
         .otherwise((found) => (
           <div className="space-y-3">
-            <Alert title={`The file has ${found.issues.length === 1 ? "1 problem" : `${found.issues.length} problems`}`}>Nothing was written. Fix the file and check it again.</Alert>
+            <Alert title={`The file has ${found.issues.length === 1 ? "1 problem" : `${found.issues.length} problems`}`}>Nothing was written. Fix the file, choose it again and check it.</Alert>
             <DataTable
               label="Problems in the file"
               rows={found.issues}
@@ -143,9 +168,9 @@ export const ImportPage = () => {
         isBusy={send.isPending}
         onCancel={() => setConfirming(false)}
         onConfirm={() => {
-          if (file === undefined) return;
+          if (checked === undefined) return;
           send.mutate(
-            { file, isDryRun: false },
+            { file: checked, isDryRun: false },
             {
               onSuccess: (written) => {
                 setConfirming(false);
