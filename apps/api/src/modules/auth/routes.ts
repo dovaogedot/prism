@@ -14,6 +14,7 @@ import {
   ResetPasswordInput,
   TwoFactorCodeInput,
   TwoFactorLoginInput,
+  type DomainError,
 } from "@prism/shared";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
@@ -276,17 +277,24 @@ export const AuthRoutes = {
         config: session,
         schema: {
           params: providerParams,
-          querystring: z.object({ code: AuthorizationCode.schema, state: OAuthState.schema }),
+          // A browser lands here from the provider, so nothing in the query may fail as JSON:
+          // a person who cancels comes back with `error` and no code.
+          querystring: z.object({
+            code: AuthorizationCode.schema.optional().catch(undefined),
+            state: OAuthState.schema.optional().catch(undefined),
+          }),
         },
       },
       async (request, reply) => {
         const expected = request.cookies[Cookies.OAUTH_STATE];
+        const failWith = (tag: DomainError["_tag"]) => reply.redirect(`${deps.publicWebOrigin}/login?error=${tag}`, 302);
 
         Cookies.clearOAuthState(reply, cookies);
 
-        if (expected === undefined || expected !== request.query.state) {
-          return HttpErrors.send(reply, { _tag: "OAuthStateInvalid" });
+        if (expected === undefined || request.query.state === undefined || expected !== request.query.state) {
+          return failWith("OAuthStateInvalid");
         }
+        if (request.query.code === undefined) return failWith("OAuthCanceled");
 
         const result = await service.completeOAuthLogin({
           provider: request.params.provider,
@@ -295,9 +303,7 @@ export const AuthRoutes = {
           context: AuthRoutes.contextOf(request),
         });
 
-        if (result.isErr()) {
-          return reply.redirect(`${deps.publicWebOrigin}/login?error=${result.error._tag}`, 302);
-        }
+        if (result.isErr()) return failWith(result.error._tag);
 
         if ("status" in result.value) {
           Cookies.setTwoFactor(reply, result.value.challengeToken, cookies);

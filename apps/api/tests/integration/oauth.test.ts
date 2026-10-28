@@ -203,8 +203,8 @@ describe.each(OAuthProvider.NAMES)("signing in with %s", (provider) => {
       cookies: { [OAUTH_STATE_COOKIE]: "the-real-state" },
     });
 
-    expect(response.statusCode).toBe(400);
-    expect(jsonOf(response)["error"]).toMatchObject({ code: "OAuthStateInvalid" });
+    expect(response.statusCode).toBe(302);
+    expect(response.headers["location"]).toBe(`${harness.config.http.webOrigin}/login?error=OAuthStateInvalid`);
     expect(await harness.database.sql`SELECT id FROM app_user`).toHaveLength(0);
   });
 
@@ -214,7 +214,18 @@ describe.each(OAuthProvider.NAMES)("signing in with %s", (provider) => {
       url: `/api/v1/auth/oauth/${provider}/callback?code=abc&state=abc`,
     });
 
-    expect(response.statusCode).toBe(400);
+    expect(response.headers["location"]).toBe(`${harness.config.http.webOrigin}/login?error=OAuthStateInvalid`);
+  });
+
+  it("sends a person who canceled at the provider back to the sign-in page", async () => {
+    const response = await harness.app.inject({
+      method: "GET",
+      url: `/api/v1/auth/oauth/${provider}/callback?error=access_denied&state=the-real-state`,
+      cookies: { [OAUTH_STATE_COOKIE]: "the-real-state" },
+    });
+
+    expect(response.statusCode).toBe(302);
+    expect(response.headers["location"]).toBe(`${harness.config.http.webOrigin}/login?error=OAuthCanceled`);
   });
 });
 

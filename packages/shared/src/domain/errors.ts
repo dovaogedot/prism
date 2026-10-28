@@ -27,6 +27,8 @@ export type DomainError =
   | Readonly<{ _tag: "ResetTokenInvalid" }>
   | Readonly<{ _tag: "PasswordLoginUnavailable" }>
   | Readonly<{ _tag: "OAuthStateInvalid" }>
+  /** The person canceled at the provider, or the provider refused to sign them in. */
+  | Readonly<{ _tag: "OAuthCanceled" }>
   | Readonly<{ _tag: "OAuthExchangeFailed" }>
   | Readonly<{ _tag: "OAuthProviderUnknown" }>
   | Readonly<{ _tag: "OAuthEmailUnavailable" }>
@@ -108,6 +110,7 @@ export const DomainError = {
     ResetTokenInvalid: 400,
     PasswordLoginUnavailable: 409,
     OAuthStateInvalid: 400,
+    OAuthCanceled: 400,
     OAuthExchangeFailed: 502,
     OAuthProviderUnknown: 404,
     OAuthEmailUnavailable: 422,
@@ -171,6 +174,7 @@ export const DomainError = {
     PasswordLoginUnavailable:
       "This account signs in through a provider. Use the provider button instead.",
     OAuthStateInvalid: "That sign-in attempt expired. Please try again.",
+    OAuthCanceled: "Signing in with that account was canceled.",
     OAuthExchangeFailed: "That sign-in provider is unavailable right now.",
     OAuthProviderUnknown: "We do not support signing in with that.",
     OAuthEmailUnavailable: "We could not read a verified email address from that account.",
