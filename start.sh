@@ -141,6 +141,14 @@ case "${1:-up}" in
     ;;
 esac
 
+# --pull fetches newer copies of the base images the Dockerfiles build from,
+# and of the images the stack runs as they are, then starts as usual.
+if [ "${1:-}" = "--pull" ]; then
+  docker compose build --pull
+  docker compose pull --ignore-buildable
+  shift
+fi
+
 # `depends_on: service_completed_successfully` makes this fail by itself if the
 # migration exits non-zero, so its status is the whole check.
 # (`docker compose wait migrate` cannot be used here: by the time up returns,

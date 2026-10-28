@@ -152,9 +152,20 @@ if ($action -eq "test") {
   exit $LASTEXITCODE
 }
 
+# --pull fetches newer copies of the base images the Dockerfiles build from,
+# and of the images the stack runs as they are, then starts as usual.
+$upArgs = @($args)
+if ($action -eq "--pull") {
+  docker compose build --pull
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  docker compose pull --ignore-buildable
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  $upArgs = @($args | Select-Object -Skip 1)
+}
+
 # `depends_on: service_completed_successfully` makes this fail by itself if the
 # migration exits non-zero, so its status is the whole check.
-docker compose up --build --detach @args
+docker compose up --build --detach @upArgs
 if ($LASTEXITCODE -ne 0) {
   Write-Host ""
   Write-Host "The stack did not come up. Migration logs:"
