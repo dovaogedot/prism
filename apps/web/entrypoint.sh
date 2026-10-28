@@ -1,5 +1,6 @@
 #!/bin/sh
-# Starts Caddy. WEB_TLS chooses how the storefront is served:
+# Starts Caddy as the caddy user, after making /tls its own. WEB_TLS chooses
+# how the storefront is served:
 #
 #   self-signed  HTTPS on port 3000 with a certificate for localhost that this
 #                script makes on the first start, and again when it nears its
@@ -29,5 +30,8 @@ case "$WEB_TLS" in
     ;;
 esac
 
+# A volume made before Caddy ran as its own user holds root's files.
+chown -R caddy:caddy /tls
+
 export WEB_TLS
-exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+exec su-exec caddy:caddy caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
