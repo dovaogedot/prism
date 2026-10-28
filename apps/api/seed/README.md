@@ -4,7 +4,7 @@ Placeholder data for the shop. The application never imports from this folder, a
 
 | Path | What it is |
 | --- | --- |
-| `seed.ts` | Fills an empty catalog: a demo shopper, reviewers, and the products of `catalog.json`. A database that already holds products is left alone. |
+| `seed.ts` | Fills an empty catalog in one transaction: a demo shopper, reviewers, and the products of `catalog.json`. A database that already holds products is left alone, apart from the smaller copies of any picture that lacks them. |
 | `seed-catalog.ts` | The shape of `catalog.json`. |
 | `data.zip` | The data: `catalog.json` with the products, and `media/` with one picture each. No image contains it. |
 | `catalog.json`, `media/` | The data unpacked. Git ignores them. |

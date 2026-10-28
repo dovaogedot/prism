@@ -27,7 +27,7 @@ import {
 } from "@prism/shared";
 import { asc, count, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
-import { Database, type Database as Db } from "../src/db/client.ts";
+import { Database, type Database as Db, type Transaction } from "../src/db/client.ts";
 import {
   brands,
   categories,
@@ -117,10 +117,18 @@ export const Seed = {
   /** The instant `hours` hours after `start`. */
   hoursAfter: (start: Date, hours: number): Date => new Date(start.getTime() + hours * 60 * 60 * 1000),
 
-  /** Plants everything unless products already exist. */
+  /**
+   * Plants everything in one transaction unless products already exist, so a
+   * seed stopped part way leaves an empty catalog. Either way, it then makes
+   * the smaller copies of every picture that has none.
+   */
   run: async (db: Db, mediaDirectory: string, cipher: FieldCipher): Promise<SeedReport> => {
+    const images = ImageStore.create(mediaDirectory);
     const [existing] = await db.select({ total: count() }).from(products);
-    if (existing !== undefined && existing.total > 0) return { _tag: "Present", products: existing.total };
+    if (existing !== undefined && existing.total > 0) {
+      await Seed.variants(db, images);
+      return { _tag: "Present", products: existing.total };
+    }
 
     faker.seed(42);
     const draw = new Faker({ locale: [en, base], seed: Seed.REVIEW_SEED });
@@ -135,114 +143,118 @@ export const Seed = {
       })),
     ];
 
-    const accounts = await db
-      .insert(users)
-      .values(
-        people.map((person) => ({
-          email: cipher.seal(person.email),
-          emailIndex: cipher.index("account-email", person.email),
-          passwordHash,
-          ...(person.email === Seed.DEMO_EMAIL
-            ? { fullName: cipher.seal(Seed.DEMO_NAME), phone: cipher.seal(Seed.DEMO_PHONE) }
-            : {}),
-        })),
-      )
-      .onConflictDoNothing()
-      .returning({ id: users.id, emailIndex: users.emailIndex });
+    const planted = await db.transaction(async (tx) => {
+      const accounts = await tx
+        .insert(users)
+        .values(
+          people.map((person) => ({
+            email: cipher.seal(person.email),
+            emailIndex: cipher.index("account-email", person.email),
+            passwordHash,
+            ...(person.email === Seed.DEMO_EMAIL
+              ? { fullName: cipher.seal(Seed.DEMO_NAME), phone: cipher.seal(Seed.DEMO_PHONE) }
+              : {}),
+          })),
+        )
+        .onConflictDoNothing()
+        .returning({ id: users.id, emailIndex: users.emailIndex });
 
-    const reviewers: Reviewer[] = [];
-    for (const person of people) {
-      const index = cipher.index("account-email", person.email);
-      const account = accounts.find((row) => row.emailIndex.equals(index));
-      if (account !== undefined) reviewers.push({ id: account.id, byline: person.byline });
-    }
-
-    const shopper = reviewers[0];
-    const catalog = await Seed.catalog();
-
-    const brandSlugs = new Set<string>();
-    const brandRows = await db
-      .insert(brands)
-      .values([...new Set(catalog.categories.map((shelf) => shelf.brand))].map((name) => ({ slug: Seed.slugOf(name, brandSlugs), name })))
-      .returning({ id: brands.id, name: brands.name });
-    const brandIds = new Map(brandRows.map((row) => [row.name, row.id]));
-
-    const categorySlugs = new Set<string>();
-    const productSlugs = new Set<string>();
-    const shelved: Shelved[] = [];
-    const reviewedByShopper = new Set<ProductId>();
-
-    for (const shelf of catalog.categories) {
-      const [category] = await db
-        .insert(categories)
-        .values({ slug: Seed.slugOf(shelf.name, categorySlugs), name: shelf.name })
-        .returning({ id: categories.id });
-      const brandId = brandIds.get(shelf.brand);
-      if (category === undefined || brandId === undefined) continue;
-
-      for (const item of shelf.products) {
-        const [product] = await db
-          .insert(products)
-          .values({
-            slug: Seed.slugOf(item.name, productSlugs),
-            name: item.name,
-            description: item.description,
-            priceCents: item.priceCents,
-            stock: faker.number.int({ min: 0, max: 40 }),
-            categoryId: category.id,
-            brandId,
-            weightGrams: faker.number.int({ min: 2, max: 500 }),
-            widthMm: faker.number.int({ min: 20, max: 300 }),
-            heightMm: faker.number.int({ min: 20, max: 300 }),
-            depthMm: faker.number.int({ min: 1, max: 100 }),
-          })
-          .returning({ id: products.id, slug: products.slug, name: products.name, priceCents: products.priceCents });
-
-        if (product === undefined) continue;
-        shelved.push(product);
-
-        const properties = Object.entries(item.properties);
-        if (properties.length > 0) {
-          await db.insert(productProperties).values(properties.map(([name, value]) => ({ productId: product.id, name, value })));
-        }
-
-        await copyFile(new URL(`media/${item.image}`, Seed.CATALOG_DIR), join(mediaDirectory, item.image));
-        await db
-          .insert(productImages)
-          .values({ productId: product.id, file: item.image, alt: item.name, position: 0, isPixelArt: true });
-
-        await Seed.review(db, product.id, reviewers, draw);
-        if (shopper !== undefined && (await Seed.hasReviewed(db, product.id, shopper.id))) reviewedByShopper.add(product.id);
+      const reviewers: Reviewer[] = [];
+      for (const person of people) {
+        const index = cipher.index("account-email", person.email);
+        const account = accounts.find((row) => row.emailIndex.equals(index));
+        if (account !== undefined) reviewers.push({ id: account.id, byline: person.byline });
       }
-    }
 
-    const now = new Date();
-    await db
-      .update(products)
-      .set({ featuredAt: now })
-      .where(
-        inArray(
-          products.id,
-          faker.helpers.arrayElements(
-            shelved.map((product) => product.id),
-            Seed.FEATURED_COUNT,
+      const shopper = reviewers[0];
+      const catalog = await Seed.catalog();
+
+      const brandSlugs = new Set<string>();
+      const brandRows = await tx
+        .insert(brands)
+        .values([...new Set(catalog.categories.map((shelf) => shelf.brand))].map((name) => ({ slug: Seed.slugOf(name, brandSlugs), name })))
+        .returning({ id: brands.id, name: brands.name });
+      const brandIds = new Map(brandRows.map((row) => [row.name, row.id]));
+
+      const categorySlugs = new Set<string>();
+      const productSlugs = new Set<string>();
+      const shelved: Shelved[] = [];
+      const reviewedByShopper = new Set<ProductId>();
+
+      for (const shelf of catalog.categories) {
+        const [category] = await tx
+          .insert(categories)
+          .values({ slug: Seed.slugOf(shelf.name, categorySlugs), name: shelf.name })
+          .returning({ id: categories.id });
+        const brandId = brandIds.get(shelf.brand);
+        if (category === undefined || brandId === undefined) continue;
+
+        for (const item of shelf.products) {
+          const [product] = await tx
+            .insert(products)
+            .values({
+              slug: Seed.slugOf(item.name, productSlugs),
+              name: item.name,
+              description: item.description,
+              priceCents: item.priceCents,
+              stock: faker.number.int({ min: 0, max: 40 }),
+              categoryId: category.id,
+              brandId,
+              weightGrams: faker.number.int({ min: 2, max: 500 }),
+              widthMm: faker.number.int({ min: 20, max: 300 }),
+              heightMm: faker.number.int({ min: 20, max: 300 }),
+              depthMm: faker.number.int({ min: 1, max: 100 }),
+            })
+            .returning({ id: products.id, slug: products.slug, name: products.name, priceCents: products.priceCents });
+
+          if (product === undefined) continue;
+          shelved.push(product);
+
+          const properties = Object.entries(item.properties);
+          if (properties.length > 0) {
+            await tx.insert(productProperties).values(properties.map(([name, value]) => ({ productId: product.id, name, value })));
+          }
+
+          await copyFile(new URL(`media/${item.image}`, Seed.CATALOG_DIR), join(mediaDirectory, item.image));
+          await tx
+            .insert(productImages)
+            .values({ productId: product.id, file: item.image, alt: item.name, position: 0, isPixelArt: true });
+
+          await Seed.review(tx, product.id, reviewers, draw);
+          if (shopper !== undefined && (await Seed.hasReviewed(tx, product.id, shopper.id))) reviewedByShopper.add(product.id);
+        }
+      }
+
+      const now = new Date();
+      await tx
+        .update(products)
+        .set({ featuredAt: now })
+        .where(
+          inArray(
+            products.id,
+            faker.helpers.arrayElements(
+              shelved.map((product) => product.id),
+              Seed.FEATURED_COUNT,
+            ),
           ),
-        ),
-      );
+        );
 
-    if (shopper !== undefined) {
-      await Seed.demoOrders(
-        db,
-        cipher,
-        shopper.id,
-        shelved.filter((product) => !reviewedByShopper.has(product.id)),
-        now,
-      );
-    }
+      if (shopper !== undefined) {
+        await Seed.demoOrders(
+          tx,
+          cipher,
+          shopper.id,
+          shelved.filter((product) => !reviewedByShopper.has(product.id)),
+          now,
+        );
+      }
 
-    await Seed.variants(db, ImageStore.create(mediaDirectory));
+      return shelved.length;
+    });
 
-    return { _tag: "Planted", products: shelved.length };
+    await Seed.variants(db, images);
+
+    return { _tag: "Planted", products: planted };
   },
 
   /** Makes the smaller copies of every picture that has none, a few pictures at a time. */
@@ -274,7 +286,7 @@ export const Seed = {
    * a few votes and some get many, a review with text more than one with
    * stars only. No body repeats on one product. Every draw comes from `draw`.
    */
-  review: async (db: Db, productId: ProductId, reviewers: readonly Reviewer[], draw: Faker): Promise<void> => {
+  review: async (db: Db | Transaction, productId: ProductId, reviewers: readonly Reviewer[], draw: Faker): Promise<void> => {
     // Squaring and cubing a uniform draw keeps most results small and a few large.
     const sample = draw.helpers.arrayElements(reviewers, Math.round(reviewers.length * draw.number.float() ** 2));
     if (sample.length === 0) return;
@@ -323,7 +335,7 @@ export const Seed = {
     if (votes.length > 0) await db.insert(reviewVotes).values(votes);
   },
 
-  hasReviewed: async (db: Db, productId: ProductId, userId: UserId): Promise<boolean> =>
+  hasReviewed: async (db: Db | Transaction, productId: ProductId, userId: UserId): Promise<boolean> =>
     (
       await db.query.productReviews.findFirst({
         columns: { id: true },
@@ -336,7 +348,7 @@ export const Seed = {
    * the order history has entries and the shopper can review at once.
    */
   demoOrders: async (
-    db: Db,
+    db: Db | Transaction,
     cipher: FieldCipher,
     shopperId: UserId,
     candidates: readonly Shelved[],
