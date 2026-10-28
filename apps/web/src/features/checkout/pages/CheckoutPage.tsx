@@ -53,10 +53,11 @@ export const CheckoutPage = () => {
         </Link>
       </div>
 
+      {/* A failed refetch keeps the data it had, so only a first load that failed replaces the form. */}
       {match({ cart, config, options, prefillSettled })
-        .with({ cart: { status: "error" } }, ({ cart: { error } }) => <Alert>{Failure.message(error)}</Alert>)
-        .with({ config: { status: "error" } }, ({ config: { error } }) => <Alert>{Failure.message(error)}</Alert>)
-        .with({ options: { status: "error" } }, ({ options: { error } }) => <Alert>{Failure.message(error)}</Alert>)
+        .with({ cart: { status: "error", data: P.nullish } }, ({ cart: { error } }) => <Alert>{Failure.message(error)}</Alert>)
+        .with({ config: { status: "error", data: P.nullish } }, ({ config: { error } }) => <Alert>{Failure.message(error)}</Alert>)
+        .with({ options: { status: "error", data: P.nullish } }, ({ options: { error } }) => <Alert>{Failure.message(error)}</Alert>)
         .with(
           P.union(
             { cart: { data: P.nullish } },
