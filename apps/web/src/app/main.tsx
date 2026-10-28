@@ -4,6 +4,7 @@
  * answered with status 404.
  */
 
+import type { UserId } from "@prism/shared";
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -35,6 +36,7 @@ import { PrivacyPage } from "../features/pages/pages/PrivacyPage.tsx";
 import { TermsPage } from "../features/pages/pages/TermsPage.tsx";
 import { ContactPage } from "../features/support/pages/ContactPage.tsx";
 import { AdminAccess } from "../features/admin/admin.ts";
+import { TokenStore } from "../features/auth/token-store.ts";
 import { AdminRoutes } from "./admin-routes.ts";
 import { Root } from "./Root.tsx";
 import "./styles.css";
@@ -50,6 +52,20 @@ const queryClient: QueryClient = new QueryClient({
       retry: 1,
     },
   },
+});
+
+/** The account the query cache holds answers for. */
+const CachedFor: { userId: UserId | undefined } = { userId: TokenStore.user()?.id };
+
+// Another account in the tab starts from an empty cache, so nothing cached for
+// the last one reaches the next: on sign-in, sign-out and an ended session alike.
+TokenStore.subscribe(() => {
+  const userId = TokenStore.user()?.id;
+
+  if (userId !== CachedFor.userId) {
+    CachedFor.userId = userId;
+    queryClient.clear();
+  }
 });
 
 const router = createBrowserRouter([
