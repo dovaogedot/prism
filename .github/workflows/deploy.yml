@@ -195,6 +195,7 @@ jobs: # The work this workflow does.
           STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }} # The browser half of the pair.
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }} # Verifies the webhook endpoint registered in the Stripe dashboard.
           RECAPTCHA_SECRET_KEY: ${{ secrets.RECAPTCHA_SECRET_KEY }} # Set, the API checks each CAPTCHA with Google.
+          RECAPTCHA_SITE_KEY: ${{ secrets.RECAPTCHA_SITE_KEY }} # Only checked here against its secret; the web image carries it from its build.
           OAUTH_GOOGLE_CLIENT_ID: ${{ secrets.OAUTH_GOOGLE_CLIENT_ID }} # Set with its secret, Google sign-in is real.
           OAUTH_GOOGLE_CLIENT_SECRET: ${{ secrets.OAUTH_GOOGLE_CLIENT_SECRET }} # The other half of Google's pair.
           OAUTH_GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }} # Set with its secret, GitHub sign-in is real.
@@ -232,6 +233,14 @@ jobs: # The work this workflow does.
           # every webhook.
           if [ -n "$STRIPE_SECRET_KEY" ] && [ -z "$STRIPE_WEBHOOK_SECRET" ]; then
             echo "STRIPE_SECRET_KEY is set but STRIPE_WEBHOOK_SECRET is not." >&2
+            exit 1
+          fi
+
+          # The site key is built into the web image and the secret goes to
+          # the API, so one without the other leaves the widget and the check
+          # on different keys, and every CAPTCHA fails or every one passes.
+          if [ "${RECAPTCHA_SITE_KEY:+set}" != "${RECAPTCHA_SECRET_KEY:+set}" ]; then
+            echo "Set RECAPTCHA_SITE_KEY and RECAPTCHA_SECRET_KEY together, or neither." >&2
             exit 1
           fi
 
