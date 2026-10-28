@@ -57,7 +57,7 @@ Without Stripe keys the cart works and checkout says that payments are not set u
 2. Copy the two test keys from Developers > API keys into `.env`: `STRIPE_SECRET_KEY` (`sk_test_...`) and `STRIPE_PUBLISHABLE_KEY` (`pk_test_...`).
 3. Run `./start.sh` again.
 
-Stripe tells the shop how each payment went through a webhook. `COMPOSE_PROFILES=stripe` in `.env` starts the Stripe CLI as a container that forwards those webhooks to the API, so the laptop needs no public address and no CLI of its own. To run the CLI on the host instead, remove that line, run `stripe listen --forward-to localhost:3000/api/v1/payments/webhook`, and put the `whsec_...` secret it prints into `STRIPE_WEBHOOK_SECRET`.
+Stripe tells the shop how each payment went through a webhook. `COMPOSE_PROFILES=stripe` in `.env` starts the Stripe CLI as a container that forwards those webhooks to the API, so the laptop needs no public address and no CLI of its own. To run the CLI on the host instead, remove that line, run `stripe listen --forward-to https://localhost:3000/api/v1/payments/webhook --skip-verify` (the storefront's certificate is self-signed), put the `whsec_...` secret it prints into `STRIPE_WEBHOOK_SECRET`, and run `docker compose up -d api` so the API reads it.
 
 `PAYMENTS_MODE=simulated` in `.env` takes payments without Stripe, on `localhost` only: checkout asks for no card, and every payment succeeds at once. The browser suite and the load test run this way.
 
