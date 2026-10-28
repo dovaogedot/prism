@@ -2,7 +2,8 @@
  * The cart as the page holds it. The server is the source of truth: every
  * change answers with the whole cart, which replaces the cached one. Until
  * it answers, a quantity change or a removal shows at once, with totals from
- * the same `Pricing` the server charges with, and is rolled back if refused.
+ * the same `Pricing` the server charges with. A refused removal is rolled
+ * back, and a refused quantity change shows the cart the server holds.
  */
 
 import { Price, Pricing, type CartView, type ProductId, type ProductSummary, type ShippingOption, type UserId } from "@prism/shared";
@@ -36,6 +37,9 @@ export const CartCache = {
   key: (userId: UserId | undefined) => ["cart", userId ?? "guest"] as const,
 
   recommendationsKey: (userId: UserId | undefined) => ["cart", userId ?? "guest", "recommendations"] as const,
+
+  /** Every quantity change in flight. */
+  quantityKey: ["cart", "quantity"] as const,
 
   /** The view with one line at `quantity` and every total recomputed. A line not in the view changes nothing. */
   withQuantity: (view: CartView, productId: ProductId, quantity: number): CartView => {
@@ -121,11 +125,23 @@ export const useCartChanges = () => {
     onSuccess: (view) => CartCache.settle(client, userId, view),
   });
 
+  /** Whether no quantity change waits behind the one that just answered; that one is counted until it settles. */
+  const isLastQuantityChange = (): boolean => client.isMutating({ mutationKey: CartCache.quantityKey }) === 1;
+
+  // Quantity changes go to the server one at a time, in the order they were
+  // made, and only the last one's answer replaces the cart: an earlier answer
+  // would undo the clicks made since. A refusal refetches what the server holds.
   const setQuantity = useMutation({
+    mutationKey: CartCache.quantityKey,
+    scope: { id: "cart-quantity" },
     mutationFn: (change: LineChange) => Api.put<CartView>(`/cart/items/${change.productId}`, { quantity: change.quantity }),
     onMutate: (change) => optimistic((view) => CartCache.withQuantity(view, change.productId, change.quantity)),
-    onError: (_reason, _change, previous) => restore(previous),
-    onSuccess: (view) => CartCache.settle(client, userId, view),
+    onError: () => {
+      if (isLastQuantityChange()) void client.invalidateQueries({ queryKey: key });
+    },
+    onSuccess: (view) => {
+      if (isLastQuantityChange()) CartCache.settle(client, userId, view);
+    },
   });
 
   const remove = useMutation({
