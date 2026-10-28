@@ -181,17 +181,18 @@ export const CatalogAdminRepository = {
       throw reason;
     };
 
-    const product = async (productId: ProductId): Promise<AdminProductDetail | undefined> => {
-      const [row] = await db.select().from(products).where(eq(products.id, productId));
+    /** Reads a product through `executor`, so a transaction reads it on its own connection. */
+    const readProduct = async (executor: Database | Transaction, productId: ProductId): Promise<AdminProductDetail | undefined> => {
+      const [row] = await executor.select().from(products).where(eq(products.id, productId));
       if (row === undefined) return undefined;
 
       const [properties, images] = await Promise.all([
-        db
+        executor
           .select({ name: productProperties.name, value: productProperties.value })
           .from(productProperties)
           .where(eq(productProperties.productId, productId))
           .orderBy(asc(productProperties.name)),
-        db.select(imageColumns).from(productImages).where(eq(productImages.productId, productId)).orderBy(asc(productImages.position)),
+        executor.select(imageColumns).from(productImages).where(eq(productImages.productId, productId)).orderBy(asc(productImages.position)),
       ]);
 
       return {
@@ -296,7 +297,7 @@ export const CatalogAdminRepository = {
         };
       },
 
-      product,
+      product: (productId) => readProduct(db, productId),
 
       createProduct: (input, actor, now) =>
         db
@@ -325,7 +326,7 @@ export const CatalogAdminRepository = {
             const [current] = await tx.select().from(products).where(eq(products.id, productId)).for("update");
             if (current === undefined) return { _tag: "NotFound" };
 
-            const before = await product(productId);
+            const before = await readProduct(tx, productId);
             // Under the row lock, so a checkout's decrement lands either before or after this one.
             const stock = Math.max(current.stock + input.stock - input.stockBefore, 0);
             const saved = { ...input, stock };

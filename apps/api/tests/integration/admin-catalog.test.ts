@@ -6,6 +6,10 @@
 import { randomBytes } from "node:crypto";
 import { AdminProductSort } from "@prism/shared";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { App } from "../../src/app.ts";
+import { Database } from "../../src/db/client.ts";
+import { Topology } from "../../src/messaging/topology.ts";
+import { MessageQueue } from "../../src/platform/queue.ts";
 import { Shop } from "../support/commerce.ts";
 import { jsonOf, seedCatalog, startHarness, type Harness } from "../support/harness.ts";
 import { Staff, type TestAccount } from "../support/staff.ts";
@@ -134,6 +138,25 @@ describe("products", () => {
     const [emptied] = await harness.database.sql`SELECT stock FROM product WHERE id = ${id}`;
 
     expect([kept?.["stock"], raised?.["stock"], emptied?.["stock"]]).toEqual([7, 9, 0]);
+  });
+
+  it("saves a product while it holds the product's row lock, on a pool of one connection", { timeout: 15_000 }, async () => {
+    const database = Database.open(harness.config.database.url, 1);
+    const single = await App.build({
+      config: harness.config,
+      database,
+      overrides: { clock: harness.clock, mailer: harness.mailer, queue: MessageQueue.memory(Topology.declarations()) },
+    });
+    const id = await Shop.productId(harness, "desk-lamp");
+
+    try {
+      const saved = await Staff.call({ ...harness, app: single.app }, content, "PUT", `/admin/products/${id}`, productInput({ slug: "desk-lamp", stock: 10, stockBefore: 10 }));
+
+      expect(saved.statusCode).toBe(200);
+    } finally {
+      await single.app.close();
+      await database.close();
+    }
   });
 
   it("refuses a slug another product uses, on the slug field", async () => {
