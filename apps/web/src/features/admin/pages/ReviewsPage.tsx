@@ -20,6 +20,11 @@ import { RejectForm } from "../components/RejectForm.tsx";
 export const ReviewsPage = () => {
   const [params, setParams] = useSearchParams();
 
+  /** Filters or sorts in place, so the page keeps its scroll. */
+  const filter = (next: URLSearchParams): void => {
+    setParams(next, { preventScrollReset: true });
+  };
+
   const status = ReviewStatus.schema.catch("pending").parse(params.get("status") ?? "pending");
   const query = params.toString();
 
@@ -48,7 +53,7 @@ export const ReviewsPage = () => {
             key={name}
             type="button"
             aria-pressed={name === status}
-            onClick={() => setParams(new URLSearchParams({ status: name }))}
+            onClick={() => filter(new URLSearchParams({ status: name }))}
           >
             {ReviewStatus.label[name]}
           </button>

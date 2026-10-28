@@ -10,6 +10,11 @@ import { OrderParams } from "../orders.ts";
 export const OrderFilters = () => {
   const [params, setParams] = useSearchParams();
 
+  /** Filters or sorts in place, so the page keeps its scroll. */
+  const filter = (next: URLSearchParams): void => {
+    setParams(next, { preventScrollReset: true });
+  };
+
   const chosen = OrderParams.statuses(params);
   const sort = OrderSort.schema.catch("newest").parse(params.get("sort") ?? "newest");
 
@@ -27,7 +32,7 @@ export const OrderFilters = () => {
               key={status}
               type="button"
               aria-pressed={on}
-              onClick={() => setParams(CatalogParams.toggle(params, "status", status))}
+              onClick={() => filter(CatalogParams.toggle(params, "status", status))}
               className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                 on ? "border-accent bg-accent text-accent-ink" : "border-line text-ink-soft hover:border-line-strong hover:text-ink"
               }`}
@@ -44,7 +49,7 @@ export const OrderFilters = () => {
           <input
             type="date"
             value={params.get("from") ?? ""}
-            onChange={(event) => setParams(CatalogParams.set(params, "from", event.target.value))}
+            onChange={(event) => filter(CatalogParams.set(params, "from", event.target.value))}
             className={dateInput}
           />
         </label>
@@ -53,7 +58,7 @@ export const OrderFilters = () => {
           <input
             type="date"
             value={params.get("to") ?? ""}
-            onChange={(event) => setParams(CatalogParams.set(params, "to", event.target.value))}
+            onChange={(event) => filter(CatalogParams.set(params, "to", event.target.value))}
             className={dateInput}
           />
         </label>
@@ -61,7 +66,7 @@ export const OrderFilters = () => {
           <span className="block">Sort</span>
           <select
             value={sort}
-            onChange={(event) => setParams(CatalogParams.set(params, "sort", event.target.value))}
+            onChange={(event) => filter(CatalogParams.set(params, "sort", event.target.value))}
             className={dateInput}
           >
             {OrderSort.NAMES.map((option) => (
@@ -78,7 +83,7 @@ export const OrderFilters = () => {
             onClick={() => {
               const next = new URLSearchParams();
               if (params.has("sort")) next.set("sort", sort);
-              setParams(next);
+              filter(next);
             }}
             className="py-2 text-sm font-medium text-accent hover:underline"
           >

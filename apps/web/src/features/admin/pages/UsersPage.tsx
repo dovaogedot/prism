@@ -17,6 +17,11 @@ import { AdminPage } from "../components/AdminPage.tsx";
 export const UsersPage = () => {
   const [params, setParams] = useSearchParams();
 
+  /** Filters or sorts in place, so the page keeps its scroll. */
+  const filter = (next: URLSearchParams): void => {
+    setParams(next, { preventScrollReset: true });
+  };
+
   const query = params.toString();
 
   const users = useAdminRead<Page<AdminUserSummary>>(AdminKeys.list("users", query), `/users${query.length === 0 ? "" : `?${query}`}`);
@@ -30,7 +35,7 @@ export const UsersPage = () => {
           role="search"
           onSubmit={(event) => {
             event.preventDefault();
-            setParams(CatalogParams.set(params, "email", email.trim()));
+            filter(CatalogParams.set(params, "email", email.trim()));
           }}
         >
           <Field
@@ -48,7 +53,7 @@ export const UsersPage = () => {
           />
         </form>
         <div className="flex flex-wrap items-end gap-5">
-          <SelectField label="Staff role" id="user-role" value={params.get("role") ?? ""} onChange={(event) => setParams(CatalogParams.set(params, "role", event.target.value))}>
+          <SelectField label="Staff role" id="user-role" value={params.get("role") ?? ""} onChange={(event) => filter(CatalogParams.set(params, "role", event.target.value))}>
             <option value="">Any account</option>
             {StaffRole.NAMES.map((role) => (
               <option key={role} value={role}>
@@ -61,7 +66,7 @@ export const UsersPage = () => {
               className="size-4 accent-[var(--color-accent)]"
               type="checkbox"
               checked={params.get("staff") === "true"}
-              onChange={(event) => setParams(CatalogParams.set(params, "staff", event.target.checked ? "true" : ""))}
+              onChange={(event) => filter(CatalogParams.set(params, "staff", event.target.checked ? "true" : ""))}
             />
             Staff only
           </label>

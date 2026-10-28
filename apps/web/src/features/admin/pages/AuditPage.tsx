@@ -19,6 +19,11 @@ import { AdminPage } from "../components/AdminPage.tsx";
 export const AuditPage = () => {
   const [params, setParams] = useSearchParams();
 
+  /** Filters or sorts in place, so the page keeps its scroll. */
+  const filter = (next: URLSearchParams): void => {
+    setParams(next, { preventScrollReset: true });
+  };
+
   const query = params.toString();
 
   const events = useAdminRead<Page<AuditEventView>>(AdminKeys.list("audit", query), `/audit${query.length === 0 ? "" : `?${query}`}`);
@@ -35,7 +40,7 @@ export const AuditPage = () => {
         className="grid gap-3 rounded-lg border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end"
         onSubmit={(event) => {
           event.preventDefault();
-          setParams(CatalogParams.set(CatalogParams.set(CatalogParams.set(params, "action", action.trim()), "targetType", targetType.trim()), "targetId", targetId.trim()));
+          filter(CatalogParams.set(CatalogParams.set(CatalogParams.set(params, "action", action.trim()), "targetType", targetType.trim()), "targetId", targetId.trim()));
         }}
       >
         <Field label="Action" id="audit-action" placeholder="product. or order.refund" value={action} onChange={(event) => setAction(event.target.value)} />
@@ -44,12 +49,12 @@ export const AuditPage = () => {
         <Button type="submit" tone="quiet">
           Find
         </Button>
-        <Field label="From" id="audit-from" type="date" value={params.get("from") ?? ""} onChange={(event) => setParams(CatalogParams.set(params, "from", event.target.value))} />
-        <Field label="Until" id="audit-to" type="date" value={params.get("to") ?? ""} onChange={(event) => setParams(CatalogParams.set(params, "to", event.target.value))} />
+        <Field label="From" id="audit-from" type="date" value={params.get("from") ?? ""} onChange={(event) => filter(CatalogParams.set(params, "from", event.target.value))} />
+        <Field label="Until" id="audit-to" type="date" value={params.get("to") ?? ""} onChange={(event) => filter(CatalogParams.set(params, "to", event.target.value))} />
         {params.get("actor") === null ? null : (
           <p className="self-center text-sm text-ink-soft">
             One person's changes.{" "}
-            <button className="font-medium text-accent underline underline-offset-2" type="button" onClick={() => setParams(CatalogParams.set(params, "actor", ""))}>
+            <button className="font-medium text-accent underline underline-offset-2" type="button" onClick={() => filter(CatalogParams.set(params, "actor", ""))}>
               Show everyone's
             </button>
           </p>

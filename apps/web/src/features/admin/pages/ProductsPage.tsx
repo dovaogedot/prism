@@ -15,6 +15,11 @@ import { AdminPage } from "../components/AdminPage.tsx";
 export const ProductsPage = () => {
   const [params, setParams] = useSearchParams();
 
+  /** Filters or sorts in place, so the page keeps its scroll. */
+  const filter = (next: URLSearchParams): void => {
+    setParams(next, { preventScrollReset: true });
+  };
+
   const query = params.toString();
 
   const products = useAdminRead<Page<AdminProductSummary>>(AdminKeys.list("products", query), `/products${query.length === 0 ? "" : `?${query}`}`);
@@ -43,7 +48,7 @@ export const ProductsPage = () => {
           role="search"
           onSubmit={(event) => {
             event.preventDefault();
-            setParams(CatalogParams.set(params, "q", text.trim()));
+            filter(CatalogParams.set(params, "q", text.trim()));
           }}
         >
           <div className="min-w-48 flex-1">
@@ -55,7 +60,7 @@ export const ProductsPage = () => {
         </form>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <SelectField label="Category" id="product-category" value={params.get("category") ?? ""} onChange={(event) => setParams(CatalogParams.set(params, "category", event.target.value))}>
+          <SelectField label="Category" id="product-category" value={params.get("category") ?? ""} onChange={(event) => filter(CatalogParams.set(params, "category", event.target.value))}>
             <option value="">Any category</option>
             {(categories.data?.items ?? []).map((category) => (
               <option key={category.id} value={category.slug}>
@@ -63,7 +68,7 @@ export const ProductsPage = () => {
               </option>
             ))}
           </SelectField>
-          <SelectField label="Brand" id="product-brand" value={params.get("brand") ?? ""} onChange={(event) => setParams(CatalogParams.set(params, "brand", event.target.value))}>
+          <SelectField label="Brand" id="product-brand" value={params.get("brand") ?? ""} onChange={(event) => filter(CatalogParams.set(params, "brand", event.target.value))}>
             <option value="">Any brand</option>
             {(brands.data?.items ?? []).map((brand) => (
               <option key={brand.id} value={brand.slug}>
@@ -71,7 +76,7 @@ export const ProductsPage = () => {
               </option>
             ))}
           </SelectField>
-          <SelectField label="Sort by" id="product-sort" value={params.get("sort") ?? "name_asc"} onChange={(event) => setParams(CatalogParams.set(params, "sort", event.target.value))}>
+          <SelectField label="Sort by" id="product-sort" value={params.get("sort") ?? "name_asc"} onChange={(event) => filter(CatalogParams.set(params, "sort", event.target.value))}>
             {AdminProductSort.NAMES.map((sort) => (
               <option key={sort} value={sort}>
                 {AdminProductSort.label[sort]}
@@ -86,7 +91,7 @@ export const ProductsPage = () => {
               className="size-4 accent-[var(--color-accent)]"
               type="checkbox"
               checked={params.get("lowStock") === "true"}
-              onChange={(event) => setParams(CatalogParams.set(params, "lowStock", event.target.checked ? "true" : ""))}
+              onChange={(event) => filter(CatalogParams.set(params, "lowStock", event.target.checked ? "true" : ""))}
             />
             Low on stock (5 or fewer)
           </label>
@@ -95,7 +100,7 @@ export const ProductsPage = () => {
               className="size-4 accent-[var(--color-accent)]"
               type="checkbox"
               checked={params.get("featured") === "true"}
-              onChange={(event) => setParams(CatalogParams.set(params, "featured", event.target.checked ? "true" : ""))}
+              onChange={(event) => filter(CatalogParams.set(params, "featured", event.target.checked ? "true" : ""))}
             />
             Featured on the home page
           </label>

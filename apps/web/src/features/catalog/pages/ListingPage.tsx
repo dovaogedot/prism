@@ -36,6 +36,11 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
 
   const [params, setParams] = useSearchParams();
 
+  /** Filters or sorts in place, so the page keeps its scroll. */
+  const filter = (next: URLSearchParams): void => {
+    setParams(next, { preventScrollReset: true });
+  };
+
   const wide = useWide();
 
   const drawer = useDrawer();
@@ -102,7 +107,6 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
 
   const goToPage = (page: number): void => {
     setParams(CatalogParams.set(params, "page", String(page)));
-    window.scrollTo({ top: 0, behavior: "instant" });
   };
 
   const sortOptions = ProductSort.NAMES.map((option) => (
@@ -119,7 +123,7 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
         ))}
       </div>
     ))
-    .otherwise((data) => <Facets facets={data.facets} params={params} onChange={setParams} />);
+    .otherwise((data) => <Facets facets={data.facets} params={params} onChange={filter} />);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -160,13 +164,13 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
               <select
                 className="h-10 rounded-lg border border-line bg-surface px-3 text-sm text-ink hover:border-line-strong"
                 value={sort}
-                onChange={(event) => setParams(CatalogParams.set(params, "sort", event.target.value))}
+                onChange={(event) => filter(CatalogParams.set(params, "sort", event.target.value))}
               >
                 {sortOptions}
               </select>
             </label>
 
-            <ViewToggle view={view} onChange={(next) => setParams(Listing.withView(params, next))} />
+            <ViewToggle view={view} onChange={(next) => filter(Listing.withView(params, next))} />
           </div>
 
           {results.data?.matched === "similar" ? (
@@ -177,15 +181,15 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
 
           {results.data === undefined ? null : (
             <div className="mb-4 flex flex-wrap gap-2">
-              {CatalogParams.active(params, results.data.facets).map((filter) => (
+              {CatalogParams.active(params, results.data.facets).map((chip) => (
                 <button
                   className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2 py-0.5 text-xs text-ink-soft hover:border-line-strong hover:text-ink"
-                  key={`${filter.key}=${filter.value}`}
+                  key={`${chip.key}=${chip.value}`}
                   type="button"
-                  onClick={() => setParams(filter.next)}
-                  aria-label={`Remove ${filter.label}`}
+                  onClick={() => filter(chip.next)}
+                  aria-label={`Remove ${chip.label}`}
                 >
-                  {filter.label}
+                  {chip.label}
                   <span aria-hidden="true">×</span>
                 </button>
               ))}
@@ -208,7 +212,7 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
                   title={kind === "search" && text.length > 0 ? `Nothing matches "${text}".` : "Nothing matches that."}
                   action={
                     CatalogParams.isFiltered(params) ? (
-                      <Button tone="quiet" type="button" onClick={() => setParams(CatalogParams.cleared(params))}>
+                      <Button tone="quiet" type="button" onClick={() => filter(CatalogParams.cleared(params))}>
                         Clear all filters
                       </Button>
                     ) : undefined
