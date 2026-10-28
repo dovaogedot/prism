@@ -26,8 +26,9 @@ e2e_compose() {
 }
 
 # Builds and seeds the prism-e2e stack, runs the suite against it with any
-# arguments passed on to `playwright test`, and removes that project with its
-# volumes, whatever the suite found.
+# arguments passed on to `playwright test`, copies the traces of failed tests
+# to apps/e2e/test-results, and removes that project with its volumes,
+# whatever the suite found.
 run_e2e() {
   local status=0
 
@@ -36,7 +37,15 @@ run_e2e() {
     e2e_compose run --rm --build seed || status=$?
   fi
   if [ "$status" -eq 0 ]; then
-    e2e_compose run --rm --build e2e npx playwright test "$@" || status=$?
+    # Named and kept until the traces are out; docker cp writes them as this user.
+    docker rm -f prism-e2e-suite >/dev/null 2>&1 || true
+    e2e_compose run --name prism-e2e-suite --build e2e npx playwright test "$@" || status=$?
+    rm -rf apps/e2e/test-results
+    docker cp prism-e2e-suite:/app/apps/e2e/test-results apps/e2e/test-results >/dev/null 2>&1 || true
+    docker rm prism-e2e-suite >/dev/null 2>&1 || true
+    if [ -n "$(ls -A apps/e2e/test-results 2>/dev/null)" ]; then
+      echo "Traces of the failed tests: apps/e2e/test-results (npx playwright show-trace <trace.zip>)."
+    fi
   fi
 
   e2e_compose down --volumes --remove-orphans

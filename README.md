@@ -22,7 +22,7 @@ Fastify API on Node, Postgres behind Drizzle, RabbitMQ between the order and pay
 | `./start.sh seed` | Runs only the seed: placeholder products, reviews and a demo shopper, planted into an empty catalog. |
 | `./start.sh test` | Runs every test suite in a container. |
 | `./start.sh test npm run test:unit` | Runs only the unit tests there. |
-| `./start.sh test e2e` | Runs the browser suite against a stack of its own, `prism-e2e`, and removes that stack afterwards. |
+| `./start.sh test e2e` | Runs the browser suite against a stack of its own, `prism-e2e`, copies the traces of failed tests to `apps/e2e/test-results`, and removes that stack afterwards. |
 | `./start.sh loadtest baseline` | Runs one load test, `baseline`, `normal`, `peak` or `stress`, against a stack of its own, `prism-load`. See [Performance](#performance). |
 | `./start.sh loadtest down` | Removes the load test's stack. |
 

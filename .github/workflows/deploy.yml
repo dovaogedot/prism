@@ -130,6 +130,16 @@ jobs: # The work this workflow does.
         working-directory: apps/e2e # The suite's workspace.
         env: # The address the suite opens.
           E2E_BASE_URL: https://localhost:3200 # The e2e overlay's port; the certificate is self-signed, which the suite accepts.
+      - name: Keep the traces of failed tests # Each opens with `npx playwright show-trace`.
+        if: failure() # Only when a step above failed.
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2; pinned the same way.
+        with: # Settings for the upload.
+          name: e2e-traces # The artifact's name on the run's page.
+          path: apps/e2e/test-results # Where Playwright keeps them.
+          if-no-files-found: ignore # A step before the suite may have failed, leaving none.
+      - name: Print the stack's last log lines # What the API and the storefront said before the failure.
+        if: failure() # Only when a step above failed.
+        run: $E2E_COMPOSE logs --tail 200 api web # The suite's stack.
 
   deploy: # Sends the settings to the VPS and restarts the shop on the new images.
     name: Pull and restart on the server # The name shown in the run's graph.
