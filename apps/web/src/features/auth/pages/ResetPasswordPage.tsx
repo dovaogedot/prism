@@ -1,8 +1,8 @@
-import { Password, ResetPasswordForm } from "@prism/shared";
+import { Password, ResetPasswordForm, ResetToken } from "@prism/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { Alert, Button, Field } from "../../../shared/ui/index.ts";
@@ -12,24 +12,28 @@ import { TokenStore } from "../token-store.ts";
 import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
 
-/** Choosing a new password against a token from an email. */
+/** Choosing a new password against a token from an email. A link without its token says so and offers a new one. */
 export const ResetPasswordPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [failure, setFailure] = useState<ReactNode | undefined>(undefined);
   const [done, setDone] = useState(false);
 
+  const token = ResetToken.schema.safeParse(params.get("token")).data;
+
   const form = useForm({
     resolver: zodResolver(ResetPasswordForm.schema),
-    defaultValues: { token: params.get("token") ?? "", password: "", confirmPassword: "" },
+    defaultValues: { password: "", confirmPassword: "" },
   });
 
   const submit = form.handleSubmit(async (values) => {
+    if (token === undefined) return;
+
     setFailure(undefined);
 
     // The confirmation is a browser-side typo guard; the server has no use for it.
     await Api.postEmptyWithoutRetry("/auth/password/reset", {
-      token: values.token,
+      token,
       password: values.password,
     })
       .then(() => {
@@ -42,15 +46,28 @@ export const ResetPasswordPage = () => {
   });
 
   return (
-    <AuthShell title="Choose a new password" lede="This also signs you out everywhere else.">
+    <AuthShell
+      title="Choose a new password"
+      lede="This also signs you out everywhere else."
+      footer={
+        <Link to="/forgot-password" className="font-medium text-accent underline underline-offset-2">
+          Ask for a new link
+        </Link>
+      }
+    >
       <PageMeta title={PageText.resetPassword.title} description={PageText.resetPassword.description} isIndexed={false} />
-      {match(done)
-        .with(true, () => (
+      {match({ done, token })
+        .with({ token: P.nullish }, () => (
+          <Alert title="This link is incomplete">
+            The address is missing its code, which happens when an email app cuts a long link. Open the link from the email again, or ask for a new one.
+          </Alert>
+        ))
+        .with({ done: true }, () => (
           <Alert tone="accent" title="Password changed">
             Taking you to the sign-in page…
           </Alert>
         ))
-        .with(false, () => (
+        .otherwise(() => (
           <form onSubmit={(event) => void submit(event)} className="space-y-4" noValidate>
             {match(failure)
               .with(P.nullish, () => null)
@@ -77,8 +94,7 @@ export const ResetPasswordPage = () => {
               Change password
             </Button>
           </form>
-        ))
-        .exhaustive()}
+        ))}
     </AuthShell>
   );
 };

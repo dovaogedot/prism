@@ -171,10 +171,11 @@ export const RegisterForm = {
     .refine(Password.matches, Password.mismatch),
 } as const;
 
-/** The reset form: the request body plus the browser-only confirmation. */
+/** The reset form: the new password and its browser-only confirmation. The token comes from the link and joins them when sent. */
 export type ResetPasswordForm = z.infer<typeof ResetPasswordForm.schema>;
 export const ResetPasswordForm = {
   schema: ResetPasswordInput.schema
+    .omit({ token: true })
     .extend({ confirmPassword: Password.confirmation })
     .refine(Password.matches, Password.mismatch),
 } as const;
