@@ -185,7 +185,7 @@ Open <https://localhost:3000/admin>, or "Admin" in the account menu. Every accou
 | Support | Find accounts and orders; cancel orders that have not shipped; refund |
 | Admin | All of the above, plus staff roles, disabling accounts, resetting 2FA, signing accounts out, and the audit log |
 
-A staff account needs 2FA. The admin sends a staff member without it to the account page to set it up, and asks every session for a code before it opens, and again after 8 hours. The navigation shows only the sections the account's roles allow, and every delete, cancellation and refund asks first.
+A staff account needs 2FA. The admin sends a staff member without it to the account page to set it up, and asks every session for a code before it opens, and again after 8 hours, then in a dialog over the page that is open, so nothing typed into it is lost. The navigation shows only the sections the account's roles allow, and every delete, cancellation and refund asks first.
 
 - **Dashboard**: counts that link to their lists, for the roles that act on them: orders to fulfill, paid today, reviews waiting, and products with 5 or fewer in stock.
 - **Orders**: filter by status, dates, order number or customer email. An order's page moves it to its next status, cancels it, or refunds it in full. A refunded order shows "Refunded" once Stripe confirms the refund; until then it keeps its status, and the payment box shows the refund as pending. A refund that is still pending or that failed can be asked for again, also for a canceled order whose automatic refund did not go through; asking again while it is pending repeats the same request, so nothing is paid back twice.

@@ -39,6 +39,7 @@ export const StepUpForm = ({ onDone }: StepUpFormProps) => {
         autoComplete="one-time-code"
         maxLength={6}
         autoFocus
+        data-autofocus
         className="max-w-40 text-center font-mono text-lg tracking-[0.3em]"
         error={form.formState.errors.code?.message}
         {...form.register("code")}

@@ -10,6 +10,7 @@ import { Alert, Card, Spinner } from "../../../shared/ui/index.ts";
 import { SignInFirst } from "../../auth/components/SignInFirst.tsx";
 import { useSession } from "../../auth/session.ts";
 import { AdminAccess, AdminKeys } from "../admin.ts";
+import { StepUpDialog } from "./StepUpDialog.tsx";
 import { StepUpForm } from "./StepUpForm.tsx";
 
 /** The admin's pages, which open only past the gate. */
@@ -19,8 +20,8 @@ export type StaffGateProps = Readonly<{ children: ReactNode }>;
  * Lets a staff member into the admin. A guest is sent to sign in. A
  * customer is told the admin is for staff. Staff without a second factor are
  * sent to their account page to set one up, and staff whose last code is too
- * old type a fresh one; the API asks for both, and this is where the page
- * answers.
+ * old type a fresh one, over the page when the admin was already open; the
+ * API asks for both, and this is where the page answers.
  */
 export const StaffGate = ({ children }: StaffGateProps) => {
   const session = useSession();
@@ -42,6 +43,16 @@ export const StaffGate = ({ children }: StaffGateProps) => {
 
   const gate = summary.status === "error" ? AdminAccess.gateOf(Api.failureOf(summary.error)) : "open";
   const frameClass = "mx-auto max-w-lg space-y-6 px-4 py-14 sm:px-6";
+
+  // Once the admin has opened, a lapsed code is asked for over the page, so the page and anything typed into it stay.
+  if (gate === "verify" && summary.data !== undefined) {
+    return (
+      <>
+        {children}
+        <StepUpDialog onDone={reopen} />
+      </>
+    );
+  }
 
   return match({ gate, status: summary.status })
     .with({ gate: "setup" }, () => (
