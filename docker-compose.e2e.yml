@@ -21,11 +21,11 @@
 services:
   mailpit:
     ports: !override
-      - "8125:8025"
+      - "127.0.0.1:8125:8025"
 
   rabbitmq:
     ports: !override
-      - "15772:15672"
+      - "127.0.0.1:15772:15672"
 
   api:
     environment:

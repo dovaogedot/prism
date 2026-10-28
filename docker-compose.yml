@@ -32,8 +32,9 @@ services:
       # The inbox's page and API ask for this login; sending mail to it needs none.
       MP_UI_AUTH: prism:${MAILPIT_PASSWORD:-prism}
     ports:
-      # Order and password-reset emails land here: this is the inbox a reviewer opens.
-      - "8025:8025"
+      # Order and password-reset emails land here: this is the inbox a reviewer
+      # opens. On this machine only, since it holds every reset link.
+      - "127.0.0.1:8025:8025"
     healthcheck:
       test: ["CMD", "/mailpit", "readyz"]
       interval: 3s
@@ -53,7 +54,8 @@ services:
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     ports:
-      - "${RABBITMQ_UI_PORT:-15672}:15672"
+      # On this machine only, like the inbox.
+      - "127.0.0.1:${RABBITMQ_UI_PORT:-15672}:15672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s

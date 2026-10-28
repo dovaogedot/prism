@@ -24,11 +24,11 @@ services:
 
   mailpit:
     ports: !override
-      - "8325:8025"
+      - "127.0.0.1:8325:8025"
 
   rabbitmq:
     ports: !override
-      - "15972:15672"
+      - "127.0.0.1:15972:15672"
 
   api:
     cpus: 2
