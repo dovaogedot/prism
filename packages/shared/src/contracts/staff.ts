@@ -69,7 +69,7 @@ export const Permission = {
     "orders.fulfill": "Move orders to processing, shipped and delivered",
     "delivery.manage": "Create, edit and deactivate delivery options",
     "orders.refund": "Cancel orders that have not shipped, and refund orders",
-    "customers.view": "See accounts, with their orders and reviews",
+    "customers.view": "See accounts, with their recent orders",
     "staff.manage": "Give and take staff roles, disable and enable accounts, reset 2FA, sign accounts out",
     "audit.view": "Read the audit log",
   } as const satisfies Record<Permission, string>,
