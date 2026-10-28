@@ -11,7 +11,8 @@
 #
 # Payments are simulated, so the Stripe keys in `.env` are never used. The
 # OAuth credentials are blanked, so sign-in through a provider runs against
-# the offline stand-in, and nothing leaves the machine to check an address.
+# the offline stand-in, nothing leaves the machine to check an address, and
+# every mail stays in this stack's Mailpit.
 # The admin has a known password and 2FA key, which the suite signs in with.
 # The rate limits are scaled up, because the suite signs in far more often
 # than a person does. Every port moves, so this stack runs beside the everyday
@@ -45,8 +46,17 @@ services:
       ADMIN_EMAIL: admin@prism.test
       ADMIN_PASSWORD: e2e admin password
       ADMIN_TOTP_SECRET: EZEPRISMADMINTOTPSECRETFORTHESUITE
+      # Mail goes to this stack's Mailpit whatever `.env` says about SMTP.
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_USER: ""
+      SMTP_PASSWORD: ""
+      SMTP_SECURE: "false"
 
   web:
+    environment:
+      # The suite calls https://web:3000, whatever `.env` says.
+      WEB_TLS: self-signed
     build:
       args:
         # Empty, so the widget uses Google's always-pass test key, which the

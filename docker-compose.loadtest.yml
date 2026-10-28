@@ -12,9 +12,9 @@
 # describe a known server size and the machine's other cores are left to k6.
 # Payments are simulated, because Stripe forbids load tests against its API.
 # The CAPTCHA runs in its test mode, addresses are checked for their format
-# only, and the rate limits are scaled out of the way: the point is what the
-# server can carry, not whom it refuses. Postgres records the cost of every
-# statement in pg_stat_statements.
+# only, every mail stays in this stack's Mailpit, and the rate limits are
+# scaled out of the way: the point is what the server can carry, not whom it
+# refuses. Postgres records the cost of every statement in pg_stat_statements.
 
 services:
   postgres:
@@ -46,8 +46,17 @@ services:
       OAUTH_GITHUB_CLIENT_SECRET: ""
       RATE_LIMIT_SCALE: "1000"
       ADDRESS_LOOKUP_URL: ""
+      # Mail goes to this stack's Mailpit whatever `.env` says about SMTP.
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_USER: ""
+      SMTP_PASSWORD: ""
+      SMTP_SECURE: "false"
 
   web:
+    environment:
+      # k6 calls https://web:3000, whatever `.env` says.
+      WEB_TLS: self-signed
     ports: !override
       - "3300:3000"
 
