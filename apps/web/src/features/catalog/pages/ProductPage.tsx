@@ -1,6 +1,6 @@
 import { Price, type ProductDetail } from "@prism/shared";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { Fragment, useEffect } from "react";
 import { Link, useParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { Api, ApiError } from "../../../shared/api/client.ts";
@@ -65,7 +65,9 @@ export const ProductPage = () => {
           </div>
         ))
         .otherwise(({ data }) => (
-          <>
+          // Keyed by product, so moving to another one starts every part afresh:
+          // the quantity, the picture, the reviews' page and an open review form.
+          <Fragment key={data.slug}>
             <PageMeta
               title={CatalogSeo.productTitle(data)}
               description={CatalogSeo.productDescription(data)}
@@ -138,7 +140,7 @@ export const ProductPage = () => {
             <ReviewsSection slug={data.slug} />
             <RelatedProducts slug={data.slug} categoryName={data.category.name} />
             <RecentlyViewedRow exclude={data.slug} />
-          </>
+          </Fragment>
         ))}
     </div>
   );
