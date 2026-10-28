@@ -7,9 +7,9 @@ on: # The events that start this workflow.
 permissions: # The rights of the job's GITHUB_TOKEN.
   contents: read # Enough to check out the code; the token can change nothing.
 
-concurrency: # Keeps a seed and a deploy from overlapping.
-  group: deploy # The deploy's group, so each waits for the other to finish.
-  cancel-in-progress: false # A running one finishes; the next one waits.
+concurrency: # Keeps two seeds from overlapping. A group shared with the deploy would cancel a deploy waiting in it.
+  group: seed # Its own group. A deploy that restarts the stack mid-seed fails the seed, which plants in one transaction, so a second run plants it.
+  cancel-in-progress: false # A running seed finishes; the next one waits.
 
 jobs: # The work this workflow does.
   seed: # The only job: copy the data over, then plant it.
