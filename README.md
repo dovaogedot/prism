@@ -202,7 +202,7 @@ A staff account needs 2FA. The admin sends a staff member without it to the acco
   `price` is in euros with at most two decimals, and each `property:<name>` column is one property, empty for none. A JSON file is an array of objects with the fields `slug`, `name`, `description`, `priceCents`, `stock`, `category`, `brand`, `weightGrams`, `widthMm`, `heightMm`, `depthMm`, `featured` and `properties`, an object of property names and values such as `{ "type": "Food" }`.
 - **Reviews**: the queue of reviews waiting; approve, reject with a reason, or delete.
 - **Delivery options**: name, price, the amount from which it ships free, the delivery window in business days, whether checkout offers it, and its place in the list. An option that orders used can be switched off, not deleted. Placed orders keep their own copy.
-- **Accounts**: find one by exact email or by role, with its orders and reviews; give and take staff roles; disable and enable it; reset its 2FA; sign it out. Nobody changes their own roles or disables themselves, and the last admin keeps the role.
+- **Accounts**: find one by exact email or by role, with its recent orders; give and take staff roles; disable and enable it; reset its 2FA; sign it out. Nobody changes their own roles or disables themselves, and the last admin keeps the role.
 - **Audit log**: every staff change, filtered by who, what, which record and when.
 
 ### The API
@@ -277,7 +277,7 @@ Staff routes are under `/api/v1/admin`. Each needs an account whose roles grant 
 | `GET` and `POST /brands`, `PUT` and `DELETE /brands/:id` | `catalog.manage` | Brands. |
 | `GET` and `POST /shipping-methods`, `PUT` and `DELETE /shipping-methods/:code` | `delivery.manage` | Delivery options. |
 | `GET /reviews`, `POST /reviews/:id/approve`, `POST /reviews/:id/reject`, `DELETE /reviews/:id` | `reviews.moderate` | The review queue. |
-| `GET /users`, `GET /users/:id` | `customers.view` | Accounts, by role or exact email, with their orders and reviews. |
+| `GET /users`, `GET /users/:id` | `customers.view` | Accounts, by role or exact email, with their recent orders. |
 | `PUT /users/:id/roles`, `POST /users/:id/disable`, `/enable`, `/reset-two-factor`, `/sign-out` | `staff.manage` | Staff roles, and the account actions. |
 | `GET /audit` | `audit.view` | The audit log, by actor, action, target and dates. |
 
