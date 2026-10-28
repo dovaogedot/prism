@@ -44,7 +44,7 @@ export type CatalogAdminDependencies = Readonly<{
 }>;
 
 /** An import file as the request carried it. */
-export type ImportUpload = Readonly<{ filename: string; mimetype: string; text: string }>;
+export type ImportUpload = Readonly<{ filename: string; mimetype: string; bytes: Uint8Array }>;
 
 /** A picture as an upload carries it. */
 export type ImageUpload = Readonly<{ bytes: Buffer; alt: string; isPixelArt: boolean }>;

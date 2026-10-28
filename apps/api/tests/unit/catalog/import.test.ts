@@ -158,3 +158,23 @@ describe("ImportFile.parseJson", () => {
     ]);
   });
 });
+
+describe("ImportFile.parse", () => {
+  it("refuses a file that is not UTF-8 instead of replacing its characters", () => {
+    // "Küünal" saved in Windows-1257, as Excel's plain CSV does.
+    const latin = Buffer.from(`${HEADER}\n${row({ name: "K\u00fc\u00fcnal" })}\n`, "latin1");
+
+    const parsed = ImportFile.parse({ filename: "lamps.csv", mimetype: "text/csv", bytes: latin });
+
+    expect(parsed.rows).toEqual([]);
+    expect(parsed.issues).toEqual([{ row: 0, column: "", message: expect.stringContaining("not UTF-8") }]);
+  });
+
+  it("reads the same file saved as UTF-8", () => {
+    const utf8 = Buffer.from(`${HEADER}\n${row({ name: "K\u00fc\u00fcnal" })}\n`, "utf8");
+
+    const parsed = ImportFile.parse({ filename: "lamps.csv", mimetype: "text/csv", bytes: utf8 });
+
+    expect(parsed.rows[0]?.product.name).toBe("Küünal");
+  });
+});

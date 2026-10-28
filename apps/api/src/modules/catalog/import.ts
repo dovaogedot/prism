@@ -250,9 +250,21 @@ export const ImportFile = {
     return ImportFile.withDuplicates({ rows, issues });
   },
 
-  /** Reads a file by its name or type: JSON for `.json` or `application/json`, CSV otherwise. */
-  parse: (file: Readonly<{ filename: string; mimetype: string; text: string }>): ParsedImport =>
-    file.filename.toLowerCase().endsWith(".json") || file.mimetype === "application/json"
-      ? ImportFile.parseJson(file.text)
-      : ImportFile.parseCsv(file.text),
+  /**
+   * Reads a file by its name or type: JSON for `.json` or `application/json`,
+   * CSV otherwise. A file that is not UTF-8 is one issue, so no character
+   * of it is replaced on the way in.
+   */
+  parse: (file: Readonly<{ filename: string; mimetype: string; bytes: Uint8Array }>): ParsedImport => {
+    let text: string;
+    try {
+      text = new TextDecoder("utf-8", { fatal: true }).decode(file.bytes);
+    } catch {
+      return { rows: [], issues: [{ row: 0, column: "", message: "The file is not UTF-8 text. Save it as UTF-8, such as Excel's \"CSV UTF-8\", and try again." }] };
+    }
+
+    return file.filename.toLowerCase().endsWith(".json") || file.mimetype === "application/json"
+      ? ImportFile.parseJson(text)
+      : ImportFile.parseCsv(text);
+  },
 } as const;

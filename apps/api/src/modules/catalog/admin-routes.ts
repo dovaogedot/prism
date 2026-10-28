@@ -37,14 +37,14 @@ type ImportRead =
   | Readonly<{ _tag: "Invalid" }>;
 
 export const CatalogAdminRoutes = {
-  /** The import file of a multipart body: its one `file` part, as text. */
+  /** The import file of a multipart body: its one `file` part. */
   readImport: async (request: FastifyRequest): Promise<ImportRead> => {
     try {
       const part = await request.file({ limits: { fileSize: ImportFile.MAX_BYTES, files: 1 } });
       if (part === undefined) return { _tag: "Invalid" };
 
       const bytes = await part.toBuffer();
-      return { _tag: "Read", file: { filename: part.filename, mimetype: part.mimetype, text: bytes.toString("utf8") } };
+      return { _tag: "Read", file: { filename: part.filename, mimetype: part.mimetype, bytes } };
     } catch (reason) {
       if (reason instanceof request.server.multipartErrors.RequestFileTooLargeError) return { _tag: "TooLarge" };
       return { _tag: "Invalid" };
