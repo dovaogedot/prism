@@ -5,7 +5,8 @@
  * produced, so the UI reads a code and a sentence rather than parsing prose.
  * A 401 triggers exactly one refresh attempt, and concurrent 401s share it:
  * rotation is single-use, so several refreshes at once would look like a
- * replay and revoke the session.
+ * replay and revoke the session. Tabs take turns under a browser lock for the
+ * same reason.
  */
 
 import type { AccessGrant, ErrorResponse } from "@prism/shared";
@@ -90,12 +91,18 @@ export const Api = {
 
   /**
    * Trades the refresh cookie for a fresh access token. Concurrent callers
-   * share one attempt.
+   * share one attempt, and the tabs of one browser take turns.
    */
   refresh: (): Promise<boolean> => {
     if (Refresh.inFlight !== undefined) return Refresh.inFlight;
 
-    const attempt = fetch(`${Api.BASE}/auth/refresh`, { method: "POST", credentials: "same-origin" })
+    const trade = (): Promise<Response> => fetch(`${Api.BASE}/auth/refresh`, { method: "POST", credentials: "same-origin" });
+
+    // Under a lock every tab shares, a second tab sends the cookie the first
+    // one was just given, never the one it spent, which would read as a replay.
+    const traded = typeof navigator.locks === "undefined" ? trade() : navigator.locks.request("prism-refresh", trade);
+
+    const attempt = traded
       .then(async (response) => {
         if (!response.ok) {
           await Api.discard(response);
