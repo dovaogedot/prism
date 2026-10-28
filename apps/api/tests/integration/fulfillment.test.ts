@@ -10,6 +10,7 @@ import { App } from "../../src/app.ts";
 import { Config, Environment } from "../../src/config.ts";
 import { Topology } from "../../src/messaging/topology.ts";
 import { OutboxRelay } from "../../src/messaging/outbox.ts";
+import { PaymentGateway } from "../../src/platform/payment-gateway.ts";
 import { MessageQueue } from "../../src/platform/queue.ts";
 import { CHECKOUT, Shop, type Caller } from "../support/commerce.ts";
 import { jsonOf, registerUser, seedCatalog, startHarness, testEnvironment, type Harness } from "../support/harness.ts";
@@ -70,6 +71,16 @@ const paidOrder = async (caller: Caller = {}, method = "standard") => {
 };
 
 const step = (orderId: string, body: object) => Staff.call(harness, delivery, "POST", `/admin/orders/${orderId}/status`, body);
+
+/** A paid order taken all the way to delivered. */
+const deliveredOrder = async () => {
+  const placed = await paidOrder();
+  await step(placed.orderId, { status: "processing" });
+  await step(placed.orderId, { status: "shipped", trackingNumber: "PR123456789EE" });
+  await step(placed.orderId, { status: "delivered" });
+
+  return placed;
+};
 
 /** A delivery option as the admin form sends it. */
 const methodInput = (overrides: Readonly<Record<string, unknown>> = {}) => ({
@@ -260,6 +271,68 @@ describe("cancellations and refunds by support", () => {
     await harness.settle();
     expect(jsonOf(again)["error"]).toMatchObject({ code: "OrderTransitionNotAllowed" });
     expect(harness.gateway.calls.refund).toHaveLength(1);
+  });
+
+  it("keeps the order delivered while its refund is pending, and refunds it once the provider confirms", async () => {
+    const placed = await deliveredOrder();
+    harness.gateway.answerNextRefund("pending");
+    harness.mailer.clear();
+
+    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`);
+    await harness.settle();
+
+    expect(await adminDetail(placed.orderId)).toMatchObject({ status: "delivered", canRefund: true, payment: { refund: "pending" } });
+    expect(harness.mailer.sent).toEqual([]);
+
+    // Asking again repeats the request under the same idempotency key.
+    harness.gateway.answerNextRefund("pending");
+    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`);
+    await harness.settle();
+    const [first, second] = harness.gateway.calls.refund;
+    expect(second?.refundId).toBe(first?.refundId);
+
+    await Shop.webhook(harness, "refund.updated", {
+      id: "re_fake_settled",
+      object: "refund",
+      status: "succeeded",
+      metadata: { [PaymentGateway.PAYMENT_KEY]: first?.refundId },
+    });
+    await harness.settle();
+
+    expect(await adminDetail(placed.orderId)).toMatchObject({ status: "refunded", canRefund: false, payment: { refund: "succeeded" } });
+    expect(harness.mailer.sent.map((email) => email.subject)).toEqual(["Refund for order #100001"]);
+  });
+
+  it("leaves a delivered order refundable when its refund fails, and refunds it afresh on the next try", async () => {
+    const placed = await deliveredOrder();
+    harness.gateway.answerNextRefund("failed");
+
+    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`);
+    await harness.settle();
+
+    expect(await adminDetail(placed.orderId)).toMatchObject({ status: "delivered", canRefund: true, payment: { refund: "failed" } });
+
+    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`);
+    await harness.settle();
+
+    expect(await adminDetail(placed.orderId)).toMatchObject({ status: "refunded", canRefund: false, payment: { refund: "succeeded" } });
+    const [first, second] = harness.gateway.calls.refund;
+    expect(second?.refundId).not.toBe(first?.refundId);
+  });
+
+  it("offers to refund a canceled order whose automatic refund failed", async () => {
+    const placed = await paidOrder();
+    harness.gateway.answerNextRefund("failed");
+
+    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/cancel`);
+    await harness.settle();
+
+    expect(await adminDetail(placed.orderId)).toMatchObject({ status: "canceled", canRefund: true, payment: { refund: "failed" } });
+
+    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`);
+    await harness.settle();
+
+    expect(await adminDetail(placed.orderId)).toMatchObject({ status: "canceled", canRefund: false, payment: { refund: "succeeded" } });
   });
 
   it("refuses to refund an order that has not shipped, where canceling applies", async () => {

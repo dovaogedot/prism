@@ -3,8 +3,9 @@
  *
  * Every working queue is a quorum queue with a delivery limit and a
  * dead-letter exchange. A handler that throws has its message rejected with
- * requeue, which the broker counts as a failed delivery; once it has counted
- * more than the limit, the message moves to the dead-letter queue. A message
+ * requeue after a pause that grows with each failed delivery, which the
+ * broker counts; once it has counted more than the limit, the message moves
+ * to the dead-letter queue. A message
  * that fails its schema can never succeed, so it is rejected without requeue
  * and goes there at once.
  */
@@ -73,11 +74,21 @@ export type RabbitOptions = Readonly<{
   topology: Topology;
   /** Called for connection failures and failed handlers. */
   onFailure: (context: string, reason: unknown) => void;
+  /** How long a failed message waits before it goes back, by its failed deliveries so far. Defaults to `MessageQueue.retryDelayMs`. */
+  retryDelayMs?: (failures: number) => number;
 }>;
 
 export const MessageQueue = {
   PREFETCH: 10,
   PUBLISH_TIMEOUT_MS: 10_000,
+
+  /**
+   * The pause before a failed message goes back: 5 s, then four times longer
+   * after each failure, at most 15 minutes. The five returns the delivery
+   * limit allows span about 22 minutes, so a short outage spends none of
+   * them at once.
+   */
+  retryDelayMs: (failures: number): number => Math.min(5_000 * 4 ** failures, 15 * 60_000),
 
   /** The queue arguments a declaration turns into. */
   argumentsOf: (queue: QueueDeclaration): Readonly<Record<string, unknown>> => ({
@@ -133,6 +144,8 @@ export const MessageQueue = {
       },
 
       consume: async (queue, schema, handler) => {
+        const deliveryLimit = options.topology.queues.find((declaration) => declaration.name === queue)?.deliveryLimit;
+
         const onMessage = async (message: ConsumeMessage): Promise<void> => {
           // Read before any await: a message can only be settled on the channel that delivered it.
           const deliveredOn = live.channel;
@@ -167,7 +180,14 @@ export const MessageQueue = {
             settle((target) => target.ack(message));
           } catch (reason) {
             options.onFailure(`a handler on ${queue} failed`, reason);
-            settle((target) => target.reject(message, true));
+            // The quorum queue counts every return in this header, absent on the first delivery.
+            const failures = Number(message.properties.headers?.["x-delivery-count"] ?? 0);
+            // A message past its last return is dead-lettered at once.
+            const isLast = deliveryLimit !== undefined && failures >= deliveryLimit;
+            const delay = isLast ? 0 : (options.retryDelayMs ?? MessageQueue.retryDelayMs)(failures);
+
+            // Unreferenced, so a pending return never keeps the process from exiting; the broker redelivers it then.
+            setTimeout(() => settle((target) => target.reject(message, true)), delay).unref();
           }
         };
 

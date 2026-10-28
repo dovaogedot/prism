@@ -18,6 +18,8 @@ let inspector: ChannelModel;
 
 const received: PaymentStatusChanged[] = [];
 const cancelAttempts = new Map<string, number>();
+/** The failed-delivery counts the adapter waited on, one per failure. */
+const waitedOn: number[] = [];
 
 beforeAll(async () => {
   container = await new RabbitMQContainer("rabbitmq:4.3.6-management-alpine").start();
@@ -25,6 +27,10 @@ beforeAll(async () => {
     url: container.getAmqpUrl(),
     topology: Topology.declarations(),
     onFailure: () => undefined,
+    retryDelayMs: (failures) => {
+      waitedOn.push(failures);
+      return 0;
+    },
   });
 
   await queue.consume(Topology.PAYMENT_STATUS_QUEUE, PaymentStatusChanged.schema, async (message) => {
@@ -134,6 +140,8 @@ describe("a message", () => {
     expect(dead).toEqual({ body: { orderId }, reason: "delivery_limit", queue: Topology.ORDER_CANCELED_QUEUE });
     // The first delivery, then one per allowed return.
     expect(cancelAttempts.get(orderId)).toBe(Topology.DELIVERY_LIMIT + 1);
+    // Each pause is chosen by how many deliveries failed before it; the last failure goes without one.
+    expect(waitedOn).toEqual([0, 1, 2, 3, 4]);
   });
 
   it("that fails its schema goes to the dead-letter queue at once, never reaching the handler", async () => {

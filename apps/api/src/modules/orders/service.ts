@@ -154,14 +154,16 @@ export const OrderService = {
   },
 
   /**
-   * Whether staff may refund an order: it was paid, no refund is on its way
-   * or done, and it shipped, or it was canceled and its automatic refund
-   * failed.
+   * Whether staff may ask for a refund of an order: it was paid, no refund
+   * succeeded, and it shipped or was canceled. Asking again while a refund
+   * is pending repeats the same request under the same idempotency key, so
+   * a refund whose messages ran out can be sent again and nothing is paid
+   * back twice.
    */
   isRefundable: (status: OrderStatus, payment: PaymentSummary | undefined): boolean => {
-    if (payment?.status !== "succeeded" || payment.refund === "pending" || payment.refund === "succeeded") return false;
+    if (payment?.status !== "succeeded" || payment.refund === "succeeded") return false;
 
-    return (OrderStatus.REFUNDABLE as readonly OrderStatus[]).includes(status) || (status === "canceled" && payment.refund === "failed");
+    return (OrderStatus.REFUNDABLE as readonly OrderStatus[]).includes(status) || status === "canceled";
   },
 
   /** The step of fulfillment after `status`, when one follows. */
