@@ -28,6 +28,9 @@ export const ImportPage = () => {
 
   const [file, setFile] = useState<File | undefined>(undefined);
 
+  /** The file chosen now, read by a check that answers after another was chosen. */
+  const chosenNow = useRef<File | undefined>(undefined);
+
   /** The bytes of the file as its last check read them, which an import sends. */
   const [checked, setChecked] = useState<File | undefined>(undefined);
 
@@ -55,6 +58,7 @@ export const ImportPage = () => {
     );
 
     if (snapshot === undefined) {
+      chosenNow.current = undefined;
       setFile(undefined);
       if (input.current !== null) input.current.value = "";
       setFailure("The file changed after it was chosen. Choose it again.");
@@ -65,10 +69,14 @@ export const ImportPage = () => {
       { file: snapshot, isDryRun: true },
       {
         onSuccess: (found) => {
+          if (chosenNow.current !== chosen) return;
+
           setReport(found);
           setChecked(snapshot);
         },
         onError: (reason) => {
+          if (chosenNow.current !== chosen) return;
+
           const found = Api.failureOf(reason);
           if (found?.code === "ImportInvalid") {
             setReport({ dryRun: true, created: 0, updated: 0, issues: found.issues.map((issue) => ({ ...Report.locate(issue.path), message: issue.message })) });
@@ -97,6 +105,7 @@ export const ImportPage = () => {
             accept=".csv,.json,text/csv,application/json"
             aria-describedby="import-file-hint"
             onChange={(event) => {
+              chosenNow.current = event.target.files?.[0];
               setFile(event.target.files?.[0]);
               setReport(undefined);
               setChecked(undefined);
