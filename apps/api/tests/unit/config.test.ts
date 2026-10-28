@@ -65,3 +65,26 @@ describe("the first admin's variables", () => {
     expect(config.firstAdmin?.totpSecret).toBe("JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP");
   });
 });
+
+describe("the stand-ins for Google, GitHub and the CAPTCHA", () => {
+  const publicSite = { PUBLIC_WEB_URL: "https://shop.example.com" };
+
+  it("run on localhost when no keys are set", () => {
+    const config = Config.fromEnvironment(Environment.schema.parse(base));
+
+    expect(config.oauth).toEqual({ mode: "mock" });
+    expect(config.captcha).toEqual({ mode: "test" });
+  });
+
+  it("offer no provider off localhost when no provider pair is set", () => {
+    const config = Config.fromEnvironment(Environment.schema.parse({ ...base, ...publicSite, RECAPTCHA_SECRET_KEY: "a-secret" }));
+
+    expect(config.oauth).toEqual({ mode: "live", credentials: [] });
+  });
+
+  it("stop the start off localhost without a CAPTCHA secret", () => {
+    expect(problemsOf(publicSite)).toEqual([
+      "Without RECAPTCHA_SECRET_KEY every CAPTCHA passes, so it may be empty only where PUBLIC_WEB_URL is on localhost.",
+    ]);
+  });
+});

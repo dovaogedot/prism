@@ -5,14 +5,14 @@
  */
 
 import { OAuthProvider } from "@prism/shared";
-import type { OAuthState, RedirectUri } from "../../platform/oauth.ts";
+import type { OAuthState } from "../../platform/oauth.ts";
 
 export const MockConsentPage = {
   escape: (value: string): string =>
     value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"),
 
   /** The consent page, with every value it is given escaped into the markup. */
-  render: (input: { provider: OAuthProvider; state: OAuthState; redirectUri: RedirectUri }): string => {
+  render: (input: { provider: OAuthProvider; state: OAuthState }): string => {
     const label = MockConsentPage.escape(OAuthProvider.label[input.provider]);
 
     return `<!doctype html>
@@ -41,7 +41,6 @@ export const MockConsentPage = {
       <label for="email">Email address</label>
       <input id="email" name="email" type="email" required value="shopper@example.com" autocomplete="email">
       <input type="hidden" name="state" value="${MockConsentPage.escape(input.state)}">
-      <input type="hidden" name="redirect_uri" value="${MockConsentPage.escape(input.redirectUri)}">
       <button type="submit">Continue</button>
     </form>
   </main>

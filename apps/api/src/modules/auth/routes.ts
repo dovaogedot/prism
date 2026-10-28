@@ -324,17 +324,11 @@ export const AuthRoutes = {
       {
         schema: {
           params: providerParams,
-          querystring: z.object({ state: OAuthState.schema, redirect_uri: RedirectUri.schema }),
+          querystring: z.object({ state: OAuthState.schema }),
         },
       },
       async (request, reply) =>
-        reply.type("text/html; charset=utf-8").send(
-          MockConsentPage.render({
-            provider: request.params.provider,
-            state: request.query.state,
-            redirectUri: request.query.redirect_uri,
-          }),
-        ),
+        reply.type("text/html; charset=utf-8").send(MockConsentPage.render({ provider: request.params.provider, state: request.query.state })),
     );
 
     routes.post(
@@ -343,18 +337,15 @@ export const AuthRoutes = {
         config: session,
         schema: {
           params: providerParams,
-          body: z.object({
-            email: Email.schema,
-            state: OAuthState.schema,
-            redirect_uri: RedirectUri.schema,
-          }),
+          body: z.object({ email: Email.schema, state: OAuthState.schema }),
         },
       },
       async (request, reply) => {
         const code = MockAuthorizationCode.issue(request.params.provider, request.body.email, secret);
         const params = new URLSearchParams({ code, state: request.body.state });
 
-        return reply.redirect(`${request.body.redirect_uri}?${params}`, 302);
+        // The stand-in sends a person only to this shop's own callback, whatever the request named.
+        return reply.redirect(`${callbackUriFor(request.params.provider)}?${params}`, 302);
       },
     );
   },

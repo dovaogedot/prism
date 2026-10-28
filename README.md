@@ -47,7 +47,7 @@ The storefront answers HTTPS only, with a self-signed certificate that the web c
 
 The API makes the admin at start when no account holds the admin role, with 2FA already on. `.env.example` sets `admin@prism.shop`, `admin-prism-admin` and the key `CFBNJ5LGD7BVFZHEQTQTFJR5CQCI6KYS`. Type the key into an authenticator app, where it is often called a setup key, then sign in with the password and the app's code. Once an admin exists, the three values change nothing.
 
-The stack runs with no external accounts: the CAPTCHA uses Google's always-pass test key, the provider buttons go to a built-in stand-in, and mail lands in Mailpit. Real keys go in `.env`; `.env.example` describes each one. Its `JWT_SECRET`, `DATA_ENCRYPTION_KEY` and admin values are public, so replace them anywhere but your own machine.
+On localhost the stack runs with no external accounts: the CAPTCHA uses Google's always-pass test key, the provider buttons go to a built-in stand-in, and mail lands in Mailpit. Where `PUBLIC_WEB_URL` is not on localhost, the API refuses to start without `RECAPTCHA_SECRET_KEY`, and a provider without its key pair has no button. Real keys go in `.env`; `.env.example` describes each one. Its `JWT_SECRET`, `DATA_ENCRYPTION_KEY` and admin values are public, so replace them anywhere but your own machine.
 
 ### Taking test payments
 
@@ -159,7 +159,7 @@ A declined order releases its stock and mails the reason; the cart keeps its ite
 ### Accounts
 
 - **Register**: email address, a password of at least twelve characters, and the CAPTCHA.
-- **Sign in** with the password or a provider button. With no provider keys the button opens a stand-in consent page, where any address works. A page that asks you to sign in sends you back to it afterwards.
+- **Sign in** with the password or a provider button. On localhost with no provider keys, the button opens a stand-in consent page, where any address works. A page that asks you to sign in sends you back to it afterwards.
 - **Password reset**: "Forgot your password?" mails a link to the Mailpit inbox. Setting the new password signs every session out.
 - **The account** has three tabs of one width: Profile, Addresses and Orders.
 - **Profile** (`/account`): full name and phone, which checkout fills in. The email is shown but stays as it is. The password and 2FA live here too.
@@ -227,7 +227,7 @@ Every route is under `/api/v1` and answers JSON. A refusal is `{ "error": { "cod
 | `GET /auth/oauth/providers` | Which provider buttons to show. |
 | `GET /auth/oauth/:provider` | Starts a provider sign-in. |
 | `GET /auth/oauth/:provider/callback` | Where the provider returns. |
-| `GET` and `POST /auth/oauth/:provider/consent` | The stand-in's consent page, for a provider without keys. |
+| `GET` and `POST /auth/oauth/:provider/consent` | The stand-in's consent page, on localhost when no provider has keys. It sends the code only to the shop's own callback. |
 | `GET /home` | Featured, top-rated and newest products, and the categories. |
 | `GET /categories` | Every category with its description, product count and a picture. |
 | `GET /products` | Searches the catalog. See the query keys below. |

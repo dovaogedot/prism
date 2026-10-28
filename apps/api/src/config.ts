@@ -100,6 +100,10 @@ export const Environment = {
       message: "PAYMENTS_MODE=simulated takes no money, so it runs only where PUBLIC_WEB_URL is on localhost.",
       path: ["PAYMENTS_MODE"],
     })
+    .refine((environment) => environment.RECAPTCHA_SECRET_KEY.length > 0 || LocalUrl.isLocal(environment.PUBLIC_WEB_URL), {
+      message: "Without RECAPTCHA_SECRET_KEY every CAPTCHA passes, so it may be empty only where PUBLIC_WEB_URL is on localhost.",
+      path: ["RECAPTCHA_SECRET_KEY"],
+    })
     .refine(
       (environment) =>
         environment.STRIPE_SECRET_KEY.length === 0 ||
@@ -154,7 +158,11 @@ export type Config = Readonly<{
   }>;
   /** Supplying a secret key is what turns the real check on. */
   captcha: Readonly<{ mode: "test" }> | Readonly<{ mode: "google"; secretKey: string }>;
-  /** Live when at least one provider has both halves of its pair. */
+  /**
+   * Live when at least one provider has both halves of its pair. Without one,
+   * the stand-in, which signs anyone in as any address, runs only on
+   * localhost; elsewhere no provider is offered.
+   */
   oauth: Readonly<{ mode: "mock" }> | Readonly<{ mode: "live"; credentials: readonly OAuthCredential[] }>;
   rateLimit: Readonly<{ scale: number }>;
   media: Readonly<{ directory: string }>;
@@ -221,7 +229,7 @@ export const Config = {
         environment.RECAPTCHA_SECRET_KEY.length > 0
           ? { mode: "google", secretKey: environment.RECAPTCHA_SECRET_KEY }
           : { mode: "test" },
-      oauth: credentials.length > 0 ? { mode: "live", credentials } : { mode: "mock" },
+      oauth: credentials.length > 0 || !LocalUrl.isLocal(webOrigin) ? { mode: "live", credentials } : { mode: "mock" },
       rateLimit: { scale: environment.RATE_LIMIT_SCALE },
       media: { directory: environment.MEDIA_DIR },
       encryptionKey: EncryptionKey.bytes(environment.DATA_ENCRYPTION_KEY),

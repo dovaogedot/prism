@@ -586,14 +586,20 @@ describe("the mock consent screen", () => {
     const consent = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/oauth/github/consent",
-      payload: {
-        email: "via-form@example.com",
-        state: "abc",
-        redirect_uri: "http://localhost:3000/api/v1/auth/oauth/github/callback",
-      },
+      payload: { email: "via-form@example.com", state: "abc" },
     });
 
     expect(consent.statusCode).toBe(302);
     expect(consent.headers["location"]).toContain("code=");
+  });
+
+  it("sends the code only to this shop's own callback, whatever the form names", async () => {
+    const consent = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/oauth/github/consent",
+      payload: { email: "via-form@example.com", state: "abc", redirect_uri: "https://elsewhere.example/steal" },
+    });
+
+    expect(String(consent.headers["location"]).startsWith(`${harness.config.http.webOrigin}/api/v1/auth/oauth/github/callback?`)).toBe(true);
   });
 });
