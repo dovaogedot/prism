@@ -77,11 +77,6 @@ export const ImportPage = () => {
         onError: (reason) => {
           if (chosenNow.current !== chosen) return;
 
-          const found = Api.failureOf(reason);
-          if (found?.code === "ImportInvalid") {
-            setReport({ dryRun: true, created: 0, updated: 0, issues: found.issues.map((issue) => ({ ...Report.locate(issue.path), message: issue.message })) });
-            return;
-          }
           setFailure(Failure.message(reason));
         },
       },
@@ -188,6 +183,16 @@ export const ImportPage = () => {
               },
               onError: (reason) => {
                 setConfirming(false);
+                setChecked(undefined);
+
+                // What changed since the check, such as a category deleted, is listed like the check's own problems.
+                const found = Api.failureOf(reason);
+                if (found?.code === "ImportInvalid") {
+                  setReport({ dryRun: false, created: 0, updated: 0, issues: found.issues.map((issue) => ({ ...Report.locate(issue.path), message: issue.message })) });
+                  return;
+                }
+
+                setReport(undefined);
                 setFailure(Failure.message(reason));
               },
             },
