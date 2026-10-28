@@ -2,6 +2,7 @@ import { useId } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { useSession, useSignOut } from "../../features/auth/session.ts";
 import { Popover } from "../ui/index.ts";
+import { AccountLinks } from "./account-links.ts";
 import { LookClass } from "./look.ts";
 
 /**
@@ -22,7 +23,7 @@ export const AccountMenu = () => {
   const panelId = useId();
 
   if (session === undefined) {
-    const signIn = `/login?next=${encodeURIComponent(`${pathname}${search}`)}`;
+    const signIn = AccountLinks.signInFrom(`${pathname}${search}`);
 
     return (
       <div className="flex shrink-0 items-center gap-1">
@@ -68,28 +69,13 @@ export const AccountMenu = () => {
       <Popover id={panelId} side="end" label="Your account">
         <p className="truncate border-b border-line px-5 py-3 text-sm text-ink-soft">{session.email}</p>
         <ul className="p-2">
-          <li>
-            <Link className={itemClass} to="/account/orders">
-              Orders
-            </Link>
-          </li>
-          <li>
-            <Link className={itemClass} to="/account">
-              Account
-            </Link>
-          </li>
-          <li>
-            <Link className={itemClass} to="/account/addresses">
-              Addresses
-            </Link>
-          </li>
-          {session.roles.length === 0 ? null : (
-            <li>
-              <Link className={itemClass} to="/admin">
-                Admin
+          {AccountLinks.listFor(session.roles).map((link) => (
+            <li key={link.to}>
+              <Link className={itemClass} to={link.to}>
+                {link.label}
               </Link>
             </li>
-          )}
+          ))}
         </ul>
         <div className="border-t border-line p-2">
           <button

@@ -1,6 +1,7 @@
-import { Link, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { useSession, useSignOut } from "../../features/auth/session.ts";
 import { useCategories } from "../../features/catalog/catalog.ts";
+import { AccountLinks } from "./account-links.ts";
 import { LookClass } from "./look.ts";
 import { ThemeToggle } from "./ThemeToggle.tsx";
 
@@ -16,6 +17,8 @@ export const DrawerMenu = ({ onClose }: DrawerMenuProps) => {
   const navigate = useNavigate();
 
   const categories = useCategories();
+
+  const { pathname, search } = useLocation();
 
   const headingClass = "px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-ink-faint";
 
@@ -48,7 +51,7 @@ export const DrawerMenu = ({ onClose }: DrawerMenuProps) => {
         {session === undefined ? (
           <ul>
             <li>
-              <Link className={LookClass.row} to="/login">
+              <Link className={LookClass.row} to={AccountLinks.signInFrom(`${pathname}${search}`)}>
                 Sign in
               </Link>
             </li>
@@ -60,28 +63,13 @@ export const DrawerMenu = ({ onClose }: DrawerMenuProps) => {
           </ul>
         ) : (
           <ul>
-            <li>
-              <Link className={LookClass.row} to="/account/orders">
-                Orders
-              </Link>
-            </li>
-            <li>
-              <Link className={LookClass.row} to="/account">
-                Account
-              </Link>
-            </li>
-            <li>
-              <Link className={LookClass.row} to="/account/addresses">
-                Addresses
-              </Link>
-            </li>
-            {session.roles.length === 0 ? null : (
-              <li>
-                <Link className={LookClass.row} to="/admin">
-                  Admin
+            {AccountLinks.listFor(session.roles).map((link) => (
+              <li key={link.to}>
+                <Link className={LookClass.row} to={link.to}>
+                  {link.label}
                 </Link>
               </li>
-            )}
+            ))}
             <li>
               <button
                 className={LookClass.row}
