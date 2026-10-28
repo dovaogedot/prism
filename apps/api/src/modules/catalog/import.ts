@@ -177,7 +177,8 @@ export const ImportFile = {
         widthMm: number("width_mm", ImportFile.wholeOf, "Write a whole number of millimeters."),
         heightMm: number("height_mm", ImportFile.wholeOf, "Write a whole number of millimeters."),
         depthMm: number("depth_mm", ImportFile.wholeOf, "Write a whole number of millimeters."),
-        featured: featured === "true",
+        // An empty cell, like a missing column, leaves the product's featuring as it is.
+        ...(featured === "" ? {} : { featured: featured === "true" }),
         properties,
       };
 
@@ -238,7 +239,6 @@ export const ImportFile = {
         row,
         {
           ...shaped.data,
-          featured: shaped.data.featured ?? false,
           properties: Object.entries(shaped.data.properties ?? {}).map(([name, value]) => ({ name, value })),
         },
         (path) => (path[0] === "properties" && typeof path[1] === "number" ? `properties.${names[path[1]] ?? ""}` : path.map(String).join(".")),

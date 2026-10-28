@@ -254,6 +254,27 @@ describe("bulk import", () => {
     expect((await auditOf("product")).map((row) => row["action"])).toEqual(["product.import"]);
   });
 
+  it("leaves a product's featuring alone when the file has no featured column or an empty cell", async () => {
+    const id = await Shop.productId(harness, "desk-lamp");
+    await Staff.call(harness, content, "PUT", `/admin/products/${id}`, productInput({ name: "Desk Lamp", slug: "desk-lamp", isFeatured: true, stock: 10, stockBefore: 10 }));
+    const [before] = await harness.database.sql`SELECT featured_at FROM product WHERE id = ${id}`;
+    const withoutColumn = HEADER.replace(",featured", "");
+    const cells = (featured: string | undefined) =>
+      ["desk-lamp", "Desk Lamp", "A good one.", "19.90", "5", "lamps", "acme", "500", "100", "200", "100", ...(featured === undefined ? [] : [featured]), "Red"].join(",");
+
+    await importFile([withoutColumn, cells(undefined)].join("\n"), "lamps.csv", false);
+    const [afterMissing] = await harness.database.sql`SELECT featured_at FROM product WHERE id = ${id}`;
+    await importFile([HEADER, cells("")].join("\n"), "lamps.csv", false);
+    const [afterEmpty] = await harness.database.sql`SELECT featured_at FROM product WHERE id = ${id}`;
+    await importFile([HEADER, cells("false")].join("\n"), "lamps.csv", false);
+    const [afterFalse] = await harness.database.sql`SELECT featured_at FROM product WHERE id = ${id}`;
+
+    expect(before?.["featured_at"]).not.toBeNull();
+    expect(afterMissing?.["featured_at"]).toEqual(before?.["featured_at"]);
+    expect(afterEmpty?.["featured_at"]).toEqual(before?.["featured_at"]);
+    expect(afterFalse?.["featured_at"]).toBeNull();
+  });
+
   it("writes nothing when one row is bad, and names its row and column", async () => {
     const bad = [HEADER, csvRow("table-lamp", "Table Lamp"), csvRow("wall-lamp", "Wall Lamp", "12.901")].join("\n");
 

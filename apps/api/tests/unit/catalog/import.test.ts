@@ -67,6 +67,12 @@ describe("ImportFile.parseCsv", () => {
     ]);
   });
 
+  it("leaves featured out when its cell is empty", () => {
+    const parsed = ImportFile.parseCsv(`${HEADER}\n${row({ featured: "" })}\n`);
+
+    expect(parsed.rows[0]?.product).not.toHaveProperty("featured");
+  });
+
   it("reads quoted fields that hold commas and line breaks, and ignores a byte order mark", () => {
     const parsed = ImportFile.parseCsv(`﻿${HEADER}\n${row({ description: '"Bright, warm\nand steady"' })}\n`);
 

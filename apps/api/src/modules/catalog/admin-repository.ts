@@ -172,6 +172,14 @@ export const CatalogAdminRepository = {
       updatedAt: now,
     });
 
+    /** What an import row writes over an existing product's featuring: a row that says nothing keeps it. */
+    const importedFeaturedAt = (featured: boolean | undefined, now: Date): SQL | null => {
+      if (featured === undefined) return sql`${products.featuredAt}`;
+
+      // A product that stays featured keeps the instant it began.
+      return featured ? sql`COALESCE(${products.featuredAt}, ${now.toISOString()}::timestamptz)` : null;
+    };
+
     /** The outcome a failed product write stands for, or the failure itself when it is none of them. */
     const saveFailure = <T>(reason: unknown): SaveOutcome<T> => {
       if (AuthRepository.isUniqueViolation(reason)) return { _tag: "SlugTaken" };
@@ -509,15 +517,8 @@ export const CatalogAdminRepository = {
 
             const [saved] = await tx
               .insert(products)
-              .values({ ...values, featuredAt: candidate.featured ? now : null, createdAt: now })
-              .onConflictDoUpdate({
-                target: products.slug,
-                set: {
-                  ...values,
-                  // A product that stays featured keeps the instant it began.
-                  featuredAt: candidate.featured ? sql`COALESCE(${products.featuredAt}, ${now.toISOString()}::timestamptz)` : null,
-                },
-              })
+              .values({ ...values, featuredAt: candidate.featured === true ? now : null, createdAt: now })
+              .onConflictDoUpdate({ target: products.slug, set: { ...values, featuredAt: importedFeaturedAt(candidate.featured, now) } })
               .returning({ id: products.id });
             if (saved === undefined) throw new Error("product upsert returned no row");
 

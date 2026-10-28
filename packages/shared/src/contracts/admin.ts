@@ -449,6 +449,8 @@ export type AdminBrand = Readonly<{ id: BrandId; slug: Slug; name: string; produ
 /**
  * One product of an import file, as checked. Categories and brands are named
  * by slug and must exist; a row with a slug that exists updates that product.
+ * Without `featured`, an updated product keeps its featuring and a new one is
+ * not featured.
  */
 export type ImportRow = z.infer<typeof ImportRow.schema>;
 export const ImportRow = {
@@ -464,7 +466,7 @@ export const ImportRow = {
     widthMm: ProductFields.millimeters,
     heightMm: ProductFields.millimeters,
     depthMm: ProductFields.millimeters,
-    featured: z.boolean().default(false),
+    featured: z.boolean().optional(),
     properties: ProductProperties.schema.default([]),
   }),
 } as const;
