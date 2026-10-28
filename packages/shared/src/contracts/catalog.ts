@@ -122,7 +122,12 @@ export const ProductQueryParams = {
       page: z.coerce.number().int().min(1).max(10_000).default(1),
       perPage: z.coerce.number().int().min(1).max(60).default(12),
     })
-    .catchall(MultiValue.schema),
+    .catchall(MultiValue.schema)
+    .refine(
+      (params: Readonly<Record<string, unknown>>): boolean =>
+        Object.keys(params).filter((key) => key.startsWith(ProductQuery.PROPERTY_PREFIX)).length <= ProductQuery.MAX_PROPERTY_FILTERS,
+      "Use at most 20 property filters.",
+    ),
 } as const;
 
 export const ProductQuery = {
@@ -130,6 +135,8 @@ export const ProductQuery = {
   MAX_PER_PAGE: 60,
   /** Query keys that start with this filter on a product property of that name. */
   PROPERTY_PREFIX: "p.",
+  /** The most property filters one search takes, since each one is a subquery of every statement the search runs. */
+  MAX_PROPERTY_FILTERS: 20,
 
   /** The query a parsed query string asks for. Empty text and empty lists count as absent. */
   fromParams: (params: ProductQueryParams): ProductQuery => {

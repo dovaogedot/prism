@@ -230,6 +230,19 @@ describe("GET /api/v1/products", () => {
     expect((await get("/api/v1/products?rating=9")).statusCode).toBe(422);
     expect((await get("/api/v1/products?category=Not%20A%20Slug")).statusCode).toBe(422);
   });
+
+  it("takes at most 20 property filters", async () => {
+    const filters = (count: number) => Array.from({ length: count }, (_, index) => `p.name${index}=x`).join("&");
+
+    expect((await get(`/api/v1/products?${filters(20)}`)).statusCode).toBe(200);
+    expect((await get(`/api/v1/products?${filters(21)}`)).statusCode).toBe(422);
+  });
+
+  it("runs every statement under a time limit", async () => {
+    const [setting] = await harness.database.sql`SHOW statement_timeout`;
+
+    expect(setting?.["statement_timeout"]).toBe("30s");
+  });
 });
 
 describe("GET /api/v1/products/suggest", () => {

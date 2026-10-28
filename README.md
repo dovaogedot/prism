@@ -260,7 +260,7 @@ Every route is under `/api/v1` and answers JSON. A refusal is `{ "error": { "cod
 | `POST /payments/webhook` | Where Stripe reports payments and refunds. Checks Stripe's signature. |
 | `GET /health` | Liveness. |
 
-`GET /products` reads `q`, `category`, `brand`, `priceMin` and `priceMax` in cents, `rating` as a minimum, `sort` (`relevance`, `price_asc`, `price_desc`, `rating`, `newest`), `page`, `perPage`, and `p.<name>=<value>` for any property. `brand` and `p.<name>` repeat: values under one key are alternatives, and different keys all have to hold. The answer carries the page of items, the total, the facets, and `matched`: `exact`, or `similar` when it fell back to similar names.
+`GET /products` reads `q`, `category`, `brand`, `priceMin` and `priceMax` in cents, `rating` as a minimum, `sort` (`relevance`, `price_asc`, `price_desc`, `rating`, `newest`), `page`, `perPage`, and `p.<name>=<value>` for any property, at most 20 of them. `brand` and `p.<name>` repeat: values under one key are alternatives, and different keys all have to hold. The answer carries the page of items, the total, the facets, and `matched`: `exact`, or `similar` when it fell back to similar names.
 
 Staff routes are under `/api/v1/admin`. Each needs an account whose roles grant the permission, with 2FA on, and a session that passed a code check within 8 hours.
 

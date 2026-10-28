@@ -24,14 +24,24 @@ export type DatabaseHandle = Readonly<{
 }>;
 
 export const Database = {
-  /** Opens a pool of at most `poolSize` connections. */
+  /** The longest one statement may run, in milliseconds; far above any query the shop makes. */
+  STATEMENT_TIMEOUT_MS: 30_000,
+
+  /**
+   * Opens a pool of at most `poolSize` connections, on which Postgres cancels
+   * any statement that runs longer than `STATEMENT_TIMEOUT_MS`.
+   */
   open: (url: string, poolSize: number): DatabaseHandle => {
     const sql = postgres(url, {
       max: poolSize,
       // Notices are Postgres talking to itself, not application log lines.
       onnotice: () => {},
-      // Every statement here is short: compiling one with JIT costs more than running it.
-      connection: { jit: "off" },
+      connection: {
+        // Every statement here is short: compiling one with JIT costs more than running it.
+        jit: "off",
+        // A runaway query gives its connection back instead of holding it, and the pool with it.
+        statement_timeout: Database.STATEMENT_TIMEOUT_MS,
+      },
     });
 
     return {
