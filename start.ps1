@@ -178,8 +178,9 @@ if ($action -eq "--pull") {
 docker compose up --build --detach @upArgs
 if ($LASTEXITCODE -ne 0) {
   Write-Host ""
-  Write-Host "The stack did not come up. Migration logs:"
-  docker compose logs migrate
+  Write-Host "The stack did not come up. Its containers, and the last lines they logged:"
+  docker compose ps --all
+  docker compose logs --tail 50 migrate api web
   exit 1
 }
 
@@ -200,13 +201,24 @@ $payments = if ($stripeKey) { "Stripe test mode" } else { "off until STRIPE_SECR
 
 Write-Host ""
 Write-Host -NoNewline "Waiting for the storefront"
+$isUp = $false
 foreach ($attempt in 1..60) {
   # curl.exe, not the `curl` alias: it is silent on failure and only sets an exit code.
   # -k: the certificate is self-signed, and this asks only whether the storefront answers.
   curl.exe -kfs -o NUL "https://localhost:$webPort/api/v1/health"
-  if ($LASTEXITCODE -eq 0) { break }
+  if ($LASTEXITCODE -eq 0) {
+    $isUp = $true
+    break
+  }
   Write-Host -NoNewline "."
   Start-Sleep -Seconds 1
+}
+
+if (-not $isUp) {
+  Write-Host ""
+  Write-Host "The storefront did not answer within a minute. The last lines it and the API logged:"
+  docker compose logs --tail 50 api web
+  exit 1
 }
 
 # The shop already answers. The seed stands apart from it, so a failed seed

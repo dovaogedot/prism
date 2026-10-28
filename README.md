@@ -66,7 +66,7 @@ The seed is separate from the shop: the shop runs without it, and a failed seed 
 ### Running it without the scripts
 
 1. Copy `.env.example` to `.env`.
-2. `docker compose up --build --detach`. If it fails, `docker compose logs migrate` says why.
+2. `docker compose up --build --detach`. If it fails, `docker compose ps --all` shows which container stopped, and `docker compose logs <service>` says why.
 3. Open <https://localhost:3000> and accept the certificate warning. The storefront answers a few seconds after step 2 returns.
 4. `docker compose down` stops the stack. Add `--volumes` to delete the data too.
 

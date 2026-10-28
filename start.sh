@@ -164,8 +164,9 @@ fi
 # the one-shot container has already exited and wait no longer sees it.)
 if ! docker compose up --build --detach "$@"; then
   echo >&2
-  echo "The stack did not come up. Migration logs:" >&2
-  docker compose logs migrate >&2
+  echo "The stack did not come up. Its containers, and the last lines they logged:" >&2
+  docker compose ps --all >&2
+  docker compose logs --tail 50 migrate api web >&2
   exit 1
 fi
 
@@ -193,14 +194,23 @@ fi
 # answers, not whether the browser will trust it.
 echo
 printf 'Waiting for the storefront'
+is_up=false
 for _ in $(seq 1 60); do
   if curl -kfsS -o /dev/null "https://localhost:${web_port}/api/v1/health" 2>/dev/null; then
+    is_up=true
     printf '\n'
     break
   fi
   printf '.'
   sleep 1
 done
+
+if [ "$is_up" = false ]; then
+  echo >&2
+  echo "The storefront did not answer within a minute. The last lines it and the API logged:" >&2
+  docker compose logs --tail 50 api web >&2
+  exit 1
+fi
 
 # The shop already answers. The seed stands apart from it, so a failed seed
 # leaves an empty shop running instead of failing the start.
