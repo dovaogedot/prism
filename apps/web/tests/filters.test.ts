@@ -68,9 +68,13 @@ describe("CatalogParams.isFiltered", () => {
     expect(CatalogParams.isFiltered(params("q=lamp&category=lighting&sort=rating&page=2&perPage=24"))).toBe(false);
   });
 
-  it("counts any other key", () => {
+  it("counts the filters and the property filters", () => {
     expect(CatalogParams.isFiltered(params("q=lamp&p.color=red"))).toBe(true);
     expect(CatalogParams.isFiltered(params("rating=4"))).toBe(true);
+  });
+
+  it("ignores keys the listing does not read", () => {
+    expect(CatalogParams.isFiltered(params("utm_source=facebook&fbclid=abc"))).toBe(false);
   });
 });
 
@@ -90,8 +94,8 @@ describe("CatalogParams.active", () => {
     expect(only?.next.toString()).toBe("brand=acme");
   });
 
-  it("finds nothing among the text, category, sort and paging", () => {
-    expect(CatalogParams.active(params("q=lamp&category=lighting&sort=rating&page=2"), facets)).toEqual([]);
+  it("finds nothing among the text, category, sort and paging, or keys the listing does not read", () => {
+    expect(CatalogParams.active(params("q=lamp&category=lighting&sort=rating&page=2&utm_source=facebook"), facets)).toEqual([]);
   });
 });
 

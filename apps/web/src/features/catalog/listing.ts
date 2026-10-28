@@ -1,9 +1,12 @@
 /**
  * The listing's state as its URL carries it. `/shop`, `/categories/:slug`
  * and `/search` share one listing. The page's query string is the query of
- * `GET /products`, except `view`, which only the page reads; a category page
- * takes its category from the path instead of the query.
+ * `GET /products`, except `view`, which only the page reads, and any key the
+ * listing does not read; a category page takes its category from the path
+ * instead of the query.
  */
+
+import { CatalogParams } from "./filters.ts";
 
 /** How the results are drawn. */
 export type ListingView = "grid" | "list";
@@ -28,10 +31,16 @@ export const Listing = {
     return next;
   },
 
-  /** The query string `GET /products` gets for the page: its own query without `view`, with the path's category. */
+  /**
+   * The query string `GET /products` gets for the page: the keys of its own
+   * query that the listing reads, without `view`, with the path's category.
+   */
   apiQuery: (params: URLSearchParams, category: string | undefined): string => {
-    const query = new URLSearchParams(params);
-    query.delete("view");
+    const query = new URLSearchParams();
+
+    for (const [key, value] of params) {
+      if (key !== "view" && CatalogParams.isListingKey(key)) query.append(key, value);
+    }
 
     if (category !== undefined) {
       query.set("category", category);

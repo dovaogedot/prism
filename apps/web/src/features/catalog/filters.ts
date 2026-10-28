@@ -2,7 +2,8 @@
  * The filters as the URL carries them.
  *
  * The catalog page's query string is the query string of `GET /products`,
- * key for key, so the page forwards it as it is and every view is a link.
+ * key for key, so every view is a link. The page forwards the keys the
+ * listing reads and leaves out any other, such as a campaign's.
  * Every operation returns a new `URLSearchParams` and leaves its input alone.
  */
 
@@ -15,6 +16,15 @@ export type ActiveFilter = Readonly<{ key: string; value: string; label: string;
 export const CatalogParams = {
   /** Keys that shape the list without narrowing it: the shelf, the order, the paging and how it is drawn. */
   UNFILTERED: new Set(["q", "category", "sort", "page", "perPage", "view"]),
+
+  /** Keys that narrow the list, besides the property filters. */
+  FILTERS: new Set(["brand", "priceMin", "priceMax", "rating"]),
+
+  /** Whether `key` narrows the list: a filter the API knows, or a property filter. */
+  isFilterKey: (key: string): boolean => CatalogParams.FILTERS.has(key) || key.startsWith(ProductQuery.PROPERTY_PREFIX),
+
+  /** Whether the listing reads `key`. Anything else, such as a campaign's `utm_source`, is not the listing's. */
+  isListingKey: (key: string): boolean => CatalogParams.UNFILTERED.has(key) || CatalogParams.isFilterKey(key),
 
   /** The query key for a filter on the property of that name. */
   propertyKey: (name: string): string => `${ProductQuery.PROPERTY_PREFIX}${name}`,
@@ -52,7 +62,7 @@ export const CatalogParams = {
 
   /** Whether anything narrows the results. */
   isFiltered: (params: URLSearchParams): boolean => {
-    for (const key of params.keys()) if (!CatalogParams.UNFILTERED.has(key)) return true;
+    for (const key of params.keys()) if (CatalogParams.isFilterKey(key)) return true;
     return false;
   },
 
@@ -69,7 +79,7 @@ export const CatalogParams = {
     const filters: ActiveFilter[] = [];
 
     for (const [key, value] of params) {
-      if (CatalogParams.UNFILTERED.has(key) || (key === "priceMax" && priceMin !== null)) continue;
+      if (!CatalogParams.isFilterKey(key) || (key === "priceMax" && priceMin !== null)) continue;
 
       const label = match(key)
         .with("priceMin", "priceMax", () =>

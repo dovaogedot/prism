@@ -21,6 +21,10 @@ describe("the query the listing asks the API", () => {
     expect(Listing.apiQuery(params("q=lamp&view=list&page=2"), undefined)).toBe("q=lamp&page=2");
   });
 
+  it("leaves out keys the listing does not read, such as a campaign's", () => {
+    expect(Listing.apiQuery(params(`utm_source=facebook&fbclid=${"x".repeat(148)}&brand=acme&p.color=red`), undefined)).toBe("brand=acme&p.color=red");
+  });
+
   it("takes a category page's category from its path", () => {
     expect(Listing.apiQuery(params("brand=acme"), "minecraft")).toBe("brand=acme&category=minecraft");
   });
