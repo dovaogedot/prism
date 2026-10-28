@@ -26,6 +26,9 @@ export const ContactPage = () => {
 
   const [sentTo, setSentTo] = useState<string | undefined>(undefined);
 
+  // Google accepts a token once, and a failed send may have spent it, so each failure draws a fresh challenge.
+  const [captchaRound, setCaptchaRound] = useState(0);
+
   const form = useForm({
     resolver: zodResolver(SupportMessageInput.schema),
     defaultValues: { name: "", email: session?.email ?? "", topic: "order", orderNumber: "", message: "", captchaToken: "" },
@@ -36,7 +39,11 @@ export const ContactPage = () => {
 
     await Api.postEmptyWithoutRetry("/support/messages", values)
       .then(() => setSentTo(values.email))
-      .catch((reason: unknown) => setFailure(Failure.describe(reason)));
+      .catch((reason: unknown) => {
+        setFailure(Failure.describe(reason));
+        form.setValue("captchaToken", "");
+        setCaptchaRound((round) => round + 1);
+      });
   });
 
   const errors = form.formState.errors;
@@ -85,7 +92,7 @@ export const ContactPage = () => {
           <TextAreaField label="Message" rows={6} error={errors.message?.message} {...form.register("message")} />
 
           <div className="space-y-1.5">
-            <Captcha dark={theme === "dark"} onToken={(token) => form.setValue("captchaToken", token, { shouldValidate: form.formState.isSubmitted })} />
+            <Captcha key={captchaRound} dark={theme === "dark"} onToken={(token) => form.setValue("captchaToken", token, { shouldValidate: form.formState.isSubmitted })} />
             {errors.captchaToken?.message === undefined ? null : (
               <p className="text-sm text-danger" role="alert">
                 {errors.captchaToken.message}

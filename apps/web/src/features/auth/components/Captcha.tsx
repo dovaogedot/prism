@@ -9,6 +9,9 @@
  * If the script cannot load at all, the component reports a static token so
  * registration is still reachable. The server decides whether that token is
  * acceptable.
+ *
+ * Google accepts a solved token once. A form whose submit was refused gives
+ * the widget a new `key`, which draws a fresh challenge.
  */
 
 import { useEffect, useRef, useState } from "react";

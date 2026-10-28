@@ -23,6 +23,8 @@ export const RegisterPage = () => {
   const next = NextPath.of(params.get("next"));
   const { theme } = useTheme();
   const [failure, setFailure] = useState<ReactNode | undefined>(undefined);
+  // Google accepts a token once, and a refused submit may have spent it, so each refusal draws a fresh challenge.
+  const [captchaRound, setCaptchaRound] = useState(0);
 
   const form = useForm({
     resolver: zodResolver(RegisterForm.schema),
@@ -43,7 +45,11 @@ export const RegisterPage = () => {
         TokenStore.set(grant.accessToken, grant.user);
         void navigate(next, { replace: true });
       })
-      .catch((reason: unknown) => setFailure(Failure.describe(reason)));
+      .catch((reason: unknown) => {
+        setFailure(Failure.describe(reason));
+        form.setValue("captchaToken", "");
+        setCaptchaRound((round) => round + 1);
+      });
   });
 
   return (
@@ -93,6 +99,7 @@ export const RegisterPage = () => {
         />
 
         <Captcha
+          key={captchaRound}
           dark={theme === "dark"}
           onToken={(token) => form.setValue("captchaToken", token, { shouldValidate: true })}
         />
