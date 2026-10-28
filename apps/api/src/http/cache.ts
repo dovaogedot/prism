@@ -20,10 +20,10 @@ export const CachePolicy = {
   PUBLIC: "public, max-age=60, stale-while-revalidate=300",
   PRIVATE: "private, no-store",
 
-  /** Sets `Cache-Control` on every answer under `prefix` that does not set its own. */
-  register: (app: FastifyInstance, prefix: string): void => {
+  /** Sets `Cache-Control` on every answer that does not set its own. */
+  register: (app: FastifyInstance): void => {
     app.addHook("onSend", async (request, reply) => {
-      if (!request.url.startsWith(prefix) || reply.hasHeader("cache-control")) return;
+      if (reply.hasHeader("cache-control")) return;
 
       const isShared =
         request.routeOptions.config.cache === "public" &&

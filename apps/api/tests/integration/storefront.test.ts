@@ -279,6 +279,13 @@ describe("cache headers", () => {
     expect(signedIn.headers["cache-control"]).toBe("private, no-store");
     expect(personal.headers["cache-control"]).toBe("private, no-store");
   });
+
+  it("marks an answer whose path spells the prefix with percent escapes", async () => {
+    const response = await harness.app.inject({ method: "GET", url: "/%61pi/v1/products" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("public, max-age=60, stale-while-revalidate=300");
+  });
 });
 
 describe("encryption at rest of what the account adds", () => {

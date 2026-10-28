@@ -427,6 +427,21 @@ describe("rate limiting", () => {
     });
   });
 
+  it("limits a path that spells the prefix with percent escapes", async () => {
+    const statuses: number[] = [];
+
+    for (let index = 0; index <= RateLimitPolicy.table.credentials.capacity; index += 1) {
+      const response = await fromAddress("203.0.113.16", "POST", "/%61pi/v1/auth/login", {
+        email: `escaped-${index}@example.com`,
+        password: "guess number one here",
+      });
+      statuses.push(response.statusCode);
+    }
+
+    expect(statuses.slice(0, -1).every((status) => status === 401)).toBe(true);
+    expect(statuses.at(-1)).toBe(429);
+  });
+
   it("lets exactly one more through after one refill interval", async () => {
     for (let index = 0; index < RateLimitPolicy.table.credentials.capacity; index += 1) {
       await guess("203.0.113.10", `target-${index}@example.com`);

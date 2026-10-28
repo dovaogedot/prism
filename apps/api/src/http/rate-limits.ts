@@ -1,6 +1,6 @@
 /**
- * The rate limits as HTTP. Every route under the API prefix falls under a
- * policy: the one its `config.rateLimit` names, or `default`. A route marked
+ * The rate limits as HTTP. Every request falls under a policy: the one its
+ * route's `config.rateLimit` names, or `default`. A route marked
  * `none` is never limited. Every answer of a limited route carries
  * `RateLimit-Remaining`, and a refusal is a 429 `RateLimited` with
  * `Retry-After`.
@@ -24,8 +24,6 @@ export type RateLimitDependencies = Readonly<{
   limiter: RateLimiter;
   /** The user a request's bearer token names, when it carries a valid one. */
   userOf: (request: FastifyRequest) => Promise<UserId | undefined>;
-  /** The path prefix the limits apply under. */
-  prefix: string;
 }>;
 
 export const RateLimits = {
@@ -49,8 +47,6 @@ export const RateLimits = {
   /** Puts every route under its policy, before anything else about the request runs. */
   register: (app: FastifyInstance, deps: RateLimitDependencies): void => {
     app.addHook("onRequest", async (request, reply) => {
-      if (!request.url.startsWith(deps.prefix)) return undefined;
-
       const name = RateLimits.policyOf(request.routeOptions.config);
       if (name === "none") return undefined;
 

@@ -221,12 +221,11 @@ export const App = {
     });
     Guards.decorate(app);
 
-    CachePolicy.register(app, App.PREFIX);
+    CachePolicy.register(app);
 
     const limiter = RateLimiter.create({ clock, scale: config.rateLimit.scale });
     RateLimits.register(app, {
       limiter,
-      prefix: App.PREFIX,
       userOf: async (request) => {
         const token = Guards.BEARER.exec(request.headers.authorization ?? "")?.[1];
         if (token === undefined) return undefined;
