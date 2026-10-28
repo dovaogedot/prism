@@ -5,12 +5,12 @@ import { Link } from "react-router";
 import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { useTheme } from "../../../shared/theme/use-theme.ts";
-import { Alert, Card, Skeleton } from "../../../shared/ui/index.ts";
+import { Alert, Button, Card, Skeleton } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 import { useSession } from "../../auth/session.ts";
 import { AccountKeys, useSavedAddresses } from "../../account/account.ts";
 import { useCart } from "../../cart/cart.ts";
-import { StripeLoader, usePaymentsConfig, useShippingOptions } from "../checkout.ts";
+import { StripeFields, usePaymentsConfig, useShippingOptions, useStripeJs } from "../checkout.ts";
 import { CheckoutBody, StripeCheckout } from "../components/index.ts";
 import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
@@ -30,6 +30,9 @@ export const CheckoutPage = () => {
   const config = usePaymentsConfig();
 
   const options = useShippingOptions();
+
+  // Starts as soon as the shop says it takes cards, beside the other reads.
+  const stripeJs = useStripeJs(config.data?.provider === "stripe" ? config.data.publishableKey : undefined);
 
   const prefill = useQuery({
     queryKey: AccountKeys.checkoutPrefill(session?.id),
@@ -106,18 +109,29 @@ export const CheckoutPage = () => {
           }
 
           return (
-            <Elements
-              stripe={StripeLoader.load(payments.publishableKey)}
-              options={{
-                mode: "payment",
-                amount: Pricing.totals(view.lines, first).totalCents,
-                currency: "eur",
-                allowedPaymentMethodTypes: ["card"],
-                appearance: StripeLoader.appearance(theme === "dark"),
-              }}
-            >
-              <StripeCheckout cart={view} options={choices} {...known} />
-            </Elements>
+            <div className="space-y-6">
+              {stripeJs.status === "error" ? (
+                <Alert title="The card fields did not load">
+                  <p>Stripe's payment form could not be reached. Check the connection and try again; what you typed stays.</p>
+                  <Button className="mt-3" tone="quiet" type="button" busy={stripeJs.isFetching} onClick={() => void stripeJs.refetch()}>
+                    Try again
+                  </Button>
+                </Alert>
+              ) : null}
+
+              <Elements
+                stripe={stripeJs.data ?? null}
+                options={{
+                  mode: "payment",
+                  amount: Pricing.totals(view.lines, first).totalCents,
+                  currency: "eur",
+                  allowedPaymentMethodTypes: ["card"],
+                  appearance: StripeFields.appearance(theme === "dark"),
+                }}
+              >
+                <StripeCheckout cart={view} options={choices} {...known} />
+              </Elements>
+            </div>
           );
         })}
     </div>

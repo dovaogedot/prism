@@ -18,7 +18,7 @@ import {
 // The pure entry loads Stripe.js when checkout asks for it, not on every page that imports this module.
 import { loadStripe } from "@stripe/stripe-js/pure";
 import type { Stripe } from "@stripe/stripe-js";
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import type { UseFormReturn } from "react-hook-form";
 import { Api } from "../../shared/api/client.ts";
 
@@ -133,20 +133,29 @@ export const useShippingOptions = () =>
     staleTime: 60_000,
   });
 
-export const StripeLoader = {
-  /** Stripe.js once per publishable key, so a second visit to checkout reuses the first load. */
-  loaded: new Map<string, Promise<Stripe | null>>(),
+/**
+ * Stripe.js for `publishableKey`, loaded from js.stripe.com and never
+ * bundled; nothing loads without a key. A load is kept for the tab, so a
+ * second visit to checkout reuses it, while a failed one is not, so `refetch`
+ * tries again.
+ */
+export const useStripeJs = (publishableKey: string | undefined) =>
+  useQuery({
+    queryKey: ["stripe-js", publishableKey],
+    queryFn:
+      publishableKey === undefined
+        ? skipToken
+        : async (): Promise<Stripe> => {
+            const stripe = await loadStripe(publishableKey);
+            if (stripe === null) throw new Error("Stripe.js did not load.");
 
-  /** Stripe.js, loaded from js.stripe.com and never bundled. */
-  load: (publishableKey: string): Promise<Stripe | null> => {
-    const existing = StripeLoader.loaded.get(publishableKey);
-    if (existing !== undefined) return existing;
+            return stripe;
+          },
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: Number.POSITIVE_INFINITY,
+  });
 
-    const loading = loadStripe(publishableKey);
-    StripeLoader.loaded.set(publishableKey, loading);
-    return loading;
-  },
-
+export const StripeFields = {
   /** Stripe's fields drawn in the shop's colors and corners, in either theme. */
   appearance: (dark: boolean) => ({
     theme: dark ? ("night" as const) : ("stripe" as const),
