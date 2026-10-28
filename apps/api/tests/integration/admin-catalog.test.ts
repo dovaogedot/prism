@@ -82,7 +82,7 @@ describe("products", () => {
     expect(created.statusCode).toBe(201);
     const id = String(jsonOf(created)["id"]);
 
-    const edited = await Staff.call(harness, content, "PUT", `/admin/products/${id}`, productInput({ priceCents: 7900, stock: 9 }));
+    const edited = await Staff.call(harness, content, "PUT", `/admin/products/${id}`, productInput({ priceCents: 7900, stock: 9, stockBefore: 4 }));
     expect(jsonOf(edited)).toMatchObject({ priceCents: 7900, stock: 9, properties: [{ name: "Color", value: "Black" }] });
 
     expect((await Staff.call(harness, content, "DELETE", `/admin/products/${id}`)).statusCode).toBe(204);
@@ -108,7 +108,7 @@ describe("products", () => {
 
   it("features a product on the home page and keeps when it began", async () => {
     const id = await Shop.productId(harness, "desk-lamp");
-    const featured = productInput({ name: "Desk Lamp", slug: "desk-lamp", isFeatured: true });
+    const featured = productInput({ name: "Desk Lamp", slug: "desk-lamp", isFeatured: true, stock: 10, stockBefore: 10 });
 
     await Staff.call(harness, content, "PUT", `/admin/products/${id}`, featured);
     const [first] = await harness.database.sql`SELECT featured_at FROM product WHERE id = ${id}`;
@@ -118,6 +118,22 @@ describe("products", () => {
 
     expect(first?.["featured_at"]).not.toBeNull();
     expect(second?.["featured_at"]).toEqual(first?.["featured_at"]);
+  });
+
+  it("moves the stock by the change made in the form, so sales since it loaded stay counted", async () => {
+    const id = await Shop.productId(harness, "desk-lamp");
+    await Shop.placed(harness, await Shop.fill(harness, [["desk-lamp", 3]]));
+    const edit = { name: "Desk Lamp", slug: "desk-lamp" };
+
+    // The form loaded 10 before the sale of 3: an untouched stock stays at 7, and +2 makes 9.
+    await Staff.call(harness, content, "PUT", `/admin/products/${id}`, productInput({ ...edit, stock: 10, stockBefore: 10 }));
+    const [kept] = await harness.database.sql`SELECT stock FROM product WHERE id = ${id}`;
+    await Staff.call(harness, content, "PUT", `/admin/products/${id}`, productInput({ ...edit, stock: 12, stockBefore: 10 }));
+    const [raised] = await harness.database.sql`SELECT stock FROM product WHERE id = ${id}`;
+    await Staff.call(harness, content, "PUT", `/admin/products/${id}`, productInput({ ...edit, stock: 0, stockBefore: 20 }));
+    const [emptied] = await harness.database.sql`SELECT stock FROM product WHERE id = ${id}`;
+
+    expect([kept?.["stock"], raised?.["stock"], emptied?.["stock"]]).toEqual([7, 9, 0]);
   });
 
   it("refuses a slug another product uses, on the slug field", async () => {

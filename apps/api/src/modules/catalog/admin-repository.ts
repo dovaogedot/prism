@@ -20,6 +20,7 @@ import {
   type ProductId,
   type ProductImage,
   type ProductInput,
+  type ProductUpdate,
   type Slug,
 } from "@prism/shared";
 import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, lte, max, or, sql, type SQL } from "drizzle-orm";
@@ -71,7 +72,7 @@ export type CatalogAdminRepository = Readonly<{
   listProducts: (query: AdminProductQuery) => Promise<Page<AdminProductSummary>>;
   product: (productId: ProductId) => Promise<AdminProductDetail | undefined>;
   createProduct: (input: ProductInput, actor: StaffActor, now: Date) => Promise<SaveOutcome<ProductId>>;
-  updateProduct: (productId: ProductId, input: ProductInput, actor: StaffActor, now: Date) => Promise<SaveOutcome<ProductId>>;
+  updateProduct: (productId: ProductId, input: ProductUpdate, actor: StaffActor, now: Date) => Promise<SaveOutcome<ProductId>>;
   /** Deletes the product; resolves to its pictures, whose files go once the row has, or `undefined` when there is none. */
   deleteProduct: (productId: ProductId, actor: StaffActor) => Promise<readonly Readonly<{ id: ImageId; file: string }>[] | undefined>;
   categories: () => Promise<readonly AdminCategory[]>;
@@ -325,10 +326,13 @@ export const CatalogAdminRepository = {
             if (current === undefined) return { _tag: "NotFound" };
 
             const before = await product(productId);
-            await tx.update(products).set(columnsOf(input, current.featuredAt, now)).where(eq(products.id, productId));
+            // Under the row lock, so a checkout's decrement lands either before or after this one.
+            const stock = Math.max(current.stock + input.stock - input.stockBefore, 0);
+            const saved = { ...input, stock };
+            await tx.update(products).set(columnsOf(saved, current.featuredAt, now)).where(eq(products.id, productId));
             await writeProperties(tx, productId, input.properties);
 
-            const changes = before === undefined ? undefined : AuditLog.diff(CatalogAdminRepository.auditedOf(before), CatalogAdminRepository.auditedOf(input));
+            const changes = before === undefined ? undefined : AuditLog.diff(CatalogAdminRepository.auditedOf(before), CatalogAdminRepository.auditedOf(saved));
             if (changes !== undefined) {
               await audit.record(tx, {
                 actor,

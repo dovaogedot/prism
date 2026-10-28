@@ -1,4 +1,4 @@
-import type { AdminBrand, AdminCategory, AdminProductDetail, ProductInput } from "@prism/shared";
+import type { AdminBrand, AdminCategory, AdminProductDetail, ProductInput, ProductUpdate } from "@prism/shared";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { match, P } from "ts-pattern";
@@ -36,7 +36,7 @@ export const ProductEditPage = () => {
 
   const create = useAdminWrite((input: ProductInput) => Api.post<AdminProductDetail>("/admin/products", input));
 
-  const update = useAdminWrite((input: ProductInput) => Api.put<AdminProductDetail>(`/admin/products/${id}`, input));
+  const update = useAdminWrite((input: ProductUpdate) => Api.put<AdminProductDetail>(`/admin/products/${id}`, input));
 
   const remove = useAdminWrite(() => Api.requestEmpty(`/admin/products/${id}`, { method: "DELETE" }));
 
@@ -113,7 +113,7 @@ export const ProductEditPage = () => {
             brands={lists.brands}
             submitLabel="Save product"
             onSave={async (input) => {
-              await update.mutateAsync(input);
+              await update.mutateAsync({ ...input, stockBefore: data.stock });
               Toast.show(`${input.name} is saved.`);
             }}
           />

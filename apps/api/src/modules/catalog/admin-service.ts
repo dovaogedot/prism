@@ -23,6 +23,7 @@ import type {
   ProductId,
   ProductImage,
   ProductInput,
+  ProductUpdate,
 } from "@prism/shared";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import type { Clock } from "../../platform/clock.ts";
@@ -53,7 +54,7 @@ export type CatalogAdminService = Readonly<{
   listProducts: (query: AdminProductQuery) => Promise<Page<AdminProductSummary>>;
   product: (productId: ProductId) => ResultAsync<AdminProductDetail, DomainError>;
   createProduct: (actor: StaffActor, input: ProductInput) => ResultAsync<AdminProductDetail, DomainError>;
-  updateProduct: (actor: StaffActor, productId: ProductId, input: ProductInput) => ResultAsync<AdminProductDetail, DomainError>;
+  updateProduct: (actor: StaffActor, productId: ProductId, input: ProductUpdate) => ResultAsync<AdminProductDetail, DomainError>;
   deleteProduct: (actor: StaffActor, productId: ProductId) => ResultAsync<void, DomainError>;
   categories: () => Promise<readonly AdminCategory[]>;
   saveCategory: (actor: StaffActor, id: CategoryId | undefined, input: CategoryInput) => ResultAsync<AdminCategory, DomainError>;

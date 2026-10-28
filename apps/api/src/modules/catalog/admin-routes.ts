@@ -11,6 +11,7 @@ import {
   ImageOrderInput,
   ProductId,
   ProductInput,
+  ProductUpdate,
 } from "@prism/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
@@ -132,7 +133,7 @@ export const CatalogAdminRoutes = {
 
     routes.put(
       "/products/:id",
-      { ...guards.admin("catalog.manage", "staff-write"), schema: { params: productParams, body: ProductInput.schema } },
+      { ...guards.admin("catalog.manage", "staff-write"), schema: { params: productParams, body: ProductUpdate.schema } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
         if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });

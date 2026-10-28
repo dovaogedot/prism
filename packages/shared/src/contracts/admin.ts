@@ -345,6 +345,17 @@ export const ProductInput = {
   }),
 } as const;
 
+/**
+ * A validated product change, as `PUT /admin/products/:id` takes it.
+ * `stock` is the stock the form shows and `stockBefore` the stock it loaded:
+ * the save moves the product's stock by their difference, never below zero,
+ * so the sales made while the form was open stay counted.
+ */
+export type ProductUpdate = z.infer<typeof ProductUpdate.schema>;
+export const ProductUpdate = {
+  schema: ProductInput.schema.extend({ stockBefore: ProductFields.stock }),
+} as const;
+
 /** An order of the admin's product list. */
 export type AdminProductSort = (typeof AdminProductSort.NAMES)[number];
 export const AdminProductSort = {

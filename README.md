@@ -286,16 +286,10 @@ first.
   fulfill, paid today, reviews waiting, and products with 5 or fewer in stock.
 - **Orders**: filter by status, dates, order number or customer email. An order's page moves
   it to its next status, cancels it, or refunds it in full.
-- **Products**: create, edit and delete; pictures with their alt text, which is required, and
-  their order; and whether the home page features the product. The list finds products by
-  name or slug, filters them by category, brand, low stock and featuring, and sorts them by
-  name, age, stock or price, either way.
+- **Products**: create, edit and delete; pictures with their alt text, which is required, and their order; and whether the home page features the product. Saving moves the stock by the change made in the form, so the sales made while the form was open stay counted. The list finds products by name or slug, filters them by category, brand, low stock and featuring, and sorts them by name, age, stock or price, either way.
 - **Categories** and **Brands**: create, edit and delete. One that a product uses cannot be
   deleted.
-- **Import**: one JSON or CSV file of up to 2 MB and 5,000 rows. "Check the file" shows the
-  report, every problem by row and column, without writing anything; "Import" writes every
-  row or none. A row updates the product with its slug, or creates one. Categories and brands are
-  named by slug and must exist.
+- **Import**: one JSON or CSV file of up to 2 MB and 5,000 rows. "Check the file" shows the report, every problem by row and column, without writing anything; "Import" writes every row or none. A row updates the product with its slug, or creates one, and its stock replaces the product's. Categories and brands are named by slug and must exist.
 
   ```csv
   slug,name,description,price,stock,category,brand,weight_g,width_mm,height_mm,depth_mm,featured,property:type
@@ -392,7 +386,7 @@ permission, with 2FA on, and a session that passed a code check within 8 hours.
 | `GET /orders`, `GET /orders/:id` | `orders.view` | Every order, by status, dates, number or customer email. |
 | `POST /orders/:id/status` | `orders.fulfill` | Moves a paid order to `processing`, `shipped` (with `trackingNumber`) or `delivered`. |
 | `POST /orders/:id/cancel`, `POST /orders/:id/refund` | `orders.refund` | Cancels an order that has not shipped, or refunds a shipped or delivered one in full. |
-| `GET` and `POST /products`, `GET`, `PUT` and `DELETE /products/:id` | `catalog.manage` | Products. The list reads `q`, `category`, `brand`, `featured`, `lowStock`, `sort` (`name_asc`, `name_desc`, `newest`, `oldest`, `stock_asc`, `stock_desc`, `price_asc`, `price_desc`), `page` and `perPage`. |
+| `GET` and `POST /products`, `GET`, `PUT` and `DELETE /products/:id` | `catalog.manage` | Products. `PUT` also takes `stockBefore`, the stock the form loaded, and moves the stock by the difference. The list reads `q`, `category`, `brand`, `featured`, `lowStock`, `sort` (`name_asc`, `name_desc`, `newest`, `oldest`, `stock_asc`, `stock_desc`, `price_asc`, `price_desc`), `page` and `perPage`. |
 | `GET`, `POST` and `PUT /products/:id/images`, `DELETE /products/:id/images/:imageId` | `catalog.manage` | Pictures: upload one (multipart), set the order and alt texts, delete one. |
 | `POST /products/import` | `catalog.import` | Imports a JSON or CSV file. `?dryRun=true` only checks it. |
 | `GET` and `POST /categories`, `PUT` and `DELETE /categories/:id` | `catalog.manage` | Categories. |
