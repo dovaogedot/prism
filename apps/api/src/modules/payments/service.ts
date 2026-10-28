@@ -38,7 +38,10 @@ export type PaymentService = Readonly<{
   handleWebhook: (rawBody: Buffer, signature: string | undefined) => ResultAsync<void, DomainError>;
   /** Consumes `order.canceled`. Rejects when the provider cannot be reached, so the message is retried. */
   onOrderCanceled: (message: OrderCanceled) => Promise<void>;
-  /** Consumes `order.refund-requested`: refunds the charge in full. Rejects like `onOrderCanceled`. */
+  /**
+   * Consumes `order.refund-requested`: refunds the charge in full, afresh
+   * when an earlier refund failed. Rejects like `onOrderCanceled`.
+   */
   onRefundRequested: (message: OrderRefundRequested) => Promise<void>;
   /** The charge and refund of an order, as its page shows them. */
   summaryOf: (orderId: OrderId) => Promise<PaymentSummary | undefined>;
@@ -246,6 +249,7 @@ export const PaymentService = {
         const charge = await repository.findOf(orderId, "charge");
         if (charge === undefined || charge.status !== "succeeded") return;
 
+        await repository.dropFailedRefund(orderId);
         await refundInFull(charge);
       },
 

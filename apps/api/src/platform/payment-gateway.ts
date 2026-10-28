@@ -105,6 +105,8 @@ export type FakeGateway = PaymentGateway &
     }>;
     /** Makes the next call of `operation` fail with `failure`. */
     failNext: (operation: "createIntent" | "refund", failure: PaymentFailure) => void;
+    /** Makes the next refund the provider creates answer `status` instead of `succeeded`. */
+    answerNextRefund: (status: RefundStatus) => void;
     /** The intent id the fake created for a payment row. */
     intentOf: (paymentId: PaymentId) => ProviderReference | undefined;
     /**
@@ -369,8 +371,8 @@ export const PaymentGateway = {
   }),
 
   /**
-   * A gateway for tests. Intents are `pi_fake_<n>`, refunds succeed at once,
-   * and webhooks are checked with the real signature code against a fixed
+   * A gateway for tests. Intents are `pi_fake_<n>`, refunds succeed at once
+   * unless `answerNextRefund` says otherwise, and webhooks are checked with the real signature code against a fixed
    * secret that `sign` uses too.
    */
   fake: (): FakeGateway => {
@@ -379,6 +381,7 @@ export const PaymentGateway = {
     const refund: { refundId: PaymentId; intent: ProviderReference; amountCents: number }[] = [];
     const intents = new Map<PaymentId, ProviderReference>();
     const failures = new Map<"createIntent" | "refund", PaymentFailure>();
+    let nextRefundStatus: RefundStatus = "succeeded";
     let sequence = 0;
 
     const takeFailure = (operation: "createIntent" | "refund"): PaymentFailure | undefined => {
@@ -394,6 +397,10 @@ export const PaymentGateway = {
 
       failNext: (operation, failure) => {
         failures.set(operation, failure);
+      },
+
+      answerNextRefund: (status) => {
+        nextRefundStatus = status;
       },
 
       intentOf: (paymentId) => intents.get(paymentId),
@@ -423,7 +430,10 @@ export const PaymentGateway = {
         if (failure !== undefined) return errAsync(failure);
 
         sequence += 1;
-        return okAsync({ reference: ProviderReference.schema.parse(`re_fake_${sequence}`), status: "succeeded" });
+        const status = nextRefundStatus;
+        nextRefundStatus = "succeeded";
+
+        return okAsync({ reference: ProviderReference.schema.parse(`re_fake_${sequence}`), status });
       },
 
       parseWebhook: (rawBody, signature) =>
@@ -462,6 +472,7 @@ export const PaymentGateway = {
         refund.length = 0;
         intents.clear();
         failures.clear();
+        nextRefundStatus = "succeeded";
       },
     };
   },

@@ -59,6 +59,12 @@ export type PaymentRepository = Readonly<{
   createCharge: (orderId: OrderId, amountCents: number, provider: ProviderName, now: Date) => Promise<PaymentId>;
   /** The order's refund row through `provider`, created pending if it has none. */
   ensureRefund: (orderId: OrderId, amountCents: number, provider: ProviderName, now: Date) => Promise<PaymentRecord>;
+  /**
+   * Deletes the order's refund row when the provider failed or canceled it,
+   * so the next `ensureRefund` makes a new row, whose id is a new
+   * idempotency key.
+   */
+  dropFailedRefund: (orderId: OrderId) => Promise<void>;
   find: (paymentId: PaymentId) => Promise<PaymentRecord | undefined>;
   findOf: (orderId: OrderId, kind: PaymentKind) => Promise<PaymentRecord | undefined>;
   /** Stores the reference without moving the status. */
@@ -115,6 +121,12 @@ export const PaymentRepository = {
         if (refund === undefined) throw new Error("refund row vanished between insert and select");
 
         return refund;
+      },
+
+      dropFailedRefund: async (orderId) => {
+        await db
+          .delete(payments)
+          .where(and(eq(payments.orderId, orderId), eq(payments.kind, "refund"), inArray(payments.status, ["failed", "canceled"])));
       },
 
       find: async (paymentId) => {

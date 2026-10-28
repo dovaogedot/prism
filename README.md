@@ -284,8 +284,7 @@ first.
 
 - **Dashboard**: counts that link to their lists, for the roles that act on them: orders to
   fulfill, paid today, reviews waiting, and products with 5 or fewer in stock.
-- **Orders**: filter by status, dates, order number or customer email. An order's page moves
-  it to its next status, cancels it, or refunds it in full.
+- **Orders**: filter by status, dates, order number or customer email. An order's page moves it to its next status, cancels it, or refunds it in full. A refunded order shows "Refunded" once Stripe confirms the refund; until then it keeps its status, and the payment box shows the refund as pending. A refund that fails can be asked for again, also for a canceled order whose automatic refund failed.
 - **Products**: create, edit and delete; pictures with their alt text, which is required, and their order; and whether the home page features the product. Saving moves the stock by the change made in the form, so the sales made while the form was open stay counted. The list finds products by name or slug, filters them by category, brand, low stock and featuring, and sorts them by name, age, stock or price, either way.
 - **Categories** and **Brands**: create, edit and delete. One that a product uses cannot be
   deleted.
@@ -385,7 +384,7 @@ permission, with 2FA on, and a session that passed a code check within 8 hours.
 | `GET /summary` | any staff role | The dashboard's counts that the roles cover. |
 | `GET /orders`, `GET /orders/:id` | `orders.view` | Every order, by status, dates, number or customer email. |
 | `POST /orders/:id/status` | `orders.fulfill` | Moves a paid order to `processing`, `shipped` (with `trackingNumber`) or `delivered`. |
-| `POST /orders/:id/cancel`, `POST /orders/:id/refund` | `orders.refund` | Cancels an order that has not shipped, or refunds a shipped or delivered one in full. |
+| `POST /orders/:id/cancel`, `POST /orders/:id/refund` | `orders.refund` | Cancels an order that has not shipped, or asks for a full refund of a shipped or delivered one, or of a canceled one whose refund failed. The order moves to `refunded` when the provider confirms. |
 | `GET` and `POST /products`, `GET`, `PUT` and `DELETE /products/:id` | `catalog.manage` | Products. `PUT` also takes `stockBefore`, the stock the form loaded, and moves the stock by the difference. The list reads `q`, `category`, `brand`, `featured`, `lowStock`, `sort` (`name_asc`, `name_desc`, `newest`, `oldest`, `stock_asc`, `stock_desc`, `price_asc`, `price_desc`), `page` and `perPage`. |
 | `GET`, `POST` and `PUT /products/:id/images`, `DELETE /products/:id/images/:imageId` | `catalog.manage` | Pictures: upload one (multipart), set the order and alt texts, delete one. |
 | `POST /products/import` | `catalog.import` | Imports a JSON or CSV file. `?dryRun=true` only checks it. |
@@ -488,13 +487,7 @@ something uses refuses deletion.
 - **Payments.** The browser sends the card to Stripe's own fields; Prism only creates a
   PaymentIntent and reads Stripe's signed webhooks, checked against the raw body. Card data
   never touches Prism, which keeps it in PCI DSS's smallest scope (SAQ A).
-- **Messages.** The payment service publishes `payment.status`; the order service consumes it
-  and updates the order, the stock and the customer. Cancellations go the other way as
-  `order.canceled`, and refunds of shipped or delivered orders as `order.refund-requested`;
-  the payment service refunds both. A message is written to `outbox_message` in the same
-  transaction as the change it announces, then published by a relay with a broker confirm,
-  so a committed change always gets its message. Consumers apply every change as a
-  conditional `UPDATE`, so a duplicate does nothing.
+- **Messages.** The payment service publishes `payment.status`; the order service consumes it and updates the order, the stock and the customer. Cancellations go the other way as `order.canceled`, and refunds of shipped or delivered orders as `order.refund-requested`; the payment service refunds both, and a refund the provider confirms comes back as `payment.status`. A message is written to `outbox_message` in the same transaction as the change it announces, then published by a relay with a broker confirm, so a committed change always gets its message. Consumers apply every change as a conditional `UPDATE`, so a duplicate does nothing.
 - **Failed messages.** Every queue is a quorum queue with `x-delivery-limit: 5` and a
   dead-letter exchange. A handler that fails rejects its message back to the queue; after the
   sixth failed delivery, or at once for a malformed message, RabbitMQ moves it to the

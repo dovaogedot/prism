@@ -136,7 +136,23 @@ export type OrderRepository = Readonly<{
   list: (userId: UserId, filter: OrderFilter) => Promise<OrderList>;
   /** Resolves to whether the order moved. */
   transition: (transition: OrderTransition) => Promise<boolean>;
-  /** Records the refund once; resolves to whether this call recorded it. */
+  /**
+   * Notes a refund request on an order in one of `from`, with its message and
+   * audit entry, and leaves the status as it is. Resolves to whether the order
+   * was in one of them.
+   */
+  requestRefund: (request: Readonly<{
+    orderId: OrderId;
+    from: readonly OrderStatus[];
+    note: string;
+    now: Date;
+    message: OutboxEntry;
+    audit: AuditEntry;
+  }>) => Promise<boolean>;
+  /**
+   * Records the refund once, and moves a shipped or delivered order to
+   * `refunded`; resolves to whether this call recorded it.
+   */
   markRefunded: (orderId: OrderId, now: Date) => Promise<boolean>;
   /** Writes one message to the outbox on its own. */
   announce: (entry: OutboxEntry) => Promise<void>;
@@ -514,11 +530,34 @@ export const OrderRepository = {
           return true;
         }),
 
+      requestRefund: (request) =>
+        db.transaction(async (tx) => {
+          const [order] = await tx
+            .select({ status: orders.status })
+            .from(orders)
+            .where(and(eq(orders.id, request.orderId), inArray(orders.status, [...request.from])))
+            .for("update");
+
+          if (order === undefined) return false;
+
+          await tx.insert(orderEvents).values({ orderId: request.orderId, status: order.status, note: request.note, createdAt: request.now });
+          await Outbox.enqueue(tx, request.message);
+          await audit.record(tx, request.audit);
+
+          return true;
+        }),
+
       markRefunded: (orderId, now) =>
         db.transaction(async (tx) => {
+          const shipped = inArray(orders.status, [...OrderStatus.REFUNDABLE]);
           const [marked] = await tx
             .update(orders)
-            .set({ refundedAt: now })
+            .set({
+              refundedAt: now,
+              // A canceled order keeps its status; one that shipped is refunded now.
+              status: sql`CASE WHEN ${shipped} THEN 'refunded' ELSE ${orders.status} END`,
+              statusChangedAt: sql`CASE WHEN ${shipped} THEN ${now.toISOString()}::timestamptz ELSE ${orders.statusChangedAt} END`,
+            })
             .where(and(eq(orders.id, orderId), isNull(orders.refundedAt)))
             .returning({ status: orders.status });
 

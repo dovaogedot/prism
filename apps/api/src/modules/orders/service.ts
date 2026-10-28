@@ -26,6 +26,7 @@ import {
   type OrderQueryParams,
   type OrderStatusChange,
   type Page,
+  type PaymentSummary,
   type PlaceOrderInput,
   type PlaceOrderResult,
   type SavedAddress,
@@ -105,7 +106,10 @@ export type OrderService = Readonly<{
   advance: (actor: StaffActor, orderId: OrderId, change: OrderStatusChange) => ResultAsync<AdminOrderDetail, DomainError>;
   /** Cancels an order that has not shipped: the stock comes back and any payment is refunded. */
   cancelByStaff: (actor: StaffActor, orderId: OrderId) => ResultAsync<AdminOrderDetail, DomainError>;
-  /** Refunds a shipped or delivered order in full. The stock stays as it is. */
+  /**
+   * Asks the payment service to refund an order in full. The order keeps its
+   * status until the provider confirms the refund. The stock stays as it is.
+   */
   refund: (actor: StaffActor, orderId: OrderId) => ResultAsync<AdminOrderDetail, DomainError>;
 }>;
 
@@ -147,6 +151,17 @@ export const OrderService = {
         .map((part) => part.toLowerCase().replace(/\s+/g, " "))
         .join("|");
     return key(a) === key(b);
+  },
+
+  /**
+   * Whether staff may refund an order: it was paid, no refund is on its way
+   * or done, and it shipped, or it was canceled and its automatic refund
+   * failed.
+   */
+  isRefundable: (status: OrderStatus, payment: PaymentSummary | undefined): boolean => {
+    if (payment?.status !== "succeeded" || payment.refund === "pending" || payment.refund === "succeeded") return false;
+
+    return (OrderStatus.REFUNDABLE as readonly OrderStatus[]).includes(status) || (status === "canceled" && payment.refund === "failed");
   },
 
   /** The step of fulfillment after `status`, when one follows. */
@@ -208,13 +223,14 @@ export const OrderService = {
 
     const adminDetailOf = async (order: OrderRecord): Promise<AdminOrderDetail> => {
       const next = OrderService.nextStepOf(order.status);
+      const detail = await detailOf(order);
 
       return {
-        ...(await detailOf(order)),
+        ...detail,
         ...(order.userId === undefined ? {} : { userId: order.userId }),
         ...(next === undefined ? {} : { nextStatus: next }),
         canCancel: (OrderStatus.STAFF_CANCELABLE as readonly OrderStatus[]).includes(order.status),
-        canRefund: (OrderStatus.REFUNDABLE as readonly OrderStatus[]).includes(order.status),
+        canRefund: OrderService.isRefundable(order.status, detail.payment),
       };
     };
 
@@ -504,22 +520,30 @@ export const OrderService = {
 
       refund: (actor, orderId) =>
         ResultAsync.fromSafePromise(
-          move({
-            orderId,
-            from: OrderStatus.REFUNDABLE,
-            to: "refunded",
-            note: OrderService.REFUND_REQUESTED_NOTE,
-            now: clock.now(),
-            message: Messages.refundRequested({ orderId }),
-            audit: {
-              actor,
-              action: "order.refund",
-              target: { type: "order", id: orderId },
-              summary: "Refunded the order in full",
-            },
-          }),
-        ).andThen((refunded) =>
-          refunded
+          (async () => {
+            const order = await repository.find(orderId);
+            if (order === undefined) return false;
+            if (!OrderService.isRefundable(order.status, await deps.payments.summaryOf(orderId))) return false;
+
+            const requested = await repository.requestRefund({
+              orderId,
+              from: [order.status],
+              note: OrderService.REFUND_REQUESTED_NOTE,
+              now: clock.now(),
+              message: Messages.refundRequested({ orderId }),
+              audit: {
+                actor,
+                action: "order.refund",
+                target: { type: "order", id: orderId },
+                summary: "Asked for a refund of the order in full",
+              },
+            });
+            if (requested) deps.kick();
+
+            return requested;
+          })(),
+        ).andThen((requested) =>
+          requested
             ? adminDetail(orderId)
             : adminDetail(orderId).andThen(() => errAsync<AdminOrderDetail, DomainError>({ _tag: "OrderTransitionNotAllowed" })),
         ),
