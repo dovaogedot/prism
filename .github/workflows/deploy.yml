@@ -199,7 +199,7 @@ jobs: # The work this workflow does.
           OAUTH_GOOGLE_CLIENT_SECRET: ${{ secrets.OAUTH_GOOGLE_CLIENT_SECRET }} # The other half of Google's pair.
           OAUTH_GITHUB_CLIENT_ID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }} # Set with its secret, GitHub sign-in is real.
           OAUTH_GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }} # The other half of GitHub's pair.
-          SUPPORT_EMAIL: ${{ vars.SUPPORT_EMAIL || 'support@localhost' }} # The inbox the contact form writes to.
+          SUPPORT_EMAIL: ${{ vars.SUPPORT_EMAIL }} # The inbox the contact form writes to; empty, the compose file's default.
           ADMIN_EMAIL: ${{ vars.ADMIN_EMAIL }} # The first admin's sign-in, made at start when no account holds the role.
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }} # The first admin's password, at least 12 characters.
           ADMIN_TOTP_SECRET: ${{ secrets.ADMIN_TOTP_SECRET }} # The first admin's 2FA key, base32 of 32 characters or more, as an authenticator app takes it.
