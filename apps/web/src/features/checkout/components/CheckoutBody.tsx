@@ -106,7 +106,8 @@ export const CheckoutBody = ({ cart, options, payments, prefill, savedAddresses 
       .with("ValidationFailed", () => {
         const { fields, other } = CheckoutIssues.split(failure.issues);
 
-        for (const field of fields) form.setError(field.path, { message: field.message });
+        // The first field the server refused takes focus, so the customer lands on it.
+        fields.forEach((field, index) => form.setError(field.path, { message: field.message }, { shouldFocus: index === 0 }));
         if (other.length > 0) setProblem(<IssueList issues={other} />);
       })
       .with("OutOfStock", "CartChanged", "CartEmpty", () => {
@@ -177,13 +178,11 @@ export const CheckoutBody = ({ cart, options, payments, prefill, savedAddresses 
     void navigate(target);
   });
 
-  const summary = (
-    <OrderSummary
-      cart={cart}
-      totals={totals}
-      {...(cartProblem === undefined ? {} : { problem: cartProblem })}
-    />
-  );
+  const summary = <OrderSummary cart={cart} totals={totals} />;
+
+  // Every refusal shows beside "Place order", where the customer is looking,
+  // whatever the width and whether the summary is open.
+  const refusal = problem ?? cartProblem;
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_22rem] lg:items-start">
@@ -198,8 +197,6 @@ export const CheckoutBody = ({ cart, options, payments, prefill, savedAddresses 
       )}
 
       <form onSubmit={(event) => void submit(event)} noValidate className="space-y-8">
-        {problem === undefined ? null : <Alert>{problem}</Alert>}
-
         {savedAddresses === undefined ? (
           <p className="rounded-lg border border-line bg-surface px-4 py-3 text-sm text-ink-soft">
             Have an account?{" "}
@@ -233,6 +230,8 @@ export const CheckoutBody = ({ cart, options, payments, prefill, savedAddresses 
         {blocked ? (
           <Alert>Some items are not available in that quantity. Fix them in the summary to place the order.</Alert>
         ) : null}
+
+        {refusal === undefined ? null : <Alert>{refusal}</Alert>}
 
         <Button
           type="submit"
