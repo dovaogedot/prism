@@ -18,7 +18,10 @@
 	tls /tls/cert.pem /tls/key.pem
 }
 
+# Plain HTTP here means a reverse proxy in front holds a real certificate, so
+# browsers may be told to use HTTPS only; they ignore this header over HTTP.
 (tls-off) {
+	header Strict-Transport-Security "max-age=31536000"
 }
 
 # Sent with every answer, the error pages included.
