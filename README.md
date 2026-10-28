@@ -199,7 +199,7 @@ A staff account needs 2FA. The admin sends a staff member without it to the acco
   lucky-chip,Lucky Chip,A poker chip that brings a little luck to every hand.,3.50,120,balatro,localthunk,10,40,40,3,true,Collectible
   ```
 
-  `price` is in euros with at most two decimals, and each `property:<name>` column is one property, empty for none. A JSON file is an array of objects with the fields `slug`, `name`, `description`, `priceCents`, `stock`, `category`, `brand`, `weightGrams`, `widthMm`, `heightMm`, `depthMm`, `featured` and `properties` (`[{ "name", "value" }]`).
+  `price` is in euros with at most two decimals, and each `property:<name>` column is one property, empty for none. A JSON file is an array of objects with the fields `slug`, `name`, `description`, `priceCents`, `stock`, `category`, `brand`, `weightGrams`, `widthMm`, `heightMm`, `depthMm`, `featured` and `properties`, an object of property names and values such as `{ "type": "Food" }`.
 - **Reviews**: the queue of reviews waiting; approve, reject with a reason, or delete.
 - **Delivery options**: name, price, the amount from which it ships free, the delivery window in business days, whether checkout offers it, and its place in the list. An option that orders used can be switched off, not deleted. Placed orders keep their own copy.
 - **Accounts**: find one by exact email or by role, with its orders and reviews; give and take staff roles; disable and enable it; reset its 2FA; sign it out. Nobody changes their own roles or disables themselves, and the last admin keeps the role.
