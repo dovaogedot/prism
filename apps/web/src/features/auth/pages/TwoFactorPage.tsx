@@ -30,7 +30,8 @@ export const TwoFactorPage = () => {
   const navigate = useNavigate();
   const { state } = useLocation();
   const [params] = useSearchParams();
-  const next = NextPath.of(params.get("next"));
+  // A provider's sign-in arrives with no `?next=`; the path it remembered waits in storage. Read once, since recalling it forgets it.
+  const [next] = useState(() => (params.has("next") ? NextPath.of(params.get("next")) : NextPath.recall()));
   const [failure, setFailure] = useState<ReactNode | undefined>(undefined);
   // Read once, at mount: the token for this attempt cannot change.
   const [challengeToken] = useState(() => ChallengeState.read(state));
