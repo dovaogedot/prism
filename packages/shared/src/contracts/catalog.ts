@@ -77,6 +77,8 @@ export const SearchText = {
 export const StoredText = {
   hasNoNul: (text: string): boolean => !text.includes("\u0000"),
   NUL_MESSAGE: "The NUL character is not allowed.",
+  /** The length Postgres's `char_length` gives: code points, so an emoji counts once. */
+  lengthOf: (text: string): number => [...text].length,
 } as const;
 
 export const MultiValue = {

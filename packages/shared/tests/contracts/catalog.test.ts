@@ -109,6 +109,17 @@ describe("Price.format", () => {
 });
 
 describe("text that reaches Postgres", () => {
+  it("counts a review's byline and texts in characters, as the database's checks do", () => {
+    const review = (fields: Readonly<Record<string, string>>) => ReviewInput.schema.safeParse({ rating: 4, authorName: "Mari", ...fields }).success;
+
+    expect(review({ authorName: "😀" })).toBe(false);
+    expect(review({ authorName: "😀😀" })).toBe(true);
+    expect(review({ authorName: "😀".repeat(40) })).toBe(true);
+    expect(review({ authorName: "😀".repeat(41) })).toBe(false);
+    expect(review({ title: "😀".repeat(120) })).toBe(true);
+    expect(review({ title: "😀".repeat(121) })).toBe(false);
+  });
+
   it("refuses the NUL character, which Postgres cannot store or compare", () => {
     expect(ProductQueryParams.schema.safeParse({ "p.color": "\u0000" }).success).toBe(false);
     expect(ProductQueryParams.schema.safeParse({ "p.color": ["red", "\u0000"] }).success).toBe(false);

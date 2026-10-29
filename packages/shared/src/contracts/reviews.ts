@@ -43,7 +43,7 @@ export const OptionalText = {
     z
       .string()
       .trim()
-      .max(max, tooLong)
+      .refine((text) => StoredText.lengthOf(text) <= max, tooLong)
       .refine(StoredText.hasNoNul, StoredText.NUL_MESSAGE)
       .transform((text) => (text.length === 0 ? undefined : text))
       .optional(),
@@ -62,8 +62,9 @@ export const ReviewInput = {
     authorName: z
       .string({ error: "Enter the name to sign with." })
       .trim()
-      .min(2, "Use at least 2 characters.")
-      .max(40, "Use at most 40 characters.")
+      // Counted as the database's check counts them.
+      .refine((text) => StoredText.lengthOf(text) >= 2, "Use at least 2 characters.")
+      .refine((text) => StoredText.lengthOf(text) <= 40, "Use at most 40 characters.")
       .refine(StoredText.hasNoNul, StoredText.NUL_MESSAGE),
     title: OptionalText.of(120, "Use at most 120 characters."),
     body: OptionalText.of(2000, "Use at most 2,000 characters."),
