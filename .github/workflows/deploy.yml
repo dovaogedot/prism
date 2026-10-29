@@ -191,10 +191,10 @@ jobs: # The work this workflow does.
       - name: Upload the settings # Sends the compose files, and writes the server's .env from this repository's settings.
         env: # Secrets reach the shell as variables, never pasted into the script. Each name is also its name in .env.
           COMPOSE_FILE: docker-compose.yml:docker-compose.prod.yml # Makes every `docker compose` in that folder, by hand too, apply the production overlay.
-          MAILPIT_PORT: ${{ vars.MAILPIT_PORT || '8026' }} # The loopback port of the reset-mail inbox.
+          MAILPIT_PORT: ${{ vars.MAILPIT_PORT || '8026' }} # The loopback port of the shop's mail inbox.
           RABBITMQ_UI_PORT: ${{ vars.RABBITMQ_UI_PORT || '15672' }} # The loopback port of the RabbitMQ management UI.
-          PUBLIC_WEB_URL: ${{ vars.PUBLIC_WEB_URL }} # The address people type; reset links and OAuth redirects are built from it.
-          MAIL_FROM: ${{ vars.MAIL_FROM || 'Prism <noreply@localhost>' }} # The sender of reset mail.
+          PUBLIC_WEB_URL: ${{ vars.PUBLIC_WEB_URL }} # The address people type; every link in mail, the sitemap, the allowed browser origin and the OAuth redirects are built from it.
+          MAIL_FROM: ${{ vars.MAIL_FROM || 'Prism <noreply@localhost>' }} # The sender of the shop's mail.
           LOG_LEVEL: info # The lowest level the API logs.
           JWT_SECRET: ${{ secrets.JWT_SECRET }} # Signs the sessions.
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }} # Read only when the database is first created.
@@ -217,9 +217,10 @@ jobs: # The work this workflow does.
         run: | # A bash script.
           # Stops before the server is touched when a value with no safe
           # default is missing. An empty POSTGRES_PASSWORD would fall back to
-          # the public local one, a wrong PUBLIC_WEB_URL breaks every reset
-          # link and OAuth redirect, and without the three admin values the
-          # shop starts with nobody who can run it.
+          # the public local one, a wrong PUBLIC_WEB_URL breaks every link in
+          # mail, the browser's calls to the API and the OAuth redirects, and
+          # without the three admin values the shop starts with nobody who
+          # can run it.
           for name in DEPLOY_PATH PUBLIC_WEB_URL JWT_SECRET POSTGRES_PASSWORD DATA_ENCRYPTION_KEY RABBITMQ_PASSWORD MAILPIT_PASSWORD \
             ADMIN_EMAIL ADMIN_PASSWORD ADMIN_TOTP_SECRET; do
             if [ -z "${!name}" ]; then
