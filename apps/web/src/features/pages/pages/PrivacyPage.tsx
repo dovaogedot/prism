@@ -48,12 +48,14 @@ export const PrivacyPage = () => (
     <h2>Who else handles it</h2>
     <p>
       Stripe processes payments. Our email provider delivers the messages we send you. Google's reCAPTCHA checks that the person
-      registering or writing to us is human, and sees your address and browser to do so.
+      registering or writing to us is human, and sees your address and browser to do so. OpenStreetMap's Nominatim service checks
+      that the delivery address of an order exists, and receives its street, city, postal code and country to do so.
     </p>
 
     <h2>Cookies and storage</h2>
     <p>
-      We use two cookies, both needed for the shop to work: one keeps you signed in and one keeps your cart. Your browser also
+      Our cookies are all needed for the shop to work: one keeps you signed in and one keeps your cart. Signing in with Google or
+      GitHub sets two more for a few minutes, which check that the answer comes from the sign-in you started. Your browser also
       remembers your theme and the items you viewed recently; that stays on your device. There are no tracking or advertising
       cookies.
     </p>
@@ -61,7 +63,7 @@ export const PrivacyPage = () => (
     <h2>How long we keep it</h2>
     <p>
       Your account stays until you ask us to delete it. Orders are kept for seven years, as Estonian accounting law requires.
-      Sessions end when you sign out or after a week without use.
+      Sessions end when you sign out, or a week after you signed in.
     </p>
 
     <h2>Your rights</h2>
