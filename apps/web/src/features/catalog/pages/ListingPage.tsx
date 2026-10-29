@@ -112,13 +112,15 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
     .with("search", () => <PageMeta title={heading} description={PageText.search.description} isIndexed={false} />)
     .exhaustive();
 
-  // On a search, a category narrows the results; elsewhere each one is its own page.
+  // On a search, a category narrows the results and drops every other filter,
+  // which may not exist there; elsewhere each one is its own page.
+  const searchIn = (slug: string): string => `/search?${CatalogParams.set(CatalogParams.cleared(params), "category", slug).toString()}`;
   const links: readonly CategoryLink[] = match(kind)
     .with("search", () => [
-      { label: "All categories", href: `/search?${CatalogParams.set(params, "category", "").toString()}`, isCurrent: params.get("category") === null },
+      { label: "All categories", href: searchIn(""), isCurrent: params.get("category") === null },
       ...(categories.data ?? []).map((candidate) => ({
         label: candidate.name,
-        href: `/search?${CatalogParams.set(params, "category", candidate.slug).toString()}`,
+        href: searchIn(candidate.slug),
         isCurrent: params.get("category") === candidate.slug,
       })),
     ])

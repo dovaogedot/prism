@@ -100,7 +100,7 @@ E2E_BASE_URL=https://localhost:3200 npm run e2e
 ### Shopping
 
 - **Home** (`/`): featured products, a tile per category, "Top rated", "New arrivals", and the products this browser viewed last.
-- **The listing**: the whole shop (`/shop`), one category (`/categories/<slug>`) and search results (`/search?q=`) share one page: the result count, the filters, the sort, the pages, and a grid or a list. The view, the filters and the page live in the URL, so a view is a link.
+- **The listing**: the whole shop (`/shop`), one category (`/categories/<slug>`) and search results (`/search?q=`) share one page: the result count, the filters, the sort, the pages, and a grid or a list. The view, the filters and the page live in the URL, so a view is a link. On search results, the category links narrow the results to one category and drop every other filter.
 - **Quick search** sits in the header of every page. From two letters it suggests products with their picture and price, and "Search for ..." last. The arrow keys move, Enter opens and Escape closes. `/` jumps to the box from anywhere.
 - **Typos**: when nothing matches exactly, the results show similar names under 'No exact matches for "...". Showing similar names.'
 - **Filters**: brands, a price range, a minimum rating, and one group per property of the matching products, each value with its count. A value the other filters leave nothing for is grayed out, not removed. A narrow screen puts the filters in a drawer, below the menu; its "Filters" button opens the drawer at the filters.
