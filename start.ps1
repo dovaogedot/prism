@@ -127,32 +127,34 @@ if ($action -eq "loadtest") {
 # Builds and seeds the prism-e2e stack, runs the suite against it with any
 # further arguments passed on to `playwright test`, copies the traces of failed
 # tests to apps\e2e\test-results, and removes that project with its volumes,
-# whatever the suite found.
+# whatever the suite found and however the run ended, Ctrl+C included.
 if ($action -eq "test" -and $args.Count -gt 1 -and $args[1] -eq "e2e") {
   $rest = @($args | Select-Object -Skip 2)
   $status = 0
 
-  Invoke-E2eCompose up --build --detach
-  if ($LASTEXITCODE -ne 0) { $status = $LASTEXITCODE }
-  if ($status -eq 0) {
-    Invoke-E2eCompose run --rm --build seed
+  try {
+    Invoke-E2eCompose up --build --detach
     if ($LASTEXITCODE -ne 0) { $status = $LASTEXITCODE }
-  }
-  if ($status -eq 0) {
-    # Named and kept until the traces are out.
-    docker rm -f prism-e2e-suite 2>&1 | Out-Null
-    Invoke-E2eCompose run --name prism-e2e-suite --build e2e npx playwright test @rest
-    if ($LASTEXITCODE -ne 0) { $status = $LASTEXITCODE }
-    $traces = Join-Path $PSScriptRoot "apps\e2e\test-results"
-    if (Test-Path $traces) { Remove-Item -Recurse -Force $traces }
-    docker cp prism-e2e-suite:/app/apps/e2e/test-results $traces 2>&1 | Out-Null
-    docker rm prism-e2e-suite 2>&1 | Out-Null
-    if ((Test-Path $traces) -and (Get-ChildItem $traces)) {
-      Write-Host "Traces of the failed tests: apps\e2e\test-results (npx playwright show-trace <trace.zip>)."
+    if ($status -eq 0) {
+      Invoke-E2eCompose run --rm --build seed
+      if ($LASTEXITCODE -ne 0) { $status = $LASTEXITCODE }
     }
+    if ($status -eq 0) {
+      # Named and kept until the traces are out.
+      docker rm -f prism-e2e-suite 2>&1 | Out-Null
+      Invoke-E2eCompose run --name prism-e2e-suite --build e2e npx playwright test @rest
+      if ($LASTEXITCODE -ne 0) { $status = $LASTEXITCODE }
+      $traces = Join-Path $PSScriptRoot "apps\e2e\test-results"
+      if (Test-Path $traces) { Remove-Item -Recurse -Force $traces }
+      docker cp prism-e2e-suite:/app/apps/e2e/test-results $traces 2>&1 | Out-Null
+      if ((Test-Path $traces) -and (Get-ChildItem $traces)) {
+        Write-Host "Traces of the failed tests: apps\e2e\test-results (npx playwright show-trace <trace.zip>)."
+      }
+    }
+  } finally {
+    docker rm -f prism-e2e-suite 2>&1 | Out-Null
+    Invoke-E2eCompose down --volumes --remove-orphans
   }
-
-  Invoke-E2eCompose down --volumes --remove-orphans
   exit $status
 }
 

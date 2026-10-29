@@ -25,12 +25,22 @@ e2e_compose() {
   COMPOSE_PROFILES= docker compose -p prism-e2e -f docker-compose.yml -f docker-compose.e2e.yml "$@"
 }
 
+# Removes the prism-e2e project with its volumes and the suite's container.
+e2e_cleanup() {
+  docker rm -f prism-e2e-suite >/dev/null 2>&1 || true
+  e2e_compose down --volumes --remove-orphans
+}
+
 # Builds and seeds the prism-e2e stack, runs the suite against it with any
 # arguments passed on to `playwright test`, copies the traces of failed tests
-# to apps/e2e/test-results, and removes that project with its volumes,
-# whatever the suite found.
+# to apps/e2e/test-results, and removes that project with its volumes when
+# the script exits, whatever the suite found and however the run ended.
 run_e2e() {
   local status=0
+
+  trap e2e_cleanup EXIT
+  # Ctrl+C or a kill ends the script through exit, so the cleanup above runs.
+  trap 'exit 130' INT TERM
 
   e2e_compose up --build --detach || status=$?
   if [ "$status" -eq 0 ]; then
@@ -48,7 +58,6 @@ run_e2e() {
     fi
   fi
 
-  e2e_compose down --volumes --remove-orphans
   return "$status"
 }
 
