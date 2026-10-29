@@ -7,6 +7,7 @@ import {
   ChallengeToken,
   ChangePasswordInput,
   Email,
+  EnableTwoFactorInput,
   ForgotPasswordInput,
   LoginInput,
   OAuthProvider,
@@ -206,7 +207,7 @@ export const AuthRoutes = {
 
     routes.post(
       "/2fa/enable",
-      { preHandler: guards.requireUser, config: credentials, schema: { body: TwoFactorCodeInput.schema } },
+      { preHandler: guards.requireUser, config: credentials, schema: { body: EnableTwoFactorInput.schema } },
       async (request, reply) => {
         if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
@@ -214,6 +215,7 @@ export const AuthRoutes = {
           userId: request.authenticated.id,
           session: AuthRoutes.sessionOf(request.authenticated),
           code: request.body.code,
+          ...(request.body.currentPassword === undefined ? {} : { currentPassword: request.body.currentPassword }),
           ipAddress: request.ip,
         });
         return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(200).send(result.value);

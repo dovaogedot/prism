@@ -389,6 +389,22 @@ describe("path traversal in media", () => {
  * These build a second application over the same database and clock, with
  * the real budgets. Each test starts an hour later, so every bucket is full.
  */
+describe("a stolen session", () => {
+  it("cannot turn on 2FA without the account's password, which would lock the owner out", async () => {
+    const { accessToken } = await registerUser(harness, "session-thief@example.com");
+    const account = { userId: undefined as never, email: "session-thief@example.com", accessToken, refreshToken: "" };
+    const setup = await Staff.call(harness, account, "POST", "/auth/2fa/setup");
+    const secret = new URL(String(jsonOf(setup)["uri"])).searchParams.get("secret") ?? "";
+    const code = harness.totpCodeFor(secret);
+
+    const without = await Staff.call(harness, account, "POST", "/auth/2fa/enable", { code });
+    const wrong = await Staff.call(harness, account, "POST", "/auth/2fa/enable", { code, currentPassword: "not the password" });
+    const right = await Staff.call(harness, account, "POST", "/auth/2fa/enable", { code, currentPassword: VALID_PASSWORD });
+
+    expect([without.statusCode, wrong.statusCode, right.statusCode]).toEqual([401, 401, 200]);
+  });
+});
+
 describe("forms from other sites", () => {
   it("are refused by sign-in, which another site could post without a preflight", async () => {
     await registerUser(harness, "form-target@example.com");

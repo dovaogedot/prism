@@ -119,6 +119,8 @@ export type AuthService = Readonly<{
     userId: UserId;
     session: SessionContext;
     code: TotpCode;
+    /** Needed when the account has a password. */
+    currentPassword?: string;
     ipAddress: string;
   }) => ResultAsync<SessionUser, DomainError>;
   /**
@@ -428,14 +430,22 @@ export const AuthService = {
           );
         }),
 
-      enableTwoFactor: ({ userId, session, code, ipAddress }) =>
+      enableTwoFactor: ({ userId, session, code, currentPassword, ipAddress }) =>
         requireUser(userId, { _tag: "Unauthenticated" }).andThen((user) => {
           if (user.totpEnabledAt !== undefined) {
             return errAsync<SessionUser, DomainError>({ _tag: "TwoFactorAlreadyEnabled" });
           }
 
+          // Like a password change, so a stolen session cannot lock the owner out.
+          const confirmed: ResultAsync<boolean, DomainError> =
+            user.passwordHash === undefined
+              ? okAsync(true)
+              : currentPassword === undefined
+                ? okAsync(false)
+                : ResultAsync.fromSafePromise(hasher.verify(user.passwordHash, currentPassword));
+
           // One live code proves the secret reached the phone.
-          return acceptCode(user, code).andThen(() => {
+          return confirmed.andThen((isConfirmed) => (isConfirmed ? acceptCode(user, code) : errAsync<void, DomainError>({ _tag: "InvalidCredentials" }))).andThen(() => {
             const enabledAt = clock.now();
 
             return ResultAsync.fromSafePromise(

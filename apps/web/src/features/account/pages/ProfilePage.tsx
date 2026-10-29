@@ -45,7 +45,7 @@ export const ProfilePage = () => {
         {session.twoFactorEnabled ? (
           <TwoFactorDisableFlow onDone={(notice) => Toast.show(notice)} />
         ) : (
-          <TwoFactorSetupFlow onDone={() => Toast.show("Two-factor authentication is now on.")} />
+          <TwoFactorSetupFlow hasPassword={session.hasPassword} onDone={() => Toast.show("Two-factor authentication is now on.")} />
         )}
       </Card>
 

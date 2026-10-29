@@ -7,7 +7,7 @@
 import type { StaffRole, UserId } from "@prism/shared";
 import { eq } from "drizzle-orm";
 import { users } from "../../src/db/schema.ts";
-import { jsonOf, registerUser, userIdOf, type Harness } from "./harness.ts";
+import { jsonOf, registerUser, userIdOf, VALID_PASSWORD, type Harness } from "./harness.ts";
 
 /** An account made for a test: its id, its tokens, and the secret its authenticator holds. */
 export type TestAccount = Readonly<{
@@ -46,7 +46,10 @@ export const Staff = {
     const secret = new URL(String(jsonOf(setup)["uri"])).searchParams.get("secret");
     if (secret === null) throw new Error(`2FA setup gave no secret: ${setup.body}`);
 
-    const enabled = await Staff.call(harness, account, "POST", "/auth/2fa/enable", { code: harness.totpCodeFor(secret) });
+    const enabled = await Staff.call(harness, account, "POST", "/auth/2fa/enable", {
+      code: harness.totpCodeFor(secret),
+      currentPassword: VALID_PASSWORD,
+    });
     if (enabled.statusCode !== 200) throw new Error(`enabling 2FA failed: ${enabled.body}`);
 
     return secret;

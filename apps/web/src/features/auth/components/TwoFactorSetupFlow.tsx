@@ -5,7 +5,7 @@
  * lock the account out.
  */
 
-import { TwoFactorCodeInput, type SessionUser, type TwoFactorSetup } from "@prism/shared";
+import { EnableTwoFactorInput, type SessionUser, type TwoFactorSetup } from "@prism/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -16,17 +16,21 @@ import { SetupKey } from "../setup-key.ts";
 import { TokenStore } from "../token-store.ts";
 import { Failure } from "./failure.tsx";
 
-/** What happens once two-factor sign-in is on. */
-export type TwoFactorSetupFlowProps = Readonly<{ onDone: () => void }>;
+export type TwoFactorSetupFlowProps = Readonly<{
+  /** Whether the account has a password, which turning 2FA on then asks for. */
+  hasPassword: boolean;
+  /** What happens once two-factor sign-in is on. */
+  onDone: () => void;
+}>;
 
-export const TwoFactorSetupFlow = ({ onDone }: TwoFactorSetupFlowProps) => {
+export const TwoFactorSetupFlow = ({ hasPassword, onDone }: TwoFactorSetupFlowProps) => {
   const [setup, setSetup] = useState<TwoFactorSetup | undefined>(undefined);
   const [failure, setFailure] = useState<string | undefined>(undefined);
   const [starting, setStarting] = useState(false);
 
   const form = useForm({
-    resolver: zodResolver(TwoFactorCodeInput.schema),
-    defaultValues: { code: "" },
+    resolver: zodResolver(hasPassword ? EnableTwoFactorInput.withPassword : EnableTwoFactorInput.schema),
+    defaultValues: hasPassword ? { code: "", currentPassword: "" } : { code: "" },
   });
 
   const begin = async (): Promise<void> => {
@@ -100,7 +104,17 @@ export const TwoFactorSetupFlow = ({ onDone }: TwoFactorSetupFlowProps) => {
                 </div>
               </div>
 
-              <form onSubmit={(event) => void confirm(event)} noValidate>
+              <form className="space-y-4" onSubmit={(event) => void confirm(event)} noValidate>
+                {hasPassword ? (
+                  <Field
+                    label="Current password"
+                    type="password"
+                    autoComplete="current-password"
+                    className="max-w-sm"
+                    error={form.formState.errors.currentPassword?.message}
+                    {...form.register("currentPassword")}
+                  />
+                ) : null}
                 <Field
                   label="Code from the app"
                   inputMode="numeric"

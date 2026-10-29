@@ -47,8 +47,9 @@ test.afterAll(async () => {
 /** Sets up a second factor on the account page `page` shows, as a person does. Resolves to the secret. */
 const turnOnTwoFactor = async (page: Page): Promise<string> => {
   await page.getByRole("button", { name: "Set up two-factor authentication" }).click();
-  const uri = await page.locator("code").filter({ hasText: "otpauth://" }).innerText();
-  const secret = new URL(uri).searchParams.get("secret") ?? "";
+  const uri = await page.getByRole("link", { name: "Open it in an authenticator app on this device" }).getAttribute("href");
+  const secret = new URL(String(uri)).searchParams.get("secret") ?? "";
+  await page.getByLabel("Current password").fill(Stack.PASSWORD);
   await page.getByLabel("Code from the app").fill(Totp.code(secret, 0));
   await page.getByRole("button", { name: "Turn it on" }).click();
   await expect(page.getByText("Two-factor authentication is now on.")).toBeVisible();

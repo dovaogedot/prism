@@ -163,6 +163,18 @@ export const TwoFactorCodeInput = {
   schema: z.object({ code: TotpCode.schema }),
 } as const;
 
+/**
+ * A validated body that turns 2FA on: a code from the enrolled secret, and
+ * the current password when the account has one, so a stolen session cannot
+ * enroll its own authenticator and lock the owner out.
+ */
+export type EnableTwoFactorInput = z.infer<typeof EnableTwoFactorInput.schema>;
+export const EnableTwoFactorInput = {
+  schema: TwoFactorCodeInput.schema.extend({ currentPassword: z.string().min(1).optional() }),
+  /** The form of an account with a password, which has to give it. */
+  withPassword: TwoFactorCodeInput.schema.extend({ currentPassword: z.string().min(1, "Enter your current password.") }),
+} as const;
+
 /** The register form: the request body plus the browser-only confirmation. */
 export type RegisterForm = z.infer<typeof RegisterForm.schema>;
 export const RegisterForm = {
