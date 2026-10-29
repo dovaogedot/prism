@@ -81,12 +81,11 @@ export const TwoFactorSetupFlow = ({ hasPassword, onDone }: TwoFactorSetupFlowPr
               </p>
 
               <div className="flex flex-col items-start gap-4 sm:flex-row">
-                <div
-                  className="qr w-40 shrink-0 rounded-lg border border-line bg-white p-3"
-                  role="img"
-                  aria-label="QR code that sets up two-factor authentication in an authenticator app"
-                  // Server-generated SVG with no user input in it.
-                  dangerouslySetInnerHTML={{ __html: value.qrCodeSvg }}
+                <img
+                  className="w-40 shrink-0 rounded-lg border border-line bg-white p-3"
+                  // The server draws the SVG from the key alone, black on clear paper; the white box keeps it scannable in dark mode.
+                  src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(value.qrCodeSvg)}`}
+                  alt="QR code that sets up two-factor authentication in an authenticator app"
                 />
 
                 <div className="min-w-0 flex-1 space-y-2">

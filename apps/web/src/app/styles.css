@@ -304,16 +304,4 @@
     color: var(--color-ink);
     font-weight: 600;
   }
-
-  /* The QR code arrives as inline SVG with transparent paper. */
-  .qr svg {
-    width: 100%;
-    height: auto;
-    display: block;
-  }
-
-  /* A scanner expects dark modules on light paper, in dark mode too. */
-  .qr svg path {
-    fill: #000;
-  }
 }
