@@ -104,7 +104,7 @@ export const ReviewService = {
       saveOwn: (slug, userId, review) =>
         productOf(slug).andThen((productId) =>
           ResultAsync.fromSafePromise(repository.isDeliveredTo(productId, userId)).andThen((isDelivered) => {
-            if (!isDelivered) return errAsync<OwnReview, DomainError>({ _tag: "ReviewNotAllowed", reason: "not_delivered" });
+            if (!isDelivered) return errAsync<OwnReview, DomainError>({ _tag: "ReviewNotAllowed" });
 
             return ResultAsync.fromSafePromise(
               repository

@@ -14,8 +14,8 @@ import { ImageId, type DomainError } from "@prism/shared";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import sharp, { type OutputInfo, type Sharp } from "sharp";
 
-/** A picture as stored: its id, its file under the media directory, and its size in pixels. */
-export type StoredImage = Readonly<{ id: ImageId; file: string; width: number; height: number }>;
+/** A picture as stored: its id and its file under the media directory. */
+export type StoredImage = Readonly<{ id: ImageId; file: string }>;
 
 /** An upload decoded and encoded again, before it is written. */
 type Encoded = Readonly<{ format: (typeof ImageStore.FORMATS)[number]; data: Buffer; info: OutputInfo }>;
@@ -109,7 +109,7 @@ export const ImageStore = {
               const file = `${id}.${ImageStore.extensions[format]}`;
               await writeFile(join(directory, file), data);
 
-              return { id, file, width: info.width, height: info.height };
+              return { id, file };
             })(),
           ),
         ),

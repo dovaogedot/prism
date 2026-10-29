@@ -52,8 +52,8 @@ export type DomainError =
   | Readonly<{ _tag: "LastAdmin" }>
   | Readonly<{ _tag: "SelfChangeNotAllowed" }>
   | Readonly<{ _tag: "UserNotFound" }>
-  /** Why this reader cannot review this product. */
-  | Readonly<{ _tag: "ReviewNotAllowed"; reason: "not_delivered" | "already_reviewed" }>
+  /** The reader has no delivered order of the product. */
+  | Readonly<{ _tag: "ReviewNotAllowed" }>
   | Readonly<{ _tag: "ReviewNotFound" }>
   | Readonly<{ _tag: "CategoryNotFound" }>
   | Readonly<{ _tag: "BrandNotFound" }>
@@ -228,9 +228,6 @@ export const DomainError = {
   messageOf: (error: DomainError): string => {
     if (error._tag === "RateLimited") {
       return `Too many attempts. Try again in ${DomainError.durationOf(error.retryAfterSeconds)}.`;
-    }
-    if (error._tag === "ReviewNotAllowed" && error.reason === "already_reviewed") {
-      return "You already reviewed this product. Edit your review instead.";
     }
     return DomainError.message[error._tag];
   },
