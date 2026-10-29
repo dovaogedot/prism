@@ -52,15 +52,17 @@ export const AdminAccess = {
 
   /**
    * Called with every failed request, and with the key of the query that
-   * failed, when a query did. A second factor that expired while a page was
-   * open makes the gate ask for it again, instead of every section failing on
-   * its own. The summary's own refusal is left alone: the gate already reads
-   * it, and fetching it again would only be refused again.
+   * failed, when a query did. A refusal about staff access while a page is
+   * open, such as an expired second factor or staff roles taken away, makes
+   * the gate ask the summary again, which then shows the code form or "Staff
+   * only" instead of every section failing on its own. The summary's own
+   * refusal is left alone: the gate already reads it, and fetching it again
+   * would only be refused again.
    */
   onFailure: (client: QueryClient, reason: unknown, failedKey?: readonly unknown[]): void => {
     if (failedKey !== undefined && hashKey(failedKey) === hashKey(AdminKeys.summary)) return;
 
-    if (AdminAccess.gateOf(Api.failureOf(reason)) === "verify") {
+    if (AdminAccess.gateOf(Api.failureOf(reason)) !== "open") {
       void client.invalidateQueries({ queryKey: AdminKeys.summary });
     }
   },
