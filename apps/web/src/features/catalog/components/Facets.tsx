@@ -20,21 +20,28 @@ export type FacetsProps = Readonly<{
 /** How many values a group shows before the rest fold behind "Show more". */
 const FOLD_AT = 8;
 
-/** A group's frame: its heading, "Clear all" beside it while the group has a choice, and its rows. */
+/**
+ * A group's frame: its heading, "Clear all" beside it while the group has a
+ * choice, and its rows. The button sits outside the legend, so the group is
+ * named by its heading alone.
+ */
 const Group = ({ title, chosen, onClear, children }: Readonly<{ title: string; chosen: boolean; onClear: () => void; children: ReactNode }>) => (
   // min-w-0: a fieldset is otherwise never narrower than its longest row, and would overflow the rail.
-  <fieldset className="min-w-0 space-y-1.5">
-    <legend className="mb-1.5 flex w-full items-center justify-between text-xs">
-      <span className="font-semibold uppercase tracking-wider text-ink-faint">{title}</span>
-      {match(chosen)
-        .with(true, () => (
-          <button type="button" onClick={onClear} className="font-medium text-accent hover:underline">
-            Clear all
-          </button>
-        ))
-        .with(false, () => null)
-        .exhaustive()}
-    </legend>
+  <fieldset className="relative min-w-0 space-y-1.5">
+    <legend className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-ink-faint">{title}</legend>
+    {match(chosen)
+      .with(true, () => (
+        <button
+          className="absolute right-0 top-0 text-xs font-medium text-accent hover:underline"
+          type="button"
+          onClick={onClear}
+          aria-label={`Clear all ${title.toLowerCase()} filters`}
+        >
+          Clear all
+        </button>
+      ))
+      .with(false, () => null)
+      .exhaustive()}
     {children}
   </fieldset>
 );

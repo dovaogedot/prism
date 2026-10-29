@@ -52,6 +52,7 @@ export const CartLineItem = ({ line, compact = false }: CartLineItemProps) => {
             type="button"
             onClick={() => remove.mutate(line.productId)}
             disabled={remove.isPending}
+            aria-label={`Remove ${line.name}`}
             className="text-sm font-medium text-ink-soft hover:text-danger"
           >
             Remove

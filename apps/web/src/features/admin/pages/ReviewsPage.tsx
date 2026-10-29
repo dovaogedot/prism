@@ -98,16 +98,16 @@ export const ReviewsPage = () => {
                   {review.rejectionReason === undefined ? null : <p className="text-sm text-danger">Rejected: {review.rejectionReason}</p>}
                   <div className="flex flex-wrap gap-2 pt-1">
                     {review.status === "approved" ? null : (
-                      <Button type="button" busy={approve.isPending && approve.variables === review.id} onClick={() => approve.mutate(review.id, { onSuccess: () => Toast.show("The review is published."), onError: refused })}>
+                      <Button type="button" busy={approve.isPending && approve.variables === review.id} onClick={() => approve.mutate(review.id, { onSuccess: () => Toast.show("The review is published."), onError: refused })} aria-label={`Approve the review of ${review.product.name}`}>
                         Approve
                       </Button>
                     )}
                     {review.status === "rejected" ? null : (
-                      <Button tone="quiet" type="button" onClick={() => setRejecting(review)}>
+                      <Button tone="quiet" type="button" onClick={() => setRejecting(review)} aria-label={`Reject the review of ${review.product.name}`}>
                         Reject
                       </Button>
                     )}
-                    <Button tone="ghost" type="button" onClick={() => setDeleting(review)}>
+                    <Button tone="ghost" type="button" onClick={() => setDeleting(review)} aria-label={`Delete the review of ${review.product.name}`}>
                       Delete
                     </Button>
                   </div>
