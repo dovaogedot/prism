@@ -3,7 +3,7 @@
  * takes in cents, and slugs made from a name.
  */
 
-import { ProductInput, ShippingMethodCode, type ShippingMethodInput, type ShippingMethodView, type ValidationIssue } from "@prism/shared";
+import { ProductFields, ProductInput, ShippingMethodCode, ShippingMethodInput, type ShippingMethodView, type ValidationIssue } from "@prism/shared";
 import type { FieldValues, Path, UseFormSetError } from "react-hook-form";
 import { z } from "zod";
 
@@ -47,10 +47,10 @@ export const Slugs = {
       .replace(/-+$/, ""),
 } as const;
 
-/** The product form: the API's product, with the price typed in euros. */
+/** The product form: the API's product, with the price typed in euros and held to the API's limits. */
 export type ProductForm = z.input<typeof ProductForm.schema>;
 export const ProductForm = {
-  schema: ProductInput.schema.omit({ priceCents: true }).extend({ price: Euros.schema }),
+  schema: ProductInput.schema.omit({ priceCents: true }).extend({ price: Euros.schema.pipe(ProductFields.priceCents) }),
 } as const;
 
 export const ServerIssues = {
@@ -88,8 +88,9 @@ export const ShippingFields = {
     .strictObject({
       code: ShippingMethodCode.schema,
       name: z.string().trim().min(1, "Enter a name.").max(60, "Use at most 60 characters."),
-      price: Euros.schema,
-      freeFrom: Euros.optional,
+      // In euros, then held to the API's limits in cents.
+      price: Euros.schema.pipe(ShippingMethodInput.schema.shape.priceCents),
+      freeFrom: Euros.optional.pipe(ShippingMethodInput.schema.shape.freeFromCents),
       minDays: z.number({ error: "Enter a number of days." }).int("Enter whole days.").min(1, "Use 1 to 30 days.").max(30, "Use 1 to 30 days."),
       maxDays: z.number({ error: "Enter a number of days." }).int("Enter whole days.").min(1, "Use 1 to 30 days.").max(30, "Use 1 to 30 days."),
       isActive: z.boolean(),

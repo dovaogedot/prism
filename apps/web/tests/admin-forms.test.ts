@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Cents, Euros, Slugs } from "../src/features/admin/forms.ts";
+import { Cents, Euros, ProductForm, ShippingFields, Slugs } from "../src/features/admin/forms.ts";
 
 describe("prices typed in euros", () => {
   it("become whole cents, with a dot or a comma, without floating point", () => {
@@ -23,6 +23,17 @@ describe("prices typed in euros", () => {
     expect(Cents.toEuros(1250)).toBe("12.50");
     expect(Cents.toEuros(5)).toBe("0.05");
     expect(Cents.toEuros(100_000)).toBe("1000.00");
+  });
+});
+
+describe("the prices of the product and delivery forms", () => {
+  it("hold to the API's limits in cents before anything is sent", () => {
+    const price = ProductForm.schema.shape.price;
+    const shipping = ShippingFields.schema.shape;
+
+    expect([price.safeParse("0").success, price.safeParse("200000").success, price.safeParse("12.50").success]).toEqual([false, false, true]);
+    expect([shipping.price.safeParse("1500").success, shipping.price.safeParse("0").success]).toEqual([false, true]);
+    expect([shipping.freeFrom.safeParse("0").success, shipping.freeFrom.safeParse("").success]).toEqual([false, true]);
   });
 });
 
