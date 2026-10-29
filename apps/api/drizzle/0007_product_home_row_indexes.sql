@@ -1,0 +1,2 @@
+CREATE INDEX "product_newest_idx" ON "product" USING btree ("created_at" DESC NULLS FIRST,"slug");--> statement-breakpoint
+CREATE INDEX "product_top_rated_idx" ON "product" USING btree ("rating_average" DESC NULLS FIRST,"rating_count" DESC NULLS FIRST,"slug");

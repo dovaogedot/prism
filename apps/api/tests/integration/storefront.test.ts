@@ -283,6 +283,26 @@ describe("what search engines read", () => {
   });
 });
 
+describe("the home page's rows", () => {
+  /** The plan of `query` when a full scan is ruled out, as one text. */
+  const planOf = (query: string) =>
+    harness.database.sql.begin(async (tx) => {
+      await tx`SET LOCAL enable_seqscan = off`;
+      const rows = await tx.unsafe(`EXPLAIN ${query}`);
+      return rows.map((row) => String(row["QUERY PLAN"])).join("\n");
+    });
+
+  it.each([
+    ["newest", "product_newest_idx", "ORDER BY created_at DESC, slug"],
+    ["top rated", "product_top_rated_idx", "WHERE rating_count >= 3 ORDER BY rating_average DESC, rating_count DESC, slug"],
+  ])("reads the %s products off %s in order, with no sort", async (_row, index, order) => {
+    const plan = await planOf(`SELECT id FROM product ${order} LIMIT 8`);
+
+    expect(plan).toContain(index);
+    expect(plan).not.toContain("Sort");
+  });
+});
+
 describe("cache headers", () => {
   it("lets anyone keep an anonymous catalog read for a minute, and nobody keep a personal one", async () => {
     const { accessToken } = await registerUser(harness, "reader@example.com");

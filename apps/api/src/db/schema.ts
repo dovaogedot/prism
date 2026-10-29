@@ -298,6 +298,10 @@ export const products = pgTable(
     // A product page asks whether another product of its category has the same name, however capitalized.
     index("product_category_name_idx").on(table.categoryId, sql`lower(${table.name})`),
     index("product_featured_idx").on(table.featuredAt).where(sql`${table.featuredAt} IS NOT NULL`),
+    // The home page's newest and top-rated rows, read in order up to their first few products.
+    // NULLS FIRST is what a plain DESC in ORDER BY means, so the queries read these in order.
+    index("product_newest_idx").on(table.createdAt.desc().nullsFirst(), table.slug),
+    index("product_top_rated_idx").on(table.ratingAverage.desc().nullsFirst(), table.ratingCount.desc().nullsFirst(), table.slug),
     // A category's shelf in display order: its picture is the first product here that has one.
     index("product_category_shelf_idx").on(table.categoryId, table.featuredAt.desc().nullsLast(), table.name),
     check("product_price_not_negative", sql`${table.priceCents} >= 0`),
