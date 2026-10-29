@@ -15,9 +15,6 @@ import { brands, categories, productProperties, products } from "../../db/schema
  */
 export type LiftedFacet = "none" | "brand" | "price" | "rating" | "property";
 
-/** The per-product rating aggregate, as the queries alias it. */
-export type RatingColumns = Readonly<{ average: SQL; count: SQL }>;
-
 /**
  * How the search text matches: `exact` finds its words and its substring;
  * `similar` finds names whose trigrams resemble it, which is what catches a
@@ -87,7 +84,7 @@ export const ProductSearch = {
    * of its own name, which is what lets one property's facet count its
    * sibling values.
    */
-  narrowing: (query: ProductQuery, rating: RatingColumns, lifted: LiftedFacet = "none"): SQL[] => {
+  narrowing: (query: ProductQuery, lifted: LiftedFacet = "none"): SQL[] => {
     const where: SQL[] = [];
 
     if (lifted !== "brand" && query.brands.length > 0) where.push(inArray(brands.slug, [...query.brands]));
@@ -99,7 +96,7 @@ export const ProductSearch = {
     }
     if (lifted !== "rating" && query.minRating !== undefined) {
       // As `isShownAtLeast` compares, so the filter keeps every product whose card shows the rating or more.
-      where.push(sql`${rating.average} * 10 >= ${query.minRating * 10 - 0.5}`);
+      where.push(sql`${products.ratingAverage} * 10 >= ${query.minRating * 10 - 0.5}`);
     }
 
     for (const filter of query.properties) {
@@ -113,9 +110,9 @@ export const ProductSearch = {
   },
 
   /** Every active filter as a condition, except the one named by `lifted`. */
-  conditions: (query: ProductQuery, rating: RatingColumns, lifted: LiftedFacet = "none", match: TextMatch = "exact"): SQL[] => [
+  conditions: (query: ProductQuery, lifted: LiftedFacet = "none", match: TextMatch = "exact"): SQL[] => [
     ...ProductSearch.shelf(query, match),
-    ...ProductSearch.narrowing(query, rating, lifted),
+    ...ProductSearch.narrowing(query, lifted),
   ],
 
   /** The conditions as one boolean for a `FILTER` clause; `true` when there are none. */
@@ -126,7 +123,7 @@ export const ProductSearch = {
     conditions.length === 0 ? undefined : and(...conditions),
 
   /** Every sort ends in the slug, so paging is stable when keys tie. */
-  orderBy: (query: ProductQuery, rating: RatingColumns, match: TextMatch = "exact"): SQL[] => {
+  orderBy: (query: ProductQuery, match: TextMatch = "exact"): SQL[] => {
     switch (query.sort) {
       case "newest":
         return [desc(products.createdAt), asc(products.slug)];
@@ -135,7 +132,7 @@ export const ProductSearch = {
       case "price_desc":
         return [desc(products.priceCents), asc(products.slug)];
       case "rating":
-        return [desc(rating.average), desc(rating.count), asc(products.slug)];
+        return [desc(products.ratingAverage), desc(products.ratingCount), asc(products.slug)];
       case "relevance":
         if (query.text !== undefined && match === "similar") {
           return [desc(sql`similarity(${products.name}, ${query.text})`), asc(products.name), asc(products.slug)];

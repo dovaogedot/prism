@@ -126,7 +126,7 @@ export const ReviewRepository = {
 
     published: async (productId, sort, page, perPage) => {
       const approved = and(eq(productReviews.productId, productId), eq(productReviews.status, "approved"));
-      const [rows, stars] = await Promise.all([
+      const [rows, stars, ratings] = await Promise.all([
         db
           .select()
           .from(productReviews)
@@ -139,21 +139,20 @@ export const ReviewRepository = {
           .from(productReviews)
           .where(approved)
           .groupBy(productReviews.rating),
+        // The product's own rating, which its trigger keeps, so the page and the product agree.
+        db.select({ average: products.ratingAverage, count: products.ratingCount }).from(products).where(eq(products.id, productId)),
       ]);
 
       const distribution: Record<"1" | "2" | "3" | "4" | "5", number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
-      let total = 0;
-      let sum = 0;
       for (const row of stars) {
         const key = String(row.rating);
         if (key === "1" || key === "2" || key === "3" || key === "4" || key === "5") distribution[key] = row.total;
-        total += row.total;
-        sum += row.rating * row.total;
       }
+      const total = ratings[0]?.count ?? 0;
 
       return {
         items: rows.map(ReviewRepository.viewOf),
-        average: total === 0 ? 0 : Math.round((sum / total) * 10) / 10,
+        average: Math.round((ratings[0]?.average ?? 0) * 10) / 10,
         count: total,
         distribution: distribution satisfies RatingDistribution,
         sort,

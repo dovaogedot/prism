@@ -65,12 +65,6 @@ export const CatalogRepository = {
   imageUrl: (file: string): string => `/media/${file}`,
 
   create: (db: Database, clock: Clock): CatalogRepository => {
-    // The product's own columns, which a trigger keeps equal to its approved reviews.
-    const ratingColumns = {
-      average: sql`${products.ratingAverage}`,
-      count: sql`${products.ratingCount}`,
-    };
-
     const summaryColumns = {
       id: products.id,
       slug: products.slug,
@@ -118,14 +112,14 @@ export const CatalogRepository = {
     });
 
     const conditions = (query: ProductQuery, lifted: LiftedFacet, match: TextMatch) =>
-      ProductSearch.where(ProductSearch.conditions(query, ratingColumns, lifted, match));
+      ProductSearch.where(ProductSearch.conditions(query, lifted, match));
 
     /** The shelf a facet lists its values over. */
     const shelf = (query: ProductQuery, match: TextMatch) => ProductSearch.where(ProductSearch.shelf(query, match));
 
     /** How many shelf rows also pass the rail's other filters. */
     const counted = (query: ProductQuery, lifted: LiftedFacet) =>
-      sql<number>`count(*) filter (where ${ProductSearch.filter(ProductSearch.narrowing(query, ratingColumns, lifted))})`.mapWith(Number);
+      sql<number>`count(*) filter (where ${ProductSearch.filter(ProductSearch.narrowing(query, lifted))})`.mapWith(Number);
 
     /** Every brand on the shelf, counted under the rail's other filters. */
     const brandsOf = async (query: ProductQuery, match: TextMatch): Promise<readonly FacetBucket[]> =>
@@ -249,7 +243,7 @@ export const CatalogRepository = {
           .innerJoin(categories, eq(products.categoryId, categories.id))
           .innerJoin(brands, eq(products.brandId, brands.id))
           .where(conditions(query, "none", match))
-          .orderBy(...ProductSearch.orderBy(query, ratingColumns, match))
+          .orderBy(...ProductSearch.orderBy(query, match))
           .limit(query.perPage)
           .offset(ProductSearch.offset(query)),
         facetsOf(query, match),
