@@ -5,7 +5,6 @@ import { CatalogParams } from "../src/features/catalog/filters.ts";
 const params = (query: string) => new URLSearchParams(query);
 
 const facets: ProductFacets = {
-  categories: [{ value: "lighting", label: "Lighting", count: 3 }],
   brands: [{ value: "acme", label: "Acme", count: 2 }],
   ratings: [{ value: "4", label: "4 stars & up", count: 1 }],
   price: { minCents: 500, maxCents: 90000 },

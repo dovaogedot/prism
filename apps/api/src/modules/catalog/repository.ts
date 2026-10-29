@@ -122,15 +122,6 @@ export const CatalogRepository = {
     const counted = (query: ProductQuery, lifted: LiftedFacet) =>
       sql<number>`count(*) filter (where ${ProductSearch.filter(ProductSearch.narrowing(query, ratingColumns, lifted))})`.mapWith(Number);
 
-    /** Every category with how many products it files, whatever the query says. */
-    const categoriesOf = async (): Promise<readonly FacetBucket[]> =>
-      db
-        .select({ value: categories.slug, label: categories.name, count: count(products.id) })
-        .from(categories)
-        .leftJoin(products, eq(products.categoryId, categories.id))
-        .groupBy(categories.slug, categories.name)
-        .orderBy(asc(categories.name));
-
     /** Every brand on the shelf, counted under the rail's other filters. */
     const brandsOf = async (query: ProductQuery, match: TextMatch): Promise<readonly FacetBucket[]> =>
       db
@@ -199,7 +190,7 @@ export const CatalogRepository = {
 
     /** One page of products matching `query`, with its facets, matching the text as `match` says. */
     const searchWith = async (query: ProductQuery, match: TextMatch): Promise<Omit<ProductSearchResult, "matched">> => {
-      const [rows, categoryBuckets, brandBuckets, price, ratings, properties] = await Promise.all([
+      const [rows, brandBuckets, price, ratings, properties] = await Promise.all([
         db
           .select({ ...summaryColumns, total: sql<number>`(count(*) OVER ())::int` })
           .from(products)
@@ -209,7 +200,6 @@ export const CatalogRepository = {
           .orderBy(...ProductSearch.orderBy(query, ratingColumns, match))
           .limit(query.perPage)
           .offset(ProductSearch.offset(query)),
-        categoriesOf(),
         brandsOf(query, match),
         priceOf(query, match),
         ratingsOf(query, match),
@@ -217,7 +207,7 @@ export const CatalogRepository = {
       ]);
 
       const total = rows[0]?.total ?? 0;
-      const facets: ProductFacets = { categories: categoryBuckets, brands: brandBuckets, ratings, price, properties };
+      const facets: ProductFacets = { brands: brandBuckets, ratings, price, properties };
 
       return {
         items: rows.map(toSummary),

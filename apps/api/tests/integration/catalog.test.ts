@@ -70,10 +70,7 @@ describe("GET /api/v1/products", () => {
 
     const facets = body["facets"] as Record<string, unknown>;
 
-    expect(facets["categories"]).toEqual([
-      { value: "furniture", label: "Furniture", count: 1 },
-      { value: "lighting", label: "Lighting", count: 2 },
-    ]);
+    expect(Object.keys(facets).toSorted()).toEqual(["brands", "price", "properties", "ratings"]);
     expect(facets["brands"]).toEqual([
       { value: "acme", label: "Acme", count: 2 },
       { value: "globex", label: "Globex", count: 1 },
@@ -145,16 +142,10 @@ describe("GET /api/v1/products", () => {
 
   it("keeps a facet's siblings countable while one of its values is chosen", async () => {
     const facets = jsonOf(await get("/api/v1/products?category=lighting&p.color=red"))["facets"] as {
-      categories: { value: string; count: number }[];
       brands: { value: string; count: number }[];
       properties: { name: string; buckets: { value: string; count: number }[] }[];
     };
 
-    // Category counts are the whole shop's, whatever is chosen.
-    expect(facets.categories).toEqual([
-      { value: "furniture", label: "Furniture", count: 1 },
-      { value: "lighting", label: "Lighting", count: 2 },
-    ]);
     // Color counts ignore the color filter but keep the category filter.
     expect(facets.properties.find((facet) => facet.name === "color")?.buckets).toEqual([
       { value: "black", label: "black", count: 1 },
@@ -173,15 +164,10 @@ describe("GET /api/v1/products", () => {
 
   it("keeps a value listed at zero when a filter of the rail excludes it", async () => {
     const facets = jsonOf(await get("/api/v1/products?brand=globex"))["facets"] as {
-      categories: { value: string; count: number }[];
       properties: { name: string; buckets: { value: string; count: number }[] }[];
       price: { minCents: number; maxCents: number };
     };
 
-    expect(facets.categories).toEqual([
-      { value: "furniture", label: "Furniture", count: 1 },
-      { value: "lighting", label: "Lighting", count: 2 },
-    ]);
     expect(facets.properties.find((facet) => facet.name === "color")?.buckets).toEqual([
       { value: "black", label: "black", count: 1 },
       { value: "red", label: "red", count: 0 },

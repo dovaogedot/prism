@@ -290,7 +290,6 @@ export type PriceRange = Readonly<{ minCents: number; maxCents: number }>;
  * other active filter, so a choice within one facet never hides its siblings.
  */
 export type ProductFacets = Readonly<{
-  categories: readonly FacetBucket[];
   brands: readonly FacetBucket[];
   /** Minimum-rating thresholds, highest first. */
   ratings: readonly FacetBucket[];

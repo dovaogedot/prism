@@ -20,7 +20,6 @@ type Results = Readonly<{
   totalPages: number;
   matched: string;
   facets: Readonly<{
-    categories: readonly Readonly<{ value: string; count: number }>[];
     brands: readonly Readonly<{ value: string; count: number }>[];
     ratings: readonly Readonly<{ value: string; count: number }>[];
     properties: readonly Readonly<{ name: string; buckets: readonly Readonly<{ value: string; count: number }>[] }>[];
@@ -103,7 +102,8 @@ describe("consistency", () => {
       }
     }
 
-    for (const bucket of (await search("")).facets.categories) expect((await search(`category=${bucket.value}`)).total).toBe(bucket.count);
+    const shelves = jsonOf(await harness.app.inject({ method: "GET", url: "/api/v1/categories" }))["items"] as { slug: string; productCount: number }[];
+    for (const shelf of shelves) expect((await search(`category=${shelf.slug}`)).total).toBe(shelf.productCount);
   });
 
   it("covers every result exactly once across the pages, in every sort", async () => {
