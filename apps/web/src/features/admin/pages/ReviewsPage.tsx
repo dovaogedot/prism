@@ -8,7 +8,7 @@ import { Alert, Button, ConfirmDialog, Dialog, EmptyState, Pagination, Skeleton,
 import { Failure } from "../../auth/components/failure.tsx";
 import { CatalogParams } from "../../catalog/filters.ts";
 import { OrderTime } from "../../orders/orders.ts";
-import { AdminKeys, useAdminRead, useAdminWrite } from "../admin.ts";
+import { useAdminRead, useAdminWrite } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
 import { RejectForm } from "../components/RejectForm.tsx";
 import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
@@ -29,7 +29,7 @@ export const ReviewsPage = () => {
   const status = ReviewStatus.schema.catch("pending").parse(params.get("status") ?? "pending");
   const query = params.toString();
 
-  const reviews = useAdminRead<Page<AdminReviewView>>(AdminKeys.list("reviews", query), `/reviews${query.length === 0 ? "" : `?${query}`}`);
+  const reviews = useAdminRead<Page<AdminReviewView>>(Api.withQuery("/reviews", query));
 
   const emptied = reviews.data !== undefined && reviews.data.items.length === 0 && reviews.data.page > 1 ? reviews.data : undefined;
 

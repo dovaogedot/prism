@@ -5,6 +5,7 @@ import { Api } from "../../../shared/api/client.ts";
 import { PageHeading } from "../../../shared/seo/page-heading.ts";
 import { Alert, Button, Toast } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
+import { OrderKeys } from "../orders.ts";
 
 /** The order to cancel, and the guest key that opens it, if any. */
 export type CancelOrderButtonProps = Readonly<{ order: OrderDetail; orderKey?: string }>;
@@ -24,8 +25,8 @@ export const CancelOrderButton = ({ order, orderKey }: CancelOrderButtonProps) =
         `/orders/${order.id}/cancel${orderKey === undefined ? "" : `?key=${encodeURIComponent(orderKey)}`}`,
       ),
     onSuccess: (detail) => {
-      client.setQueryData(["order", order.id, orderKey], detail);
-      void client.invalidateQueries({ queryKey: ["orders"] });
+      client.setQueryData(OrderKeys.one(order.id, orderKey), detail);
+      void client.invalidateQueries({ queryKey: OrderKeys.lists });
       dialog.current?.close();
       Toast.show(`Order #${order.number} is canceled.`);
 

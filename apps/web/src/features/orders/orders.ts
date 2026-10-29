@@ -17,6 +17,13 @@ export const OrderTime = {
   day: (iso: string): string => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(iso)),
 } as const;
 
+/** The query keys of orders: one order as its owner or a guest's key opens it, and the lists. */
+export const OrderKeys = {
+  lists: ["orders"] as const,
+  list: (query: string) => ["orders", query] as const,
+  one: (orderId: string, key: string | undefined) => ["order", orderId, key] as const,
+} as const;
+
 /** How a payment and its refund read, on the customer's and the staff's order pages alike. */
 export const PaymentWords = {
   status: {
@@ -57,9 +64,9 @@ export const OrderPolling = {
 /** One page of the signed-in customer's orders, for the query string `query`; nothing is asked while `enabled` is false. */
 export const useOrders = (query: string, enabled: boolean) =>
   useQuery({
-    queryKey: ["orders", query],
+    queryKey: OrderKeys.list(query),
     enabled,
-    queryFn: ({ signal }) => Api.get<OrderList>(`/orders${query.length === 0 ? "" : `?${query}`}`, signal),
+    queryFn: ({ signal }) => Api.get<OrderList>(Api.withQuery("/orders", query), signal),
     placeholderData: keepPreviousData,
     retry: false,
   });
@@ -67,7 +74,7 @@ export const useOrders = (query: string, enabled: boolean) =>
 /** One order, opened by its owner or with a guest's key, watched while its payment is pending; fetched only when `enabled`. */
 export const useOrder = (orderId: string, key: string | undefined, startedAt: number, enabled: boolean) =>
   useQuery({
-    queryKey: ["order", orderId, key],
+    queryKey: OrderKeys.one(orderId, key),
     enabled,
     queryFn: ({ signal }) =>
       Api.get<OrderDetail>(`/orders/${orderId}${key === undefined ? "" : `?key=${encodeURIComponent(key)}`}`, signal),

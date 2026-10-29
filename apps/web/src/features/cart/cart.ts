@@ -34,6 +34,8 @@ export const FreeShipping = {
 
 export const CartCache = {
   /** One cache entry per owner, so signing in fetches the merged cart rather than showing the guest's. */
+  /** Every cart key, for refetching whichever cart is shown. */
+  all: ["cart"] as const,
   key: (userId: UserId | undefined) => ["cart", userId ?? "guest"] as const,
 
   recommendationsKey: (userId: UserId | undefined) => ["cart", userId ?? "guest", "recommendations"] as const,

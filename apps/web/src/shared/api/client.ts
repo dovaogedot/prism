@@ -194,6 +194,9 @@ export const Api = {
     await response.body?.cancel();
   },
 
+  /** `path` with `query` as its query string; the bare path when `query` is empty. */
+  withQuery: (path: string, query: string): string => (query.length === 0 ? path : `${path}?${query}`),
+
   get: <A>(path: string, signal?: AbortSignal): Promise<A> =>
     Api.request<A>(path, signal === undefined ? {} : { signal }),
 

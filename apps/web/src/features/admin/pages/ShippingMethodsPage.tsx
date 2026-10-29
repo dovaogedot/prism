@@ -5,7 +5,7 @@ import { Api } from "../../../shared/api/client.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, ConfirmDialog, DataTable, Dialog, Skeleton, Toast } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
-import { AdminKeys, useAdminRead, useAdminWrite } from "../admin.ts";
+import { useAdminRead, useAdminWrite } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
 import { ShippingMethodForm } from "../components/ShippingMethodForm.tsx";
 import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
@@ -19,7 +19,7 @@ type Editing = Readonly<{ kind: "none" }> | Readonly<{ kind: "new" }> | Readonly
  * orders keep what they were charged.
  */
 export const ShippingMethodsPage = () => {
-  const options = useAdminRead<{ items: readonly ShippingMethodView[] }>(AdminKeys.list("shipping", ""), "/shipping-methods");
+  const options = useAdminRead<{ items: readonly ShippingMethodView[] }>("/shipping-methods");
 
   const [editing, setEditing] = useState<Editing>({ kind: "none" });
 

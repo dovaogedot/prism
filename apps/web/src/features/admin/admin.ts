@@ -71,14 +71,14 @@ export const AdminAccess = {
 export const AdminKeys = {
   all: ["admin"] as const,
   summary: ["admin", "summary"] as const,
-  list: (resource: string, query: string) => ["admin", resource, "list", query] as const,
-  one: (resource: string, id: string) => ["admin", resource, "one", id] as const,
+  /** The key of an admin read: the path it asks for, query string included, so a key and its request never part. */
+  of: (path: string) => ["admin", path] as const,
 } as const;
 
-/** One admin read, by its path under `/admin`. */
-export const useAdminRead = <T>(key: readonly unknown[], path: string, isEnabled = true) =>
+/** One admin read, by its path under `/admin`, query string included. */
+export const useAdminRead = <T>(path: string, isEnabled = true) =>
   useQuery({
-    queryKey: key,
+    queryKey: AdminKeys.of(path),
     queryFn: ({ signal }) => Api.get<T>(`/admin${path}`, signal),
     placeholderData: keepPreviousData,
     enabled: isEnabled,

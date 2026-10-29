@@ -1,11 +1,12 @@
 import { AdminProductQuery, AdminProductSort, Price, type AdminBrand, type AdminCategory, type AdminProductSummary, type Page } from "@prism/shared";
 import { Link, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
+import { Api } from "../../../shared/api/client.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, DataTable, EmptyState, Field, ImageSet, Pagination, SelectField, Skeleton } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 import { CatalogParams } from "../../catalog/filters.ts";
-import { AdminKeys, useAdminRead, useParamDraft } from "../admin.ts";
+import { useAdminRead, useParamDraft } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
 
 /**
@@ -22,11 +23,11 @@ export const ProductsPage = () => {
 
   const query = params.toString();
 
-  const products = useAdminRead<Page<AdminProductSummary>>(AdminKeys.list("products", query), `/products${query.length === 0 ? "" : `?${query}`}`);
+  const products = useAdminRead<Page<AdminProductSummary>>(Api.withQuery("/products", query));
 
-  const categories = useAdminRead<{ items: readonly AdminCategory[] }>(AdminKeys.list("categories", ""), "/categories");
+  const categories = useAdminRead<{ items: readonly AdminCategory[] }>("/categories");
 
-  const brands = useAdminRead<{ items: readonly AdminBrand[] }>(AdminKeys.list("brands", ""), "/brands");
+  const brands = useAdminRead<{ items: readonly AdminBrand[] }>("/brands");
 
   const [text, setText] = useParamDraft(params, "q");
 

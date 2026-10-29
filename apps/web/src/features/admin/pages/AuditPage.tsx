@@ -1,13 +1,14 @@
 import { StaffRole, type AuditEventView, type Page } from "@prism/shared";
 import { Link, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
+import { Api } from "../../../shared/api/client.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, DataTable, EmptyState, Field, Pagination, Skeleton } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 import { DateFilter, useDateFilter } from "../../../shared/hooks/use-date-filter.ts";
 import { CatalogParams } from "../../catalog/filters.ts";
 import { OrderTime } from "../../orders/orders.ts";
-import { AdminKeys, useAdminRead, useParamDraft } from "../admin.ts";
+import { useAdminRead, useParamDraft } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
 
 /**
@@ -26,7 +27,7 @@ export const AuditPage = () => {
 
   const query = params.toString();
 
-  const events = useAdminRead<Page<AuditEventView>>(AdminKeys.list("audit", query), `/audit${query.length === 0 ? "" : `?${query}`}`);
+  const events = useAdminRead<Page<AuditEventView>>(Api.withQuery("/audit", query));
 
   const from = useDateFilter(params.get("from") ?? "", (date) => filter(CatalogParams.set(params, "from", date)), { max: DateFilter.boundOf(params.get("to")) });
 

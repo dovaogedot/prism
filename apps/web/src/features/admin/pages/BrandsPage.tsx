@@ -5,7 +5,7 @@ import { Api } from "../../../shared/api/client.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, ConfirmDialog, DataTable, Dialog, Skeleton, Toast } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
-import { AdminKeys, useAdminRead, useAdminWrite } from "../admin.ts";
+import { useAdminRead, useAdminWrite } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
 import { BrandForm } from "../components/BrandForm.tsx";
 import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
@@ -15,7 +15,7 @@ type Editing = Readonly<{ kind: "none" }> | Readonly<{ kind: "new" }> | Readonly
 
 /** The catalog's brands: created and changed in a dialog, and deleted once no product carries them. */
 export const BrandsPage = () => {
-  const brands = useAdminRead<{ items: readonly AdminBrand[] }>(AdminKeys.list("brands", ""), "/brands");
+  const brands = useAdminRead<{ items: readonly AdminBrand[] }>("/brands");
 
   const [editing, setEditing] = useState<Editing>({ kind: "none" });
 

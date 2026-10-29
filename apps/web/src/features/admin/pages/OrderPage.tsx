@@ -11,7 +11,7 @@ import { useSession } from "../../auth/session.ts";
 import { OrderTimeline } from "../../orders/components/OrderTimeline.tsx";
 import { StatusBadge } from "../../orders/components/StatusBadge.tsx";
 import { OrderTime, PaymentWords } from "../../orders/orders.ts";
-import { AdminKeys, useAdminRead, useAdminWrite } from "../admin.ts";
+import { useAdminRead, useAdminWrite } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
 import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
 
@@ -28,7 +28,7 @@ export const OrderPage = () => {
 
   const session = useSession();
 
-  const order = useAdminRead<AdminOrderDetail>(AdminKeys.one("orders", id), `/orders/${id}`);
+  const order = useAdminRead<AdminOrderDetail>(`/orders/${id}`);
 
   const [tracking, setTracking] = useState("");
 

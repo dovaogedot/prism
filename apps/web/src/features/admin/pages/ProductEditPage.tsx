@@ -6,7 +6,7 @@ import { Api } from "../../../shared/api/client.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, ConfirmDialog, Skeleton, Toast } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
-import { AdminKeys, useAdminRead, useAdminWrite } from "../admin.ts";
+import { useAdminRead, useAdminWrite } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
 import { ProductForm } from "../components/ProductForm.tsx";
 import { ProductImages } from "../components/ProductImages.tsx";
@@ -25,11 +25,11 @@ export const ProductEditPage = () => {
 
   const isNew = id === "new";
 
-  const product = useAdminRead<AdminProductDetail>(AdminKeys.one("products", id), `/products/${id}`, !isNew);
+  const product = useAdminRead<AdminProductDetail>(`/products/${id}`, !isNew);
 
-  const categories = useAdminRead<{ items: readonly AdminCategory[] }>(AdminKeys.list("categories", ""), "/categories");
+  const categories = useAdminRead<{ items: readonly AdminCategory[] }>("/categories");
 
-  const brands = useAdminRead<{ items: readonly AdminBrand[] }>(AdminKeys.list("brands", ""), "/brands");
+  const brands = useAdminRead<{ items: readonly AdminBrand[] }>("/brands");
 
   const [isDeleting, setDeleting] = useState(false);
 

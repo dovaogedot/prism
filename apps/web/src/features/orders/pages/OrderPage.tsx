@@ -8,6 +8,7 @@ import { Alert, Card, Skeleton } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 import { SignInFirst } from "../../auth/components/SignInFirst.tsx";
 import { useSession } from "../../auth/session.ts";
+import { CartCache } from "../../cart/cart.ts";
 import { Picture } from "../../catalog/components/Picture.tsx";
 import { DeliveryDates } from "../../../shared/format/delivery-dates.ts";
 import { CancelOrderButton, OrderConfirmation, OrderTimeline, StatusBadge } from "../components/index.ts";
@@ -51,7 +52,7 @@ export const OrderPage = () => {
 
   // A settled payment takes the bought items out of the cart on the server.
   useEffect(() => {
-    if (placed && status !== undefined && status !== "pending_payment") void client.invalidateQueries({ queryKey: ["cart"] });
+    if (placed && status !== undefined && status !== "pending_payment") void client.invalidateQueries({ queryKey: CartCache.all });
   }, [placed, status, client]);
 
   if (needsSignIn) return <SignInFirst />;

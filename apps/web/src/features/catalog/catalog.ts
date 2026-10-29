@@ -14,9 +14,15 @@ export const useCategories = () =>
     staleTime: 5 * 60_000,
   });
 
+/** The query keys of one product: its page, and the products related to it. */
+export const ProductKeys = {
+  one: (slug: string) => ["product", slug] as const,
+  related: (slug: string) => ["product", slug, "related"] as const,
+} as const;
+
 /** Other products from the same category as `slug`, in stock first. */
 export const useRelatedProducts = (slug: string) =>
   useQuery({
-    queryKey: ["product", slug, "related"],
+    queryKey: ProductKeys.related(slug),
     queryFn: ({ signal }) => Api.getPublic<{ items: readonly ProductSummary[] }>(`/products/${slug}/related`, signal),
   });

@@ -10,7 +10,7 @@ import { AddToCart } from "../../cart/components/index.ts";
 import { NotFoundPage } from "../../pages/pages/NotFoundPage.tsx";
 import { ReviewsSection } from "../../reviews/components/ReviewsSection.tsx";
 import { useReviewPage } from "../../reviews/reviews.ts";
-import { useRelatedProducts } from "../catalog.ts";
+import { ProductKeys, useRelatedProducts } from "../catalog.ts";
 import { CatalogSeo } from "../catalog-seo.ts";
 import { Gallery } from "../components/Gallery.tsx";
 import { Measurements } from "../components/Measurements.tsx";
@@ -31,7 +31,7 @@ export const ProductPage = () => {
   const { slug = "" } = useParams();
 
   const product = useQuery({
-    queryKey: ["product", slug],
+    queryKey: ProductKeys.one(slug),
     queryFn: ({ signal }) => Api.getPublic<ProductDetail>(`/products/${slug}`, signal),
     retry: false,
   });

@@ -21,7 +21,8 @@ import { Api } from "../../../shared/api/client.ts";
 import { useWide } from "../../../shared/layout/use-wide.ts";
 import { Alert, Button, Card, IssueList } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
-import { CheckoutDefaults, CheckoutIssues, PaymentErrors, PaymentMode } from "../checkout.ts";
+import { CartCache } from "../../cart/cart.ts";
+import { CheckoutDefaults, CheckoutIssues, PaymentErrors, PaymentMode, ShippingOptionKeys } from "../checkout.ts";
 import { NextPath } from "../../auth/next-path.ts";
 import { AddressFields } from "./AddressFields.tsx";
 import { BillingFields } from "./BillingFields.tsx";
@@ -113,8 +114,8 @@ export const CheckoutBody = ({ cart, options, payments, prefill, savedAddresses 
       .with("OutOfStock", "CartChanged", "CartEmpty", () => {
         setCartProblem(failure.message);
         // The total the server compared also takes the delivery option's price, which may have changed too.
-        void client.invalidateQueries({ queryKey: ["cart"] });
-        void client.invalidateQueries({ queryKey: ["shipping-methods"] });
+        void client.invalidateQueries({ queryKey: CartCache.all });
+        void client.invalidateQueries({ queryKey: ShippingOptionKeys.all });
       })
       .with("PaymentGatewayUnavailable", "PaymentsUnavailable", () => setPaymentError(failure.message))
       .otherwise(() => setProblem(failure.message));

@@ -9,7 +9,7 @@ import { Failure } from "../../auth/components/failure.tsx";
 import { useSession } from "../../auth/session.ts";
 import { StatusBadge } from "../../orders/components/StatusBadge.tsx";
 import { OrderTime } from "../../orders/orders.ts";
-import { AdminKeys, useAdminRead, useAdminWrite } from "../admin.ts";
+import { useAdminRead, useAdminWrite } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
 import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
 
@@ -27,7 +27,7 @@ export const UserPage = () => {
 
   const session = useSession();
 
-  const user = useAdminRead<AdminUserDetail>(AdminKeys.one("users", id), `/users/${id}`);
+  const user = useAdminRead<AdminUserDetail>(`/users/${id}`);
 
   const [roles, setRoles] = useState<readonly StaffRole[] | undefined>(undefined);
 

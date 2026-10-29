@@ -1,6 +1,7 @@
 import { OrderSort, OrderStatus, Price, type AdminOrderSummary, type Page } from "@prism/shared";
 import { Link, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
+import { Api } from "../../../shared/api/client.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, DataTable, EmptyState, Field, Pagination, SelectField, Skeleton } from "../../../shared/ui/index.ts";
 import { DateFilter, useDateFilter } from "../../../shared/hooks/use-date-filter.ts";
@@ -8,7 +9,7 @@ import { Failure } from "../../auth/components/failure.tsx";
 import { CatalogParams } from "../../catalog/filters.ts";
 import { StatusBadge } from "../../orders/components/StatusBadge.tsx";
 import { OrderTime } from "../../orders/orders.ts";
-import { AdminKeys, useAdminRead, useParamDraft } from "../admin.ts";
+import { useAdminRead, useParamDraft } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
 
 /**
@@ -21,7 +22,7 @@ export const OrdersPage = () => {
 
   const query = params.toString();
 
-  const orders = useAdminRead<Page<AdminOrderSummary>>(AdminKeys.list("orders", query), `/orders${query.length === 0 ? "" : `?${query}`}`);
+  const orders = useAdminRead<Page<AdminOrderSummary>>(Api.withQuery("/orders", query));
 
   const [number, setNumber] = useParamDraft(params, "number");
 

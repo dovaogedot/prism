@@ -2,6 +2,7 @@ import type { ProductDetail } from "@prism/shared";
 import { useQueries } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { Api } from "../../../shared/api/client.ts";
+import { ProductKeys } from "../catalog.ts";
 import { RecentlyViewed } from "../recently-viewed.ts";
 import { ProductRow } from "./ProductRow.tsx";
 
@@ -18,7 +19,7 @@ export const RecentlyViewedRow = ({ exclude }: RecentlyViewedRowProps) => {
 
   const products = useQueries({
     queries: slugs.map((slug) => ({
-      queryKey: ["product", slug],
+      queryKey: ProductKeys.one(slug),
       queryFn: ({ signal }: Readonly<{ signal: AbortSignal }>) => Api.getPublic<ProductDetail>(`/products/${slug}`, signal),
       retry: false,
     })),

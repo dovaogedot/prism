@@ -45,7 +45,7 @@ describe("AdminAccess.onFailure", () => {
     const { client, fetches, unsubscribe } = clientRefusingTheSummary();
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    AdminAccess.onFailure(client, stepUp, AdminKeys.list("orders", ""));
+    AdminAccess.onFailure(client, stepUp, AdminKeys.of("/orders"));
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(fetches()).toBe(2);
@@ -56,8 +56,8 @@ describe("AdminAccess.onFailure", () => {
     const { client, fetches, unsubscribe } = clientRefusingTheSummary();
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    AdminAccess.onFailure(client, new ApiError(403, { code: "Forbidden", message: "Your account cannot do that.", issues: [] }), AdminKeys.list("orders", ""));
-    AdminAccess.onFailure(client, new ApiError(404, { code: "OrderNotFound", message: "We could not find that order.", issues: [] }), AdminKeys.one("orders", "x"));
+    AdminAccess.onFailure(client, new ApiError(403, { code: "Forbidden", message: "Your account cannot do that.", issues: [] }), AdminKeys.of("/orders"));
+    AdminAccess.onFailure(client, new ApiError(404, { code: "OrderNotFound", message: "We could not find that order.", issues: [] }), AdminKeys.of("/orders/x"));
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(fetches()).toBe(2);

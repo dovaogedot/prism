@@ -5,7 +5,7 @@ import { Api } from "../../../shared/api/client.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, ConfirmDialog, DataTable, Dialog, Skeleton, Toast } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
-import { AdminKeys, useAdminRead, useAdminWrite } from "../admin.ts";
+import { useAdminRead, useAdminWrite } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
 import { CategoryForm } from "../components/CategoryForm.tsx";
 import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
@@ -15,7 +15,7 @@ type Editing = Readonly<{ kind: "none" }> | Readonly<{ kind: "new" }> | Readonly
 
 /** The catalog's categories: created and changed in a dialog, and deleted once no product is filed under them. */
 export const CategoriesPage = () => {
-  const categories = useAdminRead<{ items: readonly AdminCategory[] }>(AdminKeys.list("categories", ""), "/categories");
+  const categories = useAdminRead<{ items: readonly AdminCategory[] }>("/categories");
 
   const [editing, setEditing] = useState<Editing>({ kind: "none" });
 
