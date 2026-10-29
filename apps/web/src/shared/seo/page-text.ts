@@ -186,7 +186,7 @@ export const PageText = {
   adminSetup: {
     title: "Set up two-factor authentication",
     description:
-      "Staff accounts at Prism need two-factor authentication before the admin opens. Scan the code with an authenticator app and type the code it shows to finish.",
+      "Staff accounts at Prism need two-factor authentication before the admin opens. Turn it on from your account page with an authenticator app, then come back here.",
   },
   adminVerify: {
     title: "Confirm it is you",
