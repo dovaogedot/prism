@@ -15,9 +15,9 @@ import type {
 import { asc, count, eq } from "drizzle-orm";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import type { Database } from "../../db/client.ts";
+import { PgError } from "../../db/pg-error.ts";
 import { orders, shippingMethods } from "../../db/schema.ts";
 import type { Clock } from "../../platform/clock.ts";
-import { AuthRepository } from "../auth/repository.ts";
 import { AuditLog, type StaffActor } from "../staff/audit.ts";
 
 /** Every read and write of the delivery options. */
@@ -138,7 +138,7 @@ export const ShippingMethods = {
             });
           }),
           (reason): DomainError =>
-            AuthRepository.isUniqueViolation(reason)
+            PgError.isUniqueViolation(reason)
               ? { _tag: "ValidationFailed", issues: [{ path: "code", message: "Another delivery option uses this code." }] }
               : ShippingMethods.rethrow(reason),
         ).andThen(() => found(input.code)),
@@ -186,21 +186,10 @@ export const ShippingMethods = {
               });
             }),
             // An order placed between the check and the delete holds the row.
-            (reason): DomainError => (ShippingMethods.isForeignKeyViolation(reason) ? { _tag: "ShippingMethodInUse" } : ShippingMethods.rethrow(reason)),
+            (reason): DomainError => (PgError.isForeignKeyViolation(reason) ? { _tag: "ShippingMethodInUse" } : ShippingMethods.rethrow(reason)),
           );
         }),
     };
-  },
-
-  /** Postgres foreign-key violation, read one level down from drizzle's wrapper. */
-  isForeignKeyViolation: (reason: unknown): boolean => {
-    const codeOf = (value: unknown): unknown =>
-      typeof value === "object" && value !== null && "code" in value ? value.code : undefined;
-
-    return (
-      codeOf(reason) === "23503" ||
-      (typeof reason === "object" && reason !== null && "cause" in reason && codeOf(reason.cause) === "23503")
-    );
   },
 
   /** Lets an unexpected database failure surface as the 500 it is, rather than a domain error. */

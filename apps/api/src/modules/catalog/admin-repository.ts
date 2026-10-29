@@ -26,9 +26,9 @@ import {
 import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, lte, max, or, sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import type { Database, Transaction } from "../../db/client.ts";
+import { PgError } from "../../db/pg-error.ts";
 import { brands, categories, productImages, productProperties, products } from "../../db/schema.ts";
 import type { StoredImage } from "../../platform/image-store.ts";
-import { AuthRepository } from "../auth/repository.ts";
 import { AuditLog, type StaffActor } from "../staff/audit.ts";
 import { ImageRows, type ImageRow } from "./images.ts";
 import type { ImportIssue } from "./import.ts";
@@ -140,16 +140,6 @@ export const CatalogAdminRepository = {
   /** Products that are featured, or that are not. */
   featuredCondition: (isFeatured: boolean): SQL => (isFeatured ? isNotNull(products.featuredAt) : isNull(products.featuredAt)),
 
-  /** The constraint a Postgres error names, read one level down from drizzle's wrapper. */
-  constraintOf: (reason: unknown): string | undefined => {
-    const own = (value: unknown): string | undefined =>
-      typeof value === "object" && value !== null && "constraint_name" in value && typeof value.constraint_name === "string"
-        ? value.constraint_name
-        : undefined;
-
-    return own(reason) ?? (typeof reason === "object" && reason !== null && "cause" in reason ? own(reason.cause) : undefined);
-  },
-
   create: (db: Database, audit: AuditLog): CatalogAdminRepository => {
     const imageColumns = {
       id: productImages.id,
@@ -194,8 +184,8 @@ export const CatalogAdminRepository = {
 
     /** The outcome a failed product write stands for, or the failure itself when it is none of them. */
     const saveFailure = <T>(reason: unknown): SaveOutcome<T> => {
-      if (AuthRepository.isUniqueViolation(reason)) return { _tag: "SlugTaken" };
-      const constraint = CatalogAdminRepository.constraintOf(reason);
+      if (PgError.isUniqueViolation(reason)) return { _tag: "SlugTaken" };
+      const constraint = PgError.constraintOf(reason);
       if (constraint === "product_category_id_category_id_fk") return { _tag: "MissingReference", field: "categoryId" };
       if (constraint === "product_brand_id_brand_id_fk") return { _tag: "MissingReference", field: "brandId" };
       throw reason;

@@ -8,6 +8,7 @@ import { and, eq, getTableColumns, gt, isNull, lt, ne, or, sql } from "drizzle-o
 import { Email, type DomainError, type OAuthProvider, type SessionUser, type StaffRole, type UserId } from "@prism/shared";
 import { err, ok, ResultAsync, type Result } from "neverthrow";
 import type { Database, Transaction } from "../../db/client.ts";
+import { PgError } from "../../db/pg-error.ts";
 import type { SessionId } from "../../db/ids.ts";
 import {
   oauthIdentities,
@@ -210,17 +211,6 @@ export const AuthRepository = {
     };
   },
 
-  /** Postgres unique-violation, read one level down from drizzle's wrapper. */
-  isUniqueViolation: (reason: unknown): boolean => {
-    const codeOf = (value: unknown): unknown =>
-      typeof value === "object" && value !== null && "code" in value ? value.code : undefined;
-
-    return (
-      codeOf(reason) === "23505" ||
-      (typeof reason === "object" && reason !== null && "cause" in reason && codeOf(reason.cause) === "23505")
-    );
-  },
-
   create: (db: Database, cipher: FieldCipher, audit: AuditLog): AuthRepository => {
     const columns = { ...getTableColumns(users), providers: AuthRepository.linkedProviders };
 
@@ -279,7 +269,7 @@ export const AuthRepository = {
               return ok(created);
             })
             .catch((reason: unknown): Result<UserRecord, DomainError> => {
-              if (AuthRepository.isUniqueViolation(reason)) return err({ _tag: "EmailAlreadyRegistered" });
+              if (PgError.isUniqueViolation(reason)) return err({ _tag: "EmailAlreadyRegistered" });
               throw reason;
             }),
         ),
