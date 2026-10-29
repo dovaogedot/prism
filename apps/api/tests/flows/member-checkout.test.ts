@@ -100,3 +100,18 @@ describe("a returning customer", () => {
     ]);
   });
 });
+
+describe("a guest who signs in before the payment settles", () => {
+  it("has the paid lines taken out of the account cart the guest cart went into", async () => {
+    const { accessToken } = await registerUser(harness, "late-sign-in@example.com");
+    const guest = await Shop.fill(harness, [["desk-lamp", 1]]);
+    const placed = await Shop.placed(harness, guest);
+
+    // Signing in merges the guest cart, which the order still points at, before the payment lands.
+    await Shop.call(harness, "GET", "/cart", { ...guest, token: accessToken });
+    await Shop.succeed(harness, placed.charge);
+    await harness.settle();
+
+    expect(jsonOf(await Shop.call(harness, "GET", "/cart", { token: accessToken }))).toMatchObject({ itemCount: 0 });
+  });
+});

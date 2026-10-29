@@ -7,7 +7,7 @@ import { Cart, Pricing, type CartLine, type CartView, type ProductId, type UserI
 import { and, asc, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
 import type { Database } from "../../db/client.ts";
 import type { CartId } from "../../db/ids.ts";
-import { cartItems, carts, products } from "../../db/schema.ts";
+import { cartItems, carts, orders, products } from "../../db/schema.ts";
 import type { Digest } from "../../platform/tokens.ts";
 import { ImageRows, type ImageRow } from "../catalog/images.ts";
 
@@ -34,8 +34,10 @@ export type CartRepository = Readonly<{
   empty: (cartId: CartId) => Promise<void>;
   /**
    * Moves every line of the guest cart into the user cart with `Cart.merge`
-   * and deletes the guest cart, as one transaction. A guest cart that a
-   * concurrent request already merged is skipped.
+   * and deletes the guest cart, as one transaction. An unpaid order placed
+   * from the guest cart is moved to the user cart, so its lines leave that
+   * cart once it is paid. A guest cart that a concurrent request already
+   * merged is skipped.
    */
   merge: (guestCartId: CartId, userCartId: CartId) => Promise<void>;
   view: (cartId: CartId) => Promise<CartView>;
@@ -163,6 +165,10 @@ export const CartRepository = {
             .onConflictDoUpdate({ target: [cartItems.cartId, cartItems.productId], set: { quantity } });
         }
 
+        await tx
+          .update(orders)
+          .set({ cartId: userCartId })
+          .where(and(eq(orders.cartId, guestCartId), eq(orders.status, "pending_payment")));
         await tx.delete(carts).where(eq(carts.id, guestCartId));
       }),
 
