@@ -115,7 +115,11 @@ export const Api = {
       .then(async (response) => {
         if (!response.ok) {
           await Api.discard(response);
-          TokenStore.clear();
+          // Only a refused cookie ends the session; a 429, or a 502 while the
+          // API restarts, leaves it and its cookie as they were.
+          if (response.status === 401 || response.status === 403) {
+            TokenStore.clear();
+          }
           return false;
         }
 
