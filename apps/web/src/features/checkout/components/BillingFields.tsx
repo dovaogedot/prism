@@ -1,6 +1,5 @@
-import { Country } from "@prism/shared";
 import { useWatch } from "react-hook-form";
-import { Field, SelectField } from "../../../shared/ui/index.ts";
+import { PostalAddressFields } from "../../../shared/ui/index.ts";
 import type { CheckoutFormApi } from "../checkout.ts";
 
 /** The form the fields belong to. */
@@ -38,31 +37,18 @@ export const BillingFields = ({ form }: BillingFieldsProps) => {
 
       {isSameAsShipping ? null : (
         <div className="space-y-4">
-          <Field label="Street and house number" id="billing-line1" autoComplete="billing address-line1" error={errors?.line1?.message} {...form.register("billingAddress.line1")} />
-          <Field
-            label="Apartment, floor (optional)"
-            id="billing-line2"
-            autoComplete="billing address-line2"
-            error={errors?.line2?.message}
-            {...form.register("billingAddress.line2")}
+          <PostalAddressFields
+            idPrefix="billing"
+            section="billing"
+            country={billing.country}
+            fields={{
+              line1: { registered: form.register("billingAddress.line1"), error: errors?.line1?.message },
+              line2: { registered: form.register("billingAddress.line2"), error: errors?.line2?.message },
+              city: { registered: form.register("billingAddress.city"), error: errors?.city?.message },
+              postalCode: { registered: form.register("billingAddress.postalCode"), error: errors?.postalCode?.message },
+              country: { registered: form.register("billingAddress.country"), error: errors?.country?.message },
+            }}
           />
-          <div className="grid gap-4 sm:grid-cols-[1fr_9rem]">
-            <Field label="City" id="billing-city" autoComplete="billing address-level2" error={errors?.city?.message} {...form.register("billingAddress.city")} />
-            <Field
-              label="Postal code"
-              id="billing-postal-code"
-              autoComplete="billing postal-code"
-              error={errors?.postalCode?.message}
-              {...form.register("billingAddress.postalCode")}
-            />
-          </div>
-          <SelectField label="Country" id="billing-country" autoComplete="billing country" error={errors?.country?.message} {...form.register("billingAddress.country")}>
-            {Country.CODES.map((code) => (
-              <option key={code} value={code}>
-                {Country.name[code]}
-              </option>
-            ))}
-          </SelectField>
         </div>
       )}
     </fieldset>

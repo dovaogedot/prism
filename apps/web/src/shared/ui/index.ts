@@ -12,6 +12,8 @@ export type { FieldProps } from "./Field.tsx";
 
 export { SelectField } from "./SelectField.tsx";
 export type { SelectFieldProps } from "./SelectField.tsx";
+export { PostalAddressFields } from "./PostalAddressFields.tsx";
+export type { PostalAddressField, PostalAddressFieldsProps } from "./PostalAddressFields.tsx";
 
 export { TextAreaField } from "./TextAreaField.tsx";
 export type { TextAreaFieldProps } from "./TextAreaField.tsx";
