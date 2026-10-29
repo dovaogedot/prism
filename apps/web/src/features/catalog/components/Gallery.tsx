@@ -59,13 +59,16 @@ export const Gallery = ({ images, name }: GalleryProps) => {
 
       {image === undefined ? null : (
         <Dialog isOpen={isEnlarged} title={name} onClose={() => setEnlarged(false)} isWide>
-          <img
-            className={`mx-auto max-h-[75dvh] w-auto max-w-full ${image.isPixelArt ? "[image-rendering:pixelated]" : ""}`}
-            src={image.url}
-            alt={image.alt}
-            width={image.width}
-            height={image.height}
-          />
+          {/* Only while open: a closed dialog is hidden, not gone, and would fetch the full-size source anyway. */}
+          {isEnlarged ? (
+            <img
+              className={`mx-auto max-h-[75dvh] w-auto max-w-full ${image.isPixelArt ? "[image-rendering:pixelated]" : ""}`}
+              src={image.url}
+              alt={image.alt}
+              width={image.width}
+              height={image.height}
+            />
+          ) : null}
         </Dialog>
       )}
     </div>
