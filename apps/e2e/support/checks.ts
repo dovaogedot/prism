@@ -90,6 +90,28 @@ export const Checks = {
 
   cspViolations: (page: Page): Promise<readonly string[]> => page.evaluate(() => window.cspViolations ?? []),
 
+  /**
+   * Answers Google's CAPTCHA script with a stand-in that draws a box of the
+   * widget's size, so a page check never waits on Google or changes when
+   * Google does. The script keeps its address, so the CSP still judges it.
+   */
+  stubCaptcha: async (context: BrowserContext): Promise<void> => {
+    await context.route("https://www.google.com/recaptcha/api.js*", (route) =>
+      route.fulfill({
+        contentType: "text/javascript",
+        body: `window.grecaptcha = {
+          render: (container, options) => {
+            const box = document.createElement("div");
+            box.style.cssText = options.size === "compact" ? "width:164px;height:144px" : "width:304px;height:78px";
+            container.appendChild(box);
+            return 0;
+          },
+          reset: () => {},
+        };`,
+      }),
+    );
+  },
+
   /** Opens `path` and waits until the page's data has arrived. */
   open: async (page: Page, path: string) => {
     const response = await page.goto(path, { waitUntil: "load" });

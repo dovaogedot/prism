@@ -3,7 +3,8 @@
  * title within 60 characters and a description of 155 to 160, no sideways
  * spill at any of the widths, nothing the Content-Security-Policy refused,
  * no request of the shop's own refused but the ones a page expects, and no
- * error of the shop's own in the console.
+ * error of the shop's own in the console. Google's CAPTCHA script gets a
+ * stand-in on every page check, and one test loads the real one.
  */
 
 import { expect, test } from "@playwright/test";
@@ -55,6 +56,7 @@ for (const theme of Checks.THEMES) {
         const origin = new URL(baseURL ?? "https://localhost:3200").origin;
         await Checks.useTheme(context, theme);
         await Checks.watchCsp(context);
+        await Checks.stubCaptcha(context);
         if (entry.isSignedIn === true) {
           await Stack.registerCustomer(context.request, "pages");
         }
@@ -95,6 +97,22 @@ for (const theme of Checks.THEMES) {
     }
   });
 }
+
+// The one check that loads Google's real CAPTCHA: the page tests answer its script with a stand-in.
+test("the Content-Security-Policy admits Google's live CAPTCHA", async ({ context, page, baseURL }) => {
+  const origin = new URL(baseURL ?? "https://localhost:3200").origin;
+  await Checks.watchCsp(context);
+  const errors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" && Checks.isOwnError(message, origin)) errors.push(message.text());
+  });
+
+  await Checks.open(page, "/register");
+  await page.locator(Checks.CAPTCHA_FRAMES).first().waitFor({ state: "attached" });
+
+  expect(await Checks.cspViolations(page)).toEqual([]);
+  expect(errors).toEqual([]);
+});
 
 test("each indexed page has a title and a description of its own", async ({ page }) => {
   const seen: { title: string; description: string; path: string }[] = [];
