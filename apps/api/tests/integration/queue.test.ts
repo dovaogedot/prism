@@ -7,7 +7,7 @@
 
 import { RabbitMQContainer, type StartedRabbitMQContainer } from "@testcontainers/rabbitmq";
 import { connect, type Channel, type ChannelModel } from "amqplib";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { OrderCanceled, PaymentStatusChanged } from "../../src/messaging/messages.ts";
 import { Topology } from "../../src/messaging/topology.ts";
 import { MessageQueue } from "../../src/platform/queue.ts";
@@ -102,6 +102,35 @@ describe("the topology", () => {
   it("declares both working queues and the dead-letter queue once connected", async () => {
     for (const name of [Topology.PAYMENT_STATUS_QUEUE, Topology.ORDER_CANCELED_QUEUE, Topology.DEAD_LETTER_QUEUE]) {
       await expect(eventually(() => inspect((channel) => channel.checkQueue(name)))).resolves.toMatchObject({ queue: name });
+    }
+  });
+});
+
+describe("a topology the broker refuses", () => {
+  it("is reported, and the process carries on", async () => {
+    const failures: string[] = [];
+    // The broker already holds this queue with another delivery limit, so it answers 406.
+    const refused = MessageQueue.rabbitmq({
+      url: container.getAmqpUrl(),
+      topology: {
+        exchanges: Topology.declarations().exchanges,
+        queues: [
+          {
+            name: Topology.PAYMENT_STATUS_QUEUE,
+            exchange: Topology.PAYMENTS_EXCHANGE,
+            routingKey: Topology.PAYMENT_STATUS_KEY,
+            deadLetterExchange: Topology.DEAD_LETTER_EXCHANGE,
+            deliveryLimit: Topology.DELIVERY_LIMIT + 1,
+          },
+        ],
+      },
+      onFailure: (context) => failures.push(context),
+    });
+
+    try {
+      await vi.waitFor(() => expect(failures).toContain("could not set up the message broker's channel"), { timeout: 20_000 });
+    } finally {
+      await refused.close();
     }
   });
 });

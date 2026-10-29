@@ -134,6 +134,10 @@ export const MessageQueue = {
       },
     });
 
+    // A setup that fails on a connect is reported here, and the wrapper tries again on the
+    // next one; an event emitter with no listener for it would throw and end the process.
+    channel.on("error", (reason) => options.onFailure("could not set up the message broker's channel", reason));
+
     return {
       publish: async (message) => {
         await channel.publish(message.exchange, message.routingKey, Buffer.from(JSON.stringify(message.body)), {
