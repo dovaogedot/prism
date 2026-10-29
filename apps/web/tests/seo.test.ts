@@ -51,11 +51,11 @@ describe("Seo.title", () => {
     const long = Seo.title("A very long product name that goes on and on past what a search engine shows")
 
     expect(long).toBe("A very long product name that goes on and on past | Prism")
-    expect(long.length).toBeLessThanOrEqual(60)
+    expect(long.length).toBeLessThan(60)
   })
 
   it("cuts a single overlong word inside the word", () => {
-    expect(Seo.title("x".repeat(80))).toBe(`${"x".repeat(52)} | Prism`)
+    expect(Seo.title("x".repeat(80))).toBe(`${"x".repeat(51)} | Prism`)
   })
 })
 
@@ -98,10 +98,10 @@ describe("the catalog's titles and descriptions", () => {
     expect(misses).toEqual([])
   })
 
-  it("gives every seeded product a unique title within 60 characters", () => {
+  it("gives every seeded product a unique title under 60 characters", () => {
     const titles = seededProducts({ count: 0 }, 10).map((product) => Seo.title(CatalogSeo.productTitle(product)))
 
-    expect(titles.filter((title) => title.length > 60)).toEqual([])
+    expect(titles.filter((title) => title.length >= 60)).toEqual([])
     expect(titles.length - new Set(titles).size).toBe(0)
   })
 

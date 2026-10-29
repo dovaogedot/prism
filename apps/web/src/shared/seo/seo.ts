@@ -1,11 +1,12 @@
 /**
  * Titles and meta descriptions sized the way search engines show them in
- * full: a title within 60 characters, and a description of 155 to 160.
+ * full: a title under 60 characters, and a description of 155 to 160.
  */
 
 export const Seo = {
   SITE: "Prism",
-  TITLE_MAX: 60,
+  /** The longest title: 59 characters, so every title stays under 60. */
+  TITLE_MAX: 59,
   DESCRIPTION_MIN: 155,
   DESCRIPTION_MAX: 160,
   /** The shortest a cut opening fragment may become, so the description keeps what it is about. */
@@ -36,7 +37,7 @@ export const Seo = {
     return kept.replace(/[\s,;:(-]+$/, "")
   },
 
-  /** "<page> | Prism", the page part cut at a word boundary so the whole stays within 60 characters. */
+  /** "<page> | Prism", the page part cut at a word boundary so the whole stays under 60 characters. */
   title: (page: string): string => {
     const suffix = ` | ${Seo.SITE}`
     return `${Seo.cut(Seo.clean(page), Seo.TITLE_MAX - suffix.length)}${suffix}`

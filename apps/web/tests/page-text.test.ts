@@ -7,8 +7,8 @@ import { Seo } from "../src/shared/seo/seo.ts"
 const pages = Object.entries(PageText)
 
 describe("the fixed pages' head text", () => {
-  it.each(pages)("gives %s a title within 60 characters", (_name, text) => {
-    expect(Seo.title(text.title).length).toBeLessThanOrEqual(60)
+  it.each(pages)("gives %s a title under 60 characters", (_name, text) => {
+    expect(Seo.title(text.title).length).toBeLessThan(60)
     expect(Seo.title(text.title)).toBe(`${text.title} | Prism`)
   })
 

@@ -1,6 +1,6 @@
 /**
  * Every storefront page, in both themes: what axe-core finds, one h1, a
- * title within 60 characters and a description of 155 to 160, no sideways
+ * title under 60 characters and a description of 155 to 160, no sideways
  * spill at any of the widths, nothing the Content-Security-Policy refused,
  * no request of the shop's own refused but the ones a page expects, and no
  * error of the shop's own in the console. Google's CAPTCHA script gets a
@@ -88,7 +88,7 @@ for (const theme of Checks.THEMES) {
 
         expect(response?.status()).toBe(entry.status ?? 200)
         expect(facts.headings, "one h1").toBe(1)
-        expect(facts.title.length, facts.title).toBeLessThanOrEqual(60)
+        expect(facts.title.length, facts.title).toBeLessThan(60)
         expect(facts.title).toMatch(/ \| Prism$/)
         expect(facts.descriptions).toHaveLength(1)
         expect(facts.descriptions[0]?.length ?? 0, facts.descriptions[0]).toBeGreaterThanOrEqual(155)
