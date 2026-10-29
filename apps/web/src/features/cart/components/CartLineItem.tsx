@@ -54,7 +54,7 @@ export const CartLineItem = ({ line, compact = false }: CartLineItemProps) => {
             disabled={remove.isPending}
             className="text-sm font-medium text-ink-soft hover:text-danger"
           >
-            Remove
+            Remove<span className="sr-only"> {line.name}</span>
           </button>
         </div>
 

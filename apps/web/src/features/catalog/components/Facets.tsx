@@ -36,7 +36,7 @@ const Group = ({ title, chosen, onClear, children }: Readonly<{ title: string; c
           type="button"
           onClick={onClear}
         >
-          Clear all
+          Clear all<span className="sr-only"> {title.toLowerCase()} filters</span>
         </button>
       ))
       .with(false, () => null)

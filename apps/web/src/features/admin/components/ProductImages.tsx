@@ -87,7 +87,7 @@ export const ProductImages = ({ productId, images }: ProductImagesProps) => {
                 ↓
               </Button>
               <Button tone="ghost" type="button" onClick={() => setDeleting(draft.image)}>
-                Delete
+                Delete<span className="sr-only"> picture {index + 1}</span>
               </Button>
             </div>
           </li>

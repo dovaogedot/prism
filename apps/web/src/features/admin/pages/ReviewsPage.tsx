@@ -98,16 +98,16 @@ export const ReviewsPage = () => {
                   <div className="flex flex-wrap gap-2 pt-1">
                     {review.status === "approved" ? null : (
                       <Button type="button" busy={approve.isPending && approve.variables === review.id} onClick={() => approve.mutate(review.id, { onSuccess: () => Toast.show("The review is published."), onError: refused })}>
-                        Approve
+                        Approve<span className="sr-only"> the review of {review.product.name}</span>
                       </Button>
                     )}
                     {review.status === "rejected" ? null : (
                       <Button tone="quiet" type="button" onClick={() => setRejecting(review)}>
-                        Reject
+                        Reject<span className="sr-only"> the review of {review.product.name}</span>
                       </Button>
                     )}
                     <Button tone="ghost" type="button" onClick={() => setDeleting(review)}>
-                      Delete
+                      Delete<span className="sr-only"> the review of {review.product.name}</span>
                     </Button>
                   </div>
                 </li>
