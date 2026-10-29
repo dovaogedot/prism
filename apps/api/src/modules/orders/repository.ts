@@ -183,11 +183,17 @@ export const OrderRepository = {
       ORDER BY i.position LIMIT 1
     )`;
 
+    // The product's slug as it stands, so a link still opens it after staff rename it; the copy once it is deleted.
+    const lineSlug = sql<typeof orderLines.$inferSelect.productSlug>`COALESCE(
+      (SELECT p.slug FROM product p WHERE p.id = ${orderLines}."product_id"),
+      ${orderLines}."product_slug"
+    )`;
+
     const linesOf = async (orderId: OrderId): Promise<readonly OrderLine[]> => {
       const rows = await db
         .select({
           productId: orderLines.productId,
-          slug: orderLines.productSlug,
+          slug: lineSlug,
           name: orderLines.productName,
           unitPriceCents: orderLines.unitPriceCents,
           quantity: orderLines.quantity,

@@ -388,6 +388,13 @@ describe("placement", () => {
     expect(jsonOf(response)["error"]).toMatchObject({ code: "OrderTotalTooSmall" });
   });
 
+  it("links an order's line to its product by the product's slug as it stands, after staff renamed it", async () => {
+    const placed = await paidOrder();
+    await harness.database.sql`UPDATE product SET slug = 'brass-desk-lamp' WHERE slug = 'desk-lamp'`;
+
+    expect((await adminDetail(placed.orderId)) as unknown as { lines: { slug: string }[] }).toMatchObject({ lines: [{ slug: "brass-desk-lamp" }] });
+  });
+
   it("refuses a total over Stripe's largest charge before reserving anything", async () => {
     await harness.database.sql`UPDATE product SET price_cents = 10000000, stock = 50 WHERE slug = 'desk-lamp'`;
     const filled = await Shop.fill(harness, [["desk-lamp", 10]]);
