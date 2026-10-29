@@ -8,6 +8,7 @@ import { Failure } from "../../auth/components/failure.tsx";
 import { AdminKeys, useAdminRead, useAdminWrite } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
 import { BrandForm } from "../components/BrandForm.tsx";
+import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
 
 /** Which form is open: none, a new brand, or the brand given. */
 type Editing = Readonly<{ kind: "none" }> | Readonly<{ kind: "new" }> | Readonly<{ kind: "existing"; brand: AdminBrand }>;
@@ -20,7 +21,7 @@ export const BrandsPage = () => {
 
   const [deleting, setDeleting] = useState<AdminBrand | undefined>(undefined);
 
-  const [failure, setFailure] = useState<string | undefined>(undefined);
+  const [failure, setFailure] = useActionFailure();
 
   const create = useAdminWrite((input: BrandInput) => Api.post<AdminBrand>("/admin/brands", input));
 

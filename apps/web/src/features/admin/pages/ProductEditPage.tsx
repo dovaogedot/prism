@@ -11,6 +11,7 @@ import { AdminPage } from "../components/AdminPage.tsx";
 import { ProductForm } from "../components/ProductForm.tsx";
 import { ProductImages } from "../components/ProductImages.tsx";
 import { Cents } from "../forms.ts";
+import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
 
 /**
  * A product's admin page: a new one at `/admin/products/new`, which goes on
@@ -32,7 +33,7 @@ export const ProductEditPage = () => {
 
   const [isDeleting, setDeleting] = useState(false);
 
-  const [failure, setFailure] = useState<string | undefined>(undefined);
+  const [failure, setFailure] = useActionFailure();
 
   const create = useAdminWrite((input: ProductInput) => Api.post<AdminProductDetail>("/admin/products", input));
 

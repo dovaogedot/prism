@@ -10,6 +10,7 @@ import { useAccountChanges, useSavedAddresses } from "../account.ts";
 import { AccountPage } from "../components/AccountPage.tsx";
 import { AddressCard } from "../components/AddressCard.tsx";
 import { AddressForm } from "../components/AddressForm.tsx";
+import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
 
 /** Which form is open: none, a new address, or the address with that id. */
 type Editing = Readonly<{ kind: "none" }> | Readonly<{ kind: "new" }> | Readonly<{ kind: "existing"; id: AddressId }>;
@@ -30,7 +31,7 @@ export const AddressesPage = () => {
 
   const [deleting, setDeleting] = useState<SavedAddress | undefined>(undefined);
 
-  const [failure, setFailure] = useState<string | undefined>(undefined);
+  const [failure, setFailure] = useActionFailure();
 
   if (session === undefined) return <SignInFirst />;
 

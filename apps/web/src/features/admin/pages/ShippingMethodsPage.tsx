@@ -8,6 +8,7 @@ import { Failure } from "../../auth/components/failure.tsx";
 import { AdminKeys, useAdminRead, useAdminWrite } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
 import { ShippingMethodForm } from "../components/ShippingMethodForm.tsx";
+import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
 
 /** Which form is open: none, a new option, or the option given. */
 type Editing = Readonly<{ kind: "none" }> | Readonly<{ kind: "new" }> | Readonly<{ kind: "existing"; option: ShippingMethodView }>;
@@ -24,7 +25,7 @@ export const ShippingMethodsPage = () => {
 
   const [deleting, setDeleting] = useState<ShippingMethodView | undefined>(undefined);
 
-  const [failure, setFailure] = useState<string | undefined>(undefined);
+  const [failure, setFailure] = useActionFailure();
 
   const create = useAdminWrite((input: ShippingMethodInput) => Api.post<ShippingMethodView>("/admin/shipping-methods", input));
 

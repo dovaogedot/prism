@@ -8,6 +8,7 @@ import { Failure } from "../../auth/components/failure.tsx";
 import { AdminKeys, useAdminRead, useAdminWrite } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
 import { CategoryForm } from "../components/CategoryForm.tsx";
+import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
 
 /** Which form is open: none, a new category, or the category given. */
 type Editing = Readonly<{ kind: "none" }> | Readonly<{ kind: "new" }> | Readonly<{ kind: "existing"; category: AdminCategory }>;
@@ -20,7 +21,7 @@ export const CategoriesPage = () => {
 
   const [deleting, setDeleting] = useState<AdminCategory | undefined>(undefined);
 
-  const [failure, setFailure] = useState<string | undefined>(undefined);
+  const [failure, setFailure] = useActionFailure();
 
   const create = useAdminWrite((input: CategoryInput) => Api.post<AdminCategory>("/admin/categories", input));
 

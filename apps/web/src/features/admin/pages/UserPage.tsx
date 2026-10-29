@@ -11,6 +11,7 @@ import { StatusBadge } from "../../orders/components/StatusBadge.tsx";
 import { OrderTime } from "../../orders/orders.ts";
 import { AdminKeys, useAdminRead, useAdminWrite } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
+import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
 
 /** One of the account actions only staff managers take, which each ask first. */
 type AccountAction = "disable" | "enable" | "reset-two-factor" | "sign-out";
@@ -34,7 +35,7 @@ export const UserPage = () => {
 
   const [action, setAction] = useState<AccountAction | undefined>(undefined);
 
-  const [failure, setFailure] = useState<string | undefined>(undefined);
+  const [failure, setFailure] = useActionFailure();
 
   const saveRoles = useAdminWrite((chosen: readonly StaffRole[]) => Api.put<AdminUserDetail>(`/admin/users/${id}/roles`, { roles: chosen }));
 

@@ -13,6 +13,7 @@ import { StatusBadge } from "../../orders/components/StatusBadge.tsx";
 import { OrderTime } from "../../orders/orders.ts";
 import { AdminKeys, useAdminRead, useAdminWrite } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
+import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
 
 /** Which confirmation is open. */
 type Confirming = "none" | "cancel" | "refund";
@@ -35,7 +36,7 @@ export const OrderPage = () => {
 
   const [confirming, setConfirming] = useState<Confirming>("none");
 
-  const [failure, setFailure] = useState<string | undefined>(undefined);
+  const [failure, setFailure] = useActionFailure();
 
   const advance = useAdminWrite((change: OrderStatusChange) => Api.post<AdminOrderDetail>(`/admin/orders/${id}/status`, change));
 

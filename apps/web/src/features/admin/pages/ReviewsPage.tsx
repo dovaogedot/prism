@@ -11,6 +11,7 @@ import { OrderTime } from "../../orders/orders.ts";
 import { AdminKeys, useAdminRead, useAdminWrite } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
 import { RejectForm } from "../components/RejectForm.tsx";
+import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
 
 /**
  * The moderation queue: reviews waiting for a moderator first, and those
@@ -44,7 +45,7 @@ export const ReviewsPage = () => {
 
   const [deleting, setDeleting] = useState<AdminReviewView | undefined>(undefined);
 
-  const [failure, setFailure] = useState<string | undefined>(undefined);
+  const [failure, setFailure] = useActionFailure();
 
   const approve = useAdminWrite((id: string) => Api.postEmpty(`/admin/reviews/${id}/approve`));
 
