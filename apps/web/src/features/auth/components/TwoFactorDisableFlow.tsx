@@ -14,10 +14,8 @@ import { Alert, Button, ConfirmDialog, Field } from "../../../shared/ui/index.ts
 import { TokenStore } from "../token-store.ts";
 import { Failure } from "./failure.tsx";
 
-/** The account's staff roles, and what happens once two-factor sign-in is off. */
+/** What happens once two-factor sign-in is off. */
 export type TwoFactorDisableFlowProps = Readonly<{
-  /** The staff roles the account loses with its second factor; empty for a customer. */
-  roles: readonly StaffRole[];
   /** Called with the line that tells the reader what changed. */
   onDone: (notice: string) => void;
 }>;
@@ -33,35 +31,49 @@ const statusesOf = (roles: HeldRoles): string => {
   return `your ${names} ${labels.length === 1 ? "status" : "statuses"}`;
 };
 
-export const TwoFactorDisableFlow = ({ roles, onDone }: TwoFactorDisableFlowProps) => {
+export const TwoFactorDisableFlow = ({ onDone }: TwoFactorDisableFlowProps) => {
   const [failure, setFailure] = useState<string | undefined>(undefined);
-  const [isConfirming, setConfirming] = useState(false);
-  const [first, ...rest] = roles;
-  const held: HeldRoles | undefined = first === undefined ? undefined : [first, ...rest];
+  // The staff roles the dialog names, present while it asks.
+  const [held, setHeld] = useState<HeldRoles | undefined>(undefined);
 
   const form = useForm({
     resolver: zodResolver(TwoFactorCodeInput.schema),
     defaultValues: { code: "" },
   });
 
-  const turnOff = form.handleSubmit(async (values) => {
-    setFailure(undefined);
-
+  const send = async (values: TwoFactorCodeInput, lost: HeldRoles | undefined): Promise<void> => {
     await Api.post<SessionUser>("/auth/2fa/disable", values)
       .then((user) => {
         TokenStore.updateUser(user);
         onDone(
-          held === undefined
+          lost === undefined
             ? "Two-factor authentication is now off."
-            : `Two-factor authentication is now off, and ${statusesOf(held)} ${held.length === 1 ? "is" : "are"} revoked.`,
+            : `Two-factor authentication is now off, and ${statusesOf(lost)} ${lost.length === 1 ? "is" : "are"} revoked.`,
         );
       })
       .catch((reason: unknown) => setFailure(Failure.message(reason)))
-      .finally(() => setConfirming(false));
+      .finally(() => setHeld(undefined));
+  };
+
+  // The roles are read from the server as the code is sent, so one granted since this page loaded is named too.
+  // Staff see what they lose before anything is sent; a customer's code goes straight away.
+  const submit = form.handleSubmit(async (values) => {
+    setFailure(undefined);
+
+    const user = await Api.get<SessionUser>("/auth/me").catch((reason: unknown) => {
+      setFailure(Failure.message(reason));
+      return undefined;
+    });
+    if (user === undefined) return;
+
+    TokenStore.updateUser(user);
+    const [first, ...rest] = user.roles;
+    if (first === undefined) return send(values, undefined);
+
+    setHeld([first, ...rest]);
   });
 
-  // Staff see what they lose before anything is sent; a customer's code goes straight away.
-  const submit = held === undefined ? turnOff : form.handleSubmit(() => setConfirming(true));
+  const confirm = form.handleSubmit((values) => send(values, held));
 
   return (
     <>
@@ -89,21 +101,21 @@ export const TwoFactorDisableFlow = ({ roles, onDone }: TwoFactorDisableFlowProp
         </Button>
       </form>
 
-      {held === undefined ? null : (
-        <ConfirmDialog
-          isOpen={isConfirming}
-          title="Turn off two-factor?"
-          confirmLabel="Turn off two-factor"
-          isBusy={form.formState.isSubmitting}
-          onCancel={() => setConfirming(false)}
-          onConfirm={() => void turnOff()}
-        >
+      <ConfirmDialog
+        isOpen={held !== undefined}
+        title="Turn off two-factor?"
+        confirmLabel="Turn off two-factor"
+        isBusy={form.formState.isSubmitting}
+        onCancel={() => setHeld(undefined)}
+        onConfirm={() => void confirm()}
+      >
+        {held === undefined ? null : (
           <p>
             Staff accounts need two-factor authentication, so {statusesOf(held)} will be revoked. To get staff access
             back, turn two-factor on again and ask an admin.
           </p>
-        </ConfirmDialog>
-      )}
+        )}
+      </ConfirmDialog>
     </>
   );
 };
