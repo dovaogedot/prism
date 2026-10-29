@@ -49,7 +49,9 @@ export const HttpErrors = {
 
   /**
    * Installs the handler everything escaping a route lands in. Schema
-   * failures become a structured 422; everything else is logged in full and
+   * failures and a body that cannot be read become a structured 422, a body
+   * over the size limit a 413 `PayloadTooLarge`, and the framework's other
+   * refusals keep their own status; everything else is logged in full and
    * reported as an opaque 500.
    */
   register: (app: FastifyInstance): void => {
@@ -63,11 +65,17 @@ export const HttpErrors = {
 
       const status = HttpErrors.statusOf(error);
 
-      if (status !== undefined && status < 500) {
+      if (status === 413) return HttpErrors.send(reply, { _tag: "PayloadTooLarge" });
+
+      if (status === 400) {
         return HttpErrors.send(reply, {
           _tag: "ValidationFailed",
           issues: [{ path: "", message: HttpErrors.messageOf(error) }],
         });
+      }
+
+      if (status !== undefined && status < 500) {
+        return reply.status(status).send({ error: { code: "RequestRefused", message: HttpErrors.messageOf(error), issues: [] } });
       }
 
       request.log.error({ err: error }, "unhandled error");

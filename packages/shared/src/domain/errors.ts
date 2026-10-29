@@ -80,8 +80,8 @@ export type DomainError =
 /** The name of a domain error, which is also the `code` clients match on. */
 export type DomainErrorTag = DomainError["_tag"];
 
-/** Every code a non-2xx response can carry: the domain tags plus the two the transport adds. */
-export type ErrorCode = DomainErrorTag | "NotFound" | "InternalError";
+/** Every code a non-2xx response can carry: the domain tags plus the three the transport adds. `RequestRefused` is a refusal by the server itself, such as an unsupported content type, under its own status. */
+export type ErrorCode = DomainErrorTag | "NotFound" | "RequestRefused" | "InternalError";
 
 /** The wire shape of every non-2xx response. */
 export type ErrorResponse = Readonly<{

@@ -416,6 +416,26 @@ describe("a stolen session", () => {
   });
 });
 
+describe("a body the server cannot take", () => {
+  it("answers 413 PayloadTooLarge when it is over the size limit, and 422 when it is not JSON", async () => {
+    const big = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      headers: { "content-type": "application/json" },
+      payload: JSON.stringify({ email: "a@example.com", password: "x".repeat(300 * 1024) }),
+    });
+    const broken = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      headers: { "content-type": "application/json" },
+      payload: "{not json",
+    });
+
+    expect([big.statusCode, jsonOf(big)["error"]]).toEqual([413, expect.objectContaining({ code: "PayloadTooLarge" })]);
+    expect(broken.statusCode).toBe(422);
+  });
+});
+
 describe("forms from other sites", () => {
   it("are refused by sign-in, which another site could post without a preflight", async () => {
     await registerUser(harness, "form-target@example.com");
@@ -427,7 +447,8 @@ describe("forms from other sites", () => {
       payload: new URLSearchParams({ email: "form-target@example.com", password: VALID_PASSWORD }).toString(),
     });
 
-    expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    expect(response.statusCode).toBe(415);
+    expect(jsonOf(response)["error"]).toMatchObject({ code: "RequestRefused" });
     expect(response.headers["set-cookie"]).toBeUndefined();
   });
 });
