@@ -43,7 +43,11 @@ const entries: readonly Entry[] = [
   { name: "register", path: "/register" },
   { name: "forgot password", path: "/forgot-password" },
   { name: "not found", path: "/no-such-page", status: 404, refused: ["404 GET /no-such-page"] },
-  { name: "unknown product", path: "/products/no-such-product", refused: ["404 GET /api/v1/products/no-such-product"] },
+  {
+    name: "unknown product",
+    path: "/products/no-such-product",
+    refused: ["404 GET /api/v1/products/no-such-product", "404 GET /api/v1/products/no-such-product/reviews"],
+  },
   { name: "account", path: "/account", isSignedIn: true },
   { name: "addresses", path: "/account/addresses", isSignedIn: true },
   { name: "orders", path: "/account/orders", isSignedIn: true },
