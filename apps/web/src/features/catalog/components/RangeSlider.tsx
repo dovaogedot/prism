@@ -2,7 +2,8 @@
  * A two-thumb range slider.
  *
  * Dragging updates a local draft and only reports on release, so a drag
- * across the track produces one navigation rather than sixty.
+ * across the track produces one navigation rather than sixty. Keys move the
+ * thumb at once and report once they pause, so a held arrow reports once.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -41,6 +42,11 @@ export const RangeSlider = ({ label, min, max, step = 1, value, onChange, format
    */
   const draggingRef = useRef(false);
 
+  /** The report a key press scheduled, waiting for the keys to pause. */
+  const keyReport = useRef<number | undefined>(undefined);
+
+  useEffect(() => () => window.clearTimeout(keyReport.current), []);
+
   // Follow the value when it changes from somewhere else: a Clear button, the
   // back button, or the parent normalizing what was just sent.
   useEffect(() => {
@@ -56,7 +62,8 @@ export const RangeSlider = ({ label, min, max, step = 1, value, onChange, format
       const bounds = track.getBoundingClientRect();
       const ratio = Range.clamp((clientX - bounds.left) / bounds.width, 0, 1);
 
-      return Math.round((min + ratio * (max - min)) / step) * step;
+      // Steps count from `min`, so either end of the track is reachable whatever the step.
+      return Range.clamp(min + Math.round((ratio * (max - min)) / step) * step, min, max);
     },
     [min, max, step],
   );
@@ -90,7 +97,6 @@ export const RangeSlider = ({ label, min, max, step = 1, value, onChange, format
     onChange(draft);
   };
 
-  /** Keyboard commits immediately: there is no drag to wait for. */
   const onKeyDown = (thumb: Thumb) => (event: React.KeyboardEvent) => {
     const current = thumb === "min" ? draft.min : draft.max;
     const big = Math.max(step, Math.round((max - min) / 10));
@@ -109,7 +115,8 @@ export const RangeSlider = ({ label, min, max, step = 1, value, onChange, format
     event.preventDefault();
     const updated = moveThumb(thumb, Range.clamp(next, min, max));
     setDraft(updated);
-    onChange(updated);
+    window.clearTimeout(keyReport.current);
+    keyReport.current = window.setTimeout(() => onChange(updated), 500);
   };
 
   const ratio = (at: number): string => `${max === min ? 0 : ((at - min) / (max - min)) * 100}%`;

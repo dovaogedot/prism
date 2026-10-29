@@ -164,6 +164,8 @@ const PriceFacet = ({ facets, params, onChange }: FacetsProps) => {
           label="Price"
           min={minCents}
           max={maxCents}
+          // Whole euros: a key press moves a thumb by one.
+          step={100}
           value={value}
           format={Price.format}
           onChange={(next) =>
