@@ -15,13 +15,25 @@ import { useCallback, useSyncExternalStore } from "react";
 /** Which of the two looks the page is drawn in. */
 export type Theme = "light" | "dark";
 
+/** Whether the visitor picked a theme in this tab, which still holds when storage is blocked. */
+const Picked: { inTab: boolean } = { inTab: false };
+
 export const Theme = {
   STORAGE_KEY: "prism-theme",
 
   is: (value: string | null): value is Theme => value === "light" || value === "dark",
 
   /** Whether the visitor has picked a theme, rather than being shown the system's. */
-  chosen: (): boolean => Theme.is(localStorage.getItem(Theme.STORAGE_KEY)),
+  chosen: (): boolean => {
+    if (Picked.inTab) return true;
+
+    try {
+      return Theme.is(localStorage.getItem(Theme.STORAGE_KEY));
+    } catch {
+      // Storage can be blocked; nothing was stored then.
+      return false;
+    }
+  },
 
   systemPrefers: (): Theme =>
     window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
@@ -38,7 +50,14 @@ export const Theme = {
 
   /** Stores `theme` over the system preference, draws the page in it, and tells every reader. */
   choose: (theme: Theme): void => {
-    localStorage.setItem(Theme.STORAGE_KEY, theme);
+    Picked.inTab = true;
+
+    try {
+      localStorage.setItem(Theme.STORAGE_KEY, theme);
+    } catch {
+      // Storage can be blocked; the choice then lasts as long as the tab.
+    }
+
     Theme.apply(theme);
     for (const listener of Theme.listeners) listener();
   },
