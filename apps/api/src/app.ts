@@ -115,6 +115,16 @@ export const App = {
   RELAY_INTERVAL_MS: 2000,
   HOUSEKEEPING_INTERVAL_MS: 30_000,
 
+  /**
+   * A request as its log line shows it: the path without the query string,
+   * where a guest's order key and a reset link's token travel.
+   */
+  requestForLog: (request: Readonly<{ method: string; url: string; ip: string }>) => {
+    const queryAt = request.url.indexOf("?");
+
+    return { method: request.method, url: queryAt === -1 ? request.url : request.url.slice(0, queryAt), remoteAddress: request.ip };
+  },
+
   /** The provider new charges go through, as the configuration chooses it. */
   gatewayOf: (payments: Config["payments"], simulated: PaymentGateway): PaymentGateway | undefined => {
     if (payments.mode === "stripe") return PaymentGateway.stripe(payments);
@@ -135,7 +145,7 @@ export const App = {
     const overrides = input.overrides ?? {};
 
     const app = Fastify({
-      logger: { level: config.logLevel },
+      logger: { level: config.logLevel, serializers: { req: App.requestForLog } },
       // Caddy terminates the connection. Trusting the private ranges, rather
       // than the whole X-Forwarded-For chain, takes the first address no proxy
       // on this network vouched for, whatever the caller put in the header.
