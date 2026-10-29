@@ -45,6 +45,9 @@ export const TEST_START = new Date("2026-08-07T12:00:00.000Z");
 /** A password that satisfies the policy, for tests that are not about the policy. */
 export const VALID_PASSWORD = "correct horse battery staple";
 
+/** The Postgres the tests start: the release docker-compose.yml pins, so they run what the shop runs. */
+export const POSTGRES_IMAGE = "postgres:18.6-alpine";
+
 /** Argon2 costs ~50 ms per call; this keeps the shape at no cost. */
 export const fastHasher: Hasher = {
   hash: async (plaintext) => PasswordHash.schema.parse(`fake:${Buffer.from(plaintext).toString("base64")}`),
@@ -167,7 +170,7 @@ export type HarnessOptions = Readonly<{
  * hour on; `stop` takes the container down.
  */
 export const startHarness = async (options: HarnessOptions = {}): Promise<Harness> => {
-  const container = await new PostgreSqlContainer("postgres:18-alpine").start();
+  const container = await new PostgreSqlContainer(POSTGRES_IMAGE).start();
   const mediaDirectory = await mkdtemp(join(tmpdir(), "prism-media-"));
 
   const config = Config.fromEnvironment(testEnvironment(container.getConnectionUri(), mediaDirectory));

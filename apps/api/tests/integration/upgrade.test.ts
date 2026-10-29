@@ -28,7 +28,7 @@ import { IdentityProvider, MockAuthorizationCode, RedirectUri } from "../../src/
 import { PaymentGateway } from "../../src/platform/payment-gateway.ts";
 import { MessageQueue } from "../../src/platform/queue.ts";
 import { TotpService } from "../../src/platform/totp.ts";
-import { fastHasher, testEnvironment, TEST_START, VALID_PASSWORD } from "../support/harness.ts";
+import { fastHasher, POSTGRES_IMAGE, testEnvironment, TEST_START, VALID_PASSWORD } from "../support/harness.ts";
 
 /** The plain text a part 2 database held, which must not survive the upgrade anywhere. */
 const PLAIN = {
@@ -154,7 +154,7 @@ const columnsOf = async (database: DatabaseHandle, table: string): Promise<reado
   ).map((row) => row.column_name);
 
 beforeAll(async () => {
-  container = await new PostgreSqlContainer("postgres:18-alpine").start();
+  container = await new PostgreSqlContainer(POSTGRES_IMAGE).start();
   media = await mkdtemp(join(tmpdir(), "prism-upgrade-media-"));
 
   // The migrations folder as it stood before the identity columns were sealed.
