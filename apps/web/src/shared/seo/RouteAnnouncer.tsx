@@ -5,19 +5,19 @@ import { PageHeading } from "./page-heading.ts";
 /**
  * Keeping focus on a newly opened page's heading while the page loads. A
  * page shows a heading while its data loads and another once it has it, so
- * the heading that took focus can leave the page a moment later.
+ * the heading that took focus can leave the page a moment later, however
+ * long the data takes.
  */
 const Settling = {
-  /** How long a newly opened page is watched. */
-  WINDOW_MS: 3000,
   /** How long the title has to stay the same before it is read out, so a loading title is skipped. */
   QUIET_MS: 400,
 
   /**
    * Moves focus to the page's h1, and calls `announce` with the page's title
-   * once the title has stayed the same for a moment. While the page settles,
-   * a heading that replaces the focused one takes focus in turn, unless the
-   * reader has moved it elsewhere. The returned function stops watching.
+   * once the title has stayed the same for a moment. Until the returned
+   * function stops it, a heading that replaces the focused one takes focus in
+   * turn, unless the reader has moved it elsewhere. A form field the page
+   * focused itself, such as a code field, keeps focus.
    */
   watch: (announce: (title: string) => void): (() => void) => {
     const state: { focused: HTMLElement | undefined; quiet: number | undefined } = { focused: undefined, quiet: undefined };
@@ -25,6 +25,12 @@ const Settling = {
     const refocus = (): void => {
       const heading = PageHeading.find();
       if (heading === null || heading === state.focused) return;
+
+      const active = document.activeElement;
+      if (state.focused === undefined && active instanceof HTMLElement && active.matches("main input, main select, main textarea")) {
+        state.focused = active;
+        return;
+      }
 
       // A heading counts as focused only once focus has landed on it, so one
       // behind the closing drawer is tried again.
@@ -44,10 +50,6 @@ const Settling = {
     const head = new MutationObserver(scheduleAnnouncement);
     page.observe(document.body, { childList: true, subtree: true });
     head.observe(document.head, { childList: true, subtree: true, characterData: true });
-    const timer = window.setTimeout(() => {
-      page.disconnect();
-      head.disconnect();
-    }, Settling.WINDOW_MS);
 
     refocus();
     scheduleAnnouncement();
@@ -55,7 +57,6 @@ const Settling = {
     return () => {
       page.disconnect();
       head.disconnect();
-      window.clearTimeout(timer);
       window.clearTimeout(state.quiet);
     };
   },
