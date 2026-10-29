@@ -2,15 +2,27 @@
  * Every storefront page, in both themes: what axe-core finds, one h1, a
  * title within 60 characters and a description of 155 to 160, no sideways
  * spill at any of the widths, nothing the Content-Security-Policy refused,
- * and no error of the shop's own in the console.
+ * no request of the shop's own refused but the ones a page expects, and no
+ * error of the shop's own in the console.
  */
 
 import { expect, test } from "@playwright/test";
 import { Checks } from "../support/checks.ts";
 import { Stack } from "../support/stack.ts";
 
-/** A page to check: its address, the status it answers with, and what it needs set up first. */
-type Entry = Readonly<{ name: string; path: string; status?: number; isSignedIn?: boolean; hasCart?: boolean }>;
+/**
+ * A page to check: its address, the status it answers with, what it needs
+ * set up first, and the requests of its own it expects refused, each as
+ * `<status> <method> <path>`.
+ */
+type Entry = Readonly<{
+  name: string;
+  path: string;
+  status?: number;
+  isSignedIn?: boolean;
+  hasCart?: boolean;
+  refused?: readonly string[];
+}>;
 
 const entries: readonly Entry[] = [
   { name: "home", path: "/" },
@@ -29,8 +41,8 @@ const entries: readonly Entry[] = [
   { name: "sign in", path: "/login" },
   { name: "register", path: "/register" },
   { name: "forgot password", path: "/forgot-password" },
-  { name: "not found", path: "/no-such-page", status: 404 },
-  { name: "unknown product", path: "/products/no-such-product" },
+  { name: "not found", path: "/no-such-page", status: 404, refused: ["404 GET /no-such-page"] },
+  { name: "unknown product", path: "/products/no-such-product", refused: ["404 GET /api/v1/products/no-such-product"] },
   { name: "account", path: "/account", isSignedIn: true },
   { name: "addresses", path: "/account/addresses", isSignedIn: true },
   { name: "orders", path: "/account/orders", isSignedIn: true },
@@ -56,6 +68,14 @@ for (const theme of Checks.THEMES) {
           if (message.type() === "error" && Checks.isOwnError(message, origin)) errors.push(message.text());
         });
 
+        // A guest's page asks to refresh a session it does not have, and is refused by design.
+        const expected = [...(entry.isSignedIn === true ? [] : ["401 POST /api/v1/auth/refresh"]), ...(entry.refused ?? [])];
+        const refused: string[] = [];
+        page.on("response", (answer) => {
+          const url = new URL(answer.url());
+          if (url.origin === origin && answer.status() >= 400) refused.push(`${answer.status()} ${answer.request().method()} ${url.pathname}`);
+        });
+
         const response = await Checks.open(page, entry.path);
         const facts = await Checks.facts(page);
 
@@ -69,6 +89,7 @@ for (const theme of Checks.THEMES) {
         expect(await Checks.axe(page)).toEqual([]);
         expect(await Checks.overflowAt(page, Checks.WIDTHS)).toEqual(Object.fromEntries(Checks.WIDTHS.map((width) => [width, 0])));
         expect(await Checks.cspViolations(page)).toEqual([]);
+        expect(refused.filter((request) => !expected.includes(request))).toEqual([]);
         expect(errors).toEqual([]);
       });
     }

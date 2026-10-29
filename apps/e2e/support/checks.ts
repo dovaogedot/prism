@@ -141,8 +141,9 @@ export const Checks = {
   /**
    * Whether a console error is the shop's own: logged by a document of the
    * shop's origin, not by a third party's frame such as the CAPTCHA's. A
-   * refused request is left out; the tests check statuses themselves, and a
-   * guest's session refresh is refused by design. So is the report of a
+   * refused request is left out: the page tests check the status of every
+   * request of the shop's own, and know the ones a page expects refused. So
+   * is the report of a
    * third party's page whose own report-only policy asks not to be framed,
    * which Chrome logs in the shop's console though the policy is not the
    * shop's and changes nothing.
