@@ -164,7 +164,7 @@ A declined order releases its stock and mails the reason; the cart keeps its ite
 - **The account** has three tabs of one width: Profile, Addresses and Orders.
 - **Profile** (`/account`): full name and phone, which checkout fills in. The email is shown but stays as it is. The password and 2FA live here too.
 - **Addresses** (`/account/addresses`): up to 10 saved addresses. One is the default, which checkout starts with.
-- **Two-factor authentication**: on the account page, scan the QR code with an authenticator app and confirm a code. Sign-in then asks for a code, and so does turning it off. Each code works once. Staff who turn it off lose every staff role with it, after a dialog that names the roles asks first; the last admin cannot turn it off.
+- **Two-factor authentication**: on the account page, scan the QR code with an authenticator app, or type its setup key or open the app's link on the same phone, and confirm a code. Sign-in then asks for a code, and so does turning it off. Each code works once. Staff who turn it off lose every staff role with it, after a dialog that names the roles asks first; the last admin cannot turn it off.
 - **Sign out** revokes the session. The account menu holds Orders, Account, Admin for staff, and Sign out.
 
 ### Contact and the other pages

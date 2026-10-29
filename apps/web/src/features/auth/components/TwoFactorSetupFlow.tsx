@@ -12,6 +12,7 @@ import { useForm } from "react-hook-form";
 import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { Alert, Button, Field } from "../../../shared/ui/index.ts";
+import { SetupKey } from "../setup-key.ts";
 import { TokenStore } from "../token-store.ts";
 import { Failure } from "./failure.tsx";
 
@@ -66,47 +67,58 @@ export const TwoFactorSetupFlow = ({ onDone }: TwoFactorSetupFlowProps) => {
             </Button>
           </>
         ))
-        .otherwise((value) => (
-          <div className="space-y-4">
-            <p className="text-sm text-ink-soft">
-              Scan this with your authenticator app, then type the code it shows to confirm it worked.
-            </p>
+        .otherwise((value) => {
+          const key = SetupKey.of(value.uri);
 
-            <div className="flex flex-col items-start gap-4 sm:flex-row">
-              <div
-                className="qr w-40 shrink-0 rounded-lg border border-line bg-white p-3"
-                // Server-generated SVG with no user input in it.
-                dangerouslySetInnerHTML={{ __html: value.qrCodeSvg }}
-              />
+          return (
+            <div className="space-y-4">
+              <p className="text-sm text-ink-soft">
+                Scan this with your authenticator app, then type the code it shows to confirm it worked.
+              </p>
 
-              <div className="min-w-0 flex-1 space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wider text-ink-faint">
-                  Or enter this manually
-                </p>
-                <code className="block break-all rounded-lg bg-sunken px-3 py-2 font-mono text-xs text-ink-soft">
-                  {value.uri}
-                </code>
+              <div className="flex flex-col items-start gap-4 sm:flex-row">
+                <div
+                  className="qr w-40 shrink-0 rounded-lg border border-line bg-white p-3"
+                  role="img"
+                  aria-label="QR code that sets up two-factor authentication in an authenticator app"
+                  // Server-generated SVG with no user input in it.
+                  dangerouslySetInnerHTML={{ __html: value.qrCodeSvg }}
+                />
+
+                <div className="min-w-0 flex-1 space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wider text-ink-faint">
+                    Or enter this setup key in the app
+                  </p>
+                  <code className="block break-all rounded-lg bg-sunken px-3 py-2 font-mono text-sm text-ink">
+                    {key ?? value.uri}
+                  </code>
+                  <p className="text-sm">
+                    <a className="text-accent underline underline-offset-2" href={value.uri}>
+                      Open it in an authenticator app on this device
+                    </a>
+                  </p>
+                </div>
               </div>
-            </div>
 
-            <form onSubmit={(event) => void confirm(event)} noValidate>
-              <Field
-                label="Code from the app"
-                inputMode="numeric"
-                maxLength={6}
-                autoComplete="one-time-code"
-                className="max-w-40 text-center font-mono text-lg tracking-[0.3em]"
-                error={form.formState.errors.code?.message}
-                action={
-                  <Button type="submit" busy={form.formState.isSubmitting}>
-                    Turn it on
-                  </Button>
-                }
-                {...form.register("code")}
-              />
-            </form>
-          </div>
-        ))}
+              <form onSubmit={(event) => void confirm(event)} noValidate>
+                <Field
+                  label="Code from the app"
+                  inputMode="numeric"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                  className="max-w-40 text-center font-mono text-lg tracking-[0.3em]"
+                  error={form.formState.errors.code?.message}
+                  action={
+                    <Button type="submit" busy={form.formState.isSubmitting}>
+                      Turn it on
+                    </Button>
+                  }
+                  {...form.register("code")}
+                />
+              </form>
+            </div>
+          );
+        })}
     </div>
   );
 };
