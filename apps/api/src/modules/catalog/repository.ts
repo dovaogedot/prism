@@ -228,6 +228,18 @@ export const CatalogRepository = {
       return facets;
     };
 
+    /** How many products match `query`, whatever page it asks for. */
+    const countOf = async (query: ProductQuery, match: TextMatch): Promise<number> => {
+      const [row] = await db
+        .select({ total: count() })
+        .from(products)
+        .innerJoin(categories, eq(products.categoryId, categories.id))
+        .innerJoin(brands, eq(products.brandId, brands.id))
+        .where(conditions(query, "none", match));
+
+      return row?.total ?? 0;
+    };
+
     /** One page of products matching `query`, with its facets, matching the text as `match` says. */
     const searchWith = async (query: ProductQuery, match: TextMatch): Promise<Omit<ProductSearchResult, "matched">> => {
       const [rows, facets] = await Promise.all([
@@ -243,7 +255,8 @@ export const CatalogRepository = {
         facetsOf(query, match),
       ]);
 
-      const total = rows[0]?.total ?? 0;
+      // A page past the end has no row to carry the count, so it is counted on its own.
+      const total = rows[0]?.total ?? (query.page > 1 ? await countOf(query, match) : 0);
 
       return {
         items: rows.map(toSummary),
