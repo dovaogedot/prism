@@ -6,6 +6,7 @@ import { Api } from "../../../shared/api/client.ts";
 import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, ImageSet, Skeleton } from "../../../shared/ui/index.ts";
+import { useCategories } from "../../catalog/catalog.ts";
 import { ProductRow, RecentlyViewedRow } from "../../catalog/components/index.ts";
 import { CategoryTile } from "../components/index.ts";
 
@@ -19,6 +20,9 @@ export const HomePage = () => {
     queryKey: ["home"],
     queryFn: ({ signal }) => Api.getPublic<HomeView>("/home", signal),
   });
+
+  // The layout asks for the categories on every page already.
+  const categories = useCategories().data ?? [];
 
   const seeAllClass = "text-sm font-medium text-accent underline-offset-2 hover:underline";
   const mosaic = (home.data?.featured ?? []).flatMap((product) => product.images.slice(0, 1)).slice(0, 4);
@@ -67,13 +71,13 @@ export const HomePage = () => {
           <>
             {data.featured.length === 0 ? null : <ProductRow id="featured-heading" title="Featured" products={data.featured} isFirst />}
 
-            {data.categories.length === 0 ? null : (
+            {categories.length === 0 ? null : (
               <section className="space-y-4" aria-labelledby="categories-heading">
                 <h2 className="text-xl font-semibold tracking-tight text-ink" id="categories-heading">
                   Shop by category
                 </h2>
                 <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {data.categories.map((category) => (
+                  {categories.map((category) => (
                     <li key={category.slug}>
                       <CategoryTile category={category} />
                     </li>

@@ -39,7 +39,7 @@ export type CatalogRepository = Readonly<{
    * them first, then the rest, each group best rated first.
    */
   related: (productIds: readonly ProductId[], limit: number) => Promise<readonly ProductSummary[]>;
-  /** The home page's rows and the categories. */
+  /** The home page's rows of products; its categories come from `categories`. */
   home: () => Promise<HomeView>;
   /** Every category with its product count and a picture, by name. */
   categories: () => Promise<readonly CategorySummary[]>;
@@ -339,7 +339,7 @@ export const CatalogRepository = {
         })),
 
       home: async () => {
-        const [featured, topRated, newest, all] = await Promise.all([
+        const [featured, topRated, newest] = await Promise.all([
           summaries(isNotNull(products.featuredAt), [desc(products.featuredAt), asc(products.slug)], CatalogRepository.HOME_ROW),
           // Three reviews at least, so one five-star review does not top the shop.
           summaries(
@@ -348,10 +348,9 @@ export const CatalogRepository = {
             CatalogRepository.HOME_ROW,
           ),
           summaries(undefined, [desc(products.createdAt), asc(products.slug)], CatalogRepository.HOME_ROW),
-          categorySummaries(),
         ]);
 
-        return { featured, topRated, newest, categories: all };
+        return { featured, topRated, newest };
       },
 
       categories: categorySummaries,

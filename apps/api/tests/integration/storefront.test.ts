@@ -205,20 +205,21 @@ describe("the contact form", () => {
 });
 
 describe("the catalog's pages", () => {
-  it("serves the home page's rows and the categories with counts", async () => {
+  it("serves the home page's rows, and the categories with counts on their own", async () => {
     await harness.database.sql`UPDATE product SET featured_at = now() WHERE slug = 'oak-chair'`;
 
     const home = jsonOf(await Shop.call(harness, "GET", "/home")) as {
       featured: { slug: string }[];
       topRated: { slug: string }[];
       newest: unknown[];
-      categories: { slug: string; productCount: number }[];
     };
+    const categories = jsonOf(await Shop.call(harness, "GET", "/categories"))["items"] as { slug: string; productCount: number }[];
 
+    expect(Object.keys(home).sort()).toEqual(["featured", "newest", "topRated"]);
     expect(home.featured.map((product) => product.slug)).toEqual(["oak-chair"]);
     expect(home.topRated.map((product) => product.slug)).toEqual(["diamond-sword"]);
     expect(home.newest).toHaveLength(3);
-    expect(home.categories.map((category) => [category.slug, category.productCount])).toEqual([
+    expect(categories.map((category) => [category.slug, category.productCount])).toEqual([
       ["furniture", 1],
       ["weapons", 2],
     ]);

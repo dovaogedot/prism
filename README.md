@@ -228,7 +228,7 @@ Every route is under `/api/v1` and answers JSON. A refusal is `{ "error": { "cod
 | `GET /auth/oauth/:provider` | Starts a provider sign-in. |
 | `GET /auth/oauth/:provider/callback` | Where the provider returns. |
 | `GET` and `POST /auth/oauth/:provider/consent` | The stand-in's consent page, on localhost when no provider has keys. It sends the code only to the shop's own callback. |
-| `GET /home` | Featured, top-rated and newest products, and the categories. |
+| `GET /home` | Featured, top-rated and newest products. The page takes the categories from `GET /categories`. |
 | `GET /categories` | Every category with its description, product count and a picture. |
 | `GET /products` | Searches the catalog. See the query keys below. |
 | `GET /products/suggest?q=` | Names containing the typed text, those starting with it first, with a thumbnail and the price. |

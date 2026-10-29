@@ -354,5 +354,4 @@ export type HomeView = Readonly<{
   featured: readonly ProductSummary[];
   topRated: readonly ProductSummary[];
   newest: readonly ProductSummary[];
-  categories: readonly CategorySummary[];
 }>;
