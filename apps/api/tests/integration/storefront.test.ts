@@ -95,6 +95,15 @@ describe("the profile and saved addresses", () => {
     expect(jsonOf(created)).toMatchObject({ isDefault: true });
   });
 
+  it("takes the default away when its box is unticked", async () => {
+    const { accessToken } = await registerUser(harness, "mari@example.com");
+    const created = await Shop.call(harness, "POST", "/account/addresses", { token: accessToken }, address());
+
+    const edited = await Shop.call(harness, "PUT", `/account/addresses/${String(jsonOf(created)["id"])}`, { token: accessToken }, address({ isDefault: false }));
+
+    expect(jsonOf(edited)).toMatchObject({ isDefault: false });
+  });
+
   it("will not read, change or delete another customer's address", async () => {
     const owner = await registerUser(harness, "owner@example.com");
     const other = await registerUser(harness, "other@example.com");

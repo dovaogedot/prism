@@ -108,7 +108,8 @@ export const AccountRepository = {
         db.transaction(async (tx) => {
           const [updated] = await tx
             .update(addresses)
-            .set({ details: sealed(input), updatedAt: now })
+            // Unticking the box takes the default away; ticking it moves the default here.
+            .set({ details: sealed(input), updatedAt: now, ...(input.isDefault ? {} : { isDefault: false }) })
             .where(and(eq(addresses.userId, userId), eq(addresses.id, id)))
             .returning({ id: addresses.id });
           if (updated === undefined) return false;
