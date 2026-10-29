@@ -8,7 +8,7 @@ import { Api } from "../../shared/api/client.ts";
 export const useCategories = () =>
   useQuery({
     queryKey: ["categories"],
-    queryFn: ({ signal }) => Api.get<{ items: readonly CategorySummary[] }>("/categories", signal),
+    queryFn: ({ signal }) => Api.getPublic<{ items: readonly CategorySummary[] }>("/categories", signal),
     select: (data) => data.items,
     // The categories change when staff change them, which is rare.
     staleTime: 5 * 60_000,

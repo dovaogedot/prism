@@ -19,7 +19,7 @@ export const RecentlyViewedRow = ({ exclude }: RecentlyViewedRowProps) => {
   const products = useQueries({
     queries: slugs.map((slug) => ({
       queryKey: ["product", slug],
-      queryFn: ({ signal }: Readonly<{ signal: AbortSignal }>) => Api.get<ProductDetail>(`/products/${slug}`, signal),
+      queryFn: ({ signal }: Readonly<{ signal: AbortSignal }>) => Api.getPublic<ProductDetail>(`/products/${slug}`, signal),
       retry: false,
     })),
   });

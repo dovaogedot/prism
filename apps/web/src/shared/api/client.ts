@@ -32,6 +32,8 @@ export type RequestOptions = Readonly<{
   body?: unknown;
   /** False for endpoints where a 401 is the answer, like sign-in. */
   retryOnUnauthorized?: boolean;
+  /** True for a read that is the same for everyone, sent without the token so a browser or a CDN may keep it. */
+  isPublic?: boolean;
   signal?: AbortSignal;
 }>;
 
@@ -86,7 +88,7 @@ export const Api = {
 
     // A form's content type carries its boundary, which the browser writes.
     if (options.body !== undefined && !isForm) headers["content-type"] = "application/json";
-    if (token !== undefined) headers["authorization"] = `Bearer ${token}`;
+    if (token !== undefined && options.isPublic !== true) headers["authorization"] = `Bearer ${token}`;
 
     return fetch(`${Api.BASE}${path}`, {
       method: options.method ?? "GET",
@@ -181,6 +183,10 @@ export const Api = {
 
   get: <A>(path: string, signal?: AbortSignal): Promise<A> =>
     Api.request<A>(path, signal === undefined ? {} : { signal }),
+
+  /** A read that is the same for everyone, such as the catalog, which the browser may keep for a minute whoever is signed in. */
+  getPublic: <A>(path: string, signal?: AbortSignal): Promise<A> =>
+    Api.request<A>(path, signal === undefined ? { isPublic: true } : { isPublic: true, signal }),
 
   post: <A>(path: string, body?: unknown): Promise<A> => Api.request<A>(path, { method: "POST", body }),
 

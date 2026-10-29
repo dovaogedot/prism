@@ -18,7 +18,7 @@ import { CategoryTile } from "../components/CategoryTile.tsx";
 export const HomePage = () => {
   const home = useQuery({
     queryKey: ["home"],
-    queryFn: ({ signal }) => Api.get<HomeView>("/home", signal),
+    queryFn: ({ signal }) => Api.getPublic<HomeView>("/home", signal),
   });
 
   const seeAllClass = "text-sm font-medium text-accent underline-offset-2 hover:underline";

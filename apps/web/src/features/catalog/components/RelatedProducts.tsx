@@ -10,7 +10,7 @@ export type RelatedProductsProps = Readonly<{ slug: string; categoryName: string
 export const RelatedProducts = ({ slug, categoryName }: RelatedProductsProps) => {
   const related = useQuery({
     queryKey: ["product", slug, "related"],
-    queryFn: ({ signal }) => Api.get<{ items: readonly ProductSummary[] }>(`/products/${slug}/related`, signal),
+    queryFn: ({ signal }) => Api.getPublic<{ items: readonly ProductSummary[] }>(`/products/${slug}/related`, signal),
   });
 
   const products = related.data?.items ?? [];

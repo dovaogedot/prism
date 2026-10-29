@@ -37,7 +37,7 @@ export const SearchCombobox = () => {
 
   const suggestions = useQuery({
     queryKey: ["suggest", typed],
-    queryFn: ({ signal }) => Api.get<{ items: readonly Suggestion[] }>(`/products/suggest?q=${encodeURIComponent(typed)}&limit=6`, signal),
+    queryFn: ({ signal }) => Api.getPublic<{ items: readonly Suggestion[] }>(`/products/suggest?q=${encodeURIComponent(typed)}&limit=6`, signal),
     enabled: typed.length >= 2,
     placeholderData: keepPreviousData,
   });

@@ -30,7 +30,7 @@ export const ProductPage = () => {
 
   const product = useQuery({
     queryKey: ["product", slug],
-    queryFn: ({ signal }) => Api.get<ProductDetail>(`/products/${slug}`, signal),
+    queryFn: ({ signal }) => Api.getPublic<ProductDetail>(`/products/${slug}`, signal),
     retry: false,
   });
 

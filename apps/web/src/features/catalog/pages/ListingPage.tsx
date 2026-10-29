@@ -53,7 +53,7 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
 
   const results = useQuery({
     queryKey: ["products", query],
-    queryFn: ({ signal }) => Api.get<ProductSearchResult>(`/products${query.length === 0 ? "" : `?${query}`}`, signal),
+    queryFn: ({ signal }) => Api.getPublic<ProductSearchResult>(`/products${query.length === 0 ? "" : `?${query}`}`, signal),
     placeholderData: keepPreviousData,
   });
 

@@ -137,7 +137,7 @@ export const PaymentMode = {
 export const useShippingOptions = () =>
   useQuery({
     queryKey: ["shipping-methods"],
-    queryFn: async ({ signal }) => (await Api.get<{ items: readonly ShippingOption[] }>("/shipping-methods", signal)).items,
+    queryFn: async ({ signal }) => (await Api.getPublic<{ items: readonly ShippingOption[] }>("/shipping-methods", signal)).items,
     staleTime: 60_000,
   });
 
