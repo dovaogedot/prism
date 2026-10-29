@@ -169,7 +169,7 @@ A declined order releases its stock and mails the reason; the cart keeps its ite
 
 ### Contact and the other pages
 
-- **Contact** (`/contact`): name, email, topic, an optional order number, the message and the CAPTCHA. The support inbox, `SUPPORT_EMAIL`, gets the message with Reply-To set to the sender, and the sender gets a copy. Both land in Mailpit. Nothing is stored.
+- **Contact** (`/contact`): name, email, topic, an optional order number, the message and the CAPTCHA. The support inbox, `SUPPORT_EMAIL`, gets the message with Reply-To set to the sender, and the sender gets a confirmation that repeats nothing they typed, since nobody checked the address is theirs. Both land in Mailpit. When the inbox's mail does not go out, the page says the message was not sent. Nothing is stored.
 - **About**, **FAQ**, **Terms** and **Privacy**, linked from the footer.
 - An address the shop does not know shows a page with a search box and a link home, and answers with status 404.
 
@@ -255,7 +255,7 @@ Every route is under `/api/v1` and answers JSON. A refusal is `{ "error": { "cod
 | `GET /account/profile` | The signed-in customer's name and phone. `PUT` changes them. |
 | `GET /account/addresses` | Their saved addresses. `POST` saves one more. |
 | `PUT /account/addresses/:id` | Changes one; `isDefault: true` makes it the default. `DELETE` deletes it. |
-| `POST /support/messages` | Sends the contact form. Body: `name`, `email`, `topic`, `orderNumber`, `message`, `captchaToken`. |
+| `POST /support/messages` | Sends the contact form. Body: `name`, `email`, `topic`, `orderNumber`, `message`, `captchaToken`. Answers 202 once the support inbox's mail is out, and 503 `MessageNotSent` when it is not. |
 | `GET /seo/robots.txt`, `GET /seo/sitemap.xml` | The crawler files, which the web server serves at `/robots.txt` and `/sitemap.xml`. |
 | `POST /payments/webhook` | Where Stripe reports payments and refunds. Checks Stripe's signature. |
 | `GET /health` | Liveness. |

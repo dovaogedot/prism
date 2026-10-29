@@ -39,7 +39,13 @@ export type MailerOptions = Readonly<{
 }>;
 
 /** A mailer that keeps what it was given, in the order it was given. */
-export type MemoryMailer = Mailer & Readonly<{ sent: readonly OutboundEmail[]; clear: () => void }>;
+export type MemoryMailer = Mailer &
+  Readonly<{
+    sent: readonly OutboundEmail[];
+    /** Makes the next send fail, as an SMTP server that refuses it would. */
+    failNext: () => void;
+    clear: () => void;
+  }>;
 
 export const Mailer = {
   /** Hands messages to an SMTP server. A failure is reported and swallowed. */
@@ -77,15 +83,25 @@ export const Mailer = {
   /** Collects messages in memory so tests can assert on what was sent. */
   memory: (): MemoryMailer => {
     const sent: OutboundEmail[] = [];
+    let shouldFailNext = false;
 
     return {
       sent,
       send: async (email) => {
+        if (shouldFailNext) {
+          shouldFailNext = false;
+          return false;
+        }
+
         sent.push(email);
         return true;
       },
+      failNext: () => {
+        shouldFailNext = true;
+      },
       clear: () => {
         sent.length = 0;
+        shouldFailNext = false;
       },
     };
   },

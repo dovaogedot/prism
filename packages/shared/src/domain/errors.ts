@@ -32,6 +32,8 @@ export type DomainError =
   | Readonly<{ _tag: "OAuthExchangeFailed" }>
   | Readonly<{ _tag: "OAuthProviderUnknown" }>
   | Readonly<{ _tag: "OAuthEmailUnavailable" }>
+  /** The contact message did not reach the support inbox. */
+  | Readonly<{ _tag: "MessageNotSent" }>
   | Readonly<{ _tag: "ProductNotFound" }>
   /** One issue per short product, with the product id as its path. */
   | Readonly<{ _tag: "OutOfStock"; issues: readonly ValidationIssue[] }>
@@ -114,6 +116,7 @@ export const DomainError = {
     OAuthExchangeFailed: 502,
     OAuthProviderUnknown: 404,
     OAuthEmailUnavailable: 422,
+    MessageNotSent: 503,
     ProductNotFound: 404,
     OutOfStock: 409,
     CartEmpty: 409,
@@ -178,6 +181,7 @@ export const DomainError = {
     OAuthExchangeFailed: "That sign-in provider is unavailable right now.",
     OAuthProviderUnknown: "We do not support signing in with that.",
     OAuthEmailUnavailable: "We could not read a verified email address from that account.",
+    MessageNotSent: "We could not send your message right now. Please try again in a few minutes.",
     ProductNotFound: "We could not find that product.",
     OutOfStock: "Some items are not available in the quantity you asked for.",
     CartEmpty: "Your cart is empty.",

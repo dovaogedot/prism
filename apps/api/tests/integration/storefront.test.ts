@@ -154,7 +154,7 @@ describe("the contact form", () => {
     captchaToken: "test-token",
   };
 
-  it("emails the support inbox, with replies going to the sender, and a copy to the sender", async () => {
+  it("emails the support inbox, with replies going to the sender, and a confirmation to the sender", async () => {
     const response = await Shop.call(harness, "POST", "/support/messages", {}, message);
 
     expect(response.statusCode).toBe(202);
@@ -162,11 +162,27 @@ describe("the contact form", () => {
       ["support@prism.test", "mari@example.com"],
       ["mari@example.com", undefined],
     ]);
-    for (const email of harness.mailer.sent) {
-      expect(email.html).not.toContain("<script>");
-      expect(email.html).toContain("&lt;script&gt;");
-      expect(email.text).toContain("Order: 100123");
-    }
+    const [inbox] = harness.mailer.sent;
+    expect(inbox?.html).not.toContain("<script>");
+    expect(inbox?.html).toContain("&lt;script&gt;");
+    expect(inbox?.text).toContain("Order: 100123");
+  });
+
+  it("carries nothing the sender typed to the address they typed, which nobody checked", async () => {
+    await Shop.call(harness, "POST", "/support/messages", {}, { ...message, message: "Click https://phish.example now" });
+
+    const confirmation = harness.mailer.sent.find((email) => email.to === "mari@example.com");
+    expect(`${confirmation?.text}${confirmation?.html}`).not.toMatch(/phish|Maasikas|100123/);
+  });
+
+  it("answers that the message was not sent when the support inbox did not get it", async () => {
+    harness.mailer.failNext();
+
+    const response = await Shop.call(harness, "POST", "/support/messages", {}, message);
+
+    expect(response.statusCode).toBe(503);
+    expect(jsonOf(response)["error"]).toMatchObject({ code: "MessageNotSent" });
+    expect(harness.mailer.sent).toHaveLength(0);
   });
 
   it("needs the CAPTCHA", async () => {

@@ -15,7 +15,7 @@ import { useSession } from "../../auth/session.ts";
 /**
  * The contact form: a name, an email to answer, a topic, the order it is
  * about if any, the message and the CAPTCHA. The message reaches support as
- * an email, and the sender gets a copy; nothing is stored in the shop.
+ * an email, and the sender gets a confirmation; nothing is stored in the shop.
  */
 export const ContactPage = () => {
   const session = useSession();
@@ -106,7 +106,7 @@ export const ContactPage = () => {
         </form>
       ) : (
         <Alert tone="accent" title="Thank you, your message is on its way">
-          We sent a copy to {sentTo}. We answer within two business days.
+          We sent a confirmation to {sentTo}. We answer within two business days.
         </Alert>
       )}
     </div>
