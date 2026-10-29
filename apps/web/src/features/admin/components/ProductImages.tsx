@@ -4,12 +4,10 @@ import { Api } from "../../../shared/api/client.ts";
 import { Alert, Button, Card, ConfirmDialog, Field, ImageSet, Toast } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 import { useAdminWrite } from "../admin.ts";
+import { PictureDrafts, type PictureDraft } from "../picture-drafts.ts";
 
 /** The product the pictures belong to, and its pictures in their order. */
 export type ProductImagesProps = Readonly<{ productId: ProductId; images: readonly ProductImage[] }>;
-
-/** A picture as the list edits it: its id, picture and the text that describes it. */
-type Draft = Readonly<{ image: ProductImage; alt: string }>;
 
 /**
  * A product's pictures: their order, which the first leads, and the text
@@ -18,7 +16,7 @@ type Draft = Readonly<{ image: ProductImage; alt: string }>;
  * camera wrote into it, and makes its smaller copies.
  */
 export const ProductImages = ({ productId, images }: ProductImagesProps) => {
-  const [drafts, setDrafts] = useState<readonly Draft[]>(() => images.map((image) => ({ image, alt: image.alt })));
+  const [drafts, setDrafts] = useState<readonly PictureDraft[]>(() => PictureDrafts.of(images));
 
   const [file, setFile] = useState<File | undefined>(undefined);
 
@@ -32,10 +30,10 @@ export const ProductImages = ({ productId, images }: ProductImagesProps) => {
 
   const [shown, setShown] = useState(images);
 
-  // The server's list replaces the drafts whenever it changes.
+  // A new server list, after an upload or a delete, keeps the unsaved order and texts.
   if (shown !== images) {
     setShown(images);
-    setDrafts(images.map((image) => ({ image, alt: image.alt })));
+    setDrafts(PictureDrafts.merge(drafts, shown, images));
   }
 
   const save = useAdminWrite(() =>
