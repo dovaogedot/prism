@@ -98,7 +98,7 @@ export const CheckoutBody = ({ cart, options, payments, prefill, savedAddresses 
     const failure = Api.failureOf(reason);
 
     if (failure === undefined) {
-      setProblem(Failure.OFFLINE);
+      setProblem(Failure.unrefused(reason));
       return;
     }
 

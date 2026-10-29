@@ -70,7 +70,7 @@ export const CartFailure = {
   /** The sentence for a refused change: the product's own issue, such as "Only 2 left.", when there is one. */
   message: (reason: unknown): string => {
     const failure = Api.failureOf(reason);
-    if (failure === undefined) return Failure.OFFLINE;
+    if (failure === undefined) return Failure.unrefused(reason);
 
     return failure.issues[0]?.message ?? failure.message;
   },

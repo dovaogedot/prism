@@ -23,15 +23,33 @@ import { PrivacyPage } from "../features/pages/pages/PrivacyPage.tsx";
 import { TermsPage } from "../features/pages/pages/TermsPage.tsx";
 import { ContactPage } from "../features/support/pages/ContactPage.tsx";
 import { AdminAccess } from "../features/admin/admin.ts";
+import { ApiError, NetworkError } from "../shared/api/client.ts";
 import { TokenStore } from "../features/auth/token-store.ts";
 import { AdminRoutes } from "./admin-routes.ts";
 import { Root } from "./Root.tsx";
 import "./styles.css";
 
+/** What a failed query or mutation does besides showing it: an API refusal or a lost connection is expected, anything else is logged. */
+const Faults = {
+  log: (reason: unknown): void => {
+    if (!(reason instanceof ApiError) && !(reason instanceof NetworkError)) console.error(reason);
+  },
+} as const;
+
 const queryClient: QueryClient = new QueryClient({
   // A second factor that expires while the admin is open sends staff back to its gate.
-  queryCache: new QueryCache({ onError: (reason, query) => AdminAccess.onFailure(queryClient, reason, query.queryKey) }),
-  mutationCache: new MutationCache({ onError: (reason) => AdminAccess.onFailure(queryClient, reason) }),
+  queryCache: new QueryCache({
+    onError: (reason, query) => {
+      Faults.log(reason);
+      AdminAccess.onFailure(queryClient, reason, query.queryKey);
+    },
+  }),
+  mutationCache: new MutationCache({
+    onError: (reason) => {
+      Faults.log(reason);
+      AdminAccess.onFailure(queryClient, reason);
+    },
+  }),
   defaultOptions: {
     queries: {
       staleTime: 30_000,

@@ -25,6 +25,14 @@ export class ApiError extends Error {
   }
 }
 
+/** A request that got no answer at all: the browser is offline, or the connection was refused or cut. */
+export class NetworkError extends Error {
+  constructor(cause: unknown) {
+    super("The request got no answer.", { cause });
+    this.name = "NetworkError";
+  }
+}
+
 /** What a request may carry beyond its path. */
 export type RequestOptions = Readonly<{
   method?: string;
@@ -97,6 +105,11 @@ export const Api = {
       credentials: "same-origin",
       body: Api.bodyOf(options.body),
       ...(options.signal === undefined ? {} : { signal: options.signal }),
+    }).catch((reason: unknown) => {
+      // A canceled request stays what it is, so the query that canceled it can tell.
+      if (reason instanceof DOMException && reason.name === "AbortError") throw reason;
+
+      throw new NetworkError(reason);
     });
   },
 

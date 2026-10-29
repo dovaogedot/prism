@@ -2,21 +2,35 @@
 
 import type { ValidationIssue } from "@prism/shared";
 import type { ReactNode } from "react";
-import { Api } from "../../../shared/api/client.ts";
+import { Api, NetworkError } from "../../../shared/api/client.ts";
 import { IssueList } from "../../../shared/ui/index.ts";
 
 export const Failure = {
   /** The sentence for a request that never reached the server. */
   OFFLINE: "We could not reach the server. Try again.",
 
+  /** The sentence for anything else that went wrong, which is a fault of the page's own. */
+  UNEXPECTED: "Something went wrong on this page. Reload it and try again.",
+
+  /**
+   * The sentence for a failure that is not the API's refusal: a lost
+   * connection, or a fault of the page's own, which is logged as well.
+   */
+  unrefused: (reason: unknown): string => {
+    if (reason instanceof NetworkError) return Failure.OFFLINE;
+
+    console.error(reason);
+    return Failure.UNEXPECTED;
+  },
+
   /** One sentence for a caught value. */
-  message: (reason: unknown): string => Api.failureOf(reason)?.message ?? Failure.OFFLINE,
+  message: (reason: unknown): string => Api.failureOf(reason)?.message ?? Failure.unrefused(reason),
 
   /** Field issues listed when the server rejected fields; one sentence otherwise. */
   describe: (reason: unknown): ReactNode => {
     const failure = Api.failureOf(reason);
 
-    if (failure === undefined) return Failure.OFFLINE;
+    if (failure === undefined) return Failure.unrefused(reason);
 
     return failure.issues.length > 0 ? <IssueList issues={failure.issues} /> : failure.message;
   },
