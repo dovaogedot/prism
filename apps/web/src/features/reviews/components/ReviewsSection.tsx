@@ -21,7 +21,8 @@ export type ReviewsSectionProps = Readonly<{ slug: string }>;
 export const ReviewsSection = ({ slug }: ReviewsSectionProps) => {
   const session = useSession();
 
-  const { pathname } = useLocation();
+  // A sign-in comes back to the same place, the reviews included when the address named them.
+  const { pathname, hash } = useLocation();
 
   const [sort, setSort] = useState<ReviewSort>("helpful");
 
@@ -53,7 +54,7 @@ export const ReviewsSection = ({ slug }: ReviewsSectionProps) => {
             .with({ session: undefined }, () => (
               <p className="text-sm text-ink-soft">
                 Bought it?{" "}
-                <Link className="font-medium text-accent underline underline-offset-2" to={`/login${NextPath.query(pathname)}`}>
+                <Link className="font-medium text-accent underline underline-offset-2" to={`/login${NextPath.query(`${pathname}${hash}`)}`}>
                   Sign in
                 </Link>{" "}
                 to write a review.

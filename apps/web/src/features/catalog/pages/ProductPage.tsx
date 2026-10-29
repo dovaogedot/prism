@@ -1,7 +1,8 @@
 import { Price, type ProductDetail } from "@prism/shared";
 import { useQuery } from "@tanstack/react-query";
-import { Fragment, useEffect } from "react";
-import { Link, useParams } from "react-router";
+import { Fragment, useEffect, useRef } from "react";
+import { Link, useLocation, useNavigationType, useParams } from "react-router";
+import { HashTarget } from "../../../shared/layout/hash-target.ts";
 import { match, P } from "ts-pattern";
 import { Api, ApiError } from "../../../shared/api/client.ts";
 import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
@@ -37,6 +38,25 @@ export const ProductPage = () => {
   useRelatedProducts(slug);
 
   const shown = product.data?.slug;
+
+  const location = useLocation();
+
+  const navigationType = useNavigationType();
+
+  /** The navigation whose hash was brought into view, so each one is, once. */
+  const revealedFor = useRef<string | undefined>(undefined);
+
+  // A followed link to a part of the page, such as a mail's link to the
+  // reviews, brings that part into view once the product has rendered it.
+  useEffect(() => {
+    if (shown === undefined || revealedFor.current === location.key || !HashTarget.isFollowed(navigationType, location.key)) return;
+
+    const target = HashTarget.find(location.hash);
+    if (target === null) return;
+
+    revealedFor.current = location.key;
+    target.scrollIntoView({ block: "start" });
+  }, [shown, location.hash, location.key, navigationType]);
 
   useEffect(() => {
     if (shown !== undefined) {
