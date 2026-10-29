@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
+import { PageHeading } from "./page-heading.ts";
 
 /**
  * Keeping focus on a newly opened page's heading while the page loads. A
@@ -12,14 +13,6 @@ const Settling = {
   /** How long the title has to stay the same before it is read out, so a loading title is skipped. */
   QUIET_MS: 400,
 
-  heading: (): HTMLElement | null => document.querySelector<HTMLElement>("main h1"),
-
-  focus: (heading: HTMLElement): void => {
-    // Not scrolled to: the page decides where it opens, and Back restores where it was.
-    heading.tabIndex = -1;
-    heading.focus({ preventScroll: true });
-  },
-
   /**
    * Moves focus to the page's h1, and calls `announce` with the page's title
    * once the title has stayed the same for a moment. While the page settles,
@@ -30,12 +23,13 @@ const Settling = {
     const state: { focused: HTMLElement | undefined; quiet: number | undefined } = { focused: undefined, quiet: undefined };
 
     const refocus = (): void => {
-      const heading = Settling.heading();
+      const heading = PageHeading.find();
       if (heading === null || heading === state.focused) return;
 
+      // A heading counts as focused only once focus has landed on it, so one
+      // behind the closing drawer is tried again.
       const isFocusLost = state.focused === undefined || (!state.focused.isConnected && document.activeElement === document.body);
-      if (isFocusLost) {
-        Settling.focus(heading);
+      if (isFocusLost && PageHeading.focus(heading)) {
         state.focused = heading;
       }
     };

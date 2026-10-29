@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, ScrollRestoration, useLocation } from "react-router";
+import { PageHeading } from "../seo/page-heading.ts";
 import { RouteAnnouncer } from "../seo/RouteAnnouncer.tsx";
 import { Toaster } from "../ui/index.ts";
 import { Drawer, type Drawer as DrawerHandle } from "./drawer.ts";
@@ -68,7 +69,15 @@ export const Layout = () => {
     slot?.querySelector<HTMLElement>("input, select, button, a[href]")?.focus({ preventScroll: true });
   }, [open, slot]);
 
-  useEffect(close, [wide, pathname, close]);
+  // Whether the open drawer is closing because a link in it opened another page.
+  const isClosingForPage = useRef(false);
+
+  useEffect(() => {
+    isClosingForPage.current = dialog.current?.open === true;
+    close();
+  }, [pathname, close]);
+
+  useEffect(close, [wide, close]);
 
   const drawer: DrawerHandle = useMemo(() => ({ slot, open, openAtSlot }), [slot, open, openAtSlot]);
 
@@ -98,6 +107,16 @@ export const Layout = () => {
           onCancel={(event) => {
             event.preventDefault();
             close();
+          }}
+          // Closing hands focus back to the menu button; after a link in the
+          // drawer, the new page's heading takes it instead, as on any other
+          // page change.
+          onClose={() => {
+            const heading = PageHeading.find();
+            if (isClosingForPage.current && heading !== null) {
+              PageHeading.focus(heading);
+            }
+            isClosingForPage.current = false;
           }}
         >
           <div className="flex h-full flex-col">
