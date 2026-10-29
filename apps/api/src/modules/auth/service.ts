@@ -1,7 +1,9 @@
 /**
  * Authentication domain logic over ports. No adapter is imported here, which
  * is what lets tests run the real logic against fakes. Every operation
- * returns `ResultAsync<T, DomainError>`; nothing throws.
+ * returns `ResultAsync<T, DomainError>`, whose error is a failure the domain
+ * names; a failure underneath, such as a lost database, rejects instead and
+ * reaches the error handler as a logged 500.
  */
 
 import {

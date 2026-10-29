@@ -6,7 +6,7 @@
 
 import { and, eq, getTableColumns, gt, isNull, lt, or, sql } from "drizzle-orm";
 import { Email, type DomainError, type OAuthProvider, type SessionUser, type StaffRole, type UserId } from "@prism/shared";
-import { errAsync, okAsync, ResultAsync } from "neverthrow";
+import { err, ok, ResultAsync, type Result } from "neverthrow";
 import type { Database, Transaction } from "../../db/client.ts";
 import type { SessionId } from "../../db/ids.ts";
 import {
@@ -260,8 +260,9 @@ export const AuthRepository = {
       },
 
       // Detected rather than pre-checked: SELECT-then-INSERT races, a unique index does not.
+      // A taken address is the one failure the domain names; any other rejects, so it is logged as a 500.
       createUser: ({ email, passwordHash }) =>
-        ResultAsync.fromPromise(
+        new ResultAsync(
           db
             .insert(users)
             .values({
@@ -269,17 +270,18 @@ export const AuthRepository = {
               emailIndex: cipher.index("account-email", email),
               passwordHash: passwordHash ?? null,
             })
-            .returning(),
-          (reason): DomainError =>
-            AuthRepository.isUniqueViolation(reason)
-              ? { _tag: "EmailAlreadyRegistered" }
-              : { _tag: "Conflict" },
-        ).andThen((rows) => {
-          const created = firstUser(rows.map((row) => ({ ...row, providers: [] })));
-          return created === undefined
-            ? errAsync<UserRecord, DomainError>({ _tag: "Conflict" })
-            : okAsync<UserRecord, DomainError>(created);
-        }),
+            .returning()
+            .then((rows): Result<UserRecord, DomainError> => {
+              const created = firstUser(rows.map((row) => ({ ...row, providers: [] })));
+              if (created === undefined) throw new Error("user insert returned no row");
+
+              return ok(created);
+            })
+            .catch((reason: unknown): Result<UserRecord, DomainError> => {
+              if (AuthRepository.isUniqueViolation(reason)) return err({ _tag: "EmailAlreadyRegistered" });
+              throw reason;
+            }),
+        ),
 
       linkOAuthIdentity: async ({ userId, provider, subject }) => {
         await db
