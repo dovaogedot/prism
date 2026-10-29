@@ -147,7 +147,7 @@ Stripe's test cards, with any future expiry and any CVC:
 | `4000 0000 0000 3220` | Asks for 3D Secure; approve or fail it |
 | `4242 4242 4242 4241` | Refused by the card field before submission: invalid number |
 
-A declined order releases its stock and mails the reason; the cart keeps its items, so "Place order" again tries another card. To see a gateway timeout, set `STRIPE_TIMEOUT_MS=1` in `.env`, run `docker compose up -d api`, and place an order.
+A declined order releases its stock and mails the reason; the cart keeps its items, so "Place order" again tries another card. When the answer to a payment is lost on the way, the page opens the order instead, which shows where the payment stands. To see a gateway timeout, set `STRIPE_TIMEOUT_MS=1` in `.env`, run `docker compose up -d api`, and place an order.
 
 ### Orders
 

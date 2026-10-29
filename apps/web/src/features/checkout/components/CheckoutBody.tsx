@@ -167,14 +167,16 @@ export const CheckoutBody = ({ cart, options, payments, prefill, savedAddresses 
         redirect: "if_required",
         confirmParams: { return_url: `${window.location.origin}${target}` },
       })
-      .catch(() => ({ error: { type: "api_connection_error" } }));
+      .catch(() => undefined);
 
-    if (confirmed.error !== undefined) {
+    if (confirmed?.error !== undefined && PaymentErrors.isRefusal(confirmed.error)) {
       // The order stays unpaid; Stripe tells the server, which releases the stock and emails.
       setPaymentError(`${PaymentErrors.messageOf(confirmed.error)} Place the order again to retry.`);
       return;
     }
 
+    // Paid, or not known when the confirmation was lost on the way: the order
+    // page shows where the payment stands, so nobody pays for a second order.
     void navigate(target);
   });
 

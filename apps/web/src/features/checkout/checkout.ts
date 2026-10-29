@@ -47,6 +47,14 @@ export const PaymentErrors = {
 
     return PaymentFailure.message.gateway_error;
   },
+
+  /**
+   * Whether a failed confirmation is a refusal Stripe answered: the card was
+   * declined, its check failed, or a field was wrong. The order is then known
+   * to be unpaid. Any other failure leaves the payment's state unknown.
+   */
+  isRefusal: (error: StripeFailure): boolean =>
+    error.type === "card_error" || error.type === "validation_error" || error.code === "payment_intent_authentication_failure",
 } as const;
 
 /** A form path the checkout renders a field for. */

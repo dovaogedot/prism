@@ -39,6 +39,20 @@ describe("PaymentErrors.messageOf", () => {
   });
 });
 
+describe("PaymentErrors.isRefusal", () => {
+  it("knows the order is unpaid only when Stripe refused the card or a field", () => {
+    expect(PaymentErrors.isRefusal({ type: "card_error", code: "card_declined" })).toBe(true);
+    expect(PaymentErrors.isRefusal({ type: "validation_error", code: "incomplete_cvc" })).toBe(true);
+    expect(PaymentErrors.isRefusal({ type: "invalid_request_error", code: "payment_intent_authentication_failure" })).toBe(true);
+  });
+
+  it("leaves a lost connection or a provider fault unknown", () => {
+    expect(PaymentErrors.isRefusal({ type: "api_connection_error" })).toBe(false);
+    expect(PaymentErrors.isRefusal({ type: "api_error" })).toBe(false);
+    expect(PaymentErrors.isRefusal({ type: "rate_limit_error" })).toBe(false);
+  });
+});
+
 describe("CheckoutIssues.split", () => {
   it("puts each issue on its field, and keeps the rest for the page", () => {
     expect(
