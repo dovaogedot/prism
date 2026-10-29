@@ -109,7 +109,8 @@ export const OrderSort = {
 
 /** A calendar day as `YYYY-MM-DD`. */
 export const CalendarDay = {
-  schema: z.iso.date("Enter a date as YYYY-MM-DD."),
+  // Postgres has no year 0, which the ISO format allows.
+  schema: z.iso.date("Enter a date as YYYY-MM-DD.").refine((day) => !day.startsWith("0000"), "Enter a year from 1 on."),
 } as const;
 
 /** The query string of `GET /orders`. Both ends of the date range count. */

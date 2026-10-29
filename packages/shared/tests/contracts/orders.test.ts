@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OrderQueryParams, OrderStatus } from "../../src/contracts/orders.ts";
+import { CalendarDay, OrderQueryParams, OrderStatus } from "../../src/contracts/orders.ts";
 
 describe("OrderQueryParams", () => {
   it("applies defaults to an empty query string", () => {
@@ -38,5 +38,13 @@ describe("OrderStatus", () => {
 
   it("labels every status", () => {
     for (const status of OrderStatus.NAMES) expect(OrderStatus.label[status].length, status).toBeGreaterThan(0);
+  });
+});
+
+describe("CalendarDay", () => {
+  it("takes a day from the year 1 on, which Postgres can store", () => {
+    expect(CalendarDay.schema.safeParse("2026-10-29").success).toBe(true);
+    expect(CalendarDay.schema.safeParse("0001-01-01").success).toBe(true);
+    expect(CalendarDay.schema.safeParse("0000-01-01").success).toBe(false);
   });
 });
