@@ -45,7 +45,7 @@ The storefront answers HTTPS only, with a self-signed certificate that the web c
 | Demo shopper | `shopper@prism.test` / `correct horse battery staple` |
 | Admin | `ADMIN_EMAIL` / `ADMIN_PASSWORD` from `.env`, and a code from `ADMIN_TOTP_SECRET` |
 
-The API makes the admin at start when no account holds the admin role, with 2FA already on. `.env.example` sets `admin@prism.shop`, `admin-prism-admin` and the key `CFBNJ5LGD7BVFZHEQTQTFJR5CQCI6KYS`. Type the key into an authenticator app, where it is often called a setup key, then sign in with the password and the app's code. Once an admin exists, the three values change nothing.
+The API makes the admin at start when no account holds the admin role: a new account with 2FA already on, or the existing account with that address, which keeps its own password and 2FA and, without 2FA, sets it up before the admin opens. `.env.example` sets `admin@prism.shop`, `admin-prism-admin` and the key `CFBNJ5LGD7BVFZHEQTQTFJR5CQCI6KYS`. Type the key into an authenticator app, where it is often called a setup key, then sign in with the password and the app's code. Once an admin exists, the three values change nothing.
 
 On localhost the stack runs with no external accounts: the CAPTCHA uses Google's always-pass test key, the provider buttons go to a built-in stand-in, and mail lands in Mailpit. Where `PUBLIC_WEB_URL` is not on localhost, the API refuses to start without `RECAPTCHA_SECRET_KEY`, and a provider without its key pair has no button. Real keys go in `.env`; `.env.example` describes each one. Its `JWT_SECRET`, `DATA_ENCRYPTION_KEY` and admin values are public, so replace them anywhere but your own machine.
 

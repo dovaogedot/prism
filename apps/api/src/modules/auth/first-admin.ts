@@ -1,10 +1,10 @@
 /**
  * The shop's first admin, from the environment. When no account holds the
- * admin role, the account named by `ADMIN_EMAIL` gets it: an existing
- * account keeps its own password and 2FA, and a new one is created with
- * `ADMIN_PASSWORD` and with 2FA already on under `ADMIN_TOTP_SECRET`, so the
- * admin never exists without a second factor. Once an admin exists, the
- * variables change nothing.
+ * admin role, the account named by `ADMIN_EMAIL` gets it. A new one is
+ * created with `ADMIN_PASSWORD` and with 2FA already on under
+ * `ADMIN_TOTP_SECRET`. An existing account keeps its own password and 2FA;
+ * one without 2FA is asked to set it up before the admin opens, like every
+ * staff account. Once an admin exists, the variables change nothing.
  */
 
 import type { FirstAdminSettings } from "../../config.ts";
