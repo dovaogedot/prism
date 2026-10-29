@@ -140,7 +140,8 @@ export const useCartChanges = () => {
       if (isLastQuantityChange()) void client.invalidateQueries({ queryKey: key });
     },
     onSuccess: (view) => {
-      if (isLastQuantityChange()) CartCache.settle(client, userId, view);
+      // A new quantity keeps the same products, so the recommendations stand.
+      if (isLastQuantityChange()) client.setQueryData(key, view);
     },
   });
 
