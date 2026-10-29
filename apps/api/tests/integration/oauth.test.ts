@@ -352,6 +352,21 @@ describe("adding a password to a provider account", () => {
     expect(jsonOf(login)["status"]).toBe("authenticated");
   });
 
+  it("ends every other session of the account, and keeps the one that changed it", async () => {
+    const { accessToken: other } = await registerUser(harness, "two-sessions@example.com");
+    const login = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      payload: { email: "two-sessions@example.com", password: VALID_PASSWORD },
+    });
+    const current = String((jsonOf(login)["grant"] as { accessToken: string }).accessToken);
+
+    expect((await setPassword(current, `${VALID_PASSWORD}-again`, VALID_PASSWORD)).statusCode).toBe(200);
+
+    const me = (token: string) => harness.app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: `Bearer ${token}` } });
+    expect([(await me(other)).statusCode, (await me(current)).statusCode]).toEqual([401, 200]);
+  });
+
   it("rejects a weak password", async () => {
     const token = await tokenFor("weak@example.com");
     expect((await setPassword(token, "password")).statusCode).toBe(422);

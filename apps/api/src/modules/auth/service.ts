@@ -373,8 +373,8 @@ export const AuthService = {
       /**
        * An account with a password must prove it knows the old one, so a
        * stolen session cannot lock the owner out; an account created through a
-       * provider has nothing to prove. Other sessions are left alone: the
-       * reset-by-email flow is the one that assumes compromise.
+       * provider has nothing to prove. Every other session ends, so a session
+       * that someone else holds stops with the old password.
        */
       changePassword: ({ userId, session, currentPassword, password }) =>
         requireUser(userId, { _tag: "Unauthenticated" }).andThen((user) => {
@@ -390,7 +390,7 @@ export const AuthService = {
               ? errAsync<SessionUser, DomainError>({ _tag: "InvalidCredentials" })
               : ResultAsync.fromSafePromise(
                   hasher.hash(password).then(async (passwordHash) => {
-                    await repository.setPasswordHash(userId, passwordHash);
+                    await repository.setPasswordHash(userId, passwordHash, session.id, clock.now());
                     return UserRecord.toSessionUser({ ...user, passwordHash }, isRecent(session.secondFactorAt));
                   }),
                 ),

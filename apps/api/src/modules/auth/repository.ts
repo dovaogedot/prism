@@ -4,7 +4,7 @@
  * nothing above this file sees `null` or ciphertext.
  */
 
-import { and, eq, getTableColumns, gt, isNull, lt, or, sql } from "drizzle-orm";
+import { and, eq, getTableColumns, gt, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { Email, type DomainError, type OAuthProvider, type SessionUser, type StaffRole, type UserId } from "@prism/shared";
 import { err, ok, ResultAsync, type Result } from "neverthrow";
 import type { Database, Transaction } from "../../db/client.ts";
@@ -125,7 +125,8 @@ export type AuthRepository = Readonly<{
   findUserByOAuthIdentity: (provider: OAuthProvider, subject: ProviderSubject) => Promise<UserRecord | undefined>;
   createUser: (input: { email: Email; passwordHash?: PasswordHash }) => ResultAsync<UserRecord, DomainError>;
   linkOAuthIdentity: (input: { userId: UserId; provider: OAuthProvider; subject: ProviderSubject }) => Promise<void>;
-  setPasswordHash: (userId: UserId, passwordHash: PasswordHash) => Promise<void>;
+  /** Stores a new password and ends every other session of the account, in one transaction. */
+  setPasswordHash: (userId: UserId, passwordHash: PasswordHash, keep: SessionId, now: Date) => Promise<void>;
   setTotpSecret: (userId: UserId, secret: TotpSecret) => Promise<void>;
   enableTotp: (userId: UserId, enabledAt: Date) => Promise<void>;
   /**
@@ -295,9 +296,14 @@ export const AuthRepository = {
           .onConflictDoNothing();
       },
 
-      setPasswordHash: async (userId, passwordHash) => {
-        await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
-      },
+      setPasswordHash: (userId, passwordHash, keep, now) =>
+        db.transaction(async (tx) => {
+          await tx.update(users).set({ passwordHash }).where(eq(users.id, userId));
+          await tx
+            .update(sessions)
+            .set({ revokedAt: now, revokedReason: "password_change" })
+            .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt), ne(sessions.id, keep)));
+        }),
 
       acceptTotpStep: async (userId, step) => {
         const accepted = await db

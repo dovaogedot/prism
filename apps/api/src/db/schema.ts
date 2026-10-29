@@ -138,7 +138,8 @@ export type RevocationReason =
   | "password_reset"
   | "account_disabled"
   | "signed_out_by_staff"
-  | "two_factor_reset";
+  | "two_factor_reset"
+  | "password_change";
 
 /**
  * A session is both the revocation unit and the refresh-token family. The
