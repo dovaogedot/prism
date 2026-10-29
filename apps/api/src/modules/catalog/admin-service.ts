@@ -183,13 +183,14 @@ export const CatalogAdminService = {
 
       importFile: (actor, file, dryRun) => {
         const parsed = ImportFile.parse(file);
+        // A file with problems is only checked, so its references are named in the same answer.
+        const isCheckOnly = dryRun || parsed.issues.length > 0;
 
-        // The references are checked even when the file has other problems, so one pass names them all.
-        return ResultAsync.fromSafePromise(repository.importProducts(parsed.rows, true, actor, clock.now())).andThen((checked) => {
-          const issues = [...parsed.issues, ...(checked._tag === "Invalid" ? checked.issues : [])].toSorted(
+        return ResultAsync.fromSafePromise(repository.importProducts(parsed.rows, isCheckOnly, actor, clock.now())).andThen((outcome) => {
+          const issues = [...parsed.issues, ...(outcome._tag === "Invalid" ? outcome.issues : [])].toSorted(
             (a, b) => a.row - b.row || a.column.localeCompare(b.column),
           );
-          const counts = checked._tag === "Imported" ? checked : { created: 0, updated: 0 };
+          const counts = outcome._tag === "Imported" ? outcome : { created: 0, updated: 0 };
 
           if (dryRun) {
             return okAsync<ImportReport, DomainError>({ dryRun, created: counts.created, updated: counts.updated, issues });
@@ -201,12 +202,7 @@ export const CatalogAdminService = {
             });
           }
 
-          return ResultAsync.fromSafePromise(repository.importProducts(parsed.rows, false, actor, clock.now())).map((written) => ({
-            dryRun,
-            created: written._tag === "Imported" ? written.created : 0,
-            updated: written._tag === "Imported" ? written.updated : 0,
-            issues: [],
-          }));
+          return okAsync<ImportReport, DomainError>({ dryRun, created: counts.created, updated: counts.updated, issues: [] });
         });
       },
 

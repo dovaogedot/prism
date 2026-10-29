@@ -291,6 +291,11 @@ describe("bulk import", () => {
     const dry = jsonOf(await importFile(unknown, "lamps.csv", true));
 
     expect(dry["issues"]).toEqual([{ row: 2, column: "category", message: "No category has this slug." }]);
+
+    const real = await importFile(unknown, "lamps.csv", false);
+
+    expect(jsonOf(real)["error"]).toMatchObject({ code: "ImportInvalid", issues: [{ path: "2:category" }] });
+    expect(await harness.database.sql`SELECT count(*)::int AS n FROM product`).toEqual([{ n: 1 }]);
   });
 
   it("refuses 5,001 rows and a 3 MB file", async () => {

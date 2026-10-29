@@ -84,7 +84,8 @@ export type CatalogAdminRepository = Readonly<{
   /**
    * Checks the rows against the database: every category and brand must
    * exist. With `dryRun` it only counts; otherwise it writes every row, each
-   * slug creating or updating its product, in one transaction.
+   * slug creating or updating its product. The check and the writes are one
+   * transaction, so what was checked is what is written.
    */
   importProducts: (rows: readonly Readonly<{ row: number; product: ImportRow }>[], dryRun: boolean, actor: StaffActor, now: Date) => Promise<ImportOutcome>;
   /** The product's pictures in order; `undefined` when there is no such product. */
@@ -472,29 +473,34 @@ export const CatalogAdminRepository = {
           return { _tag: "Deleted" };
         }),
 
-      importProducts: async (rows, dryRun, actor, now) => {
-        const slugsOf = (pick: (product: ImportRow) => Slug) => [...new Set(rows.map((entry) => pick(entry.product)))];
-        const [categoryRows, brandRows, existing] = await Promise.all([
-          rows.length === 0 ? [] : db.select({ id: categories.id, slug: categories.slug }).from(categories).where(inArray(categories.slug, slugsOf((product) => product.category))),
-          rows.length === 0 ? [] : db.select({ id: brands.id, slug: brands.slug }).from(brands).where(inArray(brands.slug, slugsOf((product) => product.brand))),
-          rows.length === 0 ? [] : db.select({ slug: products.slug }).from(products).where(inArray(products.slug, slugsOf((product) => product.slug))),
-        ]);
-        const categoryIds = new Map(categoryRows.map((row) => [row.slug, row.id]));
-        const brandIds = new Map(brandRows.map((row) => [row.slug, row.id]));
-        const known = new Set(existing.map((row) => row.slug));
+      importProducts: (rows, dryRun, actor, now) =>
+        db.transaction(async (tx): Promise<ImportOutcome> => {
+          const slugsOf = (pick: (product: ImportRow) => Slug) => [...new Set(rows.map((entry) => pick(entry.product)))];
+          // Shared locks keep every category and brand the file names from being deleted or changed until the rows are written.
+          const [categoryRows, brandRows, existing] = await Promise.all([
+            rows.length === 0
+              ? []
+              : tx.select({ id: categories.id, slug: categories.slug }).from(categories).where(inArray(categories.slug, slugsOf((product) => product.category))).for("share"),
+            rows.length === 0
+              ? []
+              : tx.select({ id: brands.id, slug: brands.slug }).from(brands).where(inArray(brands.slug, slugsOf((product) => product.brand))).for("share"),
+            rows.length === 0 ? [] : tx.select({ slug: products.slug }).from(products).where(inArray(products.slug, slugsOf((product) => product.slug))),
+          ]);
+          const categoryIds = new Map(categoryRows.map((row) => [row.slug, row.id]));
+          const brandIds = new Map(brandRows.map((row) => [row.slug, row.id]));
+          const known = new Set(existing.map((row) => row.slug));
 
-        const issues: ImportIssue[] = [];
-        for (const { row, product: candidate } of rows) {
-          if (!categoryIds.has(candidate.category)) issues.push({ row, column: "category", message: "No category has this slug." });
-          if (!brandIds.has(candidate.brand)) issues.push({ row, column: "brand", message: "No brand has this slug." });
-        }
-        if (issues.length > 0) return { _tag: "Invalid", issues };
+          const issues: ImportIssue[] = [];
+          for (const { row, product: candidate } of rows) {
+            if (!categoryIds.has(candidate.category)) issues.push({ row, column: "category", message: "No category has this slug." });
+            if (!brandIds.has(candidate.brand)) issues.push({ row, column: "brand", message: "No brand has this slug." });
+          }
+          if (issues.length > 0) return { _tag: "Invalid", issues };
 
-        const updated = rows.filter((entry) => known.has(entry.product.slug)).length;
-        const created = rows.length - updated;
-        if (dryRun) return { _tag: "Imported", created, updated };
+          const updated = rows.filter((entry) => known.has(entry.product.slug)).length;
+          const created = rows.length - updated;
+          if (dryRun) return { _tag: "Imported", created, updated };
 
-        await db.transaction(async (tx) => {
           for (const { product: candidate } of rows) {
             const categoryId = categoryIds.get(candidate.category);
             const brandId = brandIds.get(candidate.brand);
@@ -531,10 +537,9 @@ export const CatalogAdminRepository = {
             target: { type: "product" },
             summary: `Imported ${rows.length === 1 ? "1 product" : `${rows.length} products`}: ${created} new, ${updated} updated`,
           });
-        });
 
-        return { _tag: "Imported", created, updated };
-      },
+          return { _tag: "Imported", created, updated };
+        }),
 
       imagesOf: async (productId) => {
       const [product] = await db.select({ id: products.id }).from(products).where(eq(products.id, productId));
