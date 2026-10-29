@@ -10,9 +10,10 @@
   "type": "module",
   "scripts": {
     "build": "npm run build --workspace @prism/shared",
-    "typecheck": "npm run build && npm run typecheck --workspaces --if-present && tsc -p loadtest",
+    "typecheck": "npm run build && npm run typecheck --workspaces --if-present && tsc -p loadtest && tsc -p requirements",
     "test": "npm run build && npm run test --workspaces --if-present",
     "test:unit": "npm run build && npm run test:unit --workspaces --if-present",
+    "test:requirements": "npm run build && vitest run --root requirements",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "lint": "oxlint --deny-warnings"

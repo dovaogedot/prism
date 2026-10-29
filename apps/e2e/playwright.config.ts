@@ -7,7 +7,11 @@
 import { defineConfig } from "@playwright/test"
 
 export default defineConfig({
-  testDir: "./tests",
+  // The suite's own specs, and the requirement checks that need a browser.
+  projects: [
+    { name: "suite", testDir: "./tests" },
+    { name: "requirements", testDir: "../../requirements", testMatch: "**/*.spec.ts" },
+  ],
   timeout: 90_000,
   expect: { timeout: 10_000 },
   // Two at a time: the stack is small, and the admin's tests share one session.

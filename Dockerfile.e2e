@@ -15,6 +15,7 @@ COPY apps/e2e/package.json ./apps/e2e/
 RUN npm ci --workspace @prism/e2e
 
 COPY apps/e2e ./apps/e2e
+COPY requirements ./requirements
 WORKDIR /app/apps/e2e
 
 CMD ["npx", "playwright", "test"]
