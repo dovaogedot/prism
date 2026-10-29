@@ -41,6 +41,14 @@ export const OrderPage = () => {
 
   const status = order.data?.status;
 
+  // Polling ends at the limit with nothing new to show, so a timer renders the page once more, past its watch.
+  const [isWatchOver, setWatchOver] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setWatchOver(true), OrderPolling.LIMIT_MS - (Date.now() - startedAt));
+    return () => window.clearTimeout(timer);
+  }, [startedAt]);
+
   // A settled payment takes the bought items out of the cart on the server.
   useEffect(() => {
     if (placed && status !== undefined && status !== "pending_payment") void client.invalidateQueries({ queryKey: ["cart"] });
@@ -78,7 +86,7 @@ export const OrderPage = () => {
         .otherwise(({ data }) => (
           <>
             {placed ? (
-              <OrderConfirmation order={data} watching={OrderPolling.watching(data.status, startedAt, Date.now())} />
+              <OrderConfirmation order={data} watching={!isWatchOver && OrderPolling.watching(data.status, startedAt, Date.now())} />
             ) : null}
 
             <header className="flex flex-wrap items-center justify-between gap-3">
