@@ -353,7 +353,7 @@ Each user follows one scenario with 1 to 3 seconds between steps: browse (home, 
 | `peak` | 50 users for 5 minutes | the same, and at least 10 transactions per second |
 | `stress` | 25, 50, 100, 150, 200, 300, 400, 500, 600, 800 and 1,000 users, each step held for a minute | stops when p95 over the whole run passes 5 s or errors pass 5% |
 
-`./start.sh loadtest <run>` starts and seeds `prism-load` if needed, gives every product a million in stock so that checkouts never sell out, runs one run, and leaves in `loadtest/results/` the k6 summary, the CPU and memory samples, Postgres's costliest statements, and `<run>.md`: the tables of the run, which it also prints. For the stress run they include the users, p95 and errors of each half-minute, and the most users served with p95 under 5 seconds. A run loads the machine heavily, so run them one at a time. `./start.sh loadtest down` removes the stack.
+`./start.sh loadtest <run>` starts and seeds `prism-load` if needed, gives every product a million in stock so that checkouts never sell out, runs one run, and leaves in `loadtest/results/` the k6 summary, the CPU and memory samples, Postgres's costliest statements, and `<run>.md`: the tables of the run, which it also prints. For the stress run they include the p95 and errors of each step's ramp and of its held minute, and the most users a held minute served with p95 under 5 seconds. A run loads the machine heavily, so run them one at a time. `./start.sh loadtest down` removes the stack.
 
 ### Results
 
@@ -368,18 +368,18 @@ Measured on an Intel Core i5-12400F (6 cores, 12 threads) under WSL2, with k6 on
 
 Every run passes its thresholds. A CPU figure of 100% is one core, and the API and Postgres may use two each. The stress run's rates are averages over all its steps, the slow start included.
 
-**Most users before 5 seconds.** The stress run's p95 in each half-minute held at a step:
+**Most users before 5 seconds.** The stress run's p95 over the minute held at each step:
 
 | Users | p95 |
 | --- | --- |
 | 25 to 300 | 14 to 24 ms |
-| 400 | 0.5 to 1.1 s |
-| 500 | 1.6 to 2.3 s |
-| 600 | 3.4 to 3.5 s |
-| 800 | 4.8 to 5.6 s |
-| 1,000 | 7.0 to 8.6 s |
+| 400 | 1.0 s |
+| 500 | 2.2 s |
+| 600 | 3.5 s |
+| 800 | 5.4 s |
+| 1,000 | 7.7 s |
 
-600 users stay under 5 seconds for a whole step, and 800 is the edge: one half-minute at 800 users had p95 at 4.8 s, the next at 5.6 s. The report's rule, the most users of any half-minute with p95 under 5 seconds, gives 800. No request failed, even at 1,000 users.
+600 users stay under 5 seconds for the whole minute held at their step, and 800 do not. The report's rule, the most users of any held minute with p95 under 5 seconds and errors under 5%, gives 600; the ramp to a step never counts, since it spends most of its time below the step's users. No request failed, even at 1,000 users.
 
 **Throughput** levels off from 400 users on, at 238 to 274 requests a second in each half-minute, as Postgres reaches its CPU limit. The best half-minute served 274 requests and 184 transactions a second, at 500 users.
 
@@ -391,11 +391,11 @@ Every run passes its thresholds. A CPU figure of 100% is one core, and the API a
 | --- | --- | --- | --- | --- |
 | Ratings | Every listing, sort and facet averaged the approved reviews of each product it read | `product.rating_average` and `rating_count`, which a trigger keeps (see [Design notes](#design-notes)) | Peak run: the rating facet 15.1 ms a call, listing reads 11 to 20 ms | 2.7 ms, and 1.5 to 4.0 ms |
 | Category pictures | `/home` and `/categories` sorted every product and picture of a category to find one picture | The index `product_category_shelf_idx`, read in order up to the first product with a picture | Stress run: the category list 122 ms a call | 14 ms, and 0.65 ms with JIT off too |
-| JIT compilation | Postgres compiled short queries before running them: the category list, planned at 580 rows for a three-row table, spent 8.5 ms of its 20.9 ms compiling | JIT off in the API's sessions (see [Design notes](#design-notes)) | p95 at 400 users 1.8 to 2.3 s; Postgres's CPU at peak 67% | 0.5 to 1.1 s; 57% |
+| JIT compilation | Postgres compiled short queries before running them: the category list, planned at 580 rows for a three-row table, spent 8.5 ms of its 20.9 ms compiling | JIT off in the API's sessions (see [Design notes](#design-notes)) | p95 over the minute held at 400 users 2.1 s; Postgres's CPU at peak 67% | 1.0 s; 57% |
 
 The first two rows compare the code without any of the three fixes with the code that has the first two; the JIT row compares the first two with all three. The stress runs behind the category figures reach 300, 400 and 1,000 users, so the later means include more load.
 
-All three together: at peak, p95 goes from 34 to 16 ms, p99 from 177 to 29 ms, and Postgres's CPU from 181% to 57%. In the stress run, Postgres passes 90% of its CPUs at 319 users instead of 79, 600 users stay under 5 seconds for a whole step instead of 150 (800 instead of 188 by the report's rule), and throughput levels off at 238 to 274 requests a second instead of 54 to 58.
+All three together: at peak, p95 goes from 34 to 16 ms, p99 from 177 to 29 ms, and Postgres's CPU from 181% to 57%. In the stress run, Postgres passes 90% of its CPUs at 319 users instead of 79, 600 users stay under 5 seconds for a whole held minute instead of 150, and throughput levels off at 238 to 274 requests a second instead of 54 to 58.
 
 What binds next, and how to lift it:
 
