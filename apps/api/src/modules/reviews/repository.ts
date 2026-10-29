@@ -6,6 +6,7 @@
 
 import {
   Page,
+  Rating,
   type AdminReviewQuery,
   type AdminReviewView,
   type OwnReview,
@@ -152,8 +153,7 @@ export const ReviewRepository = {
 
       return {
         items: rows.map(ReviewRepository.viewOf),
-        average: Math.round((ratings[0]?.average ?? 0) * 10) / 10,
-        count: total,
+        ...Rating.of(ratings[0]?.average ?? 0, total),
         distribution: distribution satisfies RatingDistribution,
         sort,
         page,

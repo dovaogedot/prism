@@ -207,8 +207,15 @@ export type Suggestion = Readonly<{
 /** A name a product is filed under: a category or a brand. */
 export type Named = Readonly<{ slug: Slug; name: string }>;
 
-/** How shoppers have rated a product. `average` is 0 while `count` is 0. */
-export type Rating = Readonly<{ average: number; count: number }>;
+/** How shoppers have rated a product: the average, to one decimal, is present once a review counts. */
+export type Rating = Readonly<{ average?: number; count: number }>;
+
+export const Rating = {
+  /** An average as a card shows it: rounded to one decimal. */
+  shown: (average: number): number => Math.round(average * 10) / 10,
+  /** The rating of `count` approved reviews whose average is `average`. */
+  of: (average: number, count: number): Rating => (count === 0 ? { count } : { average: Rating.shown(average), count }),
+} as const;
 
 /** A smaller copy of a picture, for `srcset`. */
 export type ImageSource = Readonly<{ width: number; url: string }>;

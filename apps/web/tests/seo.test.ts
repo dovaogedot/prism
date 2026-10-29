@@ -85,7 +85,7 @@ describe("Seo.description", () => {
 
 describe("the catalog's titles and descriptions", () => {
   const variants = [
-    { label: "unrated and in stock", products: seededProducts({ average: 0, count: 0 }, 10) },
+    { label: "unrated and in stock", products: seededProducts({ count: 0 }, 10) },
     { label: "rated and in stock", products: seededProducts({ average: 4.5, count: 12 }, 10) },
     { label: "rated once and sold out", products: seededProducts({ average: 3, count: 1 }, 0) },
   ];
@@ -99,7 +99,7 @@ describe("the catalog's titles and descriptions", () => {
   });
 
   it("gives every seeded product a unique title within 60 characters", () => {
-    const titles = seededProducts({ average: 0, count: 0 }, 10).map((product) => Seo.title(CatalogSeo.productTitle(product)));
+    const titles = seededProducts({ count: 0 }, 10).map((product) => Seo.title(CatalogSeo.productTitle(product)));
 
     expect(titles.filter((title) => title.length > 60)).toEqual([]);
     expect(titles.length - new Set(titles).size).toBe(0);
@@ -147,7 +147,7 @@ describe("a product page's structured data", () => {
   });
 
   it("leaves the rating out until the product has one, and says when it is sold out", () => {
-    const unrated = { ...product, stock: 0, rating: { average: 0, count: 0 } } as ProductDetail;
+    const unrated = { ...product, stock: 0, rating: { count: 0 } } as ProductDetail;
     const [entry] = CatalogSeo.productJsonLd(unrated, "https://shop.example")["@graph"] as Record<string, unknown>[];
 
     expect(entry).not.toHaveProperty("aggregateRating");

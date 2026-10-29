@@ -2,7 +2,7 @@ import type { RatingDistribution } from "@prism/shared";
 import { Stars } from "../../../shared/ui/index.ts";
 
 /** The average, how many reviews make it, and how many gave each number of stars. */
-export type RatingSummaryProps = Readonly<{ average: number; count: number; distribution: RatingDistribution }>;
+export type RatingSummaryProps = Readonly<{ average: number | undefined; count: number; distribution: RatingDistribution }>;
 
 /** The product's rating at a glance: the average in stars, and a bar per number of stars. */
 export const RatingSummary = ({ average, count, distribution }: RatingSummaryProps) => {
@@ -13,7 +13,7 @@ export const RatingSummary = ({ average, count, distribution }: RatingSummaryPro
       {/* The stars speak the average and the count, so the figures beside them are for the eye only. */}
       <div className="flex items-center gap-3">
         <span className="text-4xl font-semibold tabular-nums text-ink" aria-hidden="true">
-          {count === 0 ? "-" : average.toFixed(1)}
+          {average === undefined ? "-" : average.toFixed(1)}
         </span>
         <div className="flex flex-col items-start gap-1">
           <Stars rating={average} count={count} isTextShown={false} />

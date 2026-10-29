@@ -3,7 +3,8 @@ import { match } from "ts-pattern";
 
 /** The average, how many ratings it comes from, and whether that count is shown. */
 export type StarsProps = Readonly<{
-  rating: number;
+  /** `undefined` while nobody has rated it, which draws the stars empty. */
+  rating: number | undefined;
   count: number;
   /** False for one review's own rating, where a count says nothing. */
   isCountShown?: boolean;
@@ -19,10 +20,12 @@ export const Stars = ({ rating, count, isCountShown = true, isTextShown = true }
   // Each star's gradient needs an id no other element on the page has.
   const gradientId = useId();
 
-  const spoken = match({ isCountShown, count })
-    .with({ isCountShown: false }, () => `Rated ${rating} out of 5`)
-    .with({ count: 0 }, () => "No reviews yet")
-    .otherwise(() => `Rated ${rating.toFixed(1)} out of 5 from ${count} ${count === 1 ? "review" : "reviews"}`);
+  const filled = rating ?? 0;
+
+  const spoken = match({ isCountShown, rating })
+    .with({ rating: undefined }, () => "No reviews yet")
+    .with({ isCountShown: false }, () => `Rated ${filled} out of 5`)
+    .otherwise(() => `Rated ${filled.toFixed(1)} out of 5 from ${count} ${count === 1 ? "review" : "reviews"}`);
 
   return (
     <span className="inline-flex items-center gap-1">
@@ -31,7 +34,7 @@ export const Stars = ({ rating, count, isCountShown = true, isTextShown = true }
           <svg className="size-3.5" key={index} viewBox="0 0 20 20">
             <defs>
               <linearGradient id={`${gradientId}-${index}`}>
-                <stop offset={`${Math.max(0, Math.min(1, rating - index)) * 100}%`} stopColor="var(--color-accent)" />
+                <stop offset={`${Math.max(0, Math.min(1, filled - index)) * 100}%`} stopColor="var(--color-accent)" />
                 <stop offset="0%" stopColor="var(--color-edge)" />
               </linearGradient>
             </defs>
@@ -42,7 +45,7 @@ export const Stars = ({ rating, count, isCountShown = true, isTextShown = true }
       <span className="sr-only">{spoken}</span>
       {isCountShown && isTextShown ? (
         <span className="text-xs text-ink-faint" aria-hidden="true">
-          {count === 0 ? "No reviews" : `${rating.toFixed(1)} (${count})`}
+          {rating === undefined ? "No reviews" : `${rating.toFixed(1)} (${count})`}
         </span>
       ) : null}
     </span>

@@ -29,9 +29,6 @@ export const ProductSearch = {
   ratingLabel: (threshold: number): string =>
     threshold >= 5 ? "5 stars" : `${threshold} stars & up`,
 
-  /** An average rating as a card shows it: rounded to one decimal. */
-  shownRating: (average: number): number => Math.round(average * 10) / 10,
-
   /**
    * Whether a card shows `average` at `threshold` stars or more. A rating
    * rounds up from half a tenth below, so this is the same comparison the

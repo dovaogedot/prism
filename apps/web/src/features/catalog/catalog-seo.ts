@@ -58,7 +58,7 @@ export const CatalogSeo = {
     return Seo.description([
       product.description,
       `${product.name} by ${product.brand.name}, from the ${product.category.name} collection.`,
-      ...(count === 0 ? [] : [`Rated ${average.toFixed(1)} out of 5 by ${count} ${count === 1 ? "customer" : "customers"}.`]),
+      ...(average === undefined ? [] : [`Rated ${average.toFixed(1)} out of 5 by ${count} ${count === 1 ? "customer" : "customers"}.`]),
       product.stock > 0 ? `In stock at ${price}.` : `${price}, currently out of stock.`,
       ...CatalogSeo.CLOSING,
     ]);
@@ -94,7 +94,7 @@ export const CatalogSeo = {
             availability: product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
             itemCondition: "https://schema.org/NewCondition",
           },
-          ...(product.rating.count === 0
+          ...(product.rating.average === undefined
             ? {}
             : { aggregateRating: { "@type": "AggregateRating", ratingValue: product.rating.average.toFixed(1), reviewCount: product.rating.count } }),
         },

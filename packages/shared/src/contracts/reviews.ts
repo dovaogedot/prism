@@ -112,8 +112,8 @@ export type RatingDistribution = Readonly<Record<"1" | "2" | "3" | "4" | "5", nu
 /** One page of a product's published reviews, with the rating they add up to. */
 export type ReviewPage = Readonly<{
   items: readonly ReviewView[];
-  /** The average of every approved review, to one decimal; 0 while there are none. */
-  average: number;
+  /** The average of every approved review, to one decimal; absent while there are none. */
+  average?: number;
   count: number;
   distribution: RatingDistribution;
   sort: ReviewSort;

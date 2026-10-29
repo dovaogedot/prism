@@ -20,7 +20,7 @@ import type {
   Slug,
   Suggestion,
 } from "@prism/shared";
-import { Dimensions, Weight } from "@prism/shared";
+import { Dimensions, Rating, Weight } from "@prism/shared";
 import { and, asc, count, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lte, max, min, not, sql, type SQL } from "drizzle-orm";
 import type { Database } from "../../db/client.ts";
 import { brands, categories, productImages, productProperties, products } from "../../db/schema.ts";
@@ -108,7 +108,7 @@ export const CatalogRepository = {
       category: { slug: row.categorySlug, name: row.categoryName },
       brand: { slug: row.brandSlug, name: row.brandName },
       images: row.images.map(ImageRows.view),
-      rating: { average: ProductSearch.shownRating(row.average), count: row.count },
+      rating: Rating.of(row.average, row.count),
     });
 
     const conditions = (query: ProductQuery, lifted: LiftedFacet, match: TextMatch) =>

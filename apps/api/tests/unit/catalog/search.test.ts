@@ -3,7 +3,7 @@
  * has to show up as a parameter, never inside the statement.
  */
 
-import { Slug, type ProductQuery } from "@prism/shared";
+import { Rating, Slug, type ProductQuery } from "@prism/shared";
 import { and, sql, type SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
@@ -39,7 +39,7 @@ describe("ProductSearch.likePattern", () => {
 
 describe("ProductSearch.isShownAtLeast", () => {
   it("counts a rating at a threshold once its card shows the threshold, rounded to one decimal", () => {
-    expect([3.94, 3.95, 3.96, 4].map((average) => ProductSearch.shownRating(average))).toEqual([3.9, 4, 4, 4]);
+    expect([3.94, 3.95, 3.96, 4].map((average) => Rating.shown(average))).toEqual([3.9, 4, 4, 4]);
     expect([3.94, 3.95, 3.96, 4].map((average) => ProductSearch.isShownAtLeast(average, 4))).toEqual([false, true, true, true]);
   });
 });

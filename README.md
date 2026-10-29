@@ -234,7 +234,7 @@ Every route is under `/api/v1` and answers JSON. A refusal is `{ "error": { "cod
 | `GET /products/suggest?q=` | Names containing the typed text, those starting with it first, with a thumbnail and the price. |
 | `GET /products/:slug` | One product with its measurements in both unit systems. |
 | `GET /products/:slug/related` | Up to 8 products from the same category. |
-| `GET /products/:slug/reviews` | Approved reviews with the average and the distribution. Reads `sort` (`helpful`, `newest`, `highest`, `lowest`) and `page`. |
+| `GET /products/:slug/reviews` | Approved reviews with the average, which is absent while there are none, and the distribution. Reads `sort` (`helpful`, `newest`, `highest`, `lowest`) and `page`. |
 | `GET /products/:slug/reviews/viewer` | Whether the signed-in reader may review, their own review, and the reviews they found helpful. |
 | `PUT /products/:slug/reviews/mine` | Writes or edits the reader's review, which then waits for approval under a new id; a moderator's decision on the old id finds nothing, so no text is published or rejected unread. Its helpful votes stay with it. |
 | `DELETE /products/:slug/reviews/mine` | Deletes it. |
