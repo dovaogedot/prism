@@ -336,6 +336,8 @@ export const AuthRepository = {
             .update(users)
             .set({ totpSecret: null, totpEnabledAt: null, totpLastStep: null, roles: [] })
             .where(eq(users.id, userId));
+          // A check passed under the old secret counts for nothing once it is gone.
+          await tx.update(sessions).set({ secondFactorAt: null }).where(eq(sessions.userId, userId));
           if (revoked.length > 0) {
             await audit.record(tx, {
               actor: { id: userId, roles: revoked, ip: ipAddress },

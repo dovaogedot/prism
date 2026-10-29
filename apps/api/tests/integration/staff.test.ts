@@ -191,6 +191,9 @@ describe("TOTP codes", () => {
       changes: { roles: [["support", "admin"], []] },
     });
     expect((await Staff.call(harness, staff, "GET", "/admin/summary")).statusCode).toBe(403);
+    expect(
+      await harness.database.sql`SELECT second_factor_at FROM session WHERE user_id = ${staff.userId} AND second_factor_at IS NOT NULL`,
+    ).toHaveLength(0);
   });
 
   it("stays on for the last admin, who keeps the role, and records nothing", async () => {
