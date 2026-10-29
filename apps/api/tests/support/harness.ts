@@ -126,38 +126,6 @@ export const testEnvironment = (databaseUrl: string, mediaDirectory: string, rat
     STAFF_VERIFICATION_TTL_SECONDS: 8 * 60 * 60,
   }) as const;
 
-/** Every table the tests write to, in an order that respects the foreign keys. */
-const MUTABLE_TABLES = [
-  "audit_event",
-  "review_vote",
-  "address",
-  "outbox_message",
-  "payment",
-  "order_event",
-  "order_line",
-  "customer_order",
-  "cart_item",
-  "cart",
-  "refresh_token",
-  "password_reset_token",
-  "session",
-  "oauth_identity",
-  "product_review",
-  "product_image",
-  "product_property",
-  "product",
-  "brand",
-  "category",
-  "app_user",
-  "shipping_method",
-];
-
-/** The delivery options the migration inserts, which every test starts from. */
-const DEFAULT_SHIPPING_METHODS = `
-  INSERT INTO shipping_method (code, name, price_cents, free_from_cents, min_days, max_days, position) VALUES
-    ('standard', 'Standard', 490, 5000, 2, 4, 0),
-    ('express', 'Express', 990, NULL, 1, 2, 1)`;
-
 /** What a suite can choose about its harness. */
 export type HarnessOptions = Readonly<{
   /** Defaults to a fast stand-in; a suite about stored passwords passes the real one. */
@@ -177,6 +145,9 @@ export const startHarness = async (options: HarnessOptions = {}): Promise<Harnes
   const database = Database.open(config.database.url, config.database.poolSize);
   const cipher = FieldCipher.create(config.encryptionKey);
   await Migrations.apply(database.db, cipher);
+  // Every table the schema has, so a table added later is emptied too, and the delivery options as the migration planted them.
+  const tables = (await database.sql`SELECT tablename FROM pg_tables WHERE schemaname = 'public'`).map((row) => `"${String(row["tablename"])}"`);
+  const plantedShippingMethods = await database.sql`SELECT * FROM shipping_method`;
 
   const clock = Clock.mutable(TEST_START);
   const mailer = Mailer.memory();
@@ -225,8 +196,8 @@ export const startHarness = async (options: HarnessOptions = {}): Promise<Harnes
       }),
 
     reset: async () => {
-      await database.sql.unsafe(`TRUNCATE ${MUTABLE_TABLES.join(", ")} RESTART IDENTITY CASCADE`);
-      await database.sql.unsafe(DEFAULT_SHIPPING_METHODS);
+      await database.sql.unsafe(`TRUNCATE ${tables.join(", ")} RESTART IDENTITY CASCADE`);
+      await database.sql`INSERT INTO shipping_method ${database.sql(plantedShippingMethods)}`;
       await rm(mediaDirectory, { recursive: true, force: true });
       await mkdir(mediaDirectory, { recursive: true });
       epoch += 60 * 60 * 1000;
