@@ -2,8 +2,7 @@ import { BrandInput, type AdminBrand } from "@prism/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
-import { Api } from "../../../shared/api/client.ts";
-import { Alert, Button, Field, IssueList } from "../../../shared/ui/index.ts";
+import { Alert, Button, Field } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 import { ServerIssues, Slugs } from "../forms.ts";
 
@@ -28,17 +27,9 @@ export const BrandForm = ({ initial, onSave, onCancel }: BrandFormProps) => {
   const submit = form.handleSubmit(async (values) => {
     setFailure(undefined);
 
-    await onSave(values).catch((reason: unknown) => {
-      const found = Api.failureOf(reason);
-      if (found === undefined || found.issues.length === 0) {
-        setFailure(Failure.message(reason));
-        return;
-      }
-      const unplaced = ServerIssues.place(found.issues, ["name", "slug"], form.setError);
-      if (unplaced.length > 0) {
-        setFailure(<IssueList issues={unplaced} />);
-      }
-    });
+    await onSave(values).catch((reason: unknown) =>
+      setFailure(Failure.describeUnplaced(reason, (issues) => ServerIssues.place(issues, ["name", "slug"], form.setError))),
+    );
   });
 
   return (

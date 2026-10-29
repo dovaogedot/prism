@@ -2,8 +2,7 @@ import { ProductFields, type AdminBrand, type AdminCategory, type ProductInput }
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, type ReactNode } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
-import { Api } from "../../../shared/api/client.ts";
-import { Alert, Button, Card, Field, IssueList, SelectField, TextAreaField } from "../../../shared/ui/index.ts";
+import { Alert, Button, Card, Field, SelectField, TextAreaField } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 import { ProductForm as ProductFormSchema, ServerIssues, Slugs } from "../forms.ts";
 
@@ -51,16 +50,8 @@ export const ProductForm = ({ initial, categories, brands, submitLabel, onSave }
     setFailure(undefined);
 
     await onSave({ ...rest, priceCents: price }).catch((reason: unknown) => {
-      const found = Api.failureOf(reason);
-      if (found === undefined || found.issues.length === 0) {
-        setFailure(Failure.message(reason));
-        return;
-      }
       const fields = ["name", "slug", "description", "price", "stock", "categoryId", "brandId", "weightGrams", "widthMm", "heightMm", "depthMm", "properties"];
-      const unplaced = ServerIssues.place(found.issues, fields, form.setError, { priceCents: "price" });
-      if (unplaced.length > 0) {
-        setFailure(<IssueList issues={unplaced} />);
-      }
+      setFailure(Failure.describeUnplaced(reason, (issues) => ServerIssues.place(issues, fields, form.setError, { priceCents: "price" })));
     });
   });
 

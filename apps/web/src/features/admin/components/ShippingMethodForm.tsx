@@ -2,8 +2,7 @@ import type { ShippingMethodInput, ShippingMethodView } from "@prism/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
-import { Api } from "../../../shared/api/client.ts";
-import { Alert, Button, Field, IssueList } from "../../../shared/ui/index.ts";
+import { Alert, Button, Field } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 import { ServerIssues, ShippingFields, ShippingForm } from "../forms.ts";
 
@@ -32,16 +31,8 @@ export const ShippingMethodForm = ({ option, nextPosition, onSave, onCancel }: S
     setFailure(undefined);
 
     await onSave(ShippingForm.toInput(values)).catch((reason: unknown) => {
-      const found = Api.failureOf(reason);
-      if (found === undefined || found.issues.length === 0) {
-        setFailure(Failure.message(reason));
-        return;
-      }
       const fields = ["code", "name", "price", "freeFrom", "minDays", "maxDays", "position"];
-      const unplaced = ServerIssues.place(found.issues, fields, form.setError, { priceCents: "price", freeFromCents: "freeFrom" });
-      if (unplaced.length > 0) {
-        setFailure(<IssueList issues={unplaced} />);
-      }
+      setFailure(Failure.describeUnplaced(reason, (issues) => ServerIssues.place(issues, fields, form.setError, { priceCents: "price", freeFromCents: "freeFrom" })));
     });
   });
 

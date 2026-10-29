@@ -1,5 +1,6 @@
 /** A rejected request as something a person can read. */
 
+import type { ValidationIssue } from "@prism/shared";
 import type { ReactNode } from "react";
 import { Api } from "../../../shared/api/client.ts";
 import { IssueList } from "../../../shared/ui/index.ts";
@@ -18,5 +19,19 @@ export const Failure = {
     if (failure === undefined) return Failure.OFFLINE;
 
     return failure.issues.length > 0 ? <IssueList issues={failure.issues} /> : failure.message;
+  },
+
+  /**
+   * What a form shows above its fields for a refused save: the sentence when
+   * the refusal named no field, the issues `place` could not put under a
+   * field, or `undefined` when every issue sits under its own.
+   */
+  describeUnplaced: (reason: unknown, place: (issues: readonly ValidationIssue[]) => readonly ValidationIssue[]): ReactNode | undefined => {
+    const failure = Api.failureOf(reason);
+    if (failure === undefined || failure.issues.length === 0) return Failure.message(reason);
+
+    const unplaced = place(failure.issues);
+
+    return unplaced.length === 0 ? undefined : <IssueList issues={unplaced} />;
   },
 } as const;
