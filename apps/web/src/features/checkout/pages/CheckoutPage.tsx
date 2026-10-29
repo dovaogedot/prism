@@ -84,7 +84,7 @@ export const CheckoutPage = () => {
         .with({ cart: { data: { lines: [] } } }, () => (
           <Card className="space-y-3 p-8 text-center">
             <p className="text-ink">Your cart is empty, so there is nothing to check out.</p>
-            <Link to="/" className="text-sm font-medium text-accent hover:underline">
+            <Link to="/shop" className="text-sm font-medium text-accent hover:underline">
               Browse the shop
             </Link>
           </Card>

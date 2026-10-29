@@ -35,7 +35,7 @@ export const CartPage = () => {
           .with({ data: { lines: [] } }, () => (
             <Card className="space-y-3 p-8 text-center">
               <p className="text-ink">Your cart is empty.</p>
-              <Link to="/" className="text-sm font-medium text-accent hover:underline">
+              <Link to="/shop" className="text-sm font-medium text-accent hover:underline">
                 Browse the shop
               </Link>
             </Card>

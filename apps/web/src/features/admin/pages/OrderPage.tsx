@@ -1,4 +1,4 @@
-import { Country, Permission, Price, TrackingNumber, type AdminOrderDetail, type OrderStatusChange } from "@prism/shared";
+import { Country, OrderStatus, Permission, Price, TrackingNumber, type AdminOrderDetail, type OrderStatusChange } from "@prism/shared";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { match, P } from "ts-pattern";
@@ -10,7 +10,7 @@ import { Failure } from "../../auth/components/failure.tsx";
 import { useSession } from "../../auth/session.ts";
 import { OrderTimeline } from "../../orders/components/OrderTimeline.tsx";
 import { StatusBadge } from "../../orders/components/StatusBadge.tsx";
-import { OrderTime } from "../../orders/orders.ts";
+import { OrderTime, PaymentWords } from "../../orders/orders.ts";
 import { AdminKeys, useAdminRead, useAdminWrite } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
 import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
@@ -76,7 +76,7 @@ export const OrderPage = () => {
           <h2 className="font-semibold text-ink">Next step</h2>
           {match({ next: data.nextStatus, canFulfill })
             .with({ canFulfill: false }, () => <p className="text-sm text-ink-soft">Moving orders along needs the delivery manager role.</p>)
-            .with({ next: P.nullish }, () => <p className="text-sm text-ink-soft">Nothing follows: the order is {data.status.replaceAll("_", " ")}.</p>)
+            .with({ next: P.nullish }, () => <p className="text-sm text-ink-soft">No step follows from here. Status: {OrderStatus.label[data.status]}.</p>)
             .with({ next: "processing" }, () => (
               <Button busy={advance.isPending} onClick={() => advance.mutate({ status: "processing" }, { onSuccess: done("The order is being processed."), onError: refused })}>
                 Start processing
@@ -211,14 +211,14 @@ export const OrderPage = () => {
                 .with(undefined, () => <p className="text-ink-soft">No payment was started.</p>)
                 .otherwise((payment) => (
                   <>
-                    <p className="capitalize text-ink">{payment.status}</p>
+                    <p className="text-ink">{PaymentWords.status[payment.status]}</p>
                     {payment.card === undefined ? null : (
                       <p className="text-ink-soft">
                         {payment.card.brand.toUpperCase()} •••• {payment.card.last4}
                       </p>
                     )}
                     {payment.reference === undefined ? null : <p className="break-all font-mono text-xs text-ink-soft">{payment.reference}</p>}
-                    {payment.refund === undefined ? null : <p className="text-ink-soft">Refund {payment.refund}</p>}
+                    {payment.refund === undefined ? null : <p className="text-ink-soft">{PaymentWords.refund[payment.refund]}</p>}
                   </>
                 ))}
             </Card>
@@ -232,7 +232,12 @@ export const OrderPage = () => {
           cancelLabel="Keep the order"
           isBusy={cancel.isPending}
           onCancel={() => setConfirming("none")}
-          onConfirm={() => cancel.mutate(undefined, { onSuccess: done("The order is canceled, and its payment refunded."), onError: refused })}
+          onConfirm={() =>
+            cancel.mutate(undefined, {
+              onSuccess: done(data.payment?.status === "succeeded" ? "The order is canceled, and its payment refunded." : "The order is canceled."),
+              onError: refused,
+            })
+          }
         >
           The items go back into stock, any payment is refunded in full, and the customer is told by email.
         </ConfirmDialog>

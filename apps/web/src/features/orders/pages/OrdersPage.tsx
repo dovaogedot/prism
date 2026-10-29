@@ -41,7 +41,7 @@ export const OrdersPage = () => {
             <p className="text-ink">
               {OrderParams.isFiltered(params) ? "No orders match these filters." : "You have not ordered anything yet."}
             </p>
-            <Link to="/" className="text-sm font-medium text-accent hover:underline">
+            <Link to="/shop" className="text-sm font-medium text-accent hover:underline">
               Browse the shop
             </Link>
           </Card>

@@ -11,7 +11,7 @@ import { useSession } from "../../auth/session.ts";
 import { Picture } from "../../catalog/components/Picture.tsx";
 import { DeliveryDates } from "../../../shared/format/delivery-dates.ts";
 import { CancelOrderButton, OrderConfirmation, OrderTimeline, StatusBadge } from "../components/index.ts";
-import { OrderPolling, OrderTime, useOrder } from "../orders.ts";
+import { OrderPolling, OrderTime, PaymentWords, useOrder } from "../orders.ts";
 import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
 
@@ -200,12 +200,7 @@ export const OrderPage = () => {
                     .otherwise((payment) => (
                       <>
                         <p className="text-ink">
-                          {match(payment.status)
-                            .with("pending", () => "Waiting for the payment")
-                            .with("succeeded", () => "Paid")
-                            .with("failed", () => "Failed")
-                            .with("canceled", () => "Not charged")
-                            .exhaustive()}
+                          {PaymentWords.status[payment.status]}
                           {payment.card === undefined ? "" : ` · ${payment.card.brand.toUpperCase()} •••• ${payment.card.last4}`}
                         </p>
                         {payment.reference === undefined ? null : (
@@ -218,7 +213,7 @@ export const OrderPage = () => {
                         )}
                         {match(payment.refund)
                           .with(P.nullish, () => null)
-                          .with("pending", () => <p className="text-ink-soft">Refund on its way.</p>)
+                          .with("pending", () => <p className="text-ink-soft">{PaymentWords.refund.pending}.</p>)
                           .with("succeeded", () => <p className="text-ink-soft">Refunded {Price.format(data.totalCents)}.</p>)
                           .with("failed", () => <p className="text-danger">The refund failed. Contact us and we will sort it out.</p>)
                           .exhaustive()}

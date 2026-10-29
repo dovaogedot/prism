@@ -1,3 +1,4 @@
+import { OAuthProvider } from "@prism/shared";
 import { match, P } from "ts-pattern";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Card, Skeleton, Toast } from "../../../shared/ui/index.ts";
@@ -53,9 +54,7 @@ export const ProfilePage = () => {
         <ul className="space-y-1 text-sm text-ink-soft">
           {session.hasPassword ? <li>Email and password.</li> : null}
           {session.providers.map((provider) => (
-            <li className="capitalize" key={provider}>
-              {provider}.
-            </li>
+            <li key={provider}>{OAuthProvider.label[provider]}.</li>
           ))}
         </ul>
       </Card>

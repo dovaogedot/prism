@@ -4,17 +4,32 @@
  * view of the list is a link and Back behaves.
  */
 
-import { OrderStatus, type OrderDetail, type OrderList } from "@prism/shared";
+import { OrderStatus, type OrderDetail, type OrderList, type PaymentSummary } from "@prism/shared";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Api } from "../../shared/api/client.ts";
 
 export const OrderTime = {
-  /** A moment as the customer's own clock reads it. */
+  /** A moment as the customer's own clock reads it, in the day-month order every date in the shop uses. */
   format: (iso: string): string =>
-    new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)),
+    new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)),
 
   /** A calendar day as the customer's own calendar reads it. */
-  day: (iso: string): string => new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(iso)),
+  day: (iso: string): string => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(iso)),
+} as const;
+
+/** How a payment and its refund read, on the customer's and the staff's order pages alike. */
+export const PaymentWords = {
+  status: {
+    pending: "Waiting for the payment",
+    succeeded: "Paid",
+    failed: "Failed",
+    canceled: "Not charged",
+  } as const satisfies Record<PaymentSummary["status"], string>,
+  refund: {
+    pending: "Refund on its way",
+    succeeded: "Refunded",
+    failed: "The refund failed",
+  } as const satisfies Record<NonNullable<PaymentSummary["refund"]>, string>,
 } as const;
 
 export const OrderParams = {

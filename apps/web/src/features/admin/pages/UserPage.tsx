@@ -1,4 +1,4 @@
-import { Permission, Price, StaffRole, type AdminUserDetail } from "@prism/shared";
+import { OAuthProvider, Permission, Price, StaffRole, type AdminUserDetail } from "@prism/shared";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { match, P } from "ts-pattern";
@@ -83,7 +83,7 @@ export const UserPage = () => {
               {data.phone === undefined ? null : <p className="text-ink-soft">{data.phone}</p>}
               <p className="text-ink-soft">Joined {OrderTime.format(data.createdAt)}</p>
               <p className="text-ink-soft">
-                Signs in with {[...(data.hasPassword ? ["a password"] : []), ...data.providers.map((provider) => provider.charAt(0).toUpperCase() + provider.slice(1))].join(" and ")}
+                Signs in with {[...(data.hasPassword ? ["a password"] : []), ...data.providers.map((provider) => OAuthProvider.label[provider])].join(" and ")}
               </p>
               <p className="text-ink-soft">Two-factor authentication {data.twoFactorEnabled ? "on" : "off"}</p>
               <p className="text-ink-soft">{data.liveSessions === 1 ? "1 session signed in" : `${data.liveSessions} sessions signed in`}</p>
