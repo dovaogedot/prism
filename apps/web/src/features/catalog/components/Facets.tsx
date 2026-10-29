@@ -46,7 +46,7 @@ const Group = ({ title, chosen, onClear, children }: Readonly<{ title: string; c
   </fieldset>
 );
 
-/** A value's row, greyed rather than removed when the other filters leave it nothing. */
+/** A value's row, grayed rather than removed when the other filters leave it nothing. */
 const Row = {
   classes: (empty: boolean): string =>
     empty

@@ -8,7 +8,7 @@ export type TextAreaFieldProps = ComponentProps<"textarea"> &
     error?: string | undefined;
   }>;
 
-/** A labelled text area, with its hint and error tied to it for a screen reader. */
+/** A labeled text area, with its hint and error tied to it for a screen reader. */
 export const TextAreaField = ({ label, hint, error, id, className = "", ...rest }: TextAreaFieldProps) => {
   const fieldId = id ?? rest.name ?? label.toLowerCase().replace(/\s+/g, "-");
   const describedBy = [hint === undefined ? undefined : `${fieldId}-hint`, error === undefined ? undefined : `${fieldId}-error`].filter(

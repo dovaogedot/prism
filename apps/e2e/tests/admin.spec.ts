@@ -162,7 +162,7 @@ test("every admin table centers each cell in its row, so text sits level with th
   }
 });
 
-test("deleting asks first, and cancelling deletes nothing", async () => {
+test("deleting asks first, and canceling deletes nothing", async () => {
   // A name of its own, so a run against a stack an earlier run used finds no brand of that name.
   const name = `Asked First ${Date.now()}`;
   const deleteButton = adminPage.getByRole("button", { name: `Delete ${name}` });

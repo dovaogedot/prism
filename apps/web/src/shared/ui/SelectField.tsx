@@ -8,7 +8,7 @@ export type SelectFieldProps = ComponentProps<"select"> &
     error?: string | undefined;
   }>;
 
-/** A labelled select, with its hint and error tied to it for a screen reader. */
+/** A labeled select, with its hint and error tied to it for a screen reader. */
 export const SelectField = ({ label, hint, error, id, className = "", children, ...rest }: SelectFieldProps) => {
   const fieldId = id ?? rest.name ?? label.toLowerCase().replace(/\s+/g, "-");
   const describedBy = [hint === undefined ? undefined : `${fieldId}-hint`, error === undefined ? undefined : `${fieldId}-error`].filter(

@@ -13,7 +13,7 @@ export type FieldProps = ComponentProps<"input"> &
     action?: ReactNode;
   }>;
 
-/** A labelled input, with its hint and error tied to it for a screen reader. */
+/** A labeled input, with its hint and error tied to it for a screen reader. */
 export const Field = ({ label, hint, error, action, id, className = "", ...rest }: FieldProps) => {
   const fieldId = id ?? rest.name ?? label.toLowerCase().replace(/\s+/g, "-");
   const describedBy = [

@@ -94,10 +94,10 @@ describe("ImportFile.parseCsv", () => {
   });
 
   it("refuses a column it does not know, and a missing one", () => {
-    const parsed = ImportFile.parseCsv(`${HEADER.replace(",stock", "")},colour\n`);
+    const parsed = ImportFile.parseCsv(`${HEADER.replace(",stock", "")},shade\n`);
 
     expect(parsed.issues).toEqual([
-      { row: 1, column: "colour", message: "This is not a column an import knows." },
+      { row: 1, column: "shade", message: "This is not a column an import knows." },
       { row: 1, column: "stock", message: "This column is missing." },
     ]);
   });
