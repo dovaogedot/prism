@@ -6,7 +6,7 @@
  * reports everything wrong with a file.
  */
 
-import { ImportRow, type ImportReport } from "@prism/shared";
+import { ImportRow, ProductFields, type ImportReport } from "@prism/shared";
 import { parse } from "csv-parse/sync";
 import { z } from "zod";
 
@@ -131,16 +131,25 @@ export const ImportFile = {
     if (header === undefined) return { rows: [], issues: [{ row: 0, column: "", message: "The file is empty." }] };
 
     const columns = header.map((name) => name.trim());
-    const issues: ImportIssue[] = [...ImportFile.withinLimit(body.length)];
     const known = new Set<string>(Object.keys(ImportFile.COLUMNS));
+    // Checked before any loop over the columns, so a huge header costs one comparison.
+    const maxColumns = known.size + ProductFields.MAX_PROPERTIES;
+    if (columns.length > maxColumns) {
+      return { rows: [], issues: [{ row: 0, column: "", message: `The header has ${columns.length} columns; an import takes at most ${maxColumns}.` }] };
+    }
+
+    const issues: ImportIssue[] = [...ImportFile.withinLimit(body.length)];
+    const positions = new Map<string, number>();
 
     for (const [index, column] of columns.entries()) {
       const isProperty = column.startsWith(ImportFile.PROPERTY_PREFIX) && column.length > ImportFile.PROPERTY_PREFIX.length;
       if (!known.has(column) && !isProperty) issues.push({ row: 1, column, message: "This is not a column an import knows." });
-      if (columns.indexOf(column) !== index) issues.push({ row: 1, column, message: "This column appears twice." });
+      const first = positions.get(column);
+      if (first !== undefined) issues.push({ row: 1, column, message: "This column appears twice." });
+      positions.set(column, first ?? index);
     }
-    for (const column of Object.keys(ImportFile.COLUMNS)) {
-      if (column !== "featured" && !columns.includes(column)) issues.push({ row: 1, column, message: "This column is missing." });
+    for (const column of known) {
+      if (column !== "featured" && !positions.has(column)) issues.push({ row: 1, column, message: "This column is missing." });
     }
     if (issues.length > 0) return { rows: [], issues };
 
@@ -148,7 +157,10 @@ export const ImportFile = {
 
     for (const [index, record] of body.entries()) {
       const row = index + 2;
-      const cell = (column: string): string => (record[columns.indexOf(column)] ?? "").trim();
+      const cell = (column: string): string => {
+        const position = positions.get(column);
+        return (position === undefined ? "" : (record[position] ?? "")).trim();
+      };
       const properties = columns
         .filter((column) => column.startsWith(ImportFile.PROPERTY_PREFIX) && cell(column).length > 0)
         .map((column) => ({ name: column.slice(ImportFile.PROPERTY_PREFIX.length), value: cell(column) }));

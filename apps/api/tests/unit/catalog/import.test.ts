@@ -102,6 +102,19 @@ describe("ImportFile.parseCsv", () => {
     ]);
   });
 
+  it("refuses a column named twice", () => {
+    expect(ImportFile.parseCsv(`${HEADER},name\n`).issues).toEqual([{ row: 1, column: "name", message: "This column appears twice." }]);
+  });
+
+  it("takes up to 30 property columns, and refuses a longer header before reading it", () => {
+    const properties = (count: number) => Array.from({ length: count }, (_, index) => `,property:p${index}`).join("");
+
+    expect(ImportFile.parseCsv(`${HEADER}${properties(30)}\n${row()}${",".repeat(30)}`).issues).toEqual([]);
+    expect(ImportFile.parseCsv(`${HEADER}${properties(100_000)}\n${row()}${",".repeat(100_000)}`).issues).toEqual([
+      { row: 0, column: "", message: "The header has 100012 columns; an import takes at most 42." },
+    ]);
+  });
+
   it("refuses a slug that appears twice in one file, naming both rows", () => {
     const parsed = ImportFile.parseCsv([HEADER, row(), row({ name: "Another lamp" })].join("\n"));
 
