@@ -124,6 +124,18 @@
 
 	log {
 		output stdout
-		format console
+		# A guest's order key and a reset link's token travel in the query
+		# string, and a page's own requests name its whole address as their
+		# referrer, so the log keeps neither of them.
+		format filter {
+			wrap console
+			fields {
+				request>uri query {
+					delete key
+					delete token
+				}
+				request>headers>Referer delete
+			}
+		}
 	}
 }
