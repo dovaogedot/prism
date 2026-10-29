@@ -1,12 +1,12 @@
 import { Link, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { Alert, Button, Card, Skeleton } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
-import { CatalogParams } from "../../catalog/filters.ts";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { OrderFilters, OrderRow } from "../components/index.ts";
 import { OrderParams, useOrders } from "../orders.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { AccountPage } from "../../account/components/index.ts";
+import { UrlParams } from "../../../shared/url/url-params.ts";
 
 /** The signed-in customer's orders, filtered by status and date and sorted as the URL says. */
 export const OrdersPage = () => {
@@ -56,7 +56,7 @@ export const OrdersPage = () => {
                   type="button"
                   tone="quiet"
                   disabled={data.page <= 1}
-                  onClick={() => setParams(CatalogParams.set(params, "page", String(data.page - 1)))}
+                  onClick={() => setParams(UrlParams.set(params, "page", String(data.page - 1)))}
                 >
                   Previous
                 </Button>
@@ -67,7 +67,7 @@ export const OrdersPage = () => {
                   type="button"
                   tone="quiet"
                   disabled={data.page >= data.totalPages}
-                  onClick={() => setParams(CatalogParams.set(params, "page", String(data.page + 1)))}
+                  onClick={() => setParams(UrlParams.set(params, "page", String(data.page + 1)))}
                 >
                   Next
                 </Button>

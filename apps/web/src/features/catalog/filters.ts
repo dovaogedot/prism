@@ -9,6 +9,7 @@
 
 import { Price, ProductQuery, type FacetBucket, type ProductFacets } from "@prism/shared";
 import { match } from "ts-pattern";
+import { UrlParams } from "../../shared/url/url-params.ts";
 
 /** One filter in force: the query pair it stands for, what to call it, and the params without it. */
 export type ActiveFilter = Readonly<{ key: string; value: string; label: string; next: URLSearchParams }>;
@@ -32,33 +33,9 @@ export const CatalogParams = {
   /** Whether `value` is among the values of the repeatable `key`. */
   has: (params: URLSearchParams, key: string, value: string): boolean => params.getAll(key).includes(value),
 
-  /**
-   * `params` with `key` set to `value`, or without `key` when `value` is
-   * empty. Any change but the page itself starts again from page one.
-   */
-  set: (params: URLSearchParams, key: string, value: string): URLSearchParams => {
-    const next = new URLSearchParams(params);
+  set: UrlParams.set,
 
-    if (value.length === 0) next.delete(key);
-    else next.set(key, value);
-
-    if (key !== "page") next.delete("page");
-
-    return next;
-  },
-
-  /** `params` with `value` added to the repeatable `key` if absent, or removed if present. */
-  toggle: (params: URLSearchParams, key: string, value: string): URLSearchParams => {
-    const next = new URLSearchParams(params);
-    const values = next.getAll(key);
-
-    next.delete(key);
-    for (const current of values) if (current !== value) next.append(key, current);
-    if (!values.includes(value)) next.append(key, value);
-    next.delete("page");
-
-    return next;
-  },
+  toggle: UrlParams.toggle,
 
   /** Whether anything narrows the results. */
   isFiltered: (params: URLSearchParams): boolean => {

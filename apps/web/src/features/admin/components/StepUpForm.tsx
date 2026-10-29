@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Api } from "../../../shared/api/client.ts";
 import { Alert, Button, Field } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
-import { TokenStore } from "../../auth/token-store.ts";
+import { Failure } from "../../../shared/api/failure.tsx";
+import { TokenStore } from "../../../shared/api/token-store.ts";
 
 /** What happens once the code is accepted. */
 export type StepUpFormProps = Readonly<{ onDone: () => void }>;

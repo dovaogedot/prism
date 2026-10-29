@@ -10,7 +10,7 @@
  */
 
 import type { AccessGrant, ErrorResponse } from "@prism/shared";
-import { TokenStore } from "../../features/auth/token-store.ts";
+import { TokenStore } from "./token-store.ts";
 
 /** A request the API refused, as something `throw` accepts. */
 export class ApiError extends Error {

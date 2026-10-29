@@ -1,5 +1,5 @@
 import { useSessionBootstrap } from "../features/auth/session.ts";
-import { Layout } from "../shared/layout/Layout.tsx";
+import { Layout } from "./Layout.tsx";
 
 /**
  * Holds the first paint until the refresh cookie has been exchanged, so the

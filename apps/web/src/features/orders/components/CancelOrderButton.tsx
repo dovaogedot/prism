@@ -4,7 +4,7 @@ import { useRef } from "react";
 import { Api } from "../../../shared/api/client.ts";
 import { PageHeading } from "../../../shared/seo/page-heading.ts";
 import { Alert, Button, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { OrderKeys } from "../orders.ts";
 
 /** The order to cancel, and the guest key that opens it, if any. */

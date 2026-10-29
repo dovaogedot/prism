@@ -9,7 +9,7 @@
 import { Price, Pricing, type CartView, type ProductId, type ProductSummary, type ShippingOption, type UserId } from "@prism/shared";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { Api } from "../../shared/api/client.ts";
-import { Failure } from "../auth/components/failure.tsx";
+import { Failure } from "../../shared/api/failure.tsx";
 import { useSession } from "../auth/session.ts";
 
 /** How far a cart is from shipping free. */

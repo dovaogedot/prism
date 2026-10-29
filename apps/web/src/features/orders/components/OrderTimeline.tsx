@@ -1,5 +1,5 @@
 import { OrderStatus, type OrderEvent } from "@prism/shared";
-import { OrderTime } from "../orders.ts";
+import { DateTime } from "../../../shared/format/date-time.ts";
 
 /** The order's history, oldest first. */
 export type OrderTimelineProps = Readonly<{ events: readonly OrderEvent[] }>;
@@ -18,7 +18,7 @@ export const OrderTimeline = ({ events }: OrderTimelineProps) => (
         <p className="text-sm font-medium text-ink">{event.note ?? OrderStatus.label[event.status]}</p>
         <p className="text-xs text-ink-faint">
           {event.note === undefined ? "" : `${OrderStatus.label[event.status]} · `}
-          <time dateTime={event.at}>{OrderTime.format(event.at)}</time>
+          <time dateTime={event.at}>{DateTime.format(event.at)}</time>
         </p>
       </li>
     ))}

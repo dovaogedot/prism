@@ -7,14 +7,15 @@ import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { useTheme } from "../../../shared/theme/use-theme.ts";
 import { Alert, Button, Card, Skeleton } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { useSession } from "../../auth/session.ts";
 import { AccountKeys, useSavedAddresses } from "../../account/account.ts";
 import { useCart } from "../../cart/cart.ts";
-import { StripeFields, usePaymentsConfig, useShippingOptions, useStripeJs } from "../checkout.ts";
+import { StripeFields, usePaymentsConfig, useStripeJs } from "../checkout.ts";
 import { CheckoutBody, StripeCheckout } from "../components/index.ts";
 import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
+import { useShippingOptions } from "../../../shared/api/shipping-options.ts";
 
 /**
  * Checkout on one page. It waits for the cart, the payment settings, the

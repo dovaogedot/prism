@@ -8,11 +8,11 @@ import { Api } from "../../../shared/api/client.ts";
 import { useTheme } from "../../../shared/theme/use-theme.ts";
 import { Alert, Button, Field } from "../../../shared/ui/index.ts";
 import { AuthShell, Captcha, ProviderButtons } from "../components/index.ts";
-import { Failure } from "../components/failure.tsx";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { NextPath } from "../next-path.ts";
-import { TokenStore } from "../token-store.ts";
+import { TokenStore } from "../../../shared/api/token-store.ts";
 
 /** Opening an account, which signs in on success. */
 export const RegisterPage = () => {

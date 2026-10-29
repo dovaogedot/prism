@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AccountLinks } from "../src/shared/layout/account-links.ts";
+import { AccountLinks } from "../src/app/account-links.ts";
 
 describe("AccountLinks", () => {
   it("lists the admin for staff only", () => {

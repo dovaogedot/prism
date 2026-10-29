@@ -4,7 +4,7 @@
  */
 
 import type { StaffRole } from "@prism/shared";
-import { NextPath } from "../../features/auth/next-path.ts";
+import { NextPath } from "../features/auth/next-path.ts";
 
 /** One page of the account. */
 export type AccountLink = Readonly<{ to: string; label: string }>;

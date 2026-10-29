@@ -2,7 +2,7 @@ import { ImageAlt, type ProductId, type ProductImage } from "@prism/shared";
 import { useState, type ReactNode } from "react";
 import { Api } from "../../../shared/api/client.ts";
 import { Alert, Button, Card, ConfirmDialog, Field, ImageSet, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { useAdminWrite } from "../admin.ts";
 import { PictureDrafts, type PictureDraft } from "../picture-drafts.ts";
 

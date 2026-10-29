@@ -1,9 +1,9 @@
 import { Link } from "react-router";
-import { CartPreviewButton } from "../../features/cart/components/index.ts";
-import { CategoryMenu, SearchCombobox } from "../../features/catalog/components/index.ts";
+import { CartPreviewButton } from "../features/cart/components/index.ts";
+import { CategoryMenu, SearchCombobox } from "../features/catalog/components/index.ts";
 import { AccountMenu } from "./AccountMenu.tsx";
-import { LookClass } from "./look.ts";
-import { ThemeToggle } from "./ThemeToggle.tsx";
+import { LookClass } from "../shared/layout/look.ts";
+import { ThemeToggle } from "../shared/layout/ThemeToggle.tsx";
 
 /** What the menu button does: open the drawer. */
 export type HeaderProps = Readonly<{ onOpenMenu: () => void }>;

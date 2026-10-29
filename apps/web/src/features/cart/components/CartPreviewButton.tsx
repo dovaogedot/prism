@@ -3,9 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { match } from "ts-pattern";
 import { ImageSet, Popover } from "../../../shared/ui/index.ts";
-import { useShippingOptions } from "../../checkout/checkout.ts";
 import { CartPreview } from "../cart-preview.ts";
 import { FreeShipping, useCart } from "../cart.ts";
+import { useShippingOptions } from "../../../shared/api/shipping-options.ts";
 
 /**
  * The header's cart: a button with how many items the cart holds, which

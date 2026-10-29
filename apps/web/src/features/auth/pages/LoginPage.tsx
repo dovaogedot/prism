@@ -7,12 +7,12 @@ import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { Alert, Button, Field } from "../../../shared/ui/index.ts";
 import { AuthShell, ProviderButtons } from "../components/index.ts";
-import { Failure } from "../components/failure.tsx";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { NextPath } from "../next-path.ts";
 import { SignInFailure } from "../sign-in-failure.ts";
-import { TokenStore } from "../token-store.ts";
+import { TokenStore } from "../../../shared/api/token-store.ts";
 
 /** Sign-in, which returns to the page named in `?next=`, or goes on to the second-factor page first. */
 export const LoginPage = () => {

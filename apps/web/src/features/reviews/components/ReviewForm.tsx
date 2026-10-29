@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, type ReactNode } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Alert, Button, ConfirmDialog, Field, TextAreaField, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { ReviewNotice, useReviewChanges } from "../reviews.ts";
 
 /** The product, and what the reader may do with its reviews. */

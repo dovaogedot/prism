@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useId, useState, type ReactNode } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Alert, Button, Field, PostalAddressFields } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
+import { Failure } from "../../../shared/api/failure.tsx";
 
 /** The address being changed, or none for a new one; what saving does; and how to leave without saving. */
 export type AddressFormProps = Readonly<{

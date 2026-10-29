@@ -3,8 +3,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, type ReactNode } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { Alert, Button, Card, Field, SelectField, TextAreaField } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
-import { ProductForm as ProductFormSchema, ServerIssues, Slugs } from "../forms.ts";
+import { Failure } from "../../../shared/api/failure.tsx";
+import { ProductForm as ProductFormSchema, Slugs } from "../forms.ts";
+import { ServerIssues } from "../../../shared/ui/server-issues.ts";
 
 /** What the form starts from, what it chooses among, and what saving does. */
 export type ProductFormProps = Readonly<{

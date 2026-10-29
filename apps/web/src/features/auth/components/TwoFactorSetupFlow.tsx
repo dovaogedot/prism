@@ -13,8 +13,8 @@ import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { Alert, Button, Field } from "../../../shared/ui/index.ts";
 import { SetupKey } from "../setup-key.ts";
-import { TokenStore } from "../token-store.ts";
-import { Failure } from "./failure.tsx";
+import { TokenStore } from "../../../shared/api/token-store.ts";
+import { Failure } from "../../../shared/api/failure.tsx";
 
 export type TwoFactorSetupFlowProps = Readonly<{
   /** Whether the account has a password, which turning 2FA on then asks for. */

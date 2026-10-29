@@ -2,8 +2,8 @@
 
 import type { ValidationIssue } from "@prism/shared";
 import type { ReactNode } from "react";
-import { Api, NetworkError } from "../../../shared/api/client.ts";
-import { IssueList } from "../../../shared/ui/index.ts";
+import { Api, NetworkError } from "./client.ts";
+import { IssueList } from "../ui/index.ts";
 
 export const Failure = {
   /** The sentence for a request that never reached the server. */

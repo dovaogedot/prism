@@ -11,8 +11,8 @@ import { PageText } from "../../../shared/seo/page-text.ts";
 import { ChallengeState } from "../challenge-state.ts";
 import { NextPath } from "../next-path.ts";
 import { AuthShell } from "../components/index.ts";
-import { Failure } from "../components/failure.tsx";
-import { TokenStore } from "../token-store.ts";
+import { Failure } from "../../../shared/api/failure.tsx";
+import { TokenStore } from "../../../shared/api/token-store.ts";
 
 /**
  * What the person types. The challenge token is no field of the form, so

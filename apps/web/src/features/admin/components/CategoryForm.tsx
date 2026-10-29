@@ -3,8 +3,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { Alert, Button, Field, TextAreaField } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
-import { ServerIssues, Slugs } from "../forms.ts";
+import { Failure } from "../../../shared/api/failure.tsx";
+import { Slugs } from "../forms.ts";
+import { ServerIssues } from "../../../shared/ui/server-issues.ts";
 
 /** The category being changed, or none for a new one; what saving does; and how to leave without saving. */
 export type CategoryFormProps = Readonly<{

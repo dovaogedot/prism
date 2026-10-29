@@ -24,7 +24,7 @@ import { TermsPage } from "../features/pages/pages/TermsPage.tsx";
 import { ContactPage } from "../features/support/pages/ContactPage.tsx";
 import { AdminAccess } from "../features/admin/admin.ts";
 import { ApiError, NetworkError } from "../shared/api/client.ts";
-import { TokenStore } from "../features/auth/token-store.ts";
+import { TokenStore } from "../shared/api/token-store.ts";
 import { AdminRoutes } from "./admin-routes.ts";
 import { Root } from "./Root.tsx";
 import "./styles.css";

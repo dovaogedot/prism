@@ -4,11 +4,11 @@ import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, DataTable, EmptyState, Field, Pagination, SelectField, Skeleton } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
-import { CatalogParams } from "../../catalog/filters.ts";
-import { OrderTime } from "../../orders/orders.ts";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { useAdminRead, useParamDraft } from "../admin.ts";
 import { AdminPage } from "../components/index.ts";
+import { DateTime } from "../../../shared/format/date-time.ts";
+import { UrlParams } from "../../../shared/url/url-params.ts";
 
 /**
  * The shop's accounts: one customer found by their exact email, or the
@@ -35,7 +35,7 @@ export const UsersPage = () => {
           role="search"
           onSubmit={(event) => {
             event.preventDefault();
-            filter(CatalogParams.set(params, "email", email.trim()));
+            filter(UrlParams.set(params, "email", email.trim()));
           }}
         >
           <Field
@@ -53,7 +53,7 @@ export const UsersPage = () => {
           />
         </form>
         <div className="flex flex-wrap items-end gap-5">
-          <SelectField label="Staff role" id="user-role" value={params.get("role") ?? ""} onChange={(event) => filter(CatalogParams.set(params, "role", event.target.value))}>
+          <SelectField label="Staff role" id="user-role" value={params.get("role") ?? ""} onChange={(event) => filter(UrlParams.set(params, "role", event.target.value))}>
             <option value="">Any account</option>
             {StaffRole.NAMES.map((role) => (
               <option key={role} value={role}>
@@ -66,7 +66,7 @@ export const UsersPage = () => {
               className="size-4 accent-[var(--color-accent)]"
               type="checkbox"
               checked={params.get("staff") === "true"}
-              onChange={(event) => filter(CatalogParams.set(params, "staff", event.target.checked ? "true" : ""))}
+              onChange={(event) => filter(UrlParams.set(params, "staff", event.target.checked ? "true" : ""))}
             />
             Staff only
           </label>
@@ -99,10 +99,10 @@ export const UsersPage = () => {
                 { key: "roles", header: "Staff roles", cell: (user) => (user.roles.length === 0 ? "Customer" : user.roles.map((role) => StaffRole.label[role]).join(", ")) },
                 { key: "2fa", header: "2FA", cell: (user) => (user.twoFactorEnabled ? "On" : "Off") },
                 { key: "status", header: "Status", cell: (user) => (user.disabledAt === undefined ? "Active" : <span className="font-medium text-danger">Disabled</span>) },
-                { key: "joined", header: "Joined", cell: (user) => <span className="whitespace-nowrap">{OrderTime.day(user.createdAt)}</span> },
+                { key: "joined", header: "Joined", cell: (user) => <span className="whitespace-nowrap">{DateTime.day(user.createdAt)}</span> },
               ]}
             />
-            <Pagination page={data.page} totalPages={data.totalPages} label="Account pages" onPage={(page) => setParams(CatalogParams.set(params, "page", String(page)))} />
+            <Pagination page={data.page} totalPages={data.totalPages} label="Account pages" onPage={(page) => setParams(UrlParams.set(params, "page", String(page)))} />
           </>
         ))}
     </AdminPage>

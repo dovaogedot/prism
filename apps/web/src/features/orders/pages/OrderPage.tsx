@@ -5,16 +5,17 @@ import { Link, useParams, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { Alert, Card, Skeleton } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { SignInFirst } from "../../auth/components/index.ts";
 import { useSession } from "../../auth/session.ts";
 import { CartCache } from "../../cart/cart.ts";
 import { Picture } from "../../catalog/components/index.ts";
 import { DeliveryDates } from "../../../shared/format/delivery-dates.ts";
 import { CancelOrderButton, OrderConfirmation, OrderTimeline, StatusBadge } from "../components/index.ts";
-import { OrderPolling, OrderTime, PaymentWords, useOrder } from "../orders.ts";
+import { OrderPolling, PaymentWords, useOrder } from "../orders.ts";
 import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
+import { DateTime } from "../../../shared/format/date-time.ts";
 
 /**
  * One order: its status and history, what is in it, where it goes and how it
@@ -94,7 +95,7 @@ export const OrderPage = () => {
               <div>
                 <h1 className="text-2xl font-semibold tracking-tight text-ink">Order #{data.number}</h1>
                 <p className="text-sm text-ink-soft">
-                  Placed <time dateTime={data.createdAt}>{OrderTime.format(data.createdAt)}</time>
+                  Placed <time dateTime={data.createdAt}>{DateTime.format(data.createdAt)}</time>
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -224,7 +225,7 @@ export const OrderPage = () => {
 
                 {data.status === "pending_payment" && data.paymentDueAt !== undefined && !placed ? (
                   <p className="text-sm text-ink-soft">
-                    Unpaid orders are canceled at {OrderTime.format(data.paymentDueAt)}.
+                    Unpaid orders are canceled at {DateTime.format(data.paymentDueAt)}.
                   </p>
                 ) : null}
 

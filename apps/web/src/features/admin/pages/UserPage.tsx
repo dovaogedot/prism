@@ -5,13 +5,13 @@ import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, Card, ConfirmDialog, Skeleton, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { useSession } from "../../auth/session.ts";
 import { StatusBadge } from "../../orders/components/index.ts";
-import { OrderTime } from "../../orders/orders.ts";
 import { useAdminRead, useAdminWrite } from "../admin.ts";
 import { AdminPage } from "../components/index.ts";
 import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
+import { DateTime } from "../../../shared/format/date-time.ts";
 
 /** One of the account actions only staff managers take, which each ask first. */
 type AccountAction = "disable" | "enable" | "reset-two-factor" | "sign-out";
@@ -81,13 +81,13 @@ export const UserPage = () => {
               <h2 className="mb-2 text-base font-semibold text-ink">The account</h2>
               <p className="text-ink">{data.fullName ?? "No name given"}</p>
               {data.phone === undefined ? null : <p className="text-ink-soft">{data.phone}</p>}
-              <p className="text-ink-soft">Joined {OrderTime.format(data.createdAt)}</p>
+              <p className="text-ink-soft">Joined {DateTime.format(data.createdAt)}</p>
               <p className="text-ink-soft">
                 Signs in with {[...(data.hasPassword ? ["a password"] : []), ...data.providers.map((provider) => OAuthProvider.label[provider])].join(" and ")}
               </p>
               <p className="text-ink-soft">Two-factor authentication {data.twoFactorEnabled ? "on" : "off"}</p>
               <p className="text-ink-soft">{data.liveSessions === 1 ? "1 session signed in" : `${data.liveSessions} sessions signed in`}</p>
-              {data.disabledAt === undefined ? null : <p className="font-medium text-danger">Disabled since {OrderTime.format(data.disabledAt)}</p>}
+              {data.disabledAt === undefined ? null : <p className="font-medium text-danger">Disabled since {DateTime.format(data.disabledAt)}</p>}
             </Card>
 
             <Card className="p-5">

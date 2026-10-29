@@ -5,12 +5,12 @@ import { Api } from "../../../shared/api/client.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, DataTable, EmptyState, Field, Pagination, SelectField, Skeleton } from "../../../shared/ui/index.ts";
 import { DateFilter, useDateFilter } from "../../../shared/hooks/use-date-filter.ts";
-import { Failure } from "../../auth/components/failure.tsx";
-import { CatalogParams } from "../../catalog/filters.ts";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { StatusBadge } from "../../orders/components/index.ts";
-import { OrderTime } from "../../orders/orders.ts";
 import { useAdminRead, useParamDraft } from "../admin.ts";
 import { AdminPage } from "../components/index.ts";
+import { DateTime } from "../../../shared/format/date-time.ts";
+import { UrlParams } from "../../../shared/url/url-params.ts";
 
 /**
  * Every order, for the staff who handle them: filtered by status, dates,
@@ -28,9 +28,9 @@ export const OrdersPage = () => {
 
   const [email, setEmail] = useParamDraft(params, "email");
 
-  const from = useDateFilter(params.get("from") ?? "", (date) => setParams(CatalogParams.set(params, "from", date)), { max: DateFilter.boundOf(params.get("to")) });
+  const from = useDateFilter(params.get("from") ?? "", (date) => setParams(UrlParams.set(params, "from", date)), { max: DateFilter.boundOf(params.get("to")) });
 
-  const to = useDateFilter(params.get("to") ?? "", (date) => setParams(CatalogParams.set(params, "to", date)), { min: DateFilter.boundOf(params.get("from")) });
+  const to = useDateFilter(params.get("to") ?? "", (date) => setParams(UrlParams.set(params, "to", date)), { min: DateFilter.boundOf(params.get("from")) });
 
   const statuses = params.getAll("status");
 
@@ -46,7 +46,7 @@ export const OrdersPage = () => {
               key={status}
               type="button"
               aria-pressed={statuses.includes(status)}
-              onClick={() => setParams(CatalogParams.toggle(params, "status", status))}
+              onClick={() => setParams(UrlParams.toggle(params, "status", status))}
             >
               {OrderStatus.label[status]}
             </button>
@@ -57,7 +57,7 @@ export const OrdersPage = () => {
           className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] lg:items-end"
           onSubmit={(event) => {
             event.preventDefault();
-            setParams(CatalogParams.set(CatalogParams.set(params, "number", number.trim().replace(/^#/, "")), "email", email.trim()));
+            setParams(UrlParams.set(UrlParams.set(params, "number", number.trim().replace(/^#/, "")), "email", email.trim()));
           }}
         >
           <Field label="Order number" id="order-number" inputMode="numeric" value={number} onChange={(event) => setNumber(event.target.value)} />
@@ -74,7 +74,7 @@ export const OrdersPage = () => {
             label="Sort by"
             id="order-sort"
             value={OrderSort.schema.catch("newest").parse(params.get("sort") ?? "newest")}
-            onChange={(event) => setParams(CatalogParams.set(params, "sort", event.target.value))}
+            onChange={(event) => setParams(UrlParams.set(params, "sort", event.target.value))}
           >
             {OrderSort.NAMES.map((sort) => (
               <option key={sort} value={sort}>
@@ -114,7 +114,7 @@ export const OrdersPage = () => {
                     </Link>
                   ),
                 },
-                { key: "placed", header: "Placed", cell: (order) => <span className="whitespace-nowrap">{OrderTime.format(order.createdAt)}</span> },
+                { key: "placed", header: "Placed", cell: (order) => <span className="whitespace-nowrap">{DateTime.format(order.createdAt)}</span> },
                 {
                   key: "customer",
                   header: "Customer",
@@ -136,7 +136,7 @@ export const OrdersPage = () => {
               page={data.page}
               totalPages={data.totalPages}
               label="Order pages"
-              onPage={(page) => setParams(CatalogParams.set(params, "page", String(page)))}
+              onPage={(page) => setParams(UrlParams.set(params, "page", String(page)))}
             />
           </>
         ))}

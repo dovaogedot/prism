@@ -9,7 +9,7 @@
 import { useState } from "react";
 import { Navigate, Outlet } from "react-router";
 import { match } from "ts-pattern";
-import { TokenStore } from "../token-store.ts";
+import { TokenStore } from "../../../shared/api/token-store.ts";
 
 /**
  * The question is whether the visitor was already signed in on arrival, not

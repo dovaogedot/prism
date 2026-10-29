@@ -20,9 +20,9 @@ import { match } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { useWide } from "../../../shared/layout/use-wide.ts";
 import { Alert, Button, Card, IssueList } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { CartCache } from "../../cart/cart.ts";
-import { CheckoutDefaults, CheckoutIssues, PaymentErrors, PaymentMode, ShippingOptionKeys } from "../checkout.ts";
+import { CheckoutDefaults, CheckoutIssues, PaymentErrors, PaymentMode } from "../checkout.ts";
 import { NextPath } from "../../auth/next-path.ts";
 import { AddressFields } from "./AddressFields.tsx";
 import { BillingFields } from "./BillingFields.tsx";
@@ -31,6 +31,7 @@ import { OrderSummary } from "./OrderSummary.tsx";
 import { PaymentFields } from "./PaymentFields.tsx";
 import { SavedAddressPicker } from "./SavedAddressPicker.tsx";
 import { ShippingOptions } from "./ShippingOptions.tsx";
+import { ShippingOptionKeys } from "../../../shared/api/shipping-options.ts";
 
 /**
  * Whether a card can be taken, and the Stripe objects to take it with. A

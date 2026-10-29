@@ -3,8 +3,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { Alert, Button, Field } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
-import { ServerIssues, ShippingFields, ShippingForm } from "../forms.ts";
+import { Failure } from "../../../shared/api/failure.tsx";
+import { ShippingFields, ShippingForm } from "../forms.ts";
+import { ServerIssues } from "../../../shared/ui/server-issues.ts";
 
 /** The option being changed, or none for a new one; where a new one goes in the list; what saving does; and how to leave. */
 export type ShippingMethodFormProps = Readonly<{

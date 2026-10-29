@@ -3,8 +3,7 @@
  * takes in cents, and slugs made from a name.
  */
 
-import { ProductFields, ProductInput, ShippingMethodCode, ShippingMethodInput, type ShippingMethodView, type ValidationIssue } from "@prism/shared";
-import type { FieldValues, Path, UseFormSetError } from "react-hook-form";
+import { ProductFields, ProductInput, ShippingMethodCode, ShippingMethodInput, type ShippingMethodView } from "@prism/shared";
 import { z } from "zod";
 
 export const Cents = {
@@ -51,35 +50,6 @@ export const Slugs = {
 export type ProductForm = z.input<typeof ProductForm.schema>;
 export const ProductForm = {
   schema: ProductInput.schema.omit({ priceCents: true }).extend({ price: Euros.schema.pipe(ProductFields.priceCents) }),
-} as const;
-
-export const ServerIssues = {
-  /**
-   * Puts each issue the server found under the field it names, and hands
-   * back the ones no field shows. `renamed` maps the API's names to the
-   * form's, such as `priceCents` to `price`.
-   */
-  place: <Values extends FieldValues>(
-    issues: readonly ValidationIssue[],
-    fields: readonly string[],
-    setError: UseFormSetError<Values>,
-    renamed: Readonly<Record<string, string>> = {},
-  ): readonly ValidationIssue[] => {
-    const unplaced: ValidationIssue[] = [];
-
-    for (const issue of issues) {
-      const path = renamed[issue.path] ?? issue.path;
-      const isField = fields.includes(path) || fields.some((field) => path.startsWith(`${field}.`));
-
-      if (isField) {
-        setError(path as Path<Values>, { message: issue.message });
-      } else {
-        unplaced.push(issue);
-      }
-    }
-
-    return unplaced;
-  },
 } as const;
 
 /** The delivery option form's fields: the API's option, with the prices typed in euros. */

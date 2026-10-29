@@ -3,7 +3,7 @@ import { useState } from "react";
 import { match, P } from "ts-pattern";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, ConfirmDialog, EmptyState, Skeleton, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { useAccountChanges, useSavedAddresses } from "../account.ts";
 import { AccountPage, AddressCard, AddressForm } from "../components/index.ts";
 import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";

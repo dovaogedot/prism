@@ -4,12 +4,12 @@ import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, DataTable, EmptyState, Field, Pagination, Skeleton } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { DateFilter, useDateFilter } from "../../../shared/hooks/use-date-filter.ts";
-import { CatalogParams } from "../../catalog/filters.ts";
-import { OrderTime } from "../../orders/orders.ts";
 import { useAdminRead, useParamDraft } from "../admin.ts";
 import { AdminPage } from "../components/index.ts";
+import { DateTime } from "../../../shared/format/date-time.ts";
+import { UrlParams } from "../../../shared/url/url-params.ts";
 
 /**
  * The audit log, newest first: every change staff made, who made it and
@@ -29,9 +29,9 @@ export const AuditPage = () => {
 
   const events = useAdminRead<Page<AuditEventView>>(Api.withQuery("/audit", query));
 
-  const from = useDateFilter(params.get("from") ?? "", (date) => filter(CatalogParams.set(params, "from", date)), { max: DateFilter.boundOf(params.get("to")) });
+  const from = useDateFilter(params.get("from") ?? "", (date) => filter(UrlParams.set(params, "from", date)), { max: DateFilter.boundOf(params.get("to")) });
 
-  const to = useDateFilter(params.get("to") ?? "", (date) => filter(CatalogParams.set(params, "to", date)), { min: DateFilter.boundOf(params.get("from")) });
+  const to = useDateFilter(params.get("to") ?? "", (date) => filter(UrlParams.set(params, "to", date)), { min: DateFilter.boundOf(params.get("from")) });
 
   const [action, setAction] = useParamDraft(params, "action");
 
@@ -45,7 +45,7 @@ export const AuditPage = () => {
         className="grid gap-3 rounded-lg border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end"
         onSubmit={(event) => {
           event.preventDefault();
-          filter(CatalogParams.set(CatalogParams.set(CatalogParams.set(params, "action", action.trim()), "targetType", targetType.trim()), "targetId", targetId.trim()));
+          filter(UrlParams.set(UrlParams.set(UrlParams.set(params, "action", action.trim()), "targetType", targetType.trim()), "targetId", targetId.trim()));
         }}
       >
         <Field label="Action" id="audit-action" placeholder="product. or order.refund" value={action} onChange={(event) => setAction(event.target.value)} />
@@ -59,7 +59,7 @@ export const AuditPage = () => {
         {params.get("actor") === null ? null : (
           <p className="self-center text-sm text-ink-soft">
             One person's changes.{" "}
-            <button className="font-medium text-accent underline underline-offset-2" type="button" onClick={() => filter(CatalogParams.set(params, "actor", ""))}>
+            <button className="font-medium text-accent underline underline-offset-2" type="button" onClick={() => filter(UrlParams.set(params, "actor", ""))}>
               Show everyone's
             </button>
           </p>
@@ -80,7 +80,7 @@ export const AuditPage = () => {
               rows={data.items}
               rowKey={(event) => String(event.id)}
               columns={[
-                { key: "at", header: "When", cell: (event) => <span className="whitespace-nowrap">{OrderTime.format(event.at)}</span> },
+                { key: "at", header: "When", cell: (event) => <span className="whitespace-nowrap">{DateTime.format(event.at)}</span> },
                 {
                   key: "actor",
                   header: "Who",
@@ -136,7 +136,7 @@ export const AuditPage = () => {
                 { key: "ip", header: "From", cell: (event) => <span className="font-mono text-xs">{event.ip ?? ""}</span> },
               ]}
             />
-            <Pagination page={data.page} totalPages={data.totalPages} label="Log pages" onPage={(page) => setParams(CatalogParams.set(params, "page", String(page)))} />
+            <Pagination page={data.page} totalPages={data.totalPages} label="Log pages" onPage={(page) => setParams(UrlParams.set(params, "page", String(page)))} />
           </>
         ))}
     </AdminPage>

@@ -1,9 +1,9 @@
 import { useId } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { useSession, useSignOut } from "../../features/auth/session.ts";
-import { Popover } from "../ui/index.ts";
+import { useSession, useSignOut } from "../features/auth/session.ts";
+import { Popover } from "../shared/ui/index.ts";
 import { AccountLinks } from "./account-links.ts";
-import { LookClass } from "./look.ts";
+import { LookClass } from "../shared/layout/look.ts";
 
 /**
  * The header's account control. A guest gets the way to sign in, which

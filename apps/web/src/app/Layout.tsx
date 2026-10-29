@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, ScrollRestoration, useLocation } from "react-router";
-import { PageHeading } from "../seo/page-heading.ts";
-import { RouteAnnouncer } from "../seo/RouteAnnouncer.tsx";
-import { Toaster } from "../ui/index.ts";
-import { Drawer, type Drawer as DrawerHandle } from "./drawer.ts";
+import { PageHeading } from "../shared/seo/page-heading.ts";
+import { RouteAnnouncer } from "../shared/seo/RouteAnnouncer.tsx";
+import { Toaster } from "../shared/ui/index.ts";
+import { Drawer, type Drawer as DrawerHandle } from "../shared/layout/drawer.ts";
 import { DrawerMenu } from "./DrawerMenu.tsx";
 import { Footer } from "./Footer.tsx";
 import { Header } from "./Header.tsx";
-import { LookClass } from "./look.ts";
-import { useWide } from "./use-wide.ts";
+import { LookClass } from "../shared/layout/look.ts";
+import { useWide } from "../shared/layout/use-wide.ts";
 
 /**
  * The header and footer every page sits between, and the drawer a narrow

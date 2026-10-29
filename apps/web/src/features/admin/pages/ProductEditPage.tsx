@@ -5,7 +5,7 @@ import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, ConfirmDialog, Skeleton, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { useAdminRead, useAdminWrite } from "../admin.ts";
 import { AdminPage, ProductForm, ProductImages } from "../components/index.ts";
 import { Cents } from "../forms.ts";

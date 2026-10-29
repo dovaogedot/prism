@@ -6,13 +6,14 @@ import { Api } from "../../../shared/api/client.ts";
 import { DeliveryDates } from "../../../shared/format/delivery-dates.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, Card, ConfirmDialog, Field, Skeleton, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { useSession } from "../../auth/session.ts";
 import { OrderTimeline, StatusBadge } from "../../orders/components/index.ts";
-import { OrderTime, PaymentWords } from "../../orders/orders.ts";
+import { PaymentWords } from "../../orders/orders.ts";
 import { useAdminRead, useAdminWrite } from "../admin.ts";
 import { AdminPage } from "../components/index.ts";
 import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
+import { DateTime } from "../../../shared/format/date-time.ts";
 
 /** Which confirmation is open. */
 type Confirming = "none" | "cancel" | "refund";
@@ -171,7 +172,7 @@ export const OrderPage = () => {
               <p className="text-ink">{data.contact.fullName}</p>
               <p className="break-all text-ink-soft">{data.contact.email}</p>
               <p className="text-ink-soft">{data.contact.phone}</p>
-              <p className="pt-1 text-ink-soft">Placed {OrderTime.format(data.createdAt)}</p>
+              <p className="pt-1 text-ink-soft">Placed {DateTime.format(data.createdAt)}</p>
               {data.userId === undefined ? (
                 <p className="text-ink-soft">Placed as a guest.</p>
               ) : Permission.can(roles, "customers.view") ? (

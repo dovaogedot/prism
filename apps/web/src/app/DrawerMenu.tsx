@@ -1,9 +1,9 @@
 import { Link, useLocation, useNavigate } from "react-router";
-import { useSession, useSignOut } from "../../features/auth/session.ts";
-import { useCategories } from "../../features/catalog/catalog.ts";
+import { useSession, useSignOut } from "../features/auth/session.ts";
+import { useCategories } from "../features/catalog/catalog.ts";
 import { AccountLinks } from "./account-links.ts";
-import { LookClass } from "./look.ts";
-import { ThemeToggle } from "./ThemeToggle.tsx";
+import { LookClass } from "../shared/layout/look.ts";
+import { ThemeToggle } from "../shared/layout/ThemeToggle.tsx";
 
 /** What signing out from the drawer does first: close it. */
 export type DrawerMenuProps = Readonly<{ onClose: () => void }>;

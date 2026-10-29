@@ -1,8 +1,8 @@
 import { Price, type OrderSummary } from "@prism/shared";
 import { Link } from "react-router";
 import { Picture } from "../../catalog/components/index.ts";
-import { OrderTime } from "../orders.ts";
 import { StatusBadge } from "./StatusBadge.tsx";
+import { DateTime } from "../../../shared/format/date-time.ts";
 
 /** The order to show. */
 export type OrderRowProps = Readonly<{ order: OrderSummary }>;
@@ -19,7 +19,7 @@ export const OrderRow = ({ order }: OrderRowProps) => (
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-ink">Order #{order.number}</p>
         <p className="text-sm text-ink-soft">
-          <time dateTime={order.createdAt}>{OrderTime.day(order.createdAt)}</time> · {order.itemCount} item
+          <time dateTime={order.createdAt}>{DateTime.day(order.createdAt)}</time> · {order.itemCount} item
           {order.itemCount === 1 ? "" : "s"}
         </p>
       </div>

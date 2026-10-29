@@ -1,8 +1,8 @@
 import { OrderSort, OrderStatus } from "@prism/shared";
 import { useSearchParams } from "react-router";
 import { DateFilter, useDateFilter } from "../../../shared/hooks/use-date-filter.ts";
-import { CatalogParams } from "../../catalog/filters.ts";
 import { OrderParams } from "../orders.ts";
+import { UrlParams } from "../../../shared/url/url-params.ts";
 
 /**
  * The list's filters: a chip per status, any number of them at once, a date
@@ -16,9 +16,9 @@ export const OrderFilters = () => {
     setParams(next, { preventScrollReset: true });
   };
 
-  const from = useDateFilter(params.get("from") ?? "", (date) => filter(CatalogParams.set(params, "from", date)), { max: DateFilter.boundOf(params.get("to")) });
+  const from = useDateFilter(params.get("from") ?? "", (date) => filter(UrlParams.set(params, "from", date)), { max: DateFilter.boundOf(params.get("to")) });
 
-  const to = useDateFilter(params.get("to") ?? "", (date) => filter(CatalogParams.set(params, "to", date)), { min: DateFilter.boundOf(params.get("from")) });
+  const to = useDateFilter(params.get("to") ?? "", (date) => filter(UrlParams.set(params, "to", date)), { min: DateFilter.boundOf(params.get("from")) });
 
   const chosen = OrderParams.statuses(params);
   const sort = OrderSort.schema.catch("newest").parse(params.get("sort") ?? "newest");
@@ -37,7 +37,7 @@ export const OrderFilters = () => {
               key={status}
               type="button"
               aria-pressed={on}
-              onClick={() => filter(CatalogParams.toggle(params, "status", status))}
+              onClick={() => filter(UrlParams.toggle(params, "status", status))}
               className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                 on ? "border-accent bg-accent text-accent-ink" : "border-line text-ink-soft hover:border-line-strong hover:text-ink"
               }`}
@@ -61,7 +61,7 @@ export const OrderFilters = () => {
           <span className="block">Sort</span>
           <select
             value={sort}
-            onChange={(event) => filter(CatalogParams.set(params, "sort", event.target.value))}
+            onChange={(event) => filter(UrlParams.set(params, "sort", event.target.value))}
             className={dateInput}
           >
             {OrderSort.NAMES.map((option) => (

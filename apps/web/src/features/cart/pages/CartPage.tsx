@@ -1,13 +1,13 @@
 import { Cart, Price } from "@prism/shared";
 import { Link } from "react-router";
 import { match, P } from "ts-pattern";
-import { Failure } from "../../auth/components/failure.tsx";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { Alert, Card, Skeleton } from "../../../shared/ui/index.ts";
-import { useShippingOptions } from "../../checkout/checkout.ts";
 import { FreeShipping, useCart } from "../cart.ts";
 import { CartLineItem, Recommendations } from "../components/index.ts";
 import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
+import { useShippingOptions } from "../../../shared/api/shipping-options.ts";
 
 /**
  * The cart: every line with its picture, price and quantity, the subtotal,

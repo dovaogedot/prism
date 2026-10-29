@@ -4,10 +4,10 @@ import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, DataTable, EmptyState, Field, ImageSet, Pagination, SelectField, Skeleton } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
-import { CatalogParams } from "../../catalog/filters.ts";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { useAdminRead, useParamDraft } from "../admin.ts";
 import { AdminPage } from "../components/index.ts";
+import { UrlParams } from "../../../shared/url/url-params.ts";
 
 /**
  * The catalog for its content managers: found by name or slug, filtered by
@@ -49,7 +49,7 @@ export const ProductsPage = () => {
           role="search"
           onSubmit={(event) => {
             event.preventDefault();
-            filter(CatalogParams.set(params, "q", text.trim()));
+            filter(UrlParams.set(params, "q", text.trim()));
           }}
         >
           <div className="min-w-48 flex-1">
@@ -61,7 +61,7 @@ export const ProductsPage = () => {
         </form>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <SelectField label="Category" id="product-category" value={params.get("category") ?? ""} onChange={(event) => filter(CatalogParams.set(params, "category", event.target.value))}>
+          <SelectField label="Category" id="product-category" value={params.get("category") ?? ""} onChange={(event) => filter(UrlParams.set(params, "category", event.target.value))}>
             <option value="">Any category</option>
             {(categories.data?.items ?? []).map((category) => (
               <option key={category.id} value={category.slug}>
@@ -69,7 +69,7 @@ export const ProductsPage = () => {
               </option>
             ))}
           </SelectField>
-          <SelectField label="Brand" id="product-brand" value={params.get("brand") ?? ""} onChange={(event) => filter(CatalogParams.set(params, "brand", event.target.value))}>
+          <SelectField label="Brand" id="product-brand" value={params.get("brand") ?? ""} onChange={(event) => filter(UrlParams.set(params, "brand", event.target.value))}>
             <option value="">Any brand</option>
             {(brands.data?.items ?? []).map((brand) => (
               <option key={brand.id} value={brand.slug}>
@@ -77,7 +77,7 @@ export const ProductsPage = () => {
               </option>
             ))}
           </SelectField>
-          <SelectField label="Sort by" id="product-sort" value={params.get("sort") ?? "name_asc"} onChange={(event) => filter(CatalogParams.set(params, "sort", event.target.value))}>
+          <SelectField label="Sort by" id="product-sort" value={params.get("sort") ?? "name_asc"} onChange={(event) => filter(UrlParams.set(params, "sort", event.target.value))}>
             {AdminProductSort.NAMES.map((sort) => (
               <option key={sort} value={sort}>
                 {AdminProductSort.label[sort]}
@@ -92,7 +92,7 @@ export const ProductsPage = () => {
               className="size-4 accent-[var(--color-accent)]"
               type="checkbox"
               checked={params.get("lowStock") === "true"}
-              onChange={(event) => filter(CatalogParams.set(params, "lowStock", event.target.checked ? "true" : ""))}
+              onChange={(event) => filter(UrlParams.set(params, "lowStock", event.target.checked ? "true" : ""))}
             />
             Low on stock ({AdminProductQuery.LOW_STOCK} or fewer)
           </label>
@@ -101,7 +101,7 @@ export const ProductsPage = () => {
               className="size-4 accent-[var(--color-accent)]"
               type="checkbox"
               checked={params.get("featured") === "true"}
-              onChange={(event) => filter(CatalogParams.set(params, "featured", event.target.checked ? "true" : ""))}
+              onChange={(event) => filter(UrlParams.set(params, "featured", event.target.checked ? "true" : ""))}
             />
             Featured on the home page
           </label>
@@ -154,7 +154,7 @@ export const ProductsPage = () => {
                 { key: "featured", header: "Featured", cell: (product) => (product.isFeatured ? "Yes" : "") },
               ]}
             />
-            <Pagination page={data.page} totalPages={data.totalPages} label="Product pages" onPage={(page) => setParams(CatalogParams.set(params, "page", String(page)))} />
+            <Pagination page={data.page} totalPages={data.totalPages} label="Product pages" onPage={(page) => setParams(UrlParams.set(params, "page", String(page)))} />
           </>
         ))}
     </AdminPage>

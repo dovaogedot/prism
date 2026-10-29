@@ -5,12 +5,12 @@ import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, ConfirmDialog, Dialog, EmptyState, Pagination, Skeleton, Stars, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
-import { CatalogParams } from "../../catalog/filters.ts";
-import { OrderTime } from "../../orders/orders.ts";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { useAdminRead, useAdminWrite } from "../admin.ts";
 import { AdminPage, RejectForm } from "../components/index.ts";
 import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
+import { DateTime } from "../../../shared/format/date-time.ts";
+import { UrlParams } from "../../../shared/url/url-params.ts";
 
 /**
  * The moderation queue: reviews waiting for a moderator first, and those
@@ -37,7 +37,7 @@ export const ReviewsPage = () => {
     if (emptied === undefined) return;
 
     const last = String(Math.max(1, Math.min(emptied.page - 1, emptied.totalPages)));
-    if (params.get("page") !== last) setParams(CatalogParams.set(params, "page", last), { replace: true, preventScrollReset: true });
+    if (params.get("page") !== last) setParams(UrlParams.set(params, "page", last), { replace: true, preventScrollReset: true });
   }, [emptied, params, setParams]);
 
   const [rejecting, setRejecting] = useState<AdminReviewView | undefined>(undefined);
@@ -88,7 +88,7 @@ export const ReviewsPage = () => {
                     <Link className="font-medium text-accent underline-offset-2 hover:underline" to={`/products/${review.product.slug}`}>
                       {review.product.name}
                     </Link>
-                    <span className="text-sm text-ink-soft">{OrderTime.format(review.createdAt)}</span>
+                    <span className="text-sm text-ink-soft">{DateTime.format(review.createdAt)}</span>
                   </div>
                   <Stars rating={review.rating} count={1} isCountShown={false} />
                   {review.title === undefined ? null : <h2 className="font-semibold text-ink">{review.title}</h2>}
@@ -113,7 +113,7 @@ export const ReviewsPage = () => {
                 </li>
               ))}
             </ul>
-            <Pagination page={data.page} totalPages={data.totalPages} label="Review pages" onPage={(page) => setParams(CatalogParams.set(params, "page", String(page)))} />
+            <Pagination page={data.page} totalPages={data.totalPages} label="Review pages" onPage={(page) => setParams(UrlParams.set(params, "page", String(page)))} />
           </>
         ))}
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Failure } from "../src/features/auth/components/failure.tsx";
+import { Failure } from "../src/shared/api/failure.tsx";
 import { ApiError, NetworkError } from "../src/shared/api/client.ts";
 
 afterEach(() => {

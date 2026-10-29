@@ -4,7 +4,7 @@ import { match } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, Card, ConfirmDialog, DataTable, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { useAdminWrite } from "../admin.ts";
 import { AdminPage } from "../components/index.ts";
 

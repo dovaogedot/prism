@@ -4,7 +4,7 @@ import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, ConfirmDialog, DataTable, Dialog, Skeleton, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../auth/components/failure.tsx";
+import { Failure } from "../../../shared/api/failure.tsx";
 import { useAdminRead, useAdminWrite } from "../admin.ts";
 import { AdminPage, ShippingMethodForm } from "../components/index.ts";
 import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";

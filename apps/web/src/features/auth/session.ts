@@ -9,7 +9,7 @@
 import type { SessionUser } from "@prism/shared";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Api } from "../../shared/api/client.ts";
-import { TokenStore } from "./token-store.ts";
+import { TokenStore } from "../../shared/api/token-store.ts";
 
 /** Who is signed in, or `undefined`. Re-renders on every sign-in and sign-out. */
 export const useSession = (): SessionUser | undefined =>

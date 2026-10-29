@@ -8,15 +8,6 @@ import { OrderStatus, type OrderDetail, type OrderList, type PaymentSummary } fr
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Api } from "../../shared/api/client.ts";
 
-export const OrderTime = {
-  /** A moment as the customer's own clock reads it, in the day-month order every date in the shop uses. */
-  format: (iso: string): string =>
-    new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)),
-
-  /** A calendar day as the customer's own calendar reads it. */
-  day: (iso: string): string => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(iso)),
-} as const;
-
 /** The query keys of orders: one order as its owner or a guest's key opens it, and the lists. */
 export const OrderKeys = {
   lists: ["orders"] as const,
