@@ -6,8 +6,9 @@
  *   simulation CLI - all other dependencies are managed within containers."
  *
  * The payment simulation CLI is Stripe's, which the stack also runs as a
- * container of its own. The start script is checked for the programs a
- * shop is built from: none of them runs on the host.
+ * container of its own. The start scripts are checked for the programs a
+ * shop is built from and for download tools such as curl: none of them runs
+ * on the host.
  */
 
 import { existsSync, readFileSync } from "node:fs"
@@ -70,15 +71,21 @@ describe("starting it", () => {
     expect(fileOf("README.md")).toMatch(/2\. `docker compose up --build --detach`/)
   })
 
-  it.each(["start.sh", "start.ps1"])("runs %s's language runtimes, databases and tools through Docker, never on the host", (script) => {
-    const commands = fileOf(script)
-      .split("\n")
-      .filter((line) => !/^\s*#/.test(line) && !/^\s*(echo|Write-Host)\b/.test(line))
-    const onHost = commands.filter(
-      (line) =>
-        /\b(node|npm|npx|psql|k6|openssl|stripe|caddy|rabbitmqctl|playwright)\b/.test(line) && !/docker|_compose|Compose /.test(line),
-    )
+  it.each(["start.sh", "start.ps1"])(
+    "runs %s's language runtimes, databases and tools through Docker, and no download tool on the host",
+    (script) => {
+      const commands = fileOf(script)
+        .split("\n")
+        .filter((line) => !/^\s*#/.test(line) && !/^\s*(echo|Write-Host)\b/.test(line))
+      const onHost = commands.filter(
+        (line) =>
+          /\b(node|npm|npx|psql|k6|openssl|stripe|caddy|rabbitmqctl|playwright)\b/.test(line) && !/docker|_compose|Compose /.test(line),
+      )
+      // A download tool on the host is a prerequisite too, wherever on the line it is called.
+      const downloaders = commands.filter((line) => /\b(curl|curl\.exe|wget)\b/.test(line))
 
-    expect(onHost).toEqual([])
-  })
+      expect(onHost).toEqual([])
+      expect(downloaders).toEqual([])
+    },
+  )
 })
