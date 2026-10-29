@@ -420,7 +420,8 @@ export const reviewVotes = pgTable(
   {
     reviewId: uuid("review_id")
       .notNull()
-      .references(() => productReviews.id, { onDelete: "cascade" })
+      // An edited review takes a new id, and its votes go with it.
+      .references(() => productReviews.id, { onDelete: "cascade", onUpdate: "cascade" })
       .$type<ReviewId>(),
     userId: uuid("user_id")
       .notNull()

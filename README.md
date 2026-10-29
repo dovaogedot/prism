@@ -113,7 +113,7 @@ E2E_BASE_URL=https://localhost:3200 npm run e2e
 - A product shows the average of its approved reviews, how many there are, and how many gave each number of stars.
 - Reviews sort by "Most helpful", which is the default, "Newest", "Highest rating" or "Lowest rating".
 - **Helpful**: a signed-in shopper marks a review helpful once, and can take it back. Nobody votes for their own review.
-- **Writing a review** takes a signed-in customer with a delivered order of the product: 1 to 5 stars, a byline, and an optional title and text. Its author sees it as "Waiting for approval" until a moderator approves it; a rejected one shows the moderator's reason. Editing an approved review sends it back for approval. One review per product per person.
+- **Writing a review** takes a signed-in customer with a delivered order of the product: 1 to 5 stars, a byline, and an optional title and text. Its author sees it as "Waiting for approval" until a moderator approves it; a rejected one shows the moderator's reason. Editing a review sends it back for approval. One review per product per person.
 - The mail that says an order arrived links to the review form of each product in it.
 
 ### Cart
@@ -236,7 +236,7 @@ Every route is under `/api/v1` and answers JSON. A refusal is `{ "error": { "cod
 | `GET /products/:slug/related` | Up to 8 products from the same category. |
 | `GET /products/:slug/reviews` | Approved reviews with the average and the distribution. Reads `sort` (`helpful`, `newest`, `highest`, `lowest`) and `page`. |
 | `GET /products/:slug/reviews/viewer` | Whether the signed-in reader may review, their own review, and the reviews they found helpful. |
-| `PUT /products/:slug/reviews/mine` | Writes or edits the reader's review, which then waits for approval. |
+| `PUT /products/:slug/reviews/mine` | Writes or edits the reader's review, which then waits for approval under a new id; a moderator's decision on the old id finds nothing, so no text is published or rejected unread. Its helpful votes stay with it. |
 | `DELETE /products/:slug/reviews/mine` | Deletes it. |
 | `PUT /reviews/:id/vote` | Marks a review helpful. `DELETE` takes it back. |
 | `GET /cart` | The caller's cart. A guest's is found by the `prism_cart` cookie. |

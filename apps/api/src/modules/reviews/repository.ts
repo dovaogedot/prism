@@ -49,7 +49,11 @@ export type ReviewRepository = Readonly<{
   own: (productId: ProductId, userId: UserId) => Promise<OwnReview | undefined>;
   /** The reviews of the product the user found helpful. */
   votesOf: (productId: ProductId, userId: UserId) => Promise<readonly ReviewId[]>;
-  /** Writes or replaces the user's review, which then waits for a moderator again. */
+  /**
+   * Writes or replaces the user's review, which then waits for a moderator
+   * again under a new id, so a decision made on the text a moderator read
+   * never lands on newer text. Its helpful votes stay with it.
+   */
   saveOwn: (input: Readonly<{ productId: ProductId; userId: UserId; review: ReviewInput; now: Date }>) => Promise<void>;
   /** Resolves to whether there was a review to delete. */
   deleteOwn: (productId: ProductId, userId: UserId) => Promise<boolean>;
@@ -186,7 +190,10 @@ export const ReviewRepository = {
       await db
         .insert(productReviews)
         .values({ productId, userId, ...written, createdAt: now })
-        .onConflictDoUpdate({ target: [productReviews.productId, productReviews.userId], set: written });
+        .onConflictDoUpdate({
+          target: [productReviews.productId, productReviews.userId],
+          set: { ...written, id: sql`gen_random_uuid()` },
+        });
     },
 
     deleteOwn: async (productId, userId) => {

@@ -98,7 +98,8 @@ describe("who may review", () => {
     const first = jsonOf(await write(token));
     const second = jsonOf(await write(token, { ...review, rating: 2 }));
 
-    expect(second).toMatchObject({ id: first["id"], rating: 2, status: "pending" });
+    expect(second).toMatchObject({ rating: 2, status: "pending" });
+    expect(second["id"]).not.toBe(first["id"]);
     expect(await harness.database.sql`SELECT count(*)::int AS n FROM product_review`).toEqual([{ n: 1 }]);
   });
 });
@@ -124,6 +125,30 @@ describe("moderation", () => {
     expect(product["rating"]).toEqual({ average: 3.5, count: 2 });
   });
 
+  it("publishes no text the moderator did not read: a decision on the text before an edit finds nothing", async () => {
+    const token = await customer("buyer@example.com", "delivered");
+    const read = String(jsonOf(await write(token))["id"]);
+    const edited = String(jsonOf(await write(token, { ...review, body: "Text nobody has read yet." }))["id"]);
+
+    const stale = await approve(read);
+    const rejected = await Staff.call(harness, moderator, "POST", `/admin/reviews/${read}/reject`, { reason: "Too short." });
+
+    expect([stale.statusCode, rejected.statusCode]).toEqual([404, 404]);
+    expect((await viewerOf(token)).own).toMatchObject({ id: edited, status: "pending" });
+    expect((await publicPage()).count).toBe(0);
+  });
+
+  it("keeps an edited review's helpful votes", async () => {
+    const { id, token } = await approvedReview("buyer@example.com");
+    const voter = await customer("voter@example.com");
+    await call(voter, "PUT", `/reviews/${id}/vote`);
+
+    const edited = String(jsonOf(await write(token, { ...review, rating: 3 }))["id"]);
+    await approve(edited);
+
+    expect((await publicPage()).items).toEqual([expect.objectContaining({ id: edited, helpfulCount: 1 })]);
+  });
+
   it("shows the author why a review was rejected", async () => {
     const token = await customer("buyer@example.com", "delivered");
     const id = String(jsonOf(await write(token))["id"]);
@@ -136,13 +161,13 @@ describe("moderation", () => {
   });
 
   it("takes an edited review out of the average until it is approved again", async () => {
-    const { id, token } = await approvedReview("buyer@example.com");
+    const { token } = await approvedReview("buyer@example.com");
     expect((await publicPage()).count).toBe(1);
 
-    await write(token, { ...review, rating: 1 });
+    const edited = String(jsonOf(await write(token, { ...review, rating: 1 }))["id"]);
 
     expect((await publicPage()).count).toBe(0);
-    await approve(id);
+    await approve(edited);
     expect(await publicPage()).toMatchObject({ count: 1, average: 1 });
   });
 

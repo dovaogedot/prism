@@ -36,6 +36,13 @@
       "when": 1792581953975,
       "tag": "0004_category_shelf",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793273910520,
+      "tag": "0005_review_vote_follows_its_review",
+      "breakpoints": true
     }
   ]
 }
