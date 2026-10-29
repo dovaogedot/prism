@@ -72,6 +72,15 @@ describe("plans", () => {
     expect(await planOf("UPDATE customer_order SET cart_id = NULL WHERE cart_id = '5b1d8f3e-6f0a-4c2b-9a7e-1d2c3b4a5f60'")).toContain("customer_order_cart_idx");
   });
 
+  it("keeps planner statistics of the tables too small for autovacuum's default threshold", async () => {
+    const tables = await harness.database.sql`
+      SELECT relname, reloptions FROM pg_class WHERE relname IN ('category', 'brand', 'shipping_method') ORDER BY relname`;
+
+    expect(tables).toEqual(
+      ["brand", "category", "shipping_method"].map((relname) => ({ relname, reloptions: ["autovacuum_analyze_threshold=0"] })),
+    );
+  });
+
   it("reads a page of the moderation queue in order, with no sort", async () => {
     const plan = await planOf("SELECT id FROM product_review WHERE status = 'pending' ORDER BY updated_at, id LIMIT 20");
 
