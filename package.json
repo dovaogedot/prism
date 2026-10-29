@@ -13,11 +13,12 @@
   },
   "scripts": {
     "build": "npm run build --workspace @prism/shared",
-    "typecheck": "npm run build && npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run build && npm run typecheck --workspaces --if-present && tsc -p loadtest",
     "test": "npm run build && npm run test --workspaces --if-present",
     "test:unit": "npm run build && npm run test:unit --workspaces --if-present"
   },
   "devDependencies": {
+    "@types/k6": "^2.3.1",
     "typescript": "^7.0.2"
   },
   "allowScripts": {

@@ -81,7 +81,7 @@ Only development needs Node.
 ```sh
 npm ci && npm run build                         # the shared package both apps import
 npm run dev --workspace @prism/web              # storefront with hot reload, proxied to the running stack
-npm run typecheck
+npm run typecheck                               # every workspace and the load test
 npm run test:unit                               # unit tests of every workspace
 npm test --workspace @prism/api                 # unit, integration, security and flows; Docker running
 ```
