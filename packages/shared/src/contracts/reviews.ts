@@ -4,6 +4,7 @@
  */
 
 import { z } from "zod";
+import { StoredText } from "./catalog.ts";
 
 /** The identity of a review, as the database assigns it. */
 export type ReviewId = z.infer<typeof ReviewId.schema>;
@@ -43,6 +44,7 @@ export const OptionalText = {
       .string()
       .trim()
       .max(max, tooLong)
+      .refine(StoredText.hasNoNul, StoredText.NUL_MESSAGE)
       .transform((text) => (text.length === 0 ? undefined : text))
       .optional(),
 } as const;
@@ -61,7 +63,8 @@ export const ReviewInput = {
       .string({ error: "Enter the name to sign with." })
       .trim()
       .min(2, "Use at least 2 characters.")
-      .max(40, "Use at most 40 characters."),
+      .max(40, "Use at most 40 characters.")
+      .refine(StoredText.hasNoNul, StoredText.NUL_MESSAGE),
     title: OptionalText.of(120, "Use at most 120 characters."),
     body: OptionalText.of(2000, "Use at most 2,000 characters."),
   }),
@@ -75,7 +78,8 @@ export const RejectReviewInput = {
       .string({ error: "Say why, for the author." })
       .trim()
       .min(3, "Say why, for the author.")
-      .max(300, "Use at most 300 characters."),
+      .max(300, "Use at most 300 characters.")
+      .refine(StoredText.hasNoNul, StoredText.NUL_MESSAGE),
   }),
 } as const;
 

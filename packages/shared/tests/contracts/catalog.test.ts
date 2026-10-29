@@ -8,6 +8,7 @@ import {
   SuggestParams,
   Weight,
 } from "../../src/contracts/catalog.ts";
+import { ReviewInput } from "../../src/contracts/reviews.ts";
 
 describe("ProductQueryParams", () => {
   it("applies defaults to an empty query string", () => {
@@ -104,5 +105,16 @@ describe("measurements", () => {
 describe("Price.format", () => {
   it("renders cents as a currency amount", () => {
     expect(Price.format(1999)).toBe("€19.99");
+  });
+});
+
+describe("text that reaches Postgres", () => {
+  it("refuses the NUL character, which Postgres cannot store or compare", () => {
+    expect(ProductQueryParams.schema.safeParse({ "p.color": "\u0000" }).success).toBe(false);
+    expect(ProductQueryParams.schema.safeParse({ "p.color": ["red", "\u0000"] }).success).toBe(false);
+    expect(ProductQueryParams.schema.safeParse({ "p.\u0000": "red" }).success).toBe(false);
+    expect(ProductQueryParams.schema.safeParse({ "p.color": "red" }).success).toBe(true);
+    expect(ReviewInput.schema.safeParse({ rating: 4, authorName: "Mari", body: "Bright\u0000" }).success).toBe(false);
+    expect(ReviewInput.schema.safeParse({ rating: 4, authorName: "Mari", body: "Bright\nand steady" }).success).toBe(true);
   });
 });

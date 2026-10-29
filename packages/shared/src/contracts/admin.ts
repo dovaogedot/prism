@@ -5,7 +5,7 @@
 
 import { z } from "zod";
 import { Email, UserId, type OAuthProvider } from "./auth.ts";
-import { BrandId, CategoryId, ImageId, Slug, type ProductId, type ProductImage } from "./catalog.ts";
+import { BrandId, CategoryId, ImageId, Slug, StoredText, type ProductId, type ProductImage } from "./catalog.ts";
 import { OptionalText, ReviewStatus, type OwnReview } from "./reviews.ts";
 import { ShippingMethodCode, type ShippingOption } from "./checkout.ts";
 import { CalendarDay, OrderSort, OrderStatus, type OrderDetail, type OrderSummary } from "./orders.ts";
@@ -120,7 +120,7 @@ export const AuditQuery = {
       /** An exact action, or the start of one ending in a dot, such as `product.`. */
       action: z.string().trim().min(1).max(60).regex(/^[a-z_.]+$/, "Not an action name.").optional(),
       targetType: z.string().trim().min(1).max(40).regex(/^[a-z_]+$/, "Not a target type.").optional(),
-      targetId: z.string().trim().min(1).max(80).optional(),
+      targetId: z.string().trim().min(1).max(80).refine(StoredText.hasNoNul, StoredText.NUL_MESSAGE).optional(),
       from: CalendarDay.schema.optional(),
       to: CalendarDay.schema.optional(),
       ...Page.params,
@@ -277,12 +277,13 @@ export type AdminReviewView = OwnReview &
 
 /** The rules every product field follows, in the admin's form and in an import alike. */
 export const ProductFields = {
-  name: z.string({ error: "Enter a name." }).trim().min(1, "Enter a name.").max(200, "Use at most 200 characters."),
+  name: z.string({ error: "Enter a name." }).trim().min(1, "Enter a name.").max(200, "Use at most 200 characters.").refine(StoredText.hasNoNul, StoredText.NUL_MESSAGE),
   description: z
     .string({ error: "Enter a description." })
     .trim()
     .min(1, "Enter a description.")
-    .max(5000, "Use at most 5,000 characters."),
+    .max(5000, "Use at most 5,000 characters.")
+    .refine(StoredText.hasNoNul, StoredText.NUL_MESSAGE),
   priceCents: z
     .number({ error: "Enter a price." })
     .int("Enter whole cents.")
@@ -307,8 +308,8 @@ export const ProductFields = {
   slug: z.string({ error: "Enter a slug." }).trim().min(1, "Enter a slug.").pipe(Slug.schema),
   /** A category or brand named by its slug in an import. */
   reference: z.string({ error: "Name it by its slug." }).trim().min(1, "Name it by its slug.").pipe(Slug.schema),
-  propertyName: z.string().trim().min(1, "Name the property.").max(40, "Use at most 40 characters."),
-  propertyValue: z.string().trim().min(1, "Enter a value.").max(200, "Use at most 200 characters."),
+  propertyName: z.string().trim().min(1, "Name the property.").max(40, "Use at most 40 characters.").refine(StoredText.hasNoNul, StoredText.NUL_MESSAGE),
+  propertyValue: z.string().trim().min(1, "Enter a value.").max(200, "Use at most 200 characters.").refine(StoredText.hasNoNul, StoredText.NUL_MESSAGE),
   /** The most named properties one product carries. */
   MAX_PROPERTIES: 30,
 } as const;
@@ -384,7 +385,7 @@ export type AdminProductQuery = z.infer<typeof AdminProductQuery.schema>;
 export const AdminProductQuery = {
   schema: z.object({
     /** Part of the name or the slug. */
-    q: z.string().trim().max(120).optional(),
+    q: z.string().trim().max(120).refine(StoredText.hasNoNul, StoredText.NUL_MESSAGE).optional(),
     category: Slug.schema.optional(),
     brand: Slug.schema.optional(),
     featured: z.stringbool().optional(),
@@ -426,7 +427,7 @@ export type CategoryInput = z.infer<typeof CategoryInput.schema>;
 export const CategoryInput = {
   schema: z.strictObject({
     slug: ProductFields.slug,
-    name: z.string({ error: "Enter a name." }).trim().min(1, "Enter a name.").max(80, "Use at most 80 characters."),
+    name: z.string({ error: "Enter a name." }).trim().min(1, "Enter a name.").max(80, "Use at most 80 characters.").refine(StoredText.hasNoNul, StoredText.NUL_MESSAGE),
     /** What the category page says about it; empty is none. */
     description: OptionalText.of(1000, "Use at most 1,000 characters."),
   }),
@@ -437,7 +438,7 @@ export type BrandInput = z.infer<typeof BrandInput.schema>;
 export const BrandInput = {
   schema: z.strictObject({
     slug: ProductFields.slug,
-    name: z.string({ error: "Enter a name." }).trim().min(1, "Enter a name.").max(80, "Use at most 80 characters."),
+    name: z.string({ error: "Enter a name." }).trim().min(1, "Enter a name.").max(80, "Use at most 80 characters.").refine(StoredText.hasNoNul, StoredText.NUL_MESSAGE),
   }),
 } as const;
 

@@ -140,6 +140,11 @@ describe("GET /api/v1/products", () => {
     expect(jsonOf(await get("/api/v1/products?p.nonsense=x"))["total"]).toBe(0);
   });
 
+  it("refuses a filter holding the NUL character, which Postgres cannot compare", async () => {
+    expect((await get("/api/v1/products?p.color=%00")).statusCode).toBe(422);
+    expect((await get("/api/v1/products?p.%00=red")).statusCode).toBe(422);
+  });
+
   it("counts the whole match on a page past the end, and keeps a text search exact there", async () => {
     const past = jsonOf(await get("/api/v1/products?perPage=1&page=10"));
     const search = jsonOf(await get("/api/v1/products?q=lamp&perPage=1&page=10"));

@@ -73,9 +73,18 @@ export const SearchText = {
 } as const;
 
 /** A key repeated in a query string arrives as an array; a single one as a string. */
+/** Text that reaches Postgres, which refuses the NUL character in any text value. */
+export const StoredText = {
+  hasNoNul: (text: string): boolean => !text.includes("\u0000"),
+  NUL_MESSAGE: "The NUL character is not allowed.",
+} as const;
+
 export const MultiValue = {
   schema: z
-    .union([z.string().max(120), z.array(z.string().max(120)).max(50)])
+    .union([
+      z.string().max(120).refine(StoredText.hasNoNul, StoredText.NUL_MESSAGE),
+      z.array(z.string().max(120).refine(StoredText.hasNoNul, StoredText.NUL_MESSAGE)).max(50),
+    ])
     .transform((value) => (typeof value === "string" ? [value] : value)),
   /** The same, where every value has to be a slug. */
   slugs: z
@@ -127,7 +136,9 @@ export const ProductQueryParams = {
       (params: Readonly<Record<string, unknown>>): boolean =>
         Object.keys(params).filter((key) => key.startsWith(ProductQuery.PROPERTY_PREFIX)).length <= ProductQuery.MAX_PROPERTY_FILTERS,
       "Use at most 20 property filters.",
-    ),
+    )
+    // A property's name comes from its key, which reaches Postgres too.
+    .refine((params: Readonly<Record<string, unknown>>): boolean => Object.keys(params).every(StoredText.hasNoNul), StoredText.NUL_MESSAGE),
 } as const;
 
 export const ProductQuery = {
