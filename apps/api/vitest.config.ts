@@ -1,12 +1,12 @@
 import { defineConfig } from "vitest/config";
 
 /**
- * Four projects, split by what they cost to run and what they prove.
+ * The projects, split by what they cost to run and what they prove.
  *
  * `unit` touches nothing outside the process and finishes in under a second,
  * so it runs on every save. `integration`, `security` and `flows` each start
  * a real Postgres in a container and are the slower gate before a commit;
- * `flows` walks whole customer journeys through the API. CI runs all four
+ * `flows` walks whole customer journeys through the API. CI runs them all
  * before every deploy.
  */
 export default defineConfig({
