@@ -60,7 +60,13 @@ export const Shop = {
 
   /** A new guest: this user's cookies, and so its cart and session, are forgotten. */
   forget: (): void => {
-    http.cookieJar().clear(Shop.BASE);
+    const jar = http.cookieJar();
+
+    // A clear removes only the cookies stored at the path it names: the
+    // cart's lives under /api/v1, the session's under /api/v1/auth.
+    for (const path of ["/", "/api/v1/", "/api/v1/auth/"]) {
+      jar.clear(`${Shop.BASE}${path}`);
+    }
   },
 
   /** Reads the catalog the scenarios pick from: the best rated page of the largest size the API serves. Runs once, before any user starts. */
