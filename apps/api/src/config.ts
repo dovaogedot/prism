@@ -10,8 +10,10 @@ import { TotpSecret } from "./platform/totp.ts";
 
 /** An address that may or may not be this machine's. */
 export const LocalUrl = {
-  /** Whether `url` names this machine. */
+  /** Whether `url` names this machine; `false` for text that is no URL at all. */
   isLocal: (url: string): boolean => {
+    if (!URL.canParse(url)) return false;
+
     const host = new URL(url).hostname;
     return host === "localhost" || host === "127.0.0.1" || host === "[::1]";
   },
@@ -35,7 +37,9 @@ export const Environment = {
       DATABASE_URL: z.string().min(1, "DATABASE_URL is required."),
       DATABASE_POOL_SIZE: z.coerce.number().int().min(1).max(100).default(10),
       /** Where the browser reaches the site. Used for CORS and email links. */
-      PUBLIC_WEB_URL: z.url().default("http://localhost:3000"),
+      PUBLIC_WEB_URL: z
+        .url({ protocol: /^https?$/, error: "PUBLIC_WEB_URL must be an http or https address, such as https://shop.example.com." })
+        .default("http://localhost:3000"),
       JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters."),
       JWT_ISSUER: z.string().min(1).default("prism"),
       ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(15 * 60),

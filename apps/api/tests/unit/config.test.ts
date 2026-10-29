@@ -96,3 +96,13 @@ describe("the stand-ins for Google, GitHub and the CAPTCHA", () => {
     ]);
   });
 });
+
+describe("PUBLIC_WEB_URL", () => {
+  it("stops the start, with the reason, when it is not an http or https address", () => {
+    const wrong = "PUBLIC_WEB_URL must be an http or https address, such as https://shop.example.com.";
+
+    expect(problemsOf({ PUBLIC_WEB_URL: "localhost:3000" })).toContain(wrong);
+    // Beside a rule that reads the address, the field's own reason is still the answer, not a thrown error.
+    expect(problemsOf({ PUBLIC_WEB_URL: "localhost", PAYMENTS_MODE: "simulated" })).toContain(wrong);
+  });
+});
