@@ -3,7 +3,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
+import { Api } from "../../../shared/api/client.ts";
 import { Alert, Card, Skeleton } from "../../../shared/ui/index.ts";
+import { Failure } from "../../auth/components/failure.tsx";
+import { SignInFirst } from "../../auth/components/SignInFirst.tsx";
+import { useSession } from "../../auth/session.ts";
 import { Picture } from "../../catalog/components/Picture.tsx";
 import { DeliveryDates } from "../../../shared/format/delivery-dates.ts";
 import { CancelOrderButton, OrderConfirmation, OrderTimeline, StatusBadge } from "../components/index.ts";
@@ -24,10 +28,14 @@ export const OrderPage = () => {
 
   const [startedAt] = useState(() => Date.now());
 
+  const session = useSession();
+
   const key = params.get("key") ?? undefined;
   const placed = params.get("placed") === "1";
+  // A member's order mails carry no key, so a member who is signed out signs in first and comes back.
+  const needsSignIn = session === undefined && key === undefined;
 
-  const order = useOrder(id, key, startedAt);
+  const order = useOrder(id, key, startedAt, !needsSignIn);
 
   const client = useQueryClient();
 
@@ -38,6 +46,8 @@ export const OrderPage = () => {
     if (placed && status !== undefined && status !== "pending_payment") void client.invalidateQueries({ queryKey: ["cart"] });
   }, [placed, status, client]);
 
+  if (needsSignIn) return <SignInFirst />;
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
       <PageMeta
@@ -46,12 +56,19 @@ export const OrderPage = () => {
         isIndexed={false}
       />
       {match(order)
-        .with({ status: "error" }, () => (
-          <>
-            <h1 className="text-2xl font-semibold tracking-tight text-ink">Order not found</h1>
-            <Alert title="No such order">We could not find that order. Check the link from your email.</Alert>
-          </>
-        ))
+        .with({ status: "error" }, ({ error }) =>
+          Api.failureOf(error)?.code === "OrderNotFound" ? (
+            <>
+              <h1 className="text-2xl font-semibold tracking-tight text-ink">Order not found</h1>
+              <Alert title="No such order">We could not find that order. Check the link from your email.</Alert>
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl font-semibold tracking-tight text-ink">Your order</h1>
+              <Alert title="The order did not load">{Failure.message(error)}</Alert>
+            </>
+          ),
+        )
         .with({ data: P.nullish }, () => (
           <div className="space-y-4">
             <h1 className="text-2xl font-semibold tracking-tight text-ink">Your order</h1>

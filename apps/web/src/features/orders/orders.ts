@@ -49,10 +49,11 @@ export const useOrders = (query: string, enabled: boolean) =>
     retry: false,
   });
 
-/** One order, opened by its owner or with a guest's key, watched while its payment is pending. */
-export const useOrder = (orderId: string, key: string | undefined, startedAt: number) =>
+/** One order, opened by its owner or with a guest's key, watched while its payment is pending; fetched only when `enabled`. */
+export const useOrder = (orderId: string, key: string | undefined, startedAt: number, enabled: boolean) =>
   useQuery({
     queryKey: ["order", orderId, key],
+    enabled,
     queryFn: ({ signal }) =>
       Api.get<OrderDetail>(`/orders/${orderId}${key === undefined ? "" : `?key=${encodeURIComponent(key)}`}`, signal),
     retry: false,
