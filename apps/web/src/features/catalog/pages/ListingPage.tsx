@@ -154,7 +154,7 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
             </h2>
 
             {wide ? null : (
-              <Button tone="quiet" type="button" aria-haspopup="dialog" onClick={drawer.open} className={CatalogParams.isFiltered(params) ? "!border-accent" : ""}>
+              <Button tone="quiet" type="button" aria-haspopup="dialog" onClick={drawer.openAtSlot} className={CatalogParams.isFiltered(params) ? "!border-accent" : ""}>
                 Filters
               </Button>
             )}

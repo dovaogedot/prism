@@ -14,14 +14,16 @@ export type Drawer = Readonly<{
   slot: HTMLElement | undefined;
   /** Opens the drawer. Opening a drawer that is already open leaves it open. */
   open: () => void;
+  /** Opens the drawer at the page's own part, scrolled to its top, with its first control focused. */
+  openAtSlot: () => void;
 }>;
 
 export const Drawer = {
   /** The drawer outside any layout, which has nowhere to render and nothing to open. */
-  NONE: { slot: undefined, open: () => undefined } satisfies Drawer,
+  NONE: { slot: undefined, open: () => undefined, openAtSlot: () => undefined } satisfies Drawer,
 
   /** The layout's drawer, for every page under it. */
-  Context: createContext<Drawer>({ slot: undefined, open: () => undefined }),
+  Context: createContext<Drawer>({ slot: undefined, open: () => undefined, openAtSlot: () => undefined }),
 } as const;
 
 /** The drawer of the layout the caller is rendered in. */

@@ -61,9 +61,16 @@ export const Layout = () => {
     });
   }, []);
 
+  // The menu comes first in the drawer, so a page's own part is scrolled to and its first control focused.
+  const openAtSlot = useCallback(() => {
+    open();
+    slot?.scrollIntoView({ block: "start" });
+    slot?.querySelector<HTMLElement>("input, select, button, a[href]")?.focus({ preventScroll: true });
+  }, [open, slot]);
+
   useEffect(close, [wide, pathname, close]);
 
-  const drawer: DrawerHandle = useMemo(() => ({ slot, open }), [slot, open]);
+  const drawer: DrawerHandle = useMemo(() => ({ slot, open, openAtSlot }), [slot, open, openAtSlot]);
 
   return (
     <Drawer.Context value={drawer}>
