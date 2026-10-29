@@ -121,6 +121,9 @@ export const RangeSlider = ({ label, min, max, step = 1, value, onChange, format
 
   const ratio = (at: number): string => `${max === min ? 0 : ((at - min) / (max - min)) * 100}%`;
 
+  // Thumbs that meet at the right end leave only the minimum free to move, so it is drawn on top there.
+  const top: Thumb = draft.min === draft.max && draft.max === max ? "min" : "max";
+
   const thumbProps = (thumb: Thumb) => {
     const current = thumb === "min" ? draft.min : draft.max;
 
@@ -137,7 +140,7 @@ export const RangeSlider = ({ label, min, max, step = 1, value, onChange, format
       onPointerUp: endDrag,
       onPointerCancel: endDrag,
       onKeyDown: onKeyDown(thumb),
-      style: { left: ratio(current) },
+      style: { left: ratio(current), zIndex: thumb === top ? 2 : 1 },
       className:
         "absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-full border-2 border-surface bg-ink shadow-md transition-transform hover:scale-110 active:cursor-grabbing active:scale-110",
     };
