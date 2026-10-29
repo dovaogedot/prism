@@ -297,6 +297,21 @@ describe("housekeeping", () => {
       payment: { status: "succeeded", refund: "succeeded" },
     });
   });
+
+  it("refunds a payment whose webhook never came, once canceling the expired order finds it paid", async () => {
+    const placed = await Shop.placed(harness, await Shop.fill(harness, [["desk-lamp", 1]]));
+    harness.gateway.answerNextCancelAsPaid();
+    harness.clock.advanceSeconds(harness.config.commerce.paymentWindowSeconds);
+
+    await harness.jobs.housekeeping.run();
+    await harness.settle();
+
+    expect(harness.gateway.calls.refund).toHaveLength(1);
+    expect(await detailOf(placed.orderId, {}, placed.key)).toMatchObject({
+      status: "canceled",
+      payment: { status: "succeeded", refund: "succeeded" },
+    });
+  });
 });
 
 describe("GET /checkout/prefill", () => {

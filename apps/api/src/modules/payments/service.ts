@@ -236,6 +236,12 @@ export const PaymentService = {
           if (charge.reference !== undefined && provider !== undefined) {
             const canceled = await provider.cancelIntent(charge.reference);
             if (canceled.isErr()) throw new Error(`Canceling the intent failed: ${canceled.error}`);
+
+            // Paid before the cancel arrived: recorded as paid, which the order service answers with a refund.
+            if (canceled.value.settlement !== undefined) {
+              await record(canceled.value.settlement);
+              return;
+            }
           }
 
           await transition({ paymentId: charge.id, from: ["pending"], to: "canceled", now: clock.now() });

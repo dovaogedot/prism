@@ -68,6 +68,12 @@ export type CreatedIntent = Readonly<{
   settlement?: GatewayEvent;
 }>;
 
+/** What canceling an intent found. */
+export type CanceledIntent = Readonly<{
+  /** Present when the intent was already paid: the success to record, since the cancel came too late. */
+  settlement?: GatewayEvent;
+}>;
+
 /** Which provider a payment went through, as its row records it. */
 export type ProviderName = "stripe" | "simulated";
 
@@ -83,8 +89,8 @@ export type PaymentGateway = Readonly<{
     orderId: OrderId;
     amountCents: number;
   }) => ResultAsync<CreatedIntent, PaymentFailure>;
-  /** Succeeds when the intent is canceled, and when it is already past canceling. */
-  cancelIntent: (reference: ProviderReference) => ResultAsync<void, PaymentFailure>;
+  /** Succeeds when the intent is canceled, and when it is already past canceling, saying when that is because it was paid. */
+  cancelIntent: (reference: ProviderReference) => ResultAsync<CanceledIntent, PaymentFailure>;
   /** Refunds a succeeded intent in full. `refundId` is the refund's own payment row. */
   refund: (input: {
     refundId: PaymentId;
@@ -107,6 +113,8 @@ export type FakeGateway = PaymentGateway &
     failNext: (operation: "createIntent" | "refund", failure: PaymentFailure) => void;
     /** Makes the next refund the provider creates answer `status` instead of `succeeded`. */
     answerNextRefund: (status: RefundStatus) => void;
+    /** Makes the next cancel find its intent already paid, as Stripe answers a cancel that came too late. */
+    answerNextCancelAsPaid: () => void;
     /** The intent id the fake created for a payment row. */
     intentOf: (paymentId: PaymentId) => ProviderReference | undefined;
     /**
@@ -180,21 +188,8 @@ export const PaymentGateway = {
     const ignored: GatewayEvent = { _tag: "Ignored", type: event.type };
 
     switch (event.type) {
-      case "payment_intent.succeeded": {
-        const intent = event.data.object;
-        const paymentId = PaymentGateway.paymentIdOf(intent.metadata);
-        if (paymentId === undefined) return ignored;
-
-        const card = await PaymentGateway.cardOfMethod(intent.payment_method, retrieveCard);
-
-        return {
-          _tag: "ChargeSucceeded",
-          paymentId,
-          reference: ProviderReference.schema.parse(intent.id),
-          amountCents: intent.amount_received,
-          ...(card === undefined ? {} : { card }),
-        };
-      }
+      case "payment_intent.succeeded":
+        return PaymentGateway.succeededOf(event.data.object, retrieveCard);
 
       case "payment_intent.payment_failed": {
         const intent = event.data.object;
@@ -263,6 +258,25 @@ export const PaymentGateway = {
     );
   },
 
+  /** A paid intent as the payment service records it; `Ignored` without Prism's metadata. */
+  succeededOf: async (
+    intent: Stripe.PaymentIntent,
+    retrieveCard: (paymentMethodId: string) => Promise<CardSummary | undefined>,
+  ): Promise<GatewayEvent> => {
+    const paymentId = PaymentGateway.paymentIdOf(intent.metadata);
+    if (paymentId === undefined) return { _tag: "Ignored", type: "payment_intent.succeeded" };
+
+    const card = await PaymentGateway.cardOfMethod(intent.payment_method, retrieveCard);
+
+    return {
+      _tag: "ChargeSucceeded",
+      paymentId,
+      reference: ProviderReference.schema.parse(intent.id),
+      amountCents: intent.amount_received,
+      ...(card === undefined ? {} : { card }),
+    };
+  },
+
   /** Stripe test or live mode, depending on the key. */
   stripe: (options: StripeGatewayOptions): PaymentGateway => {
     const stripe = new Stripe(options.secretKey, {
@@ -310,12 +324,16 @@ export const PaymentGateway = {
 
       cancelIntent: (reference) =>
         ResultAsync.fromPromise(stripe.paymentIntents.cancel(reference), (reason) => reason)
-          .map(() => undefined)
+          .map((): CanceledIntent => ({}))
           .orElse((reason) =>
-            // Already canceled or already paid: there is nothing left to cancel.
+            // Already canceled or already paid: there is nothing left to cancel, but a payment has to be recorded.
             reason instanceof Stripe.errors.StripeInvalidRequestError && reason.code === "payment_intent_unexpected_state"
-              ? okAsync<void, PaymentFailure>(undefined)
-              : errAsync<void, PaymentFailure>(PaymentGateway.failureOfError(reason)),
+              ? ResultAsync.fromPromise(stripe.paymentIntents.retrieve(reference), PaymentGateway.failureOfError).andThen((intent) =>
+                  intent.status === "succeeded"
+                    ? ResultAsync.fromSafePromise(PaymentGateway.succeededOf(intent, retrieveCard)).map((settlement): CanceledIntent => ({ settlement }))
+                    : okAsync<CanceledIntent, PaymentFailure>({}),
+                )
+              : errAsync<CanceledIntent, PaymentFailure>(PaymentGateway.failureOfError(reason)),
           ),
 
       refund: ({ refundId, intent, amountCents }) =>
@@ -358,7 +376,7 @@ export const PaymentGateway = {
       });
     },
 
-    cancelIntent: () => okAsync(undefined),
+    cancelIntent: () => okAsync({}),
 
     refund: () =>
       okAsync({
@@ -382,6 +400,7 @@ export const PaymentGateway = {
     const intents = new Map<PaymentId, ProviderReference>();
     const failures = new Map<"createIntent" | "refund", PaymentFailure>();
     let nextRefundStatus: RefundStatus = "succeeded";
+    let shouldPayNextCancel = false;
     let sequence = 0;
 
     const takeFailure = (operation: "createIntent" | "refund"): PaymentFailure | undefined => {
@@ -403,6 +422,10 @@ export const PaymentGateway = {
         nextRefundStatus = status;
       },
 
+      answerNextCancelAsPaid: () => {
+        shouldPayNextCancel = true;
+      },
+
       intentOf: (paymentId) => intents.get(paymentId),
 
       createIntent: ({ paymentId, amountCents }) => {
@@ -420,7 +443,14 @@ export const PaymentGateway = {
 
       cancelIntent: (reference) => {
         cancelIntent.push(reference);
-        return okAsync(undefined);
+        if (!shouldPayNextCancel) return okAsync({});
+
+        shouldPayNextCancel = false;
+        const paymentId = [...intents].find(([, intent]) => intent === reference)?.[0];
+        const created = createIntent.find((call) => call.paymentId === paymentId);
+        if (paymentId === undefined || created === undefined) return okAsync({});
+
+        return okAsync({ settlement: { _tag: "ChargeSucceeded", paymentId, reference, amountCents: created.amountCents, card: PaymentGateway.FAKE_CARD } });
       },
 
       refund: (input) => {
@@ -473,6 +503,7 @@ export const PaymentGateway = {
         intents.clear();
         failures.clear();
         nextRefundStatus = "succeeded";
+        shouldPayNextCancel = false;
       },
     };
   },
