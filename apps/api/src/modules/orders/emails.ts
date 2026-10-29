@@ -142,7 +142,7 @@ export const OrderEmail = {
   delivered: (order: OrderRecord, orderUrl: string, webOrigin: string): OutboundEmail => {
     const links = order.lines
       .filter((line) => line.productId !== undefined)
-      .map((line) => ({ label: `Review ${line.name}`, url: `${webOrigin}/products/${line.slug}#review` }));
+      .map((line) => ({ label: `Review ${line.name}`, url: `${webOrigin}/products/${line.slug}#reviews-heading` }));
 
     return OrderEmail.compose({
       subject: `Order ${OrderEmail.numberOf(order.number)} delivered`,

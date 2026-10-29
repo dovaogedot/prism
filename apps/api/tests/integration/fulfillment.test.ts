@@ -194,7 +194,7 @@ describe("fulfillment", () => {
     expect(detail).toMatchObject({ status: "delivered", trackingNumber: "PR123456789EE", canRefund: true, canCancel: false });
     expect(detail.nextStatus).toBeUndefined();
     expect(harness.mailer.sent.map((email) => email.subject)).toEqual(["Order #100001 shipped", "Order #100001 delivered"]);
-    expect(harness.mailer.sent[1]?.text).toContain("/products/desk-lamp#review");
+    expect(harness.mailer.sent[1]?.text).toContain("/products/desk-lamp#reviews-heading");
   });
 
   it("refuses a skipped step and a step backwards", async () => {
