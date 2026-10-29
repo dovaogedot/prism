@@ -56,16 +56,17 @@ describe("the entity relationship diagram", () => {
     }
   })
 
+  // Whether each end is required or optional is checked against the schema by part-1/14-erd.test.ts.
   it("relates carts to accounts and products, and orders to their lines, events and payments", () => {
     for (const relationship of [
-      /^ {2}app_user \|\|--.. cart : /m,
-      /^ {2}cart \|\|--o\{ cart_item : /m,
-      /^ {2}product \|\|--o\{ cart_item : /m,
-      /^ {2}app_user \|\|--o\{ customer_order : /m,
-      /^ {2}customer_order \|\|--o\{ order_line : /m,
-      /^ {2}customer_order \|\|--o\{ order_event : /m,
-      /^ {2}customer_order \|\|--o\{ payment : /m,
-      /^ {2}shipping_method \|\|--o\{ customer_order : /m,
+      /^ {2}app_user \|[|o]--o\| cart : /m,
+      /^ {2}cart \|[|o]--o\{ cart_item : /m,
+      /^ {2}product \|[|o]--o\{ cart_item : /m,
+      /^ {2}app_user \|[|o]--o\{ customer_order : /m,
+      /^ {2}customer_order \|[|o]--o\{ order_line : /m,
+      /^ {2}customer_order \|[|o]--o\{ order_event : /m,
+      /^ {2}customer_order \|[|o]--o\{ payment : /m,
+      /^ {2}shipping_method \|[|o]--o\{ customer_order : /m,
     ]) {
       expect(diagram).toMatch(relationship)
     }
