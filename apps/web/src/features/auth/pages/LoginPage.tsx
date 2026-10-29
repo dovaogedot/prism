@@ -1,12 +1,13 @@
-import { LoginInput, type LoginOutcome } from "@prism/shared";
+import { CaptchaToken, LoginInput, type LoginOutcome } from "@prism/shared";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
+import { useTheme } from "../../../shared/theme/use-theme.ts";
 import { Alert, Button, Field } from "../../../shared/ui/index.ts";
-import { AuthShell, ProviderButtons } from "../components/index.ts";
+import { AuthShell, Captcha, ProviderButtons } from "../components/index.ts";
 import { Failure } from "../../../shared/api/failure.tsx";
 import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
@@ -25,15 +26,30 @@ export const LoginPage = () => {
     return code === null ? undefined : SignInFailure.messageOf(code);
   });
 
+  const { theme } = useTheme();
+
+  // Shown once the account's sign-in attempts ran out, so its owner gets in with a solved check while guessing stays held back.
+  const [isCaptchaShown, setCaptchaShown] = useState(false);
+
+  const [captchaToken, setCaptchaToken] = useState<CaptchaToken | undefined>(undefined);
+
+  // Google accepts a token once, so each refused try draws a fresh challenge.
+  const [captchaRound, setCaptchaRound] = useState(0);
+
   const form = useForm({
     resolver: zodResolver(LoginInput.schema),
     defaultValues: { email: "", password: "" },
   });
 
   const submit = form.handleSubmit(async (values) => {
+    if (isCaptchaShown && captchaToken === undefined) {
+      setFailure("Complete the CAPTCHA to continue.");
+      return;
+    }
+
     setFailure(undefined);
 
-    await Api.postWithoutRetry<LoginOutcome>("/auth/login", values)
+    await Api.postWithoutRetry<LoginOutcome>("/auth/login", { ...values, ...(captchaToken === undefined ? {} : { captchaToken }) })
       .then((outcome) =>
         match(outcome)
           .with({ status: "authenticated" }, ({ grant }) => {
@@ -47,7 +63,12 @@ export const LoginPage = () => {
           })
           .exhaustive(),
       )
-      .catch((reason: unknown) => setFailure(Failure.describe(reason)));
+      .catch((reason: unknown) => {
+        setFailure(Failure.describe(reason));
+        if (Api.failureOf(reason)?.code === "CaptchaRequired") setCaptchaShown(true);
+        setCaptchaToken(undefined);
+        setCaptchaRound((round) => round + 1);
+      });
   });
 
   return (
@@ -86,6 +107,17 @@ export const LoginPage = () => {
           error={form.formState.errors.password?.message}
           {...form.register("password")}
         />
+
+        {isCaptchaShown ? (
+          <Captcha
+            key={captchaRound}
+            dark={theme === "dark"}
+            onToken={(token) => {
+              const parsed = CaptchaToken.schema.safeParse(token);
+              setCaptchaToken(parsed.success ? parsed.data : undefined);
+            }}
+          />
+        ) : null}
 
         <div className="flex justify-end">
           <Link to="/forgot-password" className="text-sm font-medium text-accent underline underline-offset-2">

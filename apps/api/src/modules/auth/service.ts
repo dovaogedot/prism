@@ -91,9 +91,16 @@ export type AuthService = Readonly<{
     captchaToken: CaptchaToken;
     context: RequestContext;
   }) => ResultAsync<IssuedSession, DomainError>;
+  /**
+   * Signs in with a password. With `isCaptchaRequired`, because the
+   * account's attempts ran out, it goes on only with a CAPTCHA token the
+   * provider accepts, so nobody can lock the owner out by guessing.
+   */
   login: (input: {
     email: Email;
     password: string;
+    captchaToken?: CaptchaToken;
+    isCaptchaRequired: boolean;
     context: RequestContext;
   }) => ResultAsync<LoginOutcome | IssuedSession, DomainError>;
   completeTwoFactorLogin: (input: {
@@ -165,6 +172,14 @@ export const AuthService = {
     /** Whether a check made at `at` still counts. */
     const isRecent = (at: Date | undefined): boolean =>
       at !== undefined && clock.now().getTime() - at.getTime() < deps.staffVerificationTtlSeconds * 1000;
+
+    /** Lets a sign-in on when it needs no CAPTCHA, or when the provider accepts the token it carries. */
+    const passCaptcha = (isRequired: boolean, token: CaptchaToken | undefined, ipAddress: string): ResultAsync<void, DomainError> => {
+      if (!isRequired) return okAsync(undefined);
+      if (token === undefined) return errAsync({ _tag: "CaptchaRequired" });
+
+      return captcha.verify(token, ipAddress).map(() => undefined);
+    };
 
     /**
      * Accepts `code` for the account once: a live code from a step after the
@@ -281,8 +296,10 @@ export const AuthService = {
           .andThen((passwordHash) => repository.createUser({ email, passwordHash }))
           .andThen((user) => issueSession(user, context)),
 
-      login: ({ email, password, context }) =>
-        ResultAsync.fromSafePromise(repository.findUserByEmail(email)).andThen((user) => {
+      login: ({ email, password, captchaToken, isCaptchaRequired, context }) =>
+        passCaptcha(isCaptchaRequired, captchaToken, context.ipAddress)
+          .andThen(() => ResultAsync.fromSafePromise(repository.findUserByEmail(email)))
+          .andThen((user) => {
           // An unknown address and a provider-only account both spend the CPU a
           // real verification would, so timing reveals neither.
           if (user === undefined || user.passwordHash === undefined) {

@@ -20,6 +20,8 @@ export type DomainError =
   | Readonly<{ _tag: "EmailAlreadyRegistered" }>
   | Readonly<{ _tag: "InvalidCredentials" }>
   | Readonly<{ _tag: "CaptchaRejected" }>
+  /** The account's sign-in attempts ran out, so this one needs a solved CAPTCHA. */
+  | Readonly<{ _tag: "CaptchaRequired" }>
   | Readonly<{ _tag: "Unauthenticated" }>
   | Readonly<{ _tag: "AccessTokenInvalid" }>
   | Readonly<{ _tag: "RefreshTokenInvalid" }>
@@ -106,6 +108,7 @@ export const DomainError = {
     EmailAlreadyRegistered: 409,
     InvalidCredentials: 401,
     CaptchaRejected: 400,
+    CaptchaRequired: 429,
     Unauthenticated: 401,
     AccessTokenInvalid: 401,
     RefreshTokenInvalid: 401,
@@ -171,6 +174,7 @@ export const DomainError = {
     EmailAlreadyRegistered: "That email address is already registered.",
     InvalidCredentials: "Email or password is incorrect.",
     CaptchaRejected: "We could not verify that you are human. Please try again.",
+    CaptchaRequired: "This account had too many sign-in attempts. Show you are a person below, then sign in again.",
     Unauthenticated: "Please sign in to continue.",
     AccessTokenInvalid: "Your session is no longer valid. Please sign in again.",
     RefreshTokenInvalid: "Your session has expired. Please sign in again.",

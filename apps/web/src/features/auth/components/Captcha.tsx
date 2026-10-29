@@ -7,7 +7,8 @@
  * here changes except which key is used.
  *
  * If the script cannot load at all, the component reports a static token so
- * registration and the contact form are still reachable. The server decides whether that token is
+ * registration, the contact form and a sign-in past its account's attempts
+ * are still reachable. The server decides whether that token is
  * acceptable.
  *
  * Google accepts a solved token once. A form whose submit was refused gives

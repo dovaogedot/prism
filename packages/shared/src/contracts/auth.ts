@@ -98,6 +98,8 @@ export const LoginInput = {
   schema: z.object({
     email: Email.schema,
     password: z.string().min(1, "Enter your password."),
+    /** Needed once the account's sign-in attempts have run out. */
+    captchaToken: CaptchaToken.schema.optional(),
   }),
 } as const;
 

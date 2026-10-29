@@ -24,7 +24,6 @@ import { z } from "zod";
 import { Cookies, type CookieOptions } from "../../http/cookies.ts";
 import { HttpErrors } from "../../http/errors.ts";
 import { Guards } from "../../http/guard.ts";
-import { RateLimits } from "../../http/rate-limits.ts";
 import { AuthorizationCode, MockAuthorizationCode, OAuthState, RedirectUri } from "../../platform/oauth.ts";
 import type { TakeResult } from "../../platform/rate-limit.ts";
 import { RefreshToken } from "../../platform/tokens.ts";
@@ -90,10 +89,16 @@ export const AuthRoutes = {
     });
 
     routes.post("/login", { config: credentials, schema: { body: LoginInput.schema } }, async (request, reply) => {
-      const refused = RateLimits.apply(reply, deps.limitAccount(request.body.email));
-      if (refused !== undefined) return refused;
+      const taken = deps.limitAccount(request.body.email);
+      reply.header("RateLimit-Remaining", taken.remaining);
 
-      const result = await service.login({ ...request.body, context: AuthRoutes.contextOf(request) });
+      const result = await service.login({
+        email: request.body.email,
+        password: request.body.password,
+        ...(request.body.captchaToken === undefined ? {} : { captchaToken: request.body.captchaToken }),
+        isCaptchaRequired: !taken.isAllowed,
+        context: AuthRoutes.contextOf(request),
+      });
 
       if (result.isErr()) return HttpErrors.send(reply, result.error);
 

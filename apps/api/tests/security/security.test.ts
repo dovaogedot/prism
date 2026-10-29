@@ -574,6 +574,27 @@ describe("rate limiting", () => {
     expect(refused.headers["retry-after"]).toBe("30");
   });
 
+  it("lets the owner past an account whose attempts ran out with a solved CAPTCHA, so guessing locks nobody out", async () => {
+    // Through this application, whose real hasher is the one that checks the password below.
+    await fromAddress("198.51.100.79", "POST", "/api/v1/auth/register", {
+      email: "locked-owner@example.com",
+      password: VALID_PASSWORD,
+      captchaToken: "test-token",
+    });
+    for (let index = 0; index < RateLimitPolicy.table["account-login"].capacity; index += 1) {
+      await guess(`198.51.100.${60 + index}`, "locked-owner@example.com");
+    }
+    const owner = (extra: object) =>
+      fromAddress("198.51.100.80", "POST", "/api/v1/auth/login", { email: "locked-owner@example.com", password: VALID_PASSWORD, ...extra });
+
+    const without = await owner({});
+    const solved = await owner({ captchaToken: "test-token" });
+
+    expect(without.statusCode).toBe(429);
+    expect(jsonOf(without)["error"]).toMatchObject({ code: "CaptchaRequired" });
+    expect(solved.statusCode).toBe(200);
+  });
+
   it("ignores a forwarded address the caller made up", async () => {
     // With the whole X-Forwarded-For chain trusted, a caller could name a new
     // address on every request and never spend the same budget twice. The
