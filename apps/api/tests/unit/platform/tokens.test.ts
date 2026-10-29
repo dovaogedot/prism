@@ -102,8 +102,10 @@ describe("access token validation", () => {
 
   it("rejects a token signed with a different secret", async () => {
     const { tokens } = build();
+    // The real token's claims, so only the key is wrong.
+    const { iat: _issuedAt, exp: _expires, ...real } = decodeJwt((await tokens.issueAccessToken(claims))._unsafeUnwrap());
 
-    const forged = await new SignJWT({ sub: "x", sid: "y", jti: "z" })
+    const forged = await new SignJWT(real)
       .setProtectedHeader({ alg: "HS256" })
       .setIssuer("prism")
       .setAudience("access")
@@ -122,8 +124,9 @@ describe("access token validation", () => {
     const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString(
       "base64url",
     );
+    // The real token's claims, so only the missing signature is wrong.
     const payload = Buffer.from(
-      JSON.stringify({ sub: "x", sid: "y", jti: "z" }),
+      JSON.stringify(decodeJwt((await tokens.issueAccessToken(claims))._unsafeUnwrap())),
     ).toString("base64url");
 
     const verified = await tokens.verifyAccessToken(`${header}.${payload}.`);
@@ -137,7 +140,7 @@ describe("access token validation", () => {
 
     const [header, , signature] = token.split(".");
     const escalated = Buffer.from(
-      JSON.stringify({ ...decodeJwt(token), sub: "somebody-else" }),
+      JSON.stringify({ ...decodeJwt(token), sub: "44444444-4444-4444-8444-444444444444" }),
     ).toString("base64url");
 
     const verified = await tokens.verifyAccessToken(

@@ -9,7 +9,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { Permission } from "@prism/shared";
-import { SignJWT } from "jose";
+import { decodeJwt, SignJWT } from "jose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { App, type Application } from "../../src/app.ts";
 import { Config } from "../../src/config.ts";
@@ -217,23 +217,38 @@ describe("JWT tampering", () => {
       headers: { authorization: `Bearer ${token}` },
     });
 
-  it("refuses a token signed with the wrong key", async () => {
-    const forged = await new SignJWT({ sub: "x", sid: "y", jti: "z" })
+  /**
+   * The claims of a live session, so a forged token differs from a real one
+   * only in what the test changes, and its refusal can come from nothing else.
+   */
+  const liveClaims = async (email: string) => {
+    const { accessToken } = await registerUser(harness, email);
+    const { sub, sid, jti } = decodeJwt(accessToken);
+    return { sub, sid, jti };
+  };
+
+  const signed = (claims: Readonly<Record<string, unknown>>, key: Uint8Array, issuer = "prism") =>
+    new SignJWT({ ...claims })
       .setProtectedHeader({ alg: "HS256" })
-      .setIssuer("prism")
+      .setIssuer(issuer)
       .setAudience("access")
       .setExpirationTime("1h")
-      .sign(new TextEncoder().encode("z".repeat(48)));
+      .sign(key);
+
+  it("accepts the live claims re-signed as the API signs them, so the refusals below come from the forgery", async () => {
+    expect((await attempt(await signed(await liveClaims("control@example.com"), secret))).statusCode).toBe(200);
+  });
+
+  it("refuses a token signed with the wrong key", async () => {
+    const forged = await signed(await liveClaims("wrong-key@example.com"), new TextEncoder().encode("z".repeat(48)));
 
     expect((await attempt(forged)).statusCode).toBe(401);
   });
 
   it("refuses an unsigned token claiming alg none", async () => {
-    const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString(
-      "base64url",
-    );
+    const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
     const payload = Buffer.from(
-      JSON.stringify({ sub: "x", sid: "y", jti: "z", exp: 4102444800 }),
+      JSON.stringify({ ...(await liveClaims("alg-none@example.com")), iss: "prism", aud: "access", exp: 4102444800 }),
     ).toString("base64url");
 
     expect((await attempt(`${header}.${payload}.`)).statusCode).toBe(401);
@@ -257,12 +272,7 @@ describe("JWT tampering", () => {
   });
 
   it("refuses a token with the wrong issuer", async () => {
-    const wrongIssuer = await new SignJWT({ sub: "x", sid: "y", jti: "z" })
-      .setProtectedHeader({ alg: "HS256" })
-      .setIssuer("somebody-else")
-      .setAudience("access")
-      .setExpirationTime("1h")
-      .sign(secret);
+    const wrongIssuer = await signed(await liveClaims("wrong-issuer@example.com"), secret, "somebody-else");
 
     expect((await attempt(wrongIssuer)).statusCode).toBe(401);
   });
