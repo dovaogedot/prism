@@ -12,6 +12,7 @@ import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { ProviderButtons } from "../components/ProviderButtons.tsx";
 import { NextPath } from "../next-path.ts";
+import { SignInFailure } from "../sign-in-failure.ts";
 import { TokenStore } from "../token-store.ts";
 
 /** Sign-in, which returns to the page named in `?next=`, or goes on to the second-factor page first. */
@@ -22,7 +23,7 @@ export const LoginPage = () => {
   // The OAuth callback redirects here with a reason when it fails.
   const [failure, setFailure] = useState<ReactNode | undefined>(() => {
     const code = params.get("error");
-    return code === null ? undefined : `Sign-in failed (${code}). Please try again.`;
+    return code === null ? undefined : SignInFailure.messageOf(code);
   });
 
   const form = useForm({
