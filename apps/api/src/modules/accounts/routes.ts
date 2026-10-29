@@ -5,7 +5,7 @@ import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { HttpErrors } from "../../http/errors.ts";
-import type { Guards } from "../../http/guard.ts";
+import { Guards } from "../../http/guard.ts";
 import type { AccountService } from "./service.ts";
 
 /** What the account routes are served from. */
@@ -19,52 +19,44 @@ export const AccountRoutes = {
     const write = { rateLimit: "member-write" } as const;
     const params = z.object({ id: AddressId.schema });
 
-    routes.get("/account/profile", { preHandler: guards.requireUser }, async (request, reply) => {
-      if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
-      return HttpErrors.answer(reply, service.profile(request.authenticated.id));
+    routes.get("/account/profile", { onRequest: guards.requireUser }, async (request, reply) => {
+      return HttpErrors.answer(reply, service.profile(Guards.userOf(request).id));
     });
 
     routes.put(
       "/account/profile",
-      { preHandler: guards.requireUser, config: write, schema: { body: ProfileInput.schema } },
+      { onRequest: guards.requireUser, config: write, schema: { body: ProfileInput.schema } },
       async (request, reply) => {
-        if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
-        return HttpErrors.answer(reply, service.updateProfile(request.authenticated.id, request.body));
+        return HttpErrors.answer(reply, service.updateProfile(Guards.userOf(request).id, request.body));
       },
     );
 
-    routes.get("/account/addresses", { preHandler: guards.requireUser }, async (request, reply) => {
-      if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
-      return { items: await service.addresses(request.authenticated.id) };
+    routes.get("/account/addresses", { onRequest: guards.requireUser }, async (request, reply) => {
+      return { items: await service.addresses(Guards.userOf(request).id) };
     });
 
     routes.post(
       "/account/addresses",
-      { preHandler: guards.requireUser, config: write, schema: { body: SavedAddressInput.schema } },
+      { onRequest: guards.requireUser, config: write, schema: { body: SavedAddressInput.schema } },
       async (request, reply) => {
-        if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
-
-        const result = await service.addAddress(request.authenticated.id, request.body);
+        const result = await service.addAddress(Guards.userOf(request).id, request.body);
         return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(201).send(result.value);
       },
     );
 
     routes.put(
       "/account/addresses/:id",
-      { preHandler: guards.requireUser, config: write, schema: { params, body: SavedAddressInput.schema } },
+      { onRequest: guards.requireUser, config: write, schema: { params, body: SavedAddressInput.schema } },
       async (request, reply) => {
-        if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
-        return HttpErrors.answer(reply, service.updateAddress(request.authenticated.id, request.params.id, request.body));
+        return HttpErrors.answer(reply, service.updateAddress(Guards.userOf(request).id, request.params.id, request.body));
       },
     );
 
     routes.delete(
       "/account/addresses/:id",
-      { preHandler: guards.requireUser, config: write, schema: { params } },
+      { onRequest: guards.requireUser, config: write, schema: { params } },
       async (request, reply) => {
-        if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
-
-        const result = await service.removeAddress(request.authenticated.id, request.params.id);
+        const result = await service.removeAddress(Guards.userOf(request).id, request.params.id);
         return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(204).send();
       },
     );

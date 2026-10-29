@@ -31,7 +31,6 @@ export const AccountAdminRoutes = {
       { ...guards.admin("staff.manage", "staff-write"), schema: { params, body: RoleChange.schema } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         return HttpErrors.answer(reply, service.setRoles(actor, request.params.id, request.body.roles));
       },
@@ -50,7 +49,6 @@ export const AccountAdminRoutes = {
         { ...guards.admin("staff.manage", "staff-write"), schema: { params } },
         async (request, reply) => {
           const actor = Guards.actorOf(request);
-          if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
           return HttpErrors.answer(reply, act(actor, request.params.id));
         },

@@ -37,7 +37,6 @@ export const OrderAdminRoutes = {
       { ...guards.admin("orders.fulfill", "staff-write"), schema: { params: orderParams, body: OrderStatusChange.schema } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         return HttpErrors.answer(reply, service.advance(actor, request.params.id, request.body));
       },
@@ -48,7 +47,6 @@ export const OrderAdminRoutes = {
       { ...guards.admin("orders.refund", "staff-write"), schema: { params: orderParams } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         return HttpErrors.answer(reply, service.cancelByStaff(actor, request.params.id));
       },
@@ -59,7 +57,6 @@ export const OrderAdminRoutes = {
       { ...guards.admin("orders.refund", "staff-write"), schema: { params: orderParams } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         return HttpErrors.answer(reply, service.refund(actor, request.params.id));
       },
@@ -72,7 +69,6 @@ export const OrderAdminRoutes = {
       { ...guards.admin("delivery.manage", "staff-write"), schema: { body: ShippingMethodInput.schema } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         const result = await shipping.create(actor, request.body);
         return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(201).send(result.value);
@@ -84,7 +80,6 @@ export const OrderAdminRoutes = {
       { ...guards.admin("delivery.manage", "staff-write"), schema: { params: methodParams, body: ShippingMethodInput.schema } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         return HttpErrors.answer(reply, shipping.update(actor, request.params.code, request.body));
       },
@@ -95,7 +90,6 @@ export const OrderAdminRoutes = {
       { ...guards.admin("delivery.manage", "staff-write"), schema: { params: methodParams } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         const result = await shipping.remove(actor, request.params.code);
         return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(204).send();

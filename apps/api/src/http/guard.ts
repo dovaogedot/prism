@@ -7,7 +7,7 @@
  */
 
 import { Permission, type DomainError, type StaffRole, type UserId } from "@prism/shared";
-import type { FastifyInstance, FastifyRequest, onRequestHookHandler, preHandlerHookHandler } from "fastify";
+import type { FastifyInstance, FastifyRequest, onRequestHookHandler } from "fastify";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import type { SessionId } from "../db/ids.ts";
 import type { AuthRepository } from "../modules/auth/repository.ts";
@@ -64,16 +64,20 @@ export type AdminRouteOptions = Readonly<{
   config: Readonly<{ permission: StaffRequirement; rateLimit: RateLimitPolicyName }>;
 }>;
 
-/** The preHandlers that turn a bearer token into `request.authenticated`. */
+/**
+ * The hooks that turn a bearer token into `request.authenticated`. Each runs
+ * when the request arrives, before its body is read, so a refused request is
+ * answered as such whatever it carried.
+ */
 export type Guards = Readonly<{
   /** Answers 401 to a request without a live session. */
-  requireUser: preHandlerHookHandler;
+  requireUser: onRequestHookHandler;
   /**
    * Lets a request without an `Authorization` header through as a guest. A
    * header that fails verification still answers 401, so the browser
    * refreshes and retries instead of acting as a guest by mistake.
    */
-  optionalUser: preHandlerHookHandler;
+  optionalUser: onRequestHookHandler;
   /**
    * Admits a staff account whose roles grant `requirement`, that has 2FA on,
    * and whose session passed a TOTP check within the verification window.
@@ -158,11 +162,19 @@ export const Guards = {
     return undefined;
   },
 
+  /** The user of a request that passed `requireUser` or a staff guard, which set it. */
+  userOf: (request: FastifyRequest): AuthenticatedUser => {
+    if (request.authenticated === undefined) throw new Error(`${request.method} ${request.url} reads its user without the guard that sets it.`);
+
+    return request.authenticated;
+  },
+
   /** The staff member behind an admin request, as the audit log records it. */
-  actorOf: (request: FastifyRequest): StaffActor | undefined =>
-    request.authenticated === undefined
-      ? undefined
-      : { id: request.authenticated.id, roles: request.authenticated.roles, ip: request.ip },
+  actorOf: (request: FastifyRequest): StaffActor => {
+    const user = Guards.userOf(request);
+
+    return { id: user.id, roles: user.roles, ip: request.ip };
+  },
 
   create: (deps: GuardDependencies): Guards => {
     const staff = (requirement: StaffRequirement): onRequestHookHandler => async (request, reply) => {

@@ -9,7 +9,7 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { Cookies, type CookieOptions } from "../../http/cookies.ts";
 import { HttpErrors } from "../../http/errors.ts";
-import type { Guards } from "../../http/guard.ts";
+import { Guards } from "../../http/guard.ts";
 import { CartToken } from "../../platform/tokens.ts";
 import type { CartOutcome, CartOwner, CartService, CookieEffect } from "./service.ts";
 
@@ -47,7 +47,7 @@ export const CartRoutes = {
   register: (app: FastifyInstance, deps: CartRouteDependencies): void => {
     const routes = app.withTypeProvider<ZodTypeProvider>();
     const { service, cookies } = deps;
-    const optional = { preHandler: deps.guards.optionalUser };
+    const optional = { onRequest: deps.guards.optionalUser };
     const productParams = z.object({ productId: ProductId.schema });
 
     routes.get("/cart", optional, async (request, reply) =>

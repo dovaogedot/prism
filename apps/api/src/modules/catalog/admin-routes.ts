@@ -97,7 +97,6 @@ export const CatalogAdminRoutes = {
       { ...guards.admin("catalog.manage", "staff-write"), schema: { body: ProductInput.schema } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         const result = await service.createProduct(actor, request.body);
         return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(201).send(result.value);
@@ -112,7 +111,6 @@ export const CatalogAdminRoutes = {
       },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         const read = await CatalogAdminRoutes.readImport(request);
         if (read._tag === "TooLarge") return HttpErrors.send(reply, { _tag: "PayloadTooLarge" });
@@ -136,7 +134,6 @@ export const CatalogAdminRoutes = {
       { ...guards.admin("catalog.manage", "staff-write"), schema: { params: productParams, body: ProductUpdate.schema } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         return HttpErrors.answer(reply, service.updateProduct(actor, request.params.id, request.body));
       },
@@ -147,7 +144,6 @@ export const CatalogAdminRoutes = {
       { ...guards.admin("catalog.manage", "staff-write"), schema: { params: productParams } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         const result = await service.deleteProduct(actor, request.params.id);
         return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(204).send();
@@ -161,7 +157,6 @@ export const CatalogAdminRoutes = {
       { ...guards.admin("catalog.manage", "staff-write"), schema: { body: CategoryInput.schema } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         const result = await service.saveCategory(actor, undefined, request.body);
         return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(201).send(result.value);
@@ -173,7 +168,6 @@ export const CatalogAdminRoutes = {
       { ...guards.admin("catalog.manage", "staff-write"), schema: { params: categoryParams, body: CategoryInput.schema } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         return HttpErrors.answer(reply, service.saveCategory(actor, request.params.id, request.body));
       },
@@ -184,7 +178,6 @@ export const CatalogAdminRoutes = {
       { ...guards.admin("catalog.manage", "staff-write"), schema: { params: categoryParams } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         const result = await service.deleteCategory(actor, request.params.id);
         return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(204).send();
@@ -198,7 +191,6 @@ export const CatalogAdminRoutes = {
       { ...guards.admin("catalog.manage", "staff-write"), schema: { body: BrandInput.schema } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         const result = await service.saveBrand(actor, undefined, request.body);
         return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(201).send(result.value);
@@ -210,7 +202,6 @@ export const CatalogAdminRoutes = {
       { ...guards.admin("catalog.manage", "staff-write"), schema: { params: brandParams, body: BrandInput.schema } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         return HttpErrors.answer(reply, service.saveBrand(actor, request.params.id, request.body));
       },
@@ -221,7 +212,6 @@ export const CatalogAdminRoutes = {
       { ...guards.admin("catalog.manage", "staff-write"), schema: { params: brandParams } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         const result = await service.deleteBrand(actor, request.params.id);
         return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(204).send();
@@ -237,7 +227,6 @@ export const CatalogAdminRoutes = {
       { ...guards.admin("catalog.manage", "staff-write"), schema: { params: productParams } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         const read = await CatalogAdminRoutes.readUpload(request);
         if (read._tag === "TooLarge") return HttpErrors.send(reply, { _tag: "PayloadTooLarge" });
@@ -255,7 +244,6 @@ export const CatalogAdminRoutes = {
       { ...guards.admin("catalog.manage", "staff-write"), schema: { params: productParams, body: ImageOrderInput.schema } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         return HttpErrors.answer(
           reply,
@@ -269,7 +257,6 @@ export const CatalogAdminRoutes = {
       { ...guards.admin("catalog.manage", "staff-write"), schema: { params: z.object({ id: ProductId.schema, imageId: ImageId.schema }) } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         return HttpErrors.answer(
           reply,

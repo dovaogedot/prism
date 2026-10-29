@@ -23,7 +23,7 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { Cookies, type CookieOptions } from "../../http/cookies.ts";
 import { HttpErrors } from "../../http/errors.ts";
-import type { Guards } from "../../http/guard.ts";
+import { Guards } from "../../http/guard.ts";
 import { RateLimits } from "../../http/rate-limits.ts";
 import { AuthorizationCode, MockAuthorizationCode, OAuthState, RedirectUri } from "../../platform/oauth.ts";
 import type { TakeResult } from "../../platform/rate-limit.ts";
@@ -145,17 +145,15 @@ export const AuthRoutes = {
       return reply.status(200).send(result.value.grant);
     });
 
-    routes.post("/logout", { preHandler: guards.requireUser }, async (request, reply) => {
+    routes.post("/logout", { onRequest: guards.requireUser }, async (request, reply) => {
       if (request.authenticated !== undefined) await service.logout(request.authenticated.sessionId);
 
       Cookies.clearRefresh(reply, cookies);
       return reply.status(204).send();
     });
 
-    routes.get("/me", { preHandler: guards.requireUser }, async (request, reply) => {
-      if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
-
-      const result = await service.currentUser(request.authenticated.id, AuthRoutes.sessionOf(request.authenticated));
+    routes.get("/me", { onRequest: guards.requireUser }, async (request, reply) => {
+      const result = await service.currentUser(Guards.userOf(request).id, AuthRoutes.sessionOf(Guards.userOf(request)));
       return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(200).send(result.value);
     });
 
@@ -183,14 +181,12 @@ export const AuthRoutes = {
 
     routes.post(
       "/password",
-      { preHandler: guards.requireUser, config: credentials, schema: { body: ChangePasswordInput.schema } },
+      { onRequest: guards.requireUser, config: credentials, schema: { body: ChangePasswordInput.schema } },
       async (request, reply) => {
-        if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
-
         const { currentPassword, password } = request.body;
         const result = await service.changePassword({
-          userId: request.authenticated.id,
-          session: AuthRoutes.sessionOf(request.authenticated),
+          userId: Guards.userOf(request).id,
+          session: AuthRoutes.sessionOf(Guards.userOf(request)),
           ...(currentPassword === undefined ? {} : { currentPassword }),
           password,
         });
@@ -198,22 +194,18 @@ export const AuthRoutes = {
       },
     );
 
-    routes.post("/2fa/setup", { preHandler: guards.requireUser }, async (request, reply) => {
-      if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
-
-      const result = await service.beginTwoFactorSetup(request.authenticated.id);
+    routes.post("/2fa/setup", { onRequest: guards.requireUser }, async (request, reply) => {
+      const result = await service.beginTwoFactorSetup(Guards.userOf(request).id);
       return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(200).send(result.value);
     });
 
     routes.post(
       "/2fa/enable",
-      { preHandler: guards.requireUser, config: credentials, schema: { body: EnableTwoFactorInput.schema } },
+      { onRequest: guards.requireUser, config: credentials, schema: { body: EnableTwoFactorInput.schema } },
       async (request, reply) => {
-        if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
-
         const result = await service.enableTwoFactor({
-          userId: request.authenticated.id,
-          session: AuthRoutes.sessionOf(request.authenticated),
+          userId: Guards.userOf(request).id,
+          session: AuthRoutes.sessionOf(Guards.userOf(request)),
           code: request.body.code,
           ...(request.body.currentPassword === undefined ? {} : { currentPassword: request.body.currentPassword }),
           ipAddress: request.ip,
@@ -224,13 +216,11 @@ export const AuthRoutes = {
 
     routes.post(
       "/2fa/verify",
-      { preHandler: guards.requireUser, config: credentials, schema: { body: TwoFactorCodeInput.schema } },
+      { onRequest: guards.requireUser, config: credentials, schema: { body: TwoFactorCodeInput.schema } },
       async (request, reply) => {
-        if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
-
         const result = await service.verifyTwoFactor({
-          userId: request.authenticated.id,
-          session: AuthRoutes.sessionOf(request.authenticated),
+          userId: Guards.userOf(request).id,
+          session: AuthRoutes.sessionOf(Guards.userOf(request)),
           code: request.body.code,
           ipAddress: request.ip,
         });
@@ -240,13 +230,11 @@ export const AuthRoutes = {
 
     routes.post(
       "/2fa/disable",
-      { preHandler: guards.requireUser, config: credentials, schema: { body: TwoFactorCodeInput.schema } },
+      { onRequest: guards.requireUser, config: credentials, schema: { body: TwoFactorCodeInput.schema } },
       async (request, reply) => {
-        if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
-
         const result = await service.disableTwoFactor({
-          userId: request.authenticated.id,
-          session: AuthRoutes.sessionOf(request.authenticated),
+          userId: Guards.userOf(request).id,
+          session: AuthRoutes.sessionOf(Guards.userOf(request)),
           code: request.body.code,
           ipAddress: request.ip,
         });

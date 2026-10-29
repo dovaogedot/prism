@@ -16,7 +16,7 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import type { CookieOptions } from "../../http/cookies.ts";
 import { HttpErrors } from "../../http/errors.ts";
-import type { Guards } from "../../http/guard.ts";
+import { Guards } from "../../http/guard.ts";
 import { CartRoutes } from "../cart/routes.ts";
 import type { CartService } from "../cart/service.ts";
 import type { OrderAccess, OrderService } from "./service.ts";
@@ -50,10 +50,8 @@ export const OrderRoutes = {
 
     routes.get("/shipping-methods", { config: { cache: "public" } }, async () => ({ items: await deps.shipping.active() }));
 
-    routes.get("/checkout/prefill", { preHandler: guards.requireUser }, async (request, reply) => {
-      if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
-
-      const result = await service.prefill(request.authenticated.id);
+    routes.get("/checkout/prefill", { onRequest: guards.requireUser }, async (request, reply) => {
+      const result = await service.prefill(Guards.userOf(request).id);
       return result.isErr() ? HttpErrors.send(reply, result.error) : result.value;
     });
 
@@ -63,7 +61,7 @@ export const OrderRoutes = {
 
     routes.post(
       "/orders",
-      { preHandler: guards.optionalUser, config: limited, schema: { body: PlaceOrderInput.schema } },
+      { onRequest: guards.optionalUser, config: limited, schema: { body: PlaceOrderInput.schema } },
       async (request, reply) => {
         const located = await deps.carts.locate(CartRoutes.ownerOf(request));
         const result = await service.place({
@@ -79,14 +77,13 @@ export const OrderRoutes = {
       },
     );
 
-    routes.get("/orders", { preHandler: guards.requireUser, schema: { querystring: OrderQueryParams.schema } }, async (request, reply) => {
-      if (request.authenticated === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
-      return service.list(request.authenticated.id, request.query);
+    routes.get("/orders", { onRequest: guards.requireUser, schema: { querystring: OrderQueryParams.schema } }, async (request, reply) => {
+      return service.list(Guards.userOf(request).id, request.query);
     });
 
     routes.get(
       "/orders/:id",
-      { preHandler: guards.optionalUser, schema: { params: orderParams, querystring: keyQuery } },
+      { onRequest: guards.optionalUser, schema: { params: orderParams, querystring: keyQuery } },
       async (request, reply) => {
         const result = await service.detail(request.params.id, OrderRoutes.accessOf(request, request.query.key));
         return result.isErr() ? HttpErrors.send(reply, result.error) : result.value;
@@ -95,7 +92,7 @@ export const OrderRoutes = {
 
     routes.post(
       "/orders/:id/cancel",
-      { preHandler: guards.optionalUser, schema: { params: orderParams, querystring: keyQuery } },
+      { onRequest: guards.optionalUser, schema: { params: orderParams, querystring: keyQuery } },
       async (request, reply) => {
         const result = await service.cancel(request.params.id, OrderRoutes.accessOf(request, request.query.key));
         return result.isErr() ? HttpErrors.send(reply, result.error) : result.value;

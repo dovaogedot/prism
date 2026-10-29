@@ -27,7 +27,6 @@ export const ReviewAdminRoutes = {
       { ...guards.admin("reviews.moderate", "staff-write"), schema: { params } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         const result = await service.moderate(actor, request.params.id, { _tag: "approve" });
         return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(204).send();
@@ -39,7 +38,6 @@ export const ReviewAdminRoutes = {
       { ...guards.admin("reviews.moderate", "staff-write"), schema: { params, body: RejectReviewInput.schema } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         const result = await service.moderate(actor, request.params.id, { _tag: "reject", reason: request.body.reason });
         return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(204).send();
@@ -51,7 +49,6 @@ export const ReviewAdminRoutes = {
       { ...guards.admin("reviews.moderate", "staff-write"), schema: { params } },
       async (request, reply) => {
         const actor = Guards.actorOf(request);
-        if (actor === undefined) return HttpErrors.send(reply, { _tag: "Unauthenticated" });
 
         const result = await service.remove(actor, request.params.id);
         return result.isErr() ? HttpErrors.send(reply, result.error) : reply.status(204).send();
