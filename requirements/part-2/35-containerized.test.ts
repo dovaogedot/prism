@@ -82,8 +82,12 @@ describe("the stack", () => {
 })
 
 describe("the start scripts", () => {
-  /** The tools a host would otherwise need: a runtime, a package manager, a database client, a load tester, a test runner. */
-  const TOOL = /\b(node|npm|npx|psql|k6|playwright|vitest|tsc|stripe)\b/
+  /**
+   * The tools a host would otherwise need: a runtime, a package manager, a
+   * database client, a load tester, a test runner, and an HTTP client to wait
+   * for the storefront with.
+   */
+  const TOOL = /\b(node|npm|npx|psql|k6|playwright|vitest|tsc|stripe|curl(\.exe)?|wget)\b/
 
   for (const script of ["start.sh", "start.ps1"]) {
     it(`${script} runs every tool of the project inside a container`, () => {
