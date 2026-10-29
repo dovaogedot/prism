@@ -1,5 +1,5 @@
 import { ReviewStatus, type AdminReviewView, type Page } from "@prism/shared";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
@@ -29,6 +29,16 @@ export const ReviewsPage = () => {
   const query = params.toString();
 
   const reviews = useAdminRead<Page<AdminReviewView>>(AdminKeys.list("reviews", query), `/reviews${query.length === 0 ? "" : `?${query}`}`);
+
+  const emptied = reviews.data !== undefined && reviews.data.items.length === 0 && reviews.data.page > 1 ? reviews.data : undefined;
+
+  // A later page that moderation emptied moves back to the last page that still holds reviews.
+  useEffect(() => {
+    if (emptied === undefined) return;
+
+    const last = String(Math.max(1, Math.min(emptied.page - 1, emptied.totalPages)));
+    if (params.get("page") !== last) setParams(CatalogParams.set(params, "page", last), { replace: true, preventScrollReset: true });
+  }, [emptied, params, setParams]);
 
   const [rejecting, setRejecting] = useState<AdminReviewView | undefined>(undefined);
 
