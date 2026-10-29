@@ -4,6 +4,7 @@ import { match, P } from "ts-pattern";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, DataTable, EmptyState, Field, Pagination, Skeleton } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
+import { DateFilter, useDateFilter } from "../../../shared/hooks/use-date-filter.ts";
 import { CatalogParams } from "../../catalog/filters.ts";
 import { OrderTime } from "../../orders/orders.ts";
 import { AdminKeys, useAdminRead, useParamDraft } from "../admin.ts";
@@ -27,6 +28,10 @@ export const AuditPage = () => {
 
   const events = useAdminRead<Page<AuditEventView>>(AdminKeys.list("audit", query), `/audit${query.length === 0 ? "" : `?${query}`}`);
 
+  const from = useDateFilter(params.get("from") ?? "", (date) => filter(CatalogParams.set(params, "from", date)), { max: DateFilter.boundOf(params.get("to")) });
+
+  const to = useDateFilter(params.get("to") ?? "", (date) => filter(CatalogParams.set(params, "to", date)), { min: DateFilter.boundOf(params.get("from")) });
+
   const [action, setAction] = useParamDraft(params, "action");
 
   const [targetType, setTargetType] = useParamDraft(params, "targetType");
@@ -48,8 +53,8 @@ export const AuditPage = () => {
         <Button type="submit" tone="quiet">
           Find
         </Button>
-        <Field label="From" id="audit-from" type="date" value={params.get("from") ?? ""} onChange={(event) => filter(CatalogParams.set(params, "from", event.target.value))} />
-        <Field label="Until" id="audit-to" type="date" value={params.get("to") ?? ""} onChange={(event) => filter(CatalogParams.set(params, "to", event.target.value))} />
+        <Field label="From" id="audit-from" type="date" {...from} />
+        <Field label="Until" id="audit-to" type="date" {...to} />
         {params.get("actor") === null ? null : (
           <p className="self-center text-sm text-ink-soft">
             One person's changes.{" "}

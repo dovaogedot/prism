@@ -1,5 +1,6 @@
 import { OrderSort, OrderStatus } from "@prism/shared";
 import { useSearchParams } from "react-router";
+import { DateFilter, useDateFilter } from "../../../shared/hooks/use-date-filter.ts";
 import { CatalogParams } from "../../catalog/filters.ts";
 import { OrderParams } from "../orders.ts";
 
@@ -14,6 +15,10 @@ export const OrderFilters = () => {
   const filter = (next: URLSearchParams): void => {
     setParams(next, { preventScrollReset: true });
   };
+
+  const from = useDateFilter(params.get("from") ?? "", (date) => filter(CatalogParams.set(params, "from", date)), { max: DateFilter.boundOf(params.get("to")) });
+
+  const to = useDateFilter(params.get("to") ?? "", (date) => filter(CatalogParams.set(params, "to", date)), { min: DateFilter.boundOf(params.get("from")) });
 
   const chosen = OrderParams.statuses(params);
   const sort = OrderSort.schema.catch("newest").parse(params.get("sort") ?? "newest");
@@ -46,21 +51,11 @@ export const OrderFilters = () => {
       <div className="flex flex-wrap items-end gap-3">
         <label className="space-y-1 text-sm text-ink-soft">
           <span className="block">From</span>
-          <input
-            type="date"
-            value={params.get("from") ?? ""}
-            onChange={(event) => filter(CatalogParams.set(params, "from", event.target.value))}
-            className={dateInput}
-          />
+          <input className={dateInput} type="date" {...from} />
         </label>
         <label className="space-y-1 text-sm text-ink-soft">
           <span className="block">To</span>
-          <input
-            type="date"
-            value={params.get("to") ?? ""}
-            onChange={(event) => filter(CatalogParams.set(params, "to", event.target.value))}
-            className={dateInput}
-          />
+          <input className={dateInput} type="date" {...to} />
         </label>
         <label className="space-y-1 text-sm text-ink-soft">
           <span className="block">Sort</span>

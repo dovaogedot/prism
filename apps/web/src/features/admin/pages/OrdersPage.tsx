@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, DataTable, EmptyState, Field, Pagination, SelectField, Skeleton } from "../../../shared/ui/index.ts";
+import { DateFilter, useDateFilter } from "../../../shared/hooks/use-date-filter.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 import { CatalogParams } from "../../catalog/filters.ts";
 import { StatusBadge } from "../../orders/components/StatusBadge.tsx";
@@ -25,6 +26,10 @@ export const OrdersPage = () => {
   const [number, setNumber] = useParamDraft(params, "number");
 
   const [email, setEmail] = useParamDraft(params, "email");
+
+  const from = useDateFilter(params.get("from") ?? "", (date) => setParams(CatalogParams.set(params, "from", date)), { max: DateFilter.boundOf(params.get("to")) });
+
+  const to = useDateFilter(params.get("to") ?? "", (date) => setParams(CatalogParams.set(params, "to", date)), { min: DateFilter.boundOf(params.get("from")) });
 
   const statuses = params.getAll("status");
 
@@ -56,8 +61,8 @@ export const OrdersPage = () => {
         >
           <Field label="Order number" id="order-number" inputMode="numeric" value={number} onChange={(event) => setNumber(event.target.value)} />
           <Field label="Customer email" id="order-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
-          <Field label="Placed from" id="order-from" type="date" value={params.get("from") ?? ""} onChange={(event) => setParams(CatalogParams.set(params, "from", event.target.value))} />
-          <Field label="Placed until" id="order-to" type="date" value={params.get("to") ?? ""} onChange={(event) => setParams(CatalogParams.set(params, "to", event.target.value))} />
+          <Field label="Placed from" id="order-from" type="date" {...from} />
+          <Field label="Placed until" id="order-to" type="date" {...to} />
           <Button type="submit" tone="quiet">
             Find
           </Button>
