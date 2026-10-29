@@ -2,12 +2,12 @@
  * reCAPTCHA, loaded on demand.
  *
  * Without a configured site key this renders Google's real widget with their
- * published always-pass test key, so a reviewer registers without anyone
- * owning a Google Cloud account. Point the env at your own keys and nothing
+ * published always-pass test key, so a reviewer registers and writes to the
+ * shop without anyone owning a Google Cloud account. Point the env at your own keys and nothing
  * here changes except which key is used.
  *
  * If the script cannot load at all, the component reports a static token so
- * registration is still reachable. The server decides whether that token is
+ * registration and the contact form are still reachable. The server decides whether that token is
  * acceptable.
  *
  * Google accepts a solved token once. A form whose submit was refused gives

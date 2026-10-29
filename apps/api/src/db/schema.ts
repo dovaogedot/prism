@@ -1,9 +1,13 @@
 /**
- * The database schema, and the one source the DDL is generated from.
+ * The database schema, which the DDL is generated from.
  *
  * `drizzle-kit generate` turns this file into the SQL under `drizzle/`, and
  * the migrator applies that SQL at start. Tables, enums and relations are
- * top-level exports because drizzle-kit reads the module's exports.
+ * top-level exports because drizzle-kit reads the module's exports. The
+ * triggers `audit_event_append_only` and `product_review_rating`, their
+ * functions, the `pg_trgm` extension and the small tables' statistics
+ * settings are written by hand into the migrations beside the generated
+ * SQL, so a change to a column they read has to update them too.
  *
  * Nothing here knows what the shop sells. A product is a name, a price,
  * stock, a category, a brand, its measurements and a bag of named

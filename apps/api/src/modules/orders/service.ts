@@ -102,7 +102,7 @@ export type OrderService = Readonly<{
   /** Every order, for staff, a page at a time. */
   adminList: (query: AdminOrderQuery) => Promise<Page<AdminOrderSummary>>;
   adminDetail: (orderId: OrderId) => ResultAsync<AdminOrderDetail, DomainError>;
-  /** Moves a paid order one step through fulfillment and tells the customer. */
+  /** Moves a paid order one step through fulfillment, and mails the customer when it ships and when it arrives. */
   advance: (actor: StaffActor, orderId: OrderId, change: OrderStatusChange) => ResultAsync<AdminOrderDetail, DomainError>;
   /** Cancels an order that has not shipped: the stock comes back and any payment is refunded. */
   cancelByStaff: (actor: StaffActor, orderId: OrderId) => ResultAsync<AdminOrderDetail, DomainError>;

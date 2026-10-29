@@ -1,5 +1,5 @@
 /**
- * CAPTCHA verification for registration. Google publishes a site/secret key
+ * CAPTCHA verification for registration and the contact form. Google publishes a site/secret key
  * pair that always verifies, so the widget and the check are real with no
  * account; supply a secret key and the same code path verifies for real.
  */
