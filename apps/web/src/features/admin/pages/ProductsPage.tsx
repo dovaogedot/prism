@@ -1,4 +1,4 @@
-import { AdminProductSort, Price, type AdminBrand, type AdminCategory, type AdminProductSummary, type Page } from "@prism/shared";
+import { AdminProductQuery, AdminProductSort, Price, type AdminBrand, type AdminCategory, type AdminProductSummary, type Page } from "@prism/shared";
 import { Link, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { PageText } from "../../../shared/seo/page-text.ts";
@@ -93,7 +93,7 @@ export const ProductsPage = () => {
               checked={params.get("lowStock") === "true"}
               onChange={(event) => filter(CatalogParams.set(params, "lowStock", event.target.checked ? "true" : ""))}
             />
-            Low on stock (5 or fewer)
+            Low on stock ({AdminProductQuery.LOW_STOCK} or fewer)
           </label>
           <label className={checkboxClass}>
             <input
@@ -148,7 +148,7 @@ export const ProductsPage = () => {
                   key: "stock",
                   header: "Stock",
                   isNumeric: true,
-                  cell: (product) => <span className={product.stock <= 5 ? "font-semibold text-warn" : ""}>{product.stock}</span>,
+                  cell: (product) => <span className={product.stock <= AdminProductQuery.LOW_STOCK ? "font-semibold text-warn" : ""}>{product.stock}</span>,
                 },
                 { key: "featured", header: "Featured", cell: (product) => (product.isFeatured ? "Yes" : "") },
               ]}

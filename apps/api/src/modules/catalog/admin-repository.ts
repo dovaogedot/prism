@@ -8,7 +8,7 @@ import {
   type AdminBrand,
   type AdminCategory,
   type AdminProductDetail,
-  type AdminProductQuery,
+  AdminProductQuery,
   type AdminProductSort,
   type AdminProductSummary,
   type BrandId,
@@ -248,7 +248,7 @@ export const CatalogAdminRepository = {
           query.category === undefined ? undefined : eq(categories.slug, query.category),
           query.brand === undefined ? undefined : eq(brands.slug, query.brand),
           query.featured === undefined ? undefined : CatalogAdminRepository.featuredCondition(query.featured),
-          query.lowStock === true ? lte(products.stock, 5) : undefined,
+          query.lowStock === true ? lte(products.stock, AdminProductQuery.LOW_STOCK) : undefined,
         );
 
         const [rows, totals] = await Promise.all([

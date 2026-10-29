@@ -87,6 +87,8 @@ export const OrderStatus = {
   REFUNDABLE: ["shipped", "delivered"] as const,
   /** The statuses of an order whose payment went through. */
   PAID: ["payment_successful", "processing", "shipped", "delivered", "refunded"] as const,
+  /** The statuses of a paid order that has not shipped yet: the work of fulfillment. */
+  TO_FULFILL: ["payment_successful", "processing"] as const,
   /** Each step of fulfillment and the status before it. Staff move an order one step at a time. */
   PREVIOUS: { processing: "payment_successful", shipped: "processing", delivered: "shipped" } as const satisfies Record<
     "processing" | "shipped" | "delivered",

@@ -36,7 +36,7 @@ export type AdminSummary = Readonly<{
   /** Paid and processing orders waiting for the next step. */
   ordersToFulfill?: number;
   reviewsWaiting?: number;
-  /** Products with 5 or fewer in stock. */
+  /** Products with `AdminProductQuery.LOW_STOCK` or fewer in stock. */
   lowStockProducts?: number;
   /** Orders paid for today, in the shop's time zone. */
   paidToday?: number;
@@ -382,11 +382,13 @@ export const AdminProductQuery = {
     category: Slug.schema.optional(),
     brand: Slug.schema.optional(),
     featured: z.stringbool().optional(),
-    /** Only products with 5 or fewer in stock. */
+    /** Only products with `LOW_STOCK` or fewer in stock. */
     lowStock: z.stringbool().optional(),
     sort: AdminProductSort.schema.default("name_asc"),
     ...Page.params,
   }),
+  /** The most a product holds and still counts as low on stock, in the list's filter and the dashboard's count. */
+  LOW_STOCK: 5,
 } as const;
 
 /** A product as the admin lists it. */

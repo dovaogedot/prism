@@ -29,7 +29,7 @@ export const DashboardPage = () => {
   const tiles: readonly Tile[] = [
     ...(counts.ordersToFulfill === undefined
       ? []
-      : [{ label: "Orders to fulfill", value: counts.ordersToFulfill, href: "/admin/orders?status=payment_successful&status=processing&sort=oldest" }]),
+      : [{ label: "Orders to fulfill", value: counts.ordersToFulfill, href: `/admin/orders?${OrderStatus.TO_FULFILL.map((status) => `status=${status}&`).join("")}sort=oldest` }]),
     ...(counts.paidToday === undefined
       ? []
       : [{ label: "Paid today", value: counts.paidToday, href: `/admin/orders?${OrderStatus.PAID.map((status) => `status=${status}&`).join("")}from=${today}&to=${today}` }]),

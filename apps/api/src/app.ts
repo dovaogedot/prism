@@ -9,7 +9,7 @@ import fastifyCookie from "@fastify/cookie";
 import fastifyCors from "@fastify/cors";
 import fastifyHelmet from "@fastify/helmet";
 import fastifyMultipart from "@fastify/multipart";
-import { Delivery, OAuthProvider, type PaymentsConfig } from "@prism/shared";
+import { AdminProductQuery, Delivery, OAuthProvider, OrderStatus, type PaymentsConfig } from "@prism/shared";
 import Fastify, { type FastifyContextConfig, type FastifyInstance } from "fastify";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
 import type { Config } from "./config.ts";
@@ -349,10 +349,10 @@ export const App = {
     const counters: SummaryCounters = {
       ordersToFulfill: {
         permission: "orders.fulfill",
-        count: () => orderRepository.countInStatus(["payment_successful", "processing"]),
+        count: () => orderRepository.countInStatus(OrderStatus.TO_FULFILL),
       },
       reviewsWaiting: { permission: "reviews.moderate", count: reviewRepository.countPending },
-      lowStockProducts: { permission: "catalog.manage", count: () => catalogRepository.countLowStock(5) },
+      lowStockProducts: { permission: "catalog.manage", count: () => catalogRepository.countLowStock(AdminProductQuery.LOW_STOCK) },
       paidToday: { permission: "orders.view", count: () => orderRepository.countPaidOn(Delivery.dayOf(clock.now())) },
     };
 
