@@ -1,4 +1,4 @@
-import { Delivery, Permission, type AdminSummary } from "@prism/shared";
+import { Delivery, OrderStatus, Permission, type AdminSummary } from "@prism/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { Api } from "../../../shared/api/client.ts";
@@ -30,7 +30,9 @@ export const DashboardPage = () => {
     ...(counts.ordersToFulfill === undefined
       ? []
       : [{ label: "Orders to fulfill", value: counts.ordersToFulfill, href: "/admin/orders?status=payment_successful&status=processing&sort=oldest" }]),
-    ...(counts.paidToday === undefined ? [] : [{ label: "Paid today", value: counts.paidToday, href: `/admin/orders?from=${today}&to=${today}` }]),
+    ...(counts.paidToday === undefined
+      ? []
+      : [{ label: "Paid today", value: counts.paidToday, href: `/admin/orders?${OrderStatus.PAID.map((status) => `status=${status}&`).join("")}from=${today}&to=${today}` }]),
     ...(counts.reviewsWaiting === undefined ? [] : [{ label: "Reviews waiting", value: counts.reviewsWaiting, href: "/admin/reviews" }]),
     ...(counts.lowStockProducts === undefined ? [] : [{ label: "Low on stock", value: counts.lowStockProducts, href: "/admin/products?lowStock=true&sort=stock_asc" }]),
   ];

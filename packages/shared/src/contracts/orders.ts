@@ -85,6 +85,8 @@ export const OrderStatus = {
   STAFF_CANCELABLE: ["pending_payment", "payment_successful", "processing"] as const,
   /** The statuses a refund takes an order from: it shipped, so canceling is too late. */
   REFUNDABLE: ["shipped", "delivered"] as const,
+  /** The statuses of an order whose payment went through. */
+  PAID: ["payment_successful", "processing", "shipped", "delivered", "refunded"] as const,
   /** Each step of fulfillment and the status before it. Staff move an order one step at a time. */
   PREVIOUS: { processing: "payment_successful", shipped: "processing", delivered: "shipped" } as const satisfies Record<
     "processing" | "shipped" | "delivered",

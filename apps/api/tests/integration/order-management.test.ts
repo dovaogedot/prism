@@ -117,6 +117,21 @@ describe("GET /orders", () => {
     expect((await list(accessToken, `?to=${days[1]}`)).items.map((item) => item.number)).toEqual([100002, 100001]);
   });
 
+  it("cuts days in the shop's time zone, where the pages show the times", async () => {
+    await registerUser(harness, "night-owl@example.com");
+    // 22:30 UTC is 01:30 the next day in Tallinn, summer or winter.
+    const day = 24 * 60 * 60 * 1000;
+    const now = harness.clock.now().getTime();
+    harness.clock.advanceSeconds(((22.5 * 60 * 60 * 1000 - (now % day) + day) % day) / 1000);
+    await paidOrder({ token: await signIn("night-owl@example.com") });
+    const utcDay = harness.clock.now().toISOString().slice(0, 10);
+    const tallinnDay = new Date(harness.clock.now().getTime() + day).toISOString().slice(0, 10);
+    const token = await signIn("night-owl@example.com");
+
+    expect((await list(token, `?from=${tallinnDay}&to=${tallinnDay}`)).total).toBe(1);
+    expect((await list(token, `?from=${utcDay}&to=${utcDay}`)).total).toBe(0);
+  });
+
   it("sorts oldest first, and by status in lifecycle order", async () => {
     await registerUser(harness, "buyer@example.com");
     const accessToken = await threeOrders("buyer@example.com");

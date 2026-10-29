@@ -8,7 +8,6 @@
 import {
   Cart,
   Contact,
-  Delivery,
   OrderKey,
   OrderStatus,
   Page,
@@ -28,8 +27,9 @@ import {
   type UserId,
   type ValidationIssue,
 } from "@prism/shared";
-import { and, asc, count, desc, eq, gte, inArray, isNull, lt, lte, sql, TransactionRollbackError, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull, lte, sql, TransactionRollbackError, type SQL } from "drizzle-orm";
 import type { Database, Transaction } from "../../db/client.ts";
+import { DayRange } from "../../db/day-range.ts";
 import type { CartId } from "../../db/ids.ts";
 import { cartItems, orderEvents, orderLines, orders, products } from "../../db/schema.ts";
 import { Outbox, type OutboxEntry } from "../../messaging/outbox.ts";
@@ -170,8 +170,6 @@ export type OrderRepository = Readonly<{
 
 export const OrderRepository = {
   REFUND_NOTE: "Refund issued",
-  /** The statuses of an order whose payment went through. */
-  PAID: ["payment_successful", "processing", "shipped", "delivered", "refunded"] as const satisfies readonly OrderStatus[],
 
   create: (db: Database, cipher: FieldCipher, audit: AuditLog): OrderRepository => {
     type Row = typeof orders.$inferSelect;
@@ -255,9 +253,7 @@ export const OrderRepository = {
     /** The status and date filters of a list. Both days are whole UTC days and count. */
     const periodOf = (statuses: readonly OrderStatus[], from: string | undefined, to: string | undefined) => [
       statuses.length === 0 ? undefined : inArray(orders.status, [...statuses]),
-      from === undefined ? undefined : gte(orders.createdAt, sql`(${from}::date)::timestamp AT TIME ZONE 'UTC'`),
-      // The end day counts, so the bound is the start of the next one.
-      to === undefined ? undefined : lt(orders.createdAt, sql`((${to}::date + 1)::timestamp) AT TIME ZONE 'UTC'`),
+      ...DayRange.conditionsOf(orders.createdAt, from, to),
     ];
 
     const lifecycle = sql`array_position(ARRAY[${sql.join(
@@ -599,9 +595,8 @@ export const OrderRepository = {
           .from(orders)
           .where(
             and(
-              inArray(orders.status, [...OrderRepository.PAID]),
-              gte(orders.createdAt, sql`(${day}::date)::timestamp AT TIME ZONE ${Delivery.TIME_ZONE}`),
-              lt(orders.createdAt, sql`((${day}::date + 1)::timestamp) AT TIME ZONE ${Delivery.TIME_ZONE}`),
+              inArray(orders.status, [...OrderStatus.PAID]),
+              ...DayRange.conditionsOf(orders.createdAt, day, day),
             ),
           );
         return row?.total ?? 0;

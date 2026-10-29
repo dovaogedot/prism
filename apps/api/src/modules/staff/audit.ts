@@ -5,9 +5,10 @@
  */
 
 import { Email, Page, type AuditEventView, type AuditQuery, type StaffRole, type UserId } from "@prism/shared";
-import { and, count, desc, eq, gte, like, lt, sql } from "drizzle-orm";
+import { and, count, desc, eq, like } from "drizzle-orm";
 import { z } from "zod";
 import type { Database, Transaction } from "../../db/client.ts";
+import { DayRange } from "../../db/day-range.ts";
 import { auditEvents, users } from "../../db/schema.ts";
 import type { FieldCipher } from "../../platform/cipher.ts";
 
@@ -85,13 +86,7 @@ export const AuditLog = {
         query.action === undefined ? undefined : AuditLog.actionCondition(query.action),
         query.targetType === undefined ? undefined : eq(auditEvents.targetType, query.targetType),
         query.targetId === undefined ? undefined : eq(auditEvents.targetId, query.targetId),
-        query.from === undefined
-          ? undefined
-          : gte(auditEvents.createdAt, sql`(${query.from}::date)::timestamp AT TIME ZONE 'UTC'`),
-        // The end day counts, so the bound is the start of the next one.
-        query.to === undefined
-          ? undefined
-          : lt(auditEvents.createdAt, sql`((${query.to}::date + 1)::timestamp) AT TIME ZONE 'UTC'`),
+        ...DayRange.conditionsOf(auditEvents.createdAt, query.from, query.to),
       );
 
       const [rows, totals] = await Promise.all([
