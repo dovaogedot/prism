@@ -108,6 +108,14 @@ describe("Price.format", () => {
   });
 });
 
+describe("numbers that reach Postgres", () => {
+  it("refuses a price filter past what an integer column holds", () => {
+    expect(ProductQueryParams.schema.safeParse({ priceMax: "2147483647" }).success).toBe(true);
+    expect(ProductQueryParams.schema.safeParse({ priceMax: "2147483648" }).success).toBe(false);
+    expect(ProductQueryParams.schema.safeParse({ priceMin: "9007199254740991" }).success).toBe(false);
+  });
+});
+
 describe("text that reaches Postgres", () => {
   it("counts a review's byline and texts in characters, as the database's checks do", () => {
     const review = (fields: Readonly<Record<string, string>>) => ReviewInput.schema.safeParse({ rating: 4, authorName: "Mari", ...fields }).success;

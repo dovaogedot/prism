@@ -145,6 +145,10 @@ describe("GET /api/v1/products", () => {
     expect((await get("/api/v1/products?p.%00=red")).statusCode).toBe(422);
   });
 
+  it("refuses a price filter past what the price column holds, rather than failing in Postgres", async () => {
+    expect((await get("/api/v1/products?priceMax=2147483648")).statusCode).toBe(422);
+  });
+
   it("counts the whole match on a page past the end, and keeps a text search exact there", async () => {
     const past = jsonOf(await get("/api/v1/products?perPage=1&page=10"));
     const search = jsonOf(await get("/api/v1/products?q=lamp&perPage=1&page=10"));

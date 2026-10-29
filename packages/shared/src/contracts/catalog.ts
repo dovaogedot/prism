@@ -81,6 +81,11 @@ export const StoredText = {
   lengthOf: (text: string): number => [...text].length,
 } as const;
 
+/** A whole number compared with a Postgres `integer` column, which holds at most this. */
+export const StoredInteger = {
+  MAX: 2_147_483_647,
+} as const;
+
 export const MultiValue = {
   schema: z
     .union([
@@ -126,8 +131,8 @@ export const ProductQueryParams = {
       q: SearchText.schema.optional(),
       category: Slug.schema.optional(),
       brand: MultiValue.slugs.optional(),
-      priceMin: z.coerce.number().int().min(0).optional(),
-      priceMax: z.coerce.number().int().min(0).optional(),
+      priceMin: z.coerce.number().int().min(0).max(StoredInteger.MAX).optional(),
+      priceMax: z.coerce.number().int().min(0).max(StoredInteger.MAX).optional(),
       rating: z.coerce.number().int().min(1).max(5).optional(),
       sort: ProductSort.schema.default("relevance"),
       page: z.coerce.number().int().min(1).max(10_000).default(1),

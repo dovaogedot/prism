@@ -5,7 +5,7 @@
 
 import { z } from "zod";
 import { Email, UserId, type OAuthProvider } from "./auth.ts";
-import { BrandId, CategoryId, ImageId, Slug, StoredText, type ProductId, type ProductImage } from "./catalog.ts";
+import { BrandId, CategoryId, ImageId, Slug, StoredInteger, StoredText, type ProductId, type ProductImage } from "./catalog.ts";
 import { OptionalText, ReviewStatus, type OwnReview } from "./reviews.ts";
 import { ShippingMethodCode, type ShippingOption } from "./checkout.ts";
 import { CalendarDay, OrderSort, OrderStatus, type OrderDetail, type OrderSummary } from "./orders.ts";
@@ -202,7 +202,7 @@ export const AdminOrderQuery = {
       from: CalendarDay.schema.optional(),
       to: CalendarDay.schema.optional(),
       /** The order with exactly this number. */
-      number: z.coerce.number().int().positive().optional(),
+      number: z.coerce.number().int().positive().max(StoredInteger.MAX).optional(),
       /** The orders whose contact email is exactly this. */
       email: Email.schema.optional(),
       sort: OrderSort.schema.default("newest"),
