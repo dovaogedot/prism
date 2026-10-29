@@ -8,6 +8,7 @@
 
 import { Permission, type ErrorResponse, type StaffRole } from "@prism/shared";
 import { hashKey, keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Api } from "../../shared/api/client.ts";
 
 /** What stands between a staff member and the admin. */
@@ -81,6 +82,26 @@ export const useAdminRead = <T>(key: readonly unknown[], path: string, isEnabled
     enabled: isEnabled,
     retry: false,
   });
+
+/**
+ * A filter box's text. It starts from the URL parameter `name` and follows
+ * it whenever the URL changes, as Back, Forward, a link or "Clear filters"
+ * change it, while typing changes only the box.
+ */
+export const useParamDraft = (params: URLSearchParams, name: string) => {
+  const fromUrl = params.get(name) ?? "";
+
+  const [draft, setDraft] = useState(fromUrl);
+
+  const [seen, setSeen] = useState(fromUrl);
+
+  if (seen !== fromUrl) {
+    setSeen(fromUrl);
+    setDraft(fromUrl);
+  }
+
+  return [draft, setDraft] as const;
+};
 
 /** One admin write. Every admin read is refreshed once it succeeds, so no list shows what it changed as it was. */
 export const useAdminWrite = <Input, Output>(write: (input: Input) => Promise<Output>) => {

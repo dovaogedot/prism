@@ -1,11 +1,10 @@
 import { AdminProductSort, Price, type AdminBrand, type AdminCategory, type AdminProductSummary, type Page } from "@prism/shared";
-import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, DataTable, EmptyState, Field, ImageSet, Pagination, SelectField, Skeleton } from "../../../shared/ui/index.ts";
 import { CatalogParams } from "../../catalog/filters.ts";
-import { AdminKeys, useAdminRead } from "../admin.ts";
+import { AdminKeys, useAdminRead, useParamDraft } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
 
 /**
@@ -28,7 +27,7 @@ export const ProductsPage = () => {
 
   const brands = useAdminRead<{ items: readonly AdminBrand[] }>(AdminKeys.list("brands", ""), "/brands");
 
-  const [text, setText] = useState(params.get("q") ?? "");
+  const [text, setText] = useParamDraft(params, "q");
 
   const checkboxClass = "flex items-center gap-2 text-sm text-ink";
 

@@ -1,5 +1,4 @@
 import { StaffRole, type AuditEventView, type Page } from "@prism/shared";
-import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { PageText } from "../../../shared/seo/page-text.ts";
@@ -7,7 +6,7 @@ import { Alert, Button, DataTable, EmptyState, Field, Pagination, Skeleton } fro
 import { Failure } from "../../auth/components/failure.tsx";
 import { CatalogParams } from "../../catalog/filters.ts";
 import { OrderTime } from "../../orders/orders.ts";
-import { AdminKeys, useAdminRead } from "../admin.ts";
+import { AdminKeys, useAdminRead, useParamDraft } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
 
 /**
@@ -28,11 +27,11 @@ export const AuditPage = () => {
 
   const events = useAdminRead<Page<AuditEventView>>(AdminKeys.list("audit", query), `/audit${query.length === 0 ? "" : `?${query}`}`);
 
-  const [action, setAction] = useState(params.get("action") ?? "");
+  const [action, setAction] = useParamDraft(params, "action");
 
-  const [targetType, setTargetType] = useState(params.get("targetType") ?? "");
+  const [targetType, setTargetType] = useParamDraft(params, "targetType");
 
-  const [targetId, setTargetId] = useState(params.get("targetId") ?? "");
+  const [targetId, setTargetId] = useParamDraft(params, "targetId");
 
   return (
     <AdminPage text={PageText.adminAudit} heading="Audit log">

@@ -1,5 +1,4 @@
 import { OrderSort, OrderStatus, Price, type AdminOrderSummary, type Page } from "@prism/shared";
-import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { PageText } from "../../../shared/seo/page-text.ts";
@@ -7,7 +6,7 @@ import { Alert, Button, DataTable, EmptyState, Field, Pagination, SelectField, S
 import { CatalogParams } from "../../catalog/filters.ts";
 import { StatusBadge } from "../../orders/components/StatusBadge.tsx";
 import { OrderTime } from "../../orders/orders.ts";
-import { AdminKeys, useAdminRead } from "../admin.ts";
+import { AdminKeys, useAdminRead, useParamDraft } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
 
 /**
@@ -22,9 +21,9 @@ export const OrdersPage = () => {
 
   const orders = useAdminRead<Page<AdminOrderSummary>>(AdminKeys.list("orders", query), `/orders${query.length === 0 ? "" : `?${query}`}`);
 
-  const [number, setNumber] = useState(params.get("number") ?? "");
+  const [number, setNumber] = useParamDraft(params, "number");
 
-  const [email, setEmail] = useState(params.get("email") ?? "");
+  const [email, setEmail] = useParamDraft(params, "email");
 
   const statuses = params.getAll("status");
 

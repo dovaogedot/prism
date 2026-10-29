@@ -1,5 +1,4 @@
 import { StaffRole, type AdminUserSummary, type Page } from "@prism/shared";
-import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { PageText } from "../../../shared/seo/page-text.ts";
@@ -7,7 +6,7 @@ import { Alert, Button, DataTable, EmptyState, Field, Pagination, SelectField, S
 import { Failure } from "../../auth/components/failure.tsx";
 import { CatalogParams } from "../../catalog/filters.ts";
 import { OrderTime } from "../../orders/orders.ts";
-import { AdminKeys, useAdminRead } from "../admin.ts";
+import { AdminKeys, useAdminRead, useParamDraft } from "../admin.ts";
 import { AdminPage } from "../components/AdminPage.tsx";
 
 /**
@@ -26,7 +25,7 @@ export const UsersPage = () => {
 
   const users = useAdminRead<Page<AdminUserSummary>>(AdminKeys.list("users", query), `/users${query.length === 0 ? "" : `?${query}`}`);
 
-  const [email, setEmail] = useState(params.get("email") ?? "");
+  const [email, setEmail] = useParamDraft(params, "email");
 
   return (
     <AdminPage text={PageText.adminUsers} heading="Accounts">
