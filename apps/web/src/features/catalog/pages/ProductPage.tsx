@@ -102,7 +102,13 @@ export const ProductPage = () => {
                 <div className="space-y-6">
                   <header className="space-y-2">
                     <p className="text-xs font-medium uppercase tracking-wider text-ink-faint">
-                      {data.brand.name} · {data.category.name}
+                      <Link className="hover:text-ink hover:underline" to={`/shop?brand=${encodeURIComponent(data.brand.slug)}`}>
+                        {data.brand.name}
+                      </Link>{" "}
+                      ·{" "}
+                      <Link className="hover:text-ink hover:underline" to={`/categories/${data.category.slug}`}>
+                        {data.category.name}
+                      </Link>
                     </p>
                     <h1 className="text-3xl font-semibold tracking-tight text-ink">{data.name}</h1>
                     <a className="inline-block rounded hover:opacity-80" href="#reviews-heading">

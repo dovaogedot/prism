@@ -106,7 +106,7 @@ E2E_BASE_URL=https://localhost:3200 npm run e2e
 - **Filters**: brands, a price range, a minimum rating, and one group per property of the matching products, each value with its count. A value the other filters leave nothing for is grayed out, not removed. A narrow screen puts the filters in a drawer, below the menu; its "Filters" button opens the drawer at the filters.
 - **Active filters** sit beside the count, each with a cross. "Clear all filters" keeps the search text and the category.
 - **Sort**: relevance, price either way, rating, or newest.
-- **Product page**: pictures in a gallery with a full-size view, price, stock, brand, category, the rating summary, description, properties, and weight and size in metric or imperial units. A quantity and "Add to cart", or "Sold out" when there is no stock. Below them, the reviews and related products from the same category.
+- **Product page**: pictures in a gallery with a full-size view, price, stock, the brand and the category, each a link to its products, the rating summary, description, properties, and weight and size in metric or imperial units. A quantity and "Add to cart", or "Sold out" when there is no stock. Below them, the reviews and related products from the same category.
 
 ### Reviews
 
