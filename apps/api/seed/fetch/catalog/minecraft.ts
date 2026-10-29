@@ -103,7 +103,7 @@ export const Minecraft = {
     const seen = new Set<string>();
 
     for (const shelf of Minecraft.BOXES) {
-      // ponytail: a subpage documents an old or technical form of the thing, not a thing of its own.
+      // A subpage documents an old or technical form of the thing, not a thing of its own.
       const titles = (await MediaWiki.list(API, "embeddedin", { eititle: `Template:${shelf.template}`, einamespace: "0", eilimit: "500" })).filter((title) => !title.includes("/"));
       const extracts = await Minecraft.extracts(titles);
 
