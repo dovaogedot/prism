@@ -205,9 +205,8 @@ Write-Host ""
 Write-Host -NoNewline "Waiting for the storefront"
 $isUp = $false
 foreach ($attempt in 1..60) {
-  # curl.exe, not the `curl` alias: it is silent on failure and only sets an exit code.
-  # -k: the certificate is self-signed, and this asks only whether the storefront answers.
-  curl.exe -kfs -o NUL "https://localhost:$webPort/api/v1/health"
+  # Asked inside the web container, through Caddy to the API, so the host needs nothing but Docker.
+  docker compose exec -T web healthcheck /api/v1/health *> $null
   if ($LASTEXITCODE -eq 0) {
     $isUp = $true
     break

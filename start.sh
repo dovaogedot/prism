@@ -199,13 +199,13 @@ else
   payments="off until STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY are in .env"
 fi
 
-# The storefront's certificate is self-signed, so -k: this asks whether it
-# answers, not whether the browser will trust it.
+# Asked inside the web container, through Caddy to the API, so the host
+# needs nothing but Docker.
 echo
 printf 'Waiting for the storefront'
 is_up=false
 for _ in $(seq 1 60); do
-  if curl -kfsS -o /dev/null "https://localhost:${web_port}/api/v1/health" 2>/dev/null; then
+  if docker compose exec -T web healthcheck /api/v1/health >/dev/null 2>&1; then
     is_up=true
     printf '\n'
     break
