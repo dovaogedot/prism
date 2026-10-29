@@ -1,6 +1,7 @@
 import { Pricing, type CheckoutPrefill, type ShippingOption } from "@prism/shared";
 import { Elements } from "@stripe/react-stripe-js";
 import { useQuery } from "@tanstack/react-query";
+import { useRef } from "react";
 import { Link } from "react-router";
 import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
@@ -42,6 +43,11 @@ export const CheckoutPage = () => {
   });
 
   const saved = useSavedAddresses();
+
+  // The amount Stripe's fields start from. Elements applies an option it sees
+  // change after CheckoutBody has set the chosen option's total, so it only
+  // ever sees this first one, and CheckoutBody keeps the amount current.
+  const startingAmount = useRef<number | undefined>(undefined);
 
   // A failed prefill only means an empty form; it never blocks checkout.
   const prefillSettled = session === undefined || (prefill.status !== "pending" && saved.status !== "pending");
@@ -108,6 +114,8 @@ export const CheckoutPage = () => {
             return <CheckoutBody cart={view} options={choices} payments={{ status: "simulated" }} {...known} />;
           }
 
+          startingAmount.current ??= Pricing.totals(view.lines, first).totalCents;
+
           return (
             <div className="space-y-6">
               {stripeJs.status === "error" ? (
@@ -123,7 +131,7 @@ export const CheckoutPage = () => {
                 stripe={stripeJs.data ?? null}
                 options={{
                   mode: "payment",
-                  amount: Pricing.totals(view.lines, first).totalCents,
+                  amount: startingAmount.current,
                   currency: "eur",
                   allowedPaymentMethodTypes: ["card"],
                   appearance: StripeFields.appearance(theme === "dark"),
