@@ -268,7 +268,7 @@ export const App = {
     });
     if (firstAdmin !== undefined && firstAdmin._tag !== "Present") app.log.info({ outcome: firstAdmin._tag }, "first admin");
 
-    const catalogRepository = CatalogRepository.create(database.db);
+    const catalogRepository = CatalogRepository.create(database.db, clock);
     const cookies = { secure: config.http.webOrigin.startsWith("https://") };
 
     const queue =

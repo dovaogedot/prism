@@ -24,6 +24,7 @@ import { Dimensions, Weight } from "@prism/shared";
 import { and, asc, count, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lte, max, min, not, sql, type SQL } from "drizzle-orm";
 import type { Database } from "../../db/client.ts";
 import { brands, categories, productImages, productProperties, products } from "../../db/schema.ts";
+import type { Clock } from "../../platform/clock.ts";
 import type { VariantSource } from "../../platform/image-store.ts";
 import { ProductSearch, type LiftedFacet, type TextMatch } from "./search.ts";
 import { ImageRows, type ImageRow } from "./images.ts";
@@ -55,11 +56,15 @@ export type CatalogRepository = Readonly<{
 export const CatalogRepository = {
   /** How many products each row of the home page shows. */
   HOME_ROW: 8,
+  /** How long a listing's facets are kept: as long as a public listing may be kept anyway. */
+  FACET_TTL_MS: 60_000,
+  /** The most filter sets whose facets are kept at once; the oldest goes first. */
+  FACET_ENTRIES: 500,
 
   /** Where a stored image file is served from. */
   imageUrl: (file: string): string => `/media/${file}`,
 
-  create: (db: Database): CatalogRepository => {
+  create: (db: Database, clock: Clock): CatalogRepository => {
     // The product's own columns, which a trigger keeps equal to its approved reviews.
     const ratingColumns = {
       average: sql`${products.ratingAverage}`,
@@ -188,9 +193,44 @@ export const CatalogRepository = {
       return facets;
     };
 
+    /** Facets by the filters and text match that decide them; a page, a page size and a sort change nothing in them. */
+    const keptFacets = new Map<string, Readonly<{ until: number; facets: ProductFacets }>>();
+
+    const facetsOf = async (query: ProductQuery, match: TextMatch): Promise<ProductFacets> => {
+      const key = JSON.stringify([
+        query.text,
+        query.category,
+        query.brands,
+        query.priceMinCents,
+        query.priceMaxCents,
+        query.minRating,
+        query.properties,
+        match,
+      ]);
+      const now = clock.now().getTime();
+      const kept = keptFacets.get(key);
+      if (kept !== undefined && kept.until > now) return kept.facets;
+
+      const [brandBuckets, price, ratings, properties] = await Promise.all([
+        brandsOf(query, match),
+        priceOf(query, match),
+        ratingsOf(query, match),
+        propertiesOf(query, match),
+      ]);
+      const facets: ProductFacets = { brands: brandBuckets, ratings, price, properties };
+
+      // A Map iterates in insertion order, so the first key is the oldest entry.
+      keptFacets.delete(key);
+      const oldest = keptFacets.keys().next();
+      if (keptFacets.size >= CatalogRepository.FACET_ENTRIES && oldest.done !== true) keptFacets.delete(oldest.value);
+      keptFacets.set(key, { until: now + CatalogRepository.FACET_TTL_MS, facets });
+
+      return facets;
+    };
+
     /** One page of products matching `query`, with its facets, matching the text as `match` says. */
     const searchWith = async (query: ProductQuery, match: TextMatch): Promise<Omit<ProductSearchResult, "matched">> => {
-      const [rows, brandBuckets, price, ratings, properties] = await Promise.all([
+      const [rows, facets] = await Promise.all([
         db
           .select({ ...summaryColumns, total: sql<number>`(count(*) OVER ())::int` })
           .from(products)
@@ -200,14 +240,10 @@ export const CatalogRepository = {
           .orderBy(...ProductSearch.orderBy(query, ratingColumns, match))
           .limit(query.perPage)
           .offset(ProductSearch.offset(query)),
-        brandsOf(query, match),
-        priceOf(query, match),
-        ratingsOf(query, match),
-        propertiesOf(query, match),
+        facetsOf(query, match),
       ]);
 
       const total = rows[0]?.total ?? 0;
-      const facets: ProductFacets = { brands: brandBuckets, ratings, price, properties };
 
       return {
         items: rows.map(toSummary),
