@@ -194,19 +194,16 @@ export const ImportFile = {
         properties,
       };
 
-      if (cellIssues.length > 0) {
-        issues.push(...cellIssues);
-        continue;
-      }
-
       const checked = ImportFile.check(row, candidate, (path) =>
         ImportFile.columnOf(
           path,
           properties.map((property) => property.name),
         ),
       );
-      issues.push(...checked.issues);
-      if (checked.product !== undefined) rows.push({ row, product: checked.product });
+      // A cell that could not be read is reported once, by what was wrong with its text; the shared rules report the rest.
+      const unread = new Set(cellIssues.map((issue) => issue.column));
+      issues.push(...cellIssues, ...checked.issues.filter((issue) => !unread.has(issue.column)));
+      if (cellIssues.length === 0 && checked.product !== undefined) rows.push({ row, product: checked.product });
     }
 
     return ImportFile.withDuplicates({ rows, issues });

@@ -125,7 +125,8 @@ describe("ImportFile.parseCsv", () => {
   it("checks every cell against the product rules, naming the column", () => {
     const parsed = ImportFile.parseCsv([HEADER, row({ name: "", stock: "lots", featured: "yes" })].join("\n"));
 
-    expect(parsed.issues.map((issue) => issue.column).sort()).toEqual(["featured", "stock"]);
+    // One pass names every bad cell: the unreadable ones and those the shared rules refuse.
+    expect(parsed.issues.map((issue) => issue.column).sort()).toEqual(["featured", "name", "stock"]);
   });
 
   it("refuses more than 5,000 rows", () => {
