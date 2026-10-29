@@ -7,3 +7,9 @@ apps/api/seed/media
 apps/e2e/test-results
 apps/e2e/playwright-report
 loadtest/results
+# Planning and review notes kept beside the repository, not part of it.
+PART_*.md
+PLAN.md
+REQUIREMENTS_*.md
+TASK_*.md
+REVIEW.md

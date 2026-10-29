@@ -19,8 +19,9 @@ COPY apps/web/package.json ./apps/web/
 COPY apps/e2e/package.json ./apps/e2e/
 RUN npm ci
 
-COPY packages ./packages
-COPY apps ./apps
+# The rest of the repository: the requirement checks also read the README,
+# the ERD, the Dockerfiles, the compose files and the load test's report.
+COPY . .
 # The shared package the api imports, so the seed runs without a test run first.
 RUN npm run build
 

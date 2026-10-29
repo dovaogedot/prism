@@ -419,6 +419,8 @@ RabbitMQ shows a few samples of up to 283% CPU in every run, while its median st
 ./start.sh test                       # every suite of every workspace, in a container
 ./start.sh test npm run test:unit     # only the unit tests, in the same container
 ./start.sh test e2e                   # the browser suite, against a stack of its own
+./start.sh test npm run test:requirements   # one check per requirement that needs no browser
+./start.sh test e2e --project requirements  # the requirement checks that need a browser
 ```
 
 This needs only Docker. The integration, security and flow suites run the real application on a real Postgres, started through Testcontainers. Only what would reach the outside world is substituted: the clock, the mailer, the password hasher, the message queue, Stripe and the address lookup. Stripe's stand-in signs its webhooks the way Stripe does. The browser suite drives Chromium through every page of a running stack. CI runs every suite before each deploy, then the browser suite against the commit's own images.
@@ -431,6 +433,7 @@ This needs only Docker. The integration, security and flow suites run the real a
 | Flows | `apps/api/tests/flows` | Registration, a guest checkout, a member checkout, and product search: what it finds, whether counts and pages agree, and whether every query uses the indexes |
 | Browser | `apps/e2e` | Every page in both themes: axe (WCAG 2.1 A and AA contrast), one h1, title and description lengths and uniqueness, canonical or `noindex`, no sideways scroll at 320, 640, 768, 1,024 and 1,440 pixels, no CSP violation or console error. The skip link, Tab order, quick search, the cart preview, focus after a page change with no ring on the heading, the 404 status, robots and sitemap. The admin's gates and every admin page. Rows meant to line up, every admin table's cells on the middle of their row, and the account pages' shared width, measured to the pixel. |
 | Load | `loadtest` | Response times, throughput and the breaking point; see [Performance](#performance) |
+| Requirements | `requirements/part-1` to `part-3` | One check per requirement of the assignment's three requirement lists that a test can make, numbered as in its list: `*.test.ts` read the repository or drive the API, `*.spec.ts` need a browser |
 
 Checked by hand, because a third party's screen is involved: the CAPTCHA, a provider sign-in with real Google or GitHub keys, 2FA enrollment with a phone app, and payments and refunds with Stripe's test cards. Encryption is checked by hand too:
 
