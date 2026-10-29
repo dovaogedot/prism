@@ -2,7 +2,8 @@ import type { OrderDetail } from "@prism/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 import { Api } from "../../../shared/api/client.ts";
-import { Alert, Button } from "../../../shared/ui/index.ts";
+import { PageHeading } from "../../../shared/seo/page-heading.ts";
+import { Alert, Button, Toast } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 
 /** The order to cancel, and the guest key that opens it, if any. */
@@ -26,6 +27,13 @@ export const CancelOrderButton = ({ order, orderKey }: CancelOrderButtonProps) =
       client.setQueryData(["order", order.id, orderKey], detail);
       void client.invalidateQueries({ queryKey: ["orders"] });
       dialog.current?.close();
+      Toast.show(`Order #${order.number} is canceled.`);
+
+      // This button goes with the order's cancelability, so the page heading keeps focus on the page.
+      const heading = PageHeading.find();
+      if (heading !== null) {
+        PageHeading.focus(heading);
+      }
     },
   });
 

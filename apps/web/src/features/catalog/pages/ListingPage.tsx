@@ -1,5 +1,6 @@
 import { ProductSort, type ProductSearchResult } from "@prism/shared";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Navigate, useParams, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
@@ -55,6 +56,32 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
     queryFn: ({ signal }) => Api.get<ProductSearchResult>(`/products${query.length === 0 ? "" : `?${query}`}`, signal),
     placeholderData: keepPreviousData,
   });
+
+  const activeChips = results.data === undefined ? [] : CatalogParams.active(params, results.data.facets);
+
+  const chipKeys = activeChips.map((chip) => `${chip.key}=${chip.value}`).join("&");
+
+  // Where the chip just removed sat, so focus goes to the chip now there, the one before it, or the results heading.
+  const [removedChipAt, setRemovedChipAt] = useState<number | undefined>(undefined);
+
+  const chipList = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (removedChipAt === undefined) return;
+
+    const left = chipList.current?.querySelectorAll<HTMLElement>("button");
+    const chip = left?.[removedChipAt] ?? left?.[removedChipAt - 1];
+    const heading = document.getElementById("results-heading");
+
+    if (chip !== undefined) {
+      chip.focus();
+    } else if (heading !== null) {
+      heading.tabIndex = -1;
+      heading.focus({ preventScroll: true });
+    }
+
+    setRemovedChipAt(undefined);
+  }, [chipKeys]);
 
   const redirect = kind === "shop" ? Listing.categoryRedirect(params) : undefined;
   if (redirect !== undefined) return <Navigate to={redirect} replace />;
@@ -180,13 +207,16 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
           ) : null}
 
           {results.data === undefined ? null : (
-            <div className="mb-4 flex flex-wrap gap-2">
-              {CatalogParams.active(params, results.data.facets).map((chip) => (
+            <div className="mb-4 flex flex-wrap gap-2" ref={chipList}>
+              {activeChips.map((chip, index) => (
                 <button
                   className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2 py-0.5 text-xs text-ink-soft hover:border-line-strong hover:text-ink"
                   key={`${chip.key}=${chip.value}`}
                   type="button"
-                  onClick={() => filter(chip.next)}
+                  onClick={() => {
+                    setRemovedChipAt(index);
+                    filter(chip.next);
+                  }}
                   aria-label={`Remove ${chip.label}`}
                 >
                   {chip.label}
