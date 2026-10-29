@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
@@ -10,10 +10,12 @@ export const OAuthCompletePage = () => {
 
   // The callback set a refresh cookie and sent us here with no token in the
   // URL. Trading the cookie for an access token is what `useSessionBootstrap`
-  // already does on mount, so this page only has to wait and move on.
-  useState(() => {
-    setTimeout(() => void navigate(NextPath.recall(), { replace: true }), 400);
-  });
+  // already does on mount, so this page only has to wait and move on. The
+  // path is read when the wait ends, and leaving the page first cancels it.
+  useEffect(() => {
+    const timer = window.setTimeout(() => void navigate(NextPath.recall(), { replace: true }), 400);
+    return () => window.clearTimeout(timer);
+  }, [navigate]);
 
   return (
     <div className="grid min-h-[60dvh] place-items-center px-4 text-center">
