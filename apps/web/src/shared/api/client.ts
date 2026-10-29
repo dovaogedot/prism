@@ -62,6 +62,15 @@ export const Api = {
     issues: [],
   } satisfies ErrorResponse["error"],
 
+  /**
+   * Whether a 401's body is a refusal that a fresh access token can cure: no
+   * token, an expired or bad one, or an ended session. A wrong password or
+   * code is a 401 too, and sending it again would only spend another try.
+   */
+  isCuredByRefresh: (payload: unknown): boolean =>
+    isErrorResponse(payload) &&
+    (payload.error.code === "Unauthenticated" || payload.error.code === "AccessTokenInvalid" || payload.error.code === "SessionRevoked"),
+
   /** The request body as fetch takes it: form data as it is, anything else as JSON, nothing as null. */
   bodyOf: (body: unknown): BodyInit | null => {
     if (body === undefined) return null;
@@ -122,11 +131,16 @@ export const Api = {
     return attempt;
   },
 
-  /** Sends, retries once on 401, and throws an `ApiError` on any refusal. */
+  /** Sends, retries once on a 401 a refresh can cure, and throws an `ApiError` on any refusal. */
   exchange: async (path: string, options: RequestOptions): Promise<Response> => {
     let response = await Api.send(path, options);
 
-    if (response.status === 401 && options.retryOnUnauthorized !== false) {
+    const isRetried =
+      response.status === 401 &&
+      options.retryOnUnauthorized !== false &&
+      Api.isCuredByRefresh(await response.clone().json().catch(() => null));
+
+    if (isRetried) {
       const refreshed = await Api.refresh();
       if (refreshed) {
         await Api.discard(response);
