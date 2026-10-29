@@ -18,7 +18,7 @@ The data is the items of three games: Balatro (from the Balatro wiki), The Bindi
 
 ## Commands on a host with Node
 
-Run them in `apps/api`, after `npm ci`.
+Run them in `apps/api`, after `npm ci && npm run build` at the repository root: the build makes the shared package the tools import.
 
 ```sh
 node seed/fetch/fetch-catalog.ts    # writes catalog.json and media/ again from the sources
