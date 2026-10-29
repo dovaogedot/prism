@@ -7,10 +7,10 @@ import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, Card, ConfirmDialog, Skeleton, Toast } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 import { useSession } from "../../auth/session.ts";
-import { StatusBadge } from "../../orders/components/StatusBadge.tsx";
+import { StatusBadge } from "../../orders/components/index.ts";
 import { OrderTime } from "../../orders/orders.ts";
 import { useAdminRead, useAdminWrite } from "../admin.ts";
-import { AdminPage } from "../components/AdminPage.tsx";
+import { AdminPage } from "../components/index.ts";
 import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
 
 /** One of the account actions only staff managers take, which each ask first. */

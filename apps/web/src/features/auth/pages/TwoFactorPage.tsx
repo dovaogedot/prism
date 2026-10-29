@@ -10,7 +10,7 @@ import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { ChallengeState } from "../challenge-state.ts";
 import { NextPath } from "../next-path.ts";
-import { AuthShell } from "../components/AuthShell.tsx";
+import { AuthShell } from "../components/index.ts";
 import { Failure } from "../components/failure.tsx";
 import { TokenStore } from "../token-store.ts";
 

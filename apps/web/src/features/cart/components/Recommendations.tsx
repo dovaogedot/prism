@@ -1,6 +1,6 @@
 import { match, P } from "ts-pattern";
 import { Skeleton } from "../../../shared/ui/index.ts";
-import { ProductCard } from "../../catalog/components/ProductCard.tsx";
+import { ProductCard } from "../../catalog/components/index.ts";
 import { useRecommendations } from "../cart.ts";
 
 /** "Recommended for you": products like the ones in the cart, or the best rated when it is empty. */

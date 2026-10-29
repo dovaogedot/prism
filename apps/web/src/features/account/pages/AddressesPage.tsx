@@ -5,9 +5,7 @@ import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, ConfirmDialog, EmptyState, Skeleton, Toast } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 import { useAccountChanges, useSavedAddresses } from "../account.ts";
-import { AccountPage } from "../components/AccountPage.tsx";
-import { AddressCard } from "../components/AddressCard.tsx";
-import { AddressForm } from "../components/AddressForm.tsx";
+import { AccountPage, AddressCard, AddressForm } from "../components/index.ts";
 import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
 
 /** Which form is open: none, a new address, or the address with that id. */

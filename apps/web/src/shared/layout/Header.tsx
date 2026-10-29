@@ -1,7 +1,6 @@
 import { Link } from "react-router";
 import { CartPreviewButton } from "../../features/cart/components/index.ts";
-import { CategoryMenu } from "../../features/catalog/components/CategoryMenu.tsx";
-import { SearchCombobox } from "../../features/catalog/components/SearchCombobox.tsx";
+import { CategoryMenu, SearchCombobox } from "../../features/catalog/components/index.ts";
 import { AccountMenu } from "./AccountMenu.tsx";
 import { LookClass } from "./look.ts";
 import { ThemeToggle } from "./ThemeToggle.tsx";

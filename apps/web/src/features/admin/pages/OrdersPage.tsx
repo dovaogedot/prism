@@ -7,10 +7,10 @@ import { Alert, Button, DataTable, EmptyState, Field, Pagination, SelectField, S
 import { DateFilter, useDateFilter } from "../../../shared/hooks/use-date-filter.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 import { CatalogParams } from "../../catalog/filters.ts";
-import { StatusBadge } from "../../orders/components/StatusBadge.tsx";
+import { StatusBadge } from "../../orders/components/index.ts";
 import { OrderTime } from "../../orders/orders.ts";
 import { useAdminRead, useParamDraft } from "../admin.ts";
-import { AdminPage } from "../components/AdminPage.tsx";
+import { AdminPage } from "../components/index.ts";
 
 /**
  * Every order, for the staff who handle them: filtered by status, dates,

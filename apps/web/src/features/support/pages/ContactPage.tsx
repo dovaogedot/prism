@@ -8,7 +8,7 @@ import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { useTheme } from "../../../shared/theme/use-theme.ts";
 import { Alert, Button, Field, SelectField, TextAreaField } from "../../../shared/ui/index.ts";
-import { Captcha } from "../../auth/components/Captcha.tsx";
+import { Captcha } from "../../auth/components/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 import { useSession } from "../../auth/session.ts";
 

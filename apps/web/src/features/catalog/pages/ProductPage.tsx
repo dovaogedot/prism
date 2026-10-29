@@ -8,17 +8,11 @@ import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { Alert, Card, Skeleton, Stars } from "../../../shared/ui/index.ts";
 import { AddToCart } from "../../cart/components/index.ts";
 import { NotFoundPage } from "../../pages/pages/NotFoundPage.tsx";
-import { ReviewsSection } from "../../reviews/components/ReviewsSection.tsx";
+import { ReviewsSection } from "../../reviews/components/index.ts";
 import { useReviewPage } from "../../reviews/reviews.ts";
 import { ProductKeys, useRelatedProducts } from "../catalog.ts";
 import { CatalogSeo } from "../catalog-seo.ts";
-import { Gallery } from "../components/Gallery.tsx";
-import { Measurements } from "../components/Measurements.tsx";
-import { ProductJsonLd } from "../components/ProductJsonLd.tsx";
-import { RecentlyViewedRow } from "../components/RecentlyViewedRow.tsx";
-import { RelatedProducts } from "../components/RelatedProducts.tsx";
-import { SpecRow } from "../components/SpecRow.tsx";
-import { Stock } from "../components/Stock.tsx";
+import { Gallery, Measurements, ProductJsonLd, RecentlyViewedRow, RelatedProducts, SpecRow, Stock } from "../components/index.ts";
 import { RecentlyViewed } from "../recently-viewed.ts";
 
 /**

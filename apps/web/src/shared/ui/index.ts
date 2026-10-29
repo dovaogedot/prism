@@ -18,10 +18,16 @@ export type { PostalAddressField, PostalAddressFieldsProps } from "./PostalAddre
 export { TextAreaField } from "./TextAreaField.tsx";
 export type { TextAreaFieldProps } from "./TextAreaField.tsx";
 
-export { Alert, IssueList } from "./Alert.tsx";
+export { Alert } from "./Alert.tsx";
 export type { AlertProps } from "./Alert.tsx";
 
-export { Card, Skeleton } from "./Card.tsx";
+export { IssueList } from "./IssueList.tsx";
+export type { IssueListProps } from "./IssueList.tsx";
+
+export { Card } from "./Card.tsx";
+
+export { Skeleton } from "./Skeleton.tsx";
+export type { SkeletonProps } from "./Skeleton.tsx";
 
 export { Stars } from "./Stars.tsx";
 export type { StarsProps } from "./Stars.tsx";

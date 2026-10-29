@@ -1,4 +1,3 @@
-import type { ValidationIssue } from "@prism/shared";
 import type { ReactNode } from "react";
 import { match, P } from "ts-pattern";
 
@@ -28,20 +27,3 @@ export const Alert = ({ tone = "danger", title, children }: AlertProps) => (
     <div className="text-ink-soft">{children}</div>
   </div>
 );
-
-/** Field-level messages the server produced, for anything the client missed. */
-export const IssueList = ({
-  issues,
-}: Readonly<{ issues: readonly ValidationIssue[] }>) =>
-  match(issues.length)
-    .with(0, () => null)
-    .otherwise(() => (
-      <ul className="list-inside list-disc space-y-0.5">
-        {issues.map((issue) => (
-          <li key={`${issue.path}:${issue.message}`}>
-            {issue.path.length > 0 ? `${issue.path}: ` : ""}
-            {issue.message}
-          </li>
-        ))}
-      </ul>
-    ));

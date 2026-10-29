@@ -6,7 +6,7 @@ import { PageText } from "../../../shared/seo/page-text.ts";
 import { Card } from "../../../shared/ui/index.ts";
 import { useSession } from "../../auth/session.ts";
 import { AdminKeys } from "../admin.ts";
-import { AdminPage } from "../components/AdminPage.tsx";
+import { AdminPage } from "../components/index.ts";
 
 /** One count on the dashboard, and the list it leads to. */
 type Tile = Readonly<{ label: string; value: number; href: string }>;

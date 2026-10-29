@@ -6,7 +6,7 @@ import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, Card, ConfirmDialog, DataTable, Toast } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 import { useAdminWrite } from "../admin.ts";
-import { AdminPage } from "../components/AdminPage.tsx";
+import { AdminPage } from "../components/index.ts";
 
 /** Reading where an issue the server found sits in the file. */
 const Report = {

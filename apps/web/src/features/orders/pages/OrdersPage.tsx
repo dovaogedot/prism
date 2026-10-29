@@ -6,7 +6,7 @@ import { CatalogParams } from "../../catalog/filters.ts";
 import { OrderFilters, OrderRow } from "../components/index.ts";
 import { OrderParams, useOrders } from "../orders.ts";
 import { PageText } from "../../../shared/seo/page-text.ts";
-import { AccountPage } from "../../account/components/AccountPage.tsx";
+import { AccountPage } from "../../account/components/index.ts";
 
 /** The signed-in customer's orders, filtered by status and date and sorted as the URL says. */
 export const OrdersPage = () => {

@@ -6,7 +6,7 @@ import { Link } from "react-router";
 import { match } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { Alert, Button, Field } from "../../../shared/ui/index.ts";
-import { AuthShell } from "../components/AuthShell.tsx";
+import { AuthShell } from "../components/index.ts";
 import { Failure } from "../components/failure.tsx";
 import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";

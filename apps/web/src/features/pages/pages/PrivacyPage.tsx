@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { PageText } from "../../../shared/seo/page-text.ts";
-import { FixedPage } from "../components/FixedPage.tsx";
+import { FixedPage } from "../components/index.ts";
 
 /** What Prism keeps about a person, why, and how it is protected. */
 export const PrivacyPage = () => (

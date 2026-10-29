@@ -8,11 +8,10 @@ import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, Card, ConfirmDialog, Field, Skeleton, Toast } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 import { useSession } from "../../auth/session.ts";
-import { OrderTimeline } from "../../orders/components/OrderTimeline.tsx";
-import { StatusBadge } from "../../orders/components/StatusBadge.tsx";
+import { OrderTimeline, StatusBadge } from "../../orders/components/index.ts";
 import { OrderTime, PaymentWords } from "../../orders/orders.ts";
 import { useAdminRead, useAdminWrite } from "../admin.ts";
-import { AdminPage } from "../components/AdminPage.tsx";
+import { AdminPage } from "../components/index.ts";
 import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
 
 /** Which confirmation is open. */

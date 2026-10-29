@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { match, P } from "ts-pattern";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { useShippingOptions } from "../../checkout/checkout.ts";
-import { FixedPage } from "../components/FixedPage.tsx";
+import { FixedPage } from "../components/index.ts";
 
 /** Common questions about shipping, payment and returns. The delivery options come from the shop's own settings. */
 export const FaqPage = () => {

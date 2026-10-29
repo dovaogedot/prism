@@ -9,7 +9,7 @@ import { DateFilter, useDateFilter } from "../../../shared/hooks/use-date-filter
 import { CatalogParams } from "../../catalog/filters.ts";
 import { OrderTime } from "../../orders/orders.ts";
 import { useAdminRead, useParamDraft } from "../admin.ts";
-import { AdminPage } from "../components/AdminPage.tsx";
+import { AdminPage } from "../components/index.ts";
 
 /**
  * The audit log, newest first: every change staff made, who made it and

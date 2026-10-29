@@ -7,12 +7,10 @@ import { match, P } from "ts-pattern";
 import { Api } from "../../../shared/api/client.ts";
 import { useTheme } from "../../../shared/theme/use-theme.ts";
 import { Alert, Button, Field } from "../../../shared/ui/index.ts";
-import { AuthShell } from "../components/AuthShell.tsx";
-import { Captcha } from "../components/Captcha.tsx";
+import { AuthShell, Captcha, ProviderButtons } from "../components/index.ts";
 import { Failure } from "../components/failure.tsx";
 import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
-import { ProviderButtons } from "../components/ProviderButtons.tsx";
 import { NextPath } from "../next-path.ts";
 import { TokenStore } from "../token-store.ts";
 

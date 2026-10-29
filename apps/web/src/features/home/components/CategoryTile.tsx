@@ -1,6 +1,6 @@
 import type { CategorySummary } from "@prism/shared";
 import { Link } from "react-router";
-import { Picture } from "../../catalog/components/Picture.tsx";
+import { Picture } from "../../catalog/components/index.ts";
 
 /** The category the tile leads to. */
 export type CategoryTileProps = Readonly<{ category: CategorySummary }>;

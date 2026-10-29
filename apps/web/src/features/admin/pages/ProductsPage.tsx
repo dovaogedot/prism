@@ -7,7 +7,7 @@ import { Alert, Button, DataTable, EmptyState, Field, ImageSet, Pagination, Sele
 import { Failure } from "../../auth/components/failure.tsx";
 import { CatalogParams } from "../../catalog/filters.ts";
 import { useAdminRead, useParamDraft } from "../admin.ts";
-import { AdminPage } from "../components/AdminPage.tsx";
+import { AdminPage } from "../components/index.ts";
 
 /**
  * The catalog for its content managers: found by name or slug, filtered by

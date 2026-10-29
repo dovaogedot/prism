@@ -9,8 +9,7 @@ import { Failure } from "../../auth/components/failure.tsx";
 import { CatalogParams } from "../../catalog/filters.ts";
 import { OrderTime } from "../../orders/orders.ts";
 import { useAdminRead, useAdminWrite } from "../admin.ts";
-import { AdminPage } from "../components/AdminPage.tsx";
-import { RejectForm } from "../components/RejectForm.tsx";
+import { AdminPage, RejectForm } from "../components/index.ts";
 import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
 
 /**

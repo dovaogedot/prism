@@ -6,8 +6,7 @@ import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, ConfirmDialog, DataTable, Dialog, Skeleton, Toast } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 import { useAdminRead, useAdminWrite } from "../admin.ts";
-import { AdminPage } from "../components/AdminPage.tsx";
-import { CategoryForm } from "../components/CategoryForm.tsx";
+import { AdminPage, CategoryForm } from "../components/index.ts";
 import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
 
 /** Which form is open: none, a new category, or the category given. */

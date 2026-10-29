@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { PageText } from "../../../shared/seo/page-text.ts";
-import { FixedPage } from "../components/FixedPage.tsx";
+import { FixedPage } from "../components/index.ts";
 
 /** Who runs Prism, what it is for, and where else to find it. */
 export const AboutPage = () => {

@@ -1,7 +1,7 @@
 import { Cart, Price, Quantity, type CartLine } from "@prism/shared";
 import { Link } from "react-router";
 import { match, P } from "ts-pattern";
-import { Picture } from "../../catalog/components/Picture.tsx";
+import { Picture } from "../../catalog/components/index.ts";
 import { CartFailure, useCartChanges } from "../cart.ts";
 import { QuantityStepper } from "./QuantityStepper.tsx";
 

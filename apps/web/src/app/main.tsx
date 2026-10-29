@@ -9,14 +9,13 @@ import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@ta
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router";
-import { GuestOnly } from "../features/auth/components/GuestOnly.tsx";
-import { SignedInOnly } from "../features/auth/components/SignedInOnly.tsx";
+import { GuestOnly, SignedInOnly } from "../features/auth/components/index.ts";
 import { CartPage } from "../features/cart/pages/CartPage.tsx";
-import { ItemRedirect } from "../features/catalog/components/ItemRedirect.tsx";
+import { ItemRedirect } from "../features/catalog/components/index.ts";
 import { ListingPage } from "../features/catalog/pages/ListingPage.tsx";
 import { ProductPage } from "../features/catalog/pages/ProductPage.tsx";
 import { HomePage } from "../features/home/pages/HomePage.tsx";
-import { OrdersRedirect } from "../features/orders/components/OrdersRedirect.tsx";
+import { OrdersRedirect } from "../features/orders/components/index.ts";
 import { AboutPage } from "../features/pages/pages/AboutPage.tsx";
 import { FaqPage } from "../features/pages/pages/FaqPage.tsx";
 import { NotFoundPage } from "../features/pages/pages/NotFoundPage.tsx";

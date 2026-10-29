@@ -7,9 +7,7 @@ import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, ConfirmDialog, Skeleton, Toast } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
 import { useAdminRead, useAdminWrite } from "../admin.ts";
-import { AdminPage } from "../components/AdminPage.tsx";
-import { ProductForm } from "../components/ProductForm.tsx";
-import { ProductImages } from "../components/ProductImages.tsx";
+import { AdminPage, ProductForm, ProductImages } from "../components/index.ts";
 import { Cents } from "../forms.ts";
 import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
 

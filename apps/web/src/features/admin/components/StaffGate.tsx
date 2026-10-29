@@ -7,7 +7,7 @@ import { Api } from "../../../shared/api/client.ts";
 import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Card, Spinner } from "../../../shared/ui/index.ts";
-import { SignInFirst } from "../../auth/components/SignInFirst.tsx";
+import { SignInFirst } from "../../auth/components/index.ts";
 import { useSession } from "../../auth/session.ts";
 import { AdminAccess, AdminKeys } from "../admin.ts";
 import { StepUpDialog } from "./StepUpDialog.tsx";

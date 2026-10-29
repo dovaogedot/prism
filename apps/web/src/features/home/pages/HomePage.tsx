@@ -6,9 +6,8 @@ import { Api } from "../../../shared/api/client.ts";
 import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, ImageSet, Skeleton } from "../../../shared/ui/index.ts";
-import { ProductRow } from "../../catalog/components/ProductRow.tsx";
-import { RecentlyViewedRow } from "../../catalog/components/RecentlyViewedRow.tsx";
-import { CategoryTile } from "../components/CategoryTile.tsx";
+import { ProductRow, RecentlyViewedRow } from "../../catalog/components/index.ts";
+import { CategoryTile } from "../components/index.ts";
 
 /**
  * The home page: what the shop is, the featured products, the categories,

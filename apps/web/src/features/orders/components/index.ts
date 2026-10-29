@@ -5,6 +5,7 @@ export type { OrderConfirmationProps } from "./OrderConfirmation.tsx";
 export { OrderFilters } from "./OrderFilters.tsx";
 export { OrderRow } from "./OrderRow.tsx";
 export type { OrderRowProps } from "./OrderRow.tsx";
+export { OrdersRedirect } from "./OrdersRedirect.tsx";
 export { OrderTimeline } from "./OrderTimeline.tsx";
 export type { OrderTimelineProps } from "./OrderTimeline.tsx";
 export { StatusBadge } from "./StatusBadge.tsx";

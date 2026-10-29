@@ -13,8 +13,3 @@ export const Card = ({
     {children}
   </div>
 );
-
-/** A block standing where content will be, sized entirely by its class. */
-export const Skeleton = ({ className = "" }: Readonly<{ className?: string }>) => (
-  <div className={`animate-pulse rounded-lg bg-sunken ${className}`} />
-);

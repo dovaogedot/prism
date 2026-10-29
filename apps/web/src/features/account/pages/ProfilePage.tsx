@@ -2,13 +2,10 @@ import { OAuthProvider } from "@prism/shared";
 import { match, P } from "ts-pattern";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Card, Skeleton, Toast } from "../../../shared/ui/index.ts";
-import { PasswordFlow } from "../../auth/components/PasswordFlow.tsx";
-import { TwoFactorDisableFlow } from "../../auth/components/TwoFactorDisableFlow.tsx";
-import { TwoFactorSetupFlow } from "../../auth/components/TwoFactorSetupFlow.tsx";
+import { PasswordFlow, TwoFactorDisableFlow, TwoFactorSetupFlow } from "../../auth/components/index.ts";
 import { useSignedInSession } from "../../auth/session.ts";
 import { useProfile } from "../account.ts";
-import { AccountPage } from "../components/AccountPage.tsx";
-import { ProfileForm } from "../components/ProfileForm.tsx";
+import { AccountPage, ProfileForm } from "../components/index.ts";
 
 /**
  * The signed-in customer's own page: the profile checkout starts from, the

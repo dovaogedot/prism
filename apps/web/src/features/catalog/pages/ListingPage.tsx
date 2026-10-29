@@ -13,11 +13,7 @@ import { Alert, Button, EmptyState, Pagination, Skeleton } from "../../../shared
 import { NotFoundPage } from "../../pages/pages/NotFoundPage.tsx";
 import { CatalogSeo } from "../catalog-seo.ts";
 import { useCategories } from "../catalog.ts";
-import { CategoryNav, type CategoryLink } from "../components/CategoryNav.tsx";
-import { Facets } from "../components/Facets.tsx";
-import { ProductCard } from "../components/ProductCard.tsx";
-import { ProductListItem } from "../components/ProductListItem.tsx";
-import { ViewToggle } from "../components/ViewToggle.tsx";
+import { CategoryNav, Facets, ProductCard, ProductListItem, ViewToggle, type CategoryLink } from "../components/index.ts";
 import { CatalogParams } from "../filters.ts";
 import { Listing, type ListingKind } from "../listing.ts";
 

@@ -1,6 +1,6 @@
 import { Price, type OrderSummary } from "@prism/shared";
 import { Link } from "react-router";
-import { Picture } from "../../catalog/components/Picture.tsx";
+import { Picture } from "../../catalog/components/index.ts";
 import { OrderTime } from "../orders.ts";
 import { StatusBadge } from "./StatusBadge.tsx";
 

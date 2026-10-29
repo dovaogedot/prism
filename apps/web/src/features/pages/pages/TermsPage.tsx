@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { PageText } from "../../../shared/seo/page-text.ts";
-import { FixedPage } from "../components/FixedPage.tsx";
+import { FixedPage } from "../components/index.ts";
 
 /** The terms every order is placed under. */
 export const TermsPage = () => (
