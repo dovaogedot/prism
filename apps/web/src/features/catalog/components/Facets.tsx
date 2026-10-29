@@ -35,7 +35,6 @@ const Group = ({ title, chosen, onClear, children }: Readonly<{ title: string; c
           className="absolute right-0 top-0 text-xs font-medium text-accent hover:underline"
           type="button"
           onClick={onClear}
-          aria-label={`Clear all ${title.toLowerCase()} filters`}
         >
           Clear all
         </button>

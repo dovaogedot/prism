@@ -86,7 +86,7 @@ export const ProductImages = ({ productId, images }: ProductImagesProps) => {
               <Button tone="quiet" type="button" disabled={index === drafts.length - 1} onClick={() => move(index, 1)} aria-label={`Move picture ${index + 1} down`}>
                 ↓
               </Button>
-              <Button tone="ghost" type="button" onClick={() => setDeleting(draft.image)} aria-label={`Delete picture ${index + 1}`}>
+              <Button tone="ghost" type="button" onClick={() => setDeleting(draft.image)}>
                 Delete
               </Button>
             </div>
