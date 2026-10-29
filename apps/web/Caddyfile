@@ -80,9 +80,10 @@
 		file_server
 	}
 
-	# The storefront's own pages: the same list as the route table in
-	# src/app/main.tsx. Each is index.html, and the app draws the page.
-	@app path_regexp ^/(|shop|search|cart|checkout|orders|orders/[^/]+|about|contact|faq|terms|privacy|login|login/2fa|register|forgot-password|reset-password|oauth/complete|account|account/addresses|account/orders|admin(/.*)?|categories/[a-z0-9-]+|products/[a-z0-9-]+|item/[a-z0-9-]+)/?$
+	# The storefront's own pages: the same list as the route tables in
+	# src/app/main.tsx and src/app/admin-routes.ts, which tests/routes.test.ts
+	# holds the pattern to. Each is index.html, and the app draws the page.
+	@app path_regexp ^/(|shop|search|cart|checkout|orders|orders/[^/]+|about|contact|faq|terms|privacy|login|login/2fa|register|forgot-password|reset-password|oauth/complete|account|account/addresses|account/orders|admin(/(orders|orders/[^/]+|products|products/[^/]+|categories|brands|import|reviews|shipping|users|users/[^/]+|audit))?|categories/[a-z0-9-]+|products/[a-z0-9-]+|item/[a-z0-9-]+)/?$
 	handle @app {
 		root * /srv
 		header Cache-Control "no-cache"
