@@ -7,7 +7,6 @@
 import { mkdir } from "node:fs/promises";
 import fastifyCookie from "@fastify/cookie";
 import fastifyCors from "@fastify/cors";
-import fastifyFormbody from "@fastify/formbody";
 import fastifyHelmet from "@fastify/helmet";
 import fastifyMultipart from "@fastify/multipart";
 import { Delivery, OAuthProvider, type PaymentsConfig } from "@prism/shared";
@@ -211,8 +210,6 @@ export const App = {
     });
 
     await app.register(fastifyCookie);
-    // The mock consent screen is a plain HTML form, which posts urlencoded.
-    await app.register(fastifyFormbody);
     // Picture uploads and catalog imports. Each route sets its own file size.
     await app.register(fastifyMultipart, { limits: { files: 1, fields: 10, fieldSize: 1024 } });
 

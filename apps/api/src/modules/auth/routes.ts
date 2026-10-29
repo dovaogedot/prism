@@ -16,6 +16,7 @@ import {
   TwoFactorLoginInput,
   type DomainError,
 } from "@prism/shared";
+import fastifyFormbody from "@fastify/formbody";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
@@ -319,34 +320,41 @@ export const AuthRoutes = {
     const secret = deps.mockOAuthSecret;
     if (secret === undefined) return;
 
-    routes.get(
-      "/oauth/:provider/consent",
-      {
-        schema: {
-          params: providerParams,
-          querystring: z.object({ state: OAuthState.schema }),
-        },
-      },
-      async (request, reply) =>
-        reply.type("text/html; charset=utf-8").send(MockConsentPage.render({ provider: request.params.provider, state: request.query.state })),
-    );
+    // The stand-in's consent screen is a plain HTML form, which posts urlencoded. Only this
+    // scope parses that, so no other route takes a form another site can post without a preflight.
+    routes.register(async (scope) => {
+      await scope.register(fastifyFormbody);
+      const consent = scope.withTypeProvider<ZodTypeProvider>();
 
-    routes.post(
-      "/oauth/:provider/consent",
-      {
-        config: session,
-        schema: {
-          params: providerParams,
-          body: z.object({ email: Email.schema, state: OAuthState.schema }),
+      consent.get(
+        "/oauth/:provider/consent",
+        {
+          schema: {
+            params: providerParams,
+            querystring: z.object({ state: OAuthState.schema }),
+          },
         },
-      },
-      async (request, reply) => {
-        const code = MockAuthorizationCode.issue(request.params.provider, request.body.email, secret);
-        const params = new URLSearchParams({ code, state: request.body.state });
+        async (request, reply) =>
+          reply.type("text/html; charset=utf-8").send(MockConsentPage.render({ provider: request.params.provider, state: request.query.state })),
+      );
 
-        // The stand-in sends a person only to this shop's own callback, whatever the request named.
-        return reply.redirect(`${callbackUriFor(request.params.provider)}?${params}`, 302);
-      },
-    );
+      consent.post(
+        "/oauth/:provider/consent",
+        {
+          config: session,
+          schema: {
+            params: providerParams,
+            body: z.object({ email: Email.schema, state: OAuthState.schema }),
+          },
+        },
+        async (request, reply) => {
+          const code = MockAuthorizationCode.issue(request.params.provider, request.body.email, secret);
+          const params = new URLSearchParams({ code, state: request.body.state });
+
+          // The stand-in sends a person only to this shop's own callback, whatever the request named.
+          return reply.redirect(`${callbackUriFor(request.params.provider)}?${params}`, 302);
+        },
+      );
+    });
   },
 } as const;

@@ -593,6 +593,17 @@ describe("the mock consent screen", () => {
     expect(consent.headers["location"]).toContain("code=");
   });
 
+  it("takes the form as the browser posts it, urlencoded", async () => {
+    const consent = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/oauth/github/consent",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      payload: new URLSearchParams({ email: "via-form@example.com", state: "abc" }).toString(),
+    });
+
+    expect(consent.statusCode).toBe(302);
+  });
+
   it("sends the code only to this shop's own callback, whatever the form names", async () => {
     const consent = await harness.app.inject({
       method: "POST",

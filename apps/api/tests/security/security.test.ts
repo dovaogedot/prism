@@ -379,6 +379,22 @@ describe("path traversal in media", () => {
  * These build a second application over the same database and clock, with
  * the real budgets. Each test starts an hour later, so every bucket is full.
  */
+describe("forms from other sites", () => {
+  it("are refused by sign-in, which another site could post without a preflight", async () => {
+    await registerUser(harness, "form-target@example.com");
+
+    const response = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      payload: new URLSearchParams({ email: "form-target@example.com", password: VALID_PASSWORD }).toString(),
+    });
+
+    expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    expect(response.headers["set-cookie"]).toBeUndefined();
+  });
+});
+
 describe("rate limiting", () => {
   let throttled: Application;
 
