@@ -325,10 +325,17 @@ The schema is `apps/api/src/db/schema.ts`, and the migrations under `apps/api/dr
   | --- | --- | --- | --- | --- |
   | `credentials` | everything that checks a password or a code | client address | 10 | 1 every 6 s |
   | `account-login` | sign-in, besides `credentials`; once it is empty, sign-in asks for a CAPTCHA instead of refusing | account | 5 | 1 every 60 s |
+  | `account-code` | every 2FA code check of one account, besides `credentials` | account | 5 | 1 every 60 s |
+  | `session` | refresh, provider sign-in | client address | 30 | 1 per s |
+  | `checkout` | placing an order, the address lookup | client address | 10 | 1 every 6 s |
+  | `contact` | the contact form | client address | 3 | 1 every 5 min |
+  | `suggest` | quick search | client address | 40 | 5 per s |
+  | `member-write` | reviews, votes, profile, addresses | account | 30 | 1 every 2 s |
+  | `staff-write` | admin changes | account | 60 | 2 per s |
+  | `import` | bulk import | account | 5 | 1 every 30 s |
+  | `default` | every other route | client address | 120 | 20 per s |
 
-| `account-code` | every 2FA code check of one account, besides `credentials` | account | 5 | 1 every 60 s | | `session` | refresh, provider sign-in | client address | 30 | 1 per s | | `checkout` | placing an order, the address lookup | client address | 10 | 1 every 6 s | | `contact` | the contact form | client address | 3 | 1 every 5 min | | `suggest` | quick search | client address | 40 | 5 per s | | `member-write` | reviews, votes, profile, addresses | account | 30 | 1 every 2 s | | `staff-write` | admin changes | account | 60 | 2 per s | | `import` | bulk import | account | 5 | 1 every 30 s | | `default` | every other route | client address | 120 | 20 per s |
-
-The webhook, which Stripe signs, and the health check are not limited. The buckets live in the API process's memory; several API replicas would share them through a store such as Redis. `RATE_LIMIT_SCALE` multiplies every burst and rate, for the test stacks.
+  The webhook, which Stripe signs, and the health check are not limited. The buckets live in the API process's memory; several API replicas would share them through a store such as Redis. `RATE_LIMIT_SCALE` multiplies every burst and rate, for the test stacks.
 
 - **SEO.** Every page sets its own title, "<page> | Prism" within 60 characters, a description of 155 to 160 characters, and either its canonical address or `noindex`. Product descriptions are built from the product's own text and its facts. Cart, checkout, account, order, search and admin pages are `noindex`. The API serves `robots.txt` and a sitemap of every category, product and fixed page, and product pages carry JSON-LD with the offer, the rating and a breadcrumb. The storefront renders in the browser, so a crawler that runs no JavaScript sees only the generic title.
 - **Accessibility.** WCAG 2.1 Level A, and AA color contrast: 4.5:1 for text, and 3:1 for the focus ring, the edge of every field and the empty stars of a rating. Landmarks and a skip link; one h1 per page in every state, with h2 and h3 below it. On every page change, focus moves to the new h1 and the title is announced; the h1 shows no focus ring, since nothing on it can be pressed. Native `<dialog>`, `popover`, `<details>` and `<table>` come first; ARIA adds only what native markup cannot say, such as a field's error, a toggle button's state, the price slider's values, a table's sort order, the search combobox and the live regions. Font sizes are in rem, and the layouts reflow at 320 pixels and at 200% zoom. Every meaningful picture has alt text, which the admin requires; decorative ones are hidden.
