@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, DataTable, EmptyState, Field, Pagination, SelectField, Skeleton } from "../../../shared/ui/index.ts";
+import { Failure } from "../../auth/components/failure.tsx";
 import { CatalogParams } from "../../catalog/filters.ts";
 import { StatusBadge } from "../../orders/components/StatusBadge.tsx";
 import { OrderTime } from "../../orders/orders.ts";
@@ -84,7 +85,7 @@ export const OrdersPage = () => {
       </div>
 
       {match(orders)
-        .with({ status: "error" }, ({ error }) => <Alert>{error.message}</Alert>)
+        .with({ status: "error" }, ({ error }) => <Alert>{Failure.message(error)}</Alert>)
         .with({ data: P.nullish }, () => <Skeleton className="h-96 w-full" />)
         .when(
           ({ data }) => data.items.length === 0,
