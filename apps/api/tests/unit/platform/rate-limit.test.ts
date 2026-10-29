@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Clock } from "../../../src/platform/clock.ts";
 import { RateLimiter, RateLimitPolicy, TokenBucket } from "../../../src/platform/rate-limit.ts";
+import { RateLimits } from "../../../src/http/rate-limits.ts";
 
 const shape = { capacity: 5, refillPerSecond: 0.5 };
 const start = new Date("2026-08-07T12:00:00.000Z").getTime();
@@ -131,5 +132,22 @@ describe("RateLimiter", () => {
     // "b" was dropped, so it starts full again; "a" kept its spent tokens.
     expect(limiter.take("contact", "b")).toMatchObject({ allowed: true, remaining: 2 });
     expect(limiter.take("contact", "a")).toMatchObject({ allowed: true, remaining: 0 });
+  });
+});
+
+describe("the address a budget covers", () => {
+  it("is the whole IPv4 address, also when written as IPv6", () => {
+    expect(RateLimits.addressKeyOf("203.0.113.9")).toBe("203.0.113.9");
+    expect(RateLimits.addressKeyOf("::ffff:203.0.113.9")).toBe("203.0.113.9");
+  });
+
+  it("is the /64 of an IPv6 address, however it is written", () => {
+    const key = "2001:db8:1:2::/64";
+
+    expect(RateLimits.addressKeyOf("2001:db8:1:2::1")).toBe(key);
+    expect(RateLimits.addressKeyOf("2001:0db8:0001:0002:ffff:eeee:dddd:cccc")).toBe(key);
+    expect(RateLimits.addressKeyOf("2001:DB8:1:2:a::")).toBe(key);
+    expect(RateLimits.addressKeyOf("2001:db8::1")).toBe("2001:db8:0:0::/64");
+    expect(RateLimits.addressKeyOf("::1")).toBe("0:0:0:0::/64");
   });
 });

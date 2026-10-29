@@ -316,7 +316,7 @@ The schema is `apps/api/src/db/schema.ts`, and the migrations under `apps/api/dr
 - **Blind index.** A sealed email cannot be searched, so each one also gets an HMAC-SHA256 of its normalized value, under a key derived from `DATA_ENCRYPTION_KEY` with HKDF and a purpose per column. Sign-in by email, provider sign-in, uniqueness and staff search by email look values up by it, and it reveals nothing else.
 - **TLS.** Locally, Caddy serves HTTPS with the self-signed certificate: EC P-256, for `localhost` and `127.0.0.1`. In production the server's own Caddy holds a real certificate and terminates TLS, and the web container behind it serves plain HTTP (`WEB_TLS=off`). Card data goes from the browser to Stripe over TLS, and the API calls Stripe over TLS.
 - **Security headers.** A Content-Security-Policy that lets scripts and frames come only from the shop, Stripe and Google's CAPTCHA, with no inline script; `X-Frame-Options: DENY` and `frame-ancestors 'none'`; `nosniff`; a strict referrer policy; `Cross-Origin-Opener-Policy: same-origin`; no camera, microphone or location; and, behind a server's own TLS (`WEB_TLS=off`), `Strict-Transport-Security` for a year.
-- **Rate limiting** is a token bucket per policy and key. A bucket holds a burst and refills at a steady rate, so short bursts pass and sustained abuse does not.
+- **Rate limiting** is a token bucket per policy and key. A bucket holds a burst and refills at a steady rate, so short bursts pass and sustained abuse does not. A client address counts as itself for IPv4 and as its /64 for IPv6, which one client usually holds whole.
 
   | Policy | Routes | Counted per | Burst | Refill |
   | --- | --- | --- | --- | --- |
