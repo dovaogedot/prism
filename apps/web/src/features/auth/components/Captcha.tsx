@@ -59,22 +59,46 @@ const Recaptcha = {
     return Recaptcha.isGrecaptcha(candidate) ? candidate : undefined;
   },
 
+  /**
+   * Resolves once the script has loaded, for every mount. A script still on
+   * its way is waited for, and one that failed is taken out of the page, so
+   * the next mount tries again.
+   */
   load: (): Promise<void> =>
     new Promise((resolve, reject) => {
-      if (document.getElementById(Recaptcha.SCRIPT_ID) !== null) {
+      const existing = document.getElementById(Recaptcha.SCRIPT_ID);
+      if (existing instanceof HTMLScriptElement && existing.dataset["loaded"] === "true") {
         resolve();
         return;
       }
 
-      const script = document.createElement("script");
-      script.id = Recaptcha.SCRIPT_ID;
-      script.src = Recaptcha.SCRIPT_SRC;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error("recaptcha script failed to load"));
+      const script = existing instanceof HTMLScriptElement ? existing : document.createElement("script");
 
-      document.head.appendChild(script);
+      script.addEventListener(
+        "load",
+        () => {
+          script.dataset["loaded"] = "true";
+          resolve();
+        },
+        { once: true },
+      );
+
+      script.addEventListener(
+        "error",
+        () => {
+          script.remove();
+          reject(new Error("recaptcha script failed to load"));
+        },
+        { once: true },
+      );
+
+      if (script !== existing) {
+        script.id = Recaptcha.SCRIPT_ID;
+        script.src = Recaptcha.SCRIPT_SRC;
+        script.async = true;
+        script.defer = true;
+        document.head.appendChild(script);
+      }
     }),
 
   /** The global, once the script has defined it. */
@@ -102,11 +126,21 @@ export const Captcha = ({ onToken, dark }: CaptchaProps) => {
   useEffect(() => {
     let canceled = false;
 
+    const fallBack = (): void => {
+      setState("unavailable");
+      onToken(Recaptcha.UNAVAILABLE_TOKEN);
+    };
+
     void Recaptcha.ready()
       .then((grecaptcha) => {
         const container = containerRef.current;
 
-        if (canceled || grecaptcha === undefined || container === null) return;
+        if (canceled || container === null) return;
+        // The script loaded but never defined the widget in time: the same as not loading.
+        if (grecaptcha === undefined) {
+          fallBack();
+          return;
+        }
         if (container.childElementCount > 0) return;
 
         grecaptcha.render(container, {
@@ -122,8 +156,7 @@ export const Captcha = ({ onToken, dark }: CaptchaProps) => {
       })
       .catch(() => {
         if (canceled) return;
-        setState("unavailable");
-        onToken(Recaptcha.UNAVAILABLE_TOKEN);
+        fallBack();
       });
 
     return () => {
