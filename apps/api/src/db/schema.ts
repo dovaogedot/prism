@@ -167,8 +167,6 @@ export const sessions = pgTable(
   },
   (table) => [
     index("session_user_idx").on(table.userId),
-    // The guard's hot path: is this session live right now?
-    index("session_live_idx").on(table.id).where(sql`${table.revokedAt} IS NULL`),
     check(
       "session_revocation_has_reason",
       sql`(${table.revokedAt} IS NULL) = (${table.revokedReason} IS NULL)`,

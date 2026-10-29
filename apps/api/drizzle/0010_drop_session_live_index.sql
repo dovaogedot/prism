@@ -1,0 +1,1 @@
+DROP INDEX "session_live_idx";
