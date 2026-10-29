@@ -371,6 +371,12 @@ export const AdminProductSort = {
     price_asc: "Price, lowest first",
     price_desc: "Price, highest first",
   } as const satisfies Record<"name_asc" | "name_desc" | "newest" | "oldest" | "stock_asc" | "stock_desc" | "price_asc" | "price_desc", string>,
+  /** A sort named by its field alone, as a bookmark may carry it, and the order it stands for. */
+  byField: new Map<unknown, "name_asc" | "stock_asc" | "price_asc">([
+    ["name", "name_asc"],
+    ["stock", "stock_asc"],
+    ["price", "price_asc"],
+  ]),
 } as const;
 
 /** The query string of `GET /admin/products`. */
@@ -384,7 +390,7 @@ export const AdminProductQuery = {
     featured: z.stringbool().optional(),
     /** Only products with `LOW_STOCK` or fewer in stock. */
     lowStock: z.stringbool().optional(),
-    sort: AdminProductSort.schema.default("name_asc"),
+    sort: z.preprocess((value) => AdminProductSort.byField.get(value) ?? value, AdminProductSort.schema).default("name_asc"),
     ...Page.params,
   }),
   /** The most a product holds and still counts as low on stock, in the list's filter and the dashboard's count. */
