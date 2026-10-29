@@ -59,6 +59,20 @@ describe("the connection", () => {
   });
 });
 
+describe("plans", () => {
+  /** The plan of `query` when a full scan is ruled out, as one text. */
+  const planOf = (query: string) =>
+    harness.database.sql.begin(async (tx) => {
+      await tx`SET LOCAL enable_seqscan = off`;
+      const rows = await tx.unsafe(`EXPLAIN ${query}`);
+      return rows.map((row) => String(row["QUERY PLAN"])).join("\n");
+    });
+
+  it("finds a deleted cart's orders through an index", async () => {
+    expect(await planOf("UPDATE customer_order SET cart_id = NULL WHERE cart_id = '5b1d8f3e-6f0a-4c2b-9a7e-1d2c3b4a5f60'")).toContain("customer_order_cart_idx");
+  });
+});
+
 describe("cart", () => {
   it("has exactly one owner", async () => {
     await violates(harness.database.sql.unsafe("INSERT INTO cart (expires_at) VALUES (now())"), "cart_one_owner");

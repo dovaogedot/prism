@@ -580,6 +580,8 @@ export const orders = pgTable(
     index("customer_order_status_changed_idx").on(table.status, table.statusChangedAt),
     index("customer_order_email_index_idx").on(table.emailIndex),
     index("customer_order_created_idx").on(table.createdAt.desc()),
+    // Deleting a cart sets this to null on its orders, which finds them here instead of scanning every order.
+    index("customer_order_cart_idx").on(table.cartId),
     check("customer_order_status_known", sql`${table.status} IN (${literals(OrderStatus.NAMES)})`),
     check(
       "customer_order_money_not_negative",
