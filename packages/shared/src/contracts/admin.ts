@@ -492,6 +492,10 @@ export type ImportReport = Readonly<{
   dryRun: boolean;
   created: number;
   updated: number;
-  /** One issue per bad cell: the row, counted from 1 as the file's own rows are, the column, and what is wrong. */
-  issues: readonly Readonly<{ row: number; column: string; message: string }>[];
+  /**
+   * One issue per problem and what is wrong: a bad cell names its row,
+   * counted from 1 as the file's own rows are, and its column; a problem with
+   * the whole file names neither.
+   */
+  issues: readonly Readonly<{ row?: number; column?: string; message: string }>[];
 }>;

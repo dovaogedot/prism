@@ -1032,7 +1032,7 @@ describe("bulk import limits", () => {
     const response = await send([header, ...rows].join("\n"), "many.csv");
 
     expect(response.statusCode).toBe(422);
-    expect(jsonOf(response)["error"]).toMatchObject({ code: "ImportInvalid", issues: [{ path: "0:" }] });
+    expect(jsonOf(response)["error"]).toMatchObject({ code: "ImportInvalid", issues: [{ path: "" }] });
   });
 
   it("refuses a column it does not know, rather than writing it anywhere", async () => {

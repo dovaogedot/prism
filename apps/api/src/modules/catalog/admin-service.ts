@@ -186,7 +186,7 @@ export const CatalogAdminService = {
 
         return ResultAsync.fromSafePromise(repository.importProducts(parsed.rows, isCheckOnly, actor, clock.now())).andThen((outcome) => {
           const issues = [...parsed.issues, ...(outcome._tag === "Invalid" ? outcome.issues : [])].toSorted(
-            (a, b) => a.row - b.row || a.column.localeCompare(b.column),
+            (a, b) => (a.row ?? 0) - (b.row ?? 0) || (a.column ?? "").localeCompare(b.column ?? ""),
           );
           const counts = outcome._tag === "Imported" ? outcome : { created: 0, updated: 0 };
 
@@ -196,7 +196,8 @@ export const CatalogAdminService = {
           if (issues.length > 0) {
             return errAsync<ImportReport, DomainError>({
               _tag: "ImportInvalid",
-              issues: issues.map((issue) => ({ path: `${issue.row}:${issue.column}`, message: issue.message })),
+              // `row:column` for a cell; an empty path for the whole file.
+              issues: issues.map((issue) => ({ path: issue.row === undefined ? "" : `${issue.row}:${issue.column ?? ""}`, message: issue.message })),
             });
           }
 

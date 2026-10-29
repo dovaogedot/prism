@@ -10,9 +10,11 @@ import { AdminPage } from "../components/index.ts";
 
 /** Reading where an issue the server found sits in the file. */
 const Report = {
-  /** `"3:price"` as row 3 and column price; a path without a row is about the whole file. */
-  locate: (path: string): Readonly<{ row: number; column: string }> => {
-    const [row = "0", ...column] = path.split(":");
+  /** `"3:price"` as row 3 and column price; an empty path is about the whole file, and names neither. */
+  locate: (path: string): Readonly<{ row?: number; column?: string }> => {
+    if (path === "") return {};
+
+    const [row = "", ...column] = path.split(":");
     return { row: Number(row), column: column.join(":") };
   },
 } as const;
@@ -137,10 +139,10 @@ export const ImportPage = () => {
             <DataTable
               label="Problems in the file"
               rows={found.issues}
-              rowKey={(issue) => `${issue.row}:${issue.column}:${issue.message}`}
+              rowKey={(issue) => `${issue.row ?? "file"}:${issue.column ?? ""}:${issue.message}`}
               columns={[
-                { key: "row", header: "Row", isNumeric: true, cell: (issue) => (issue.row === 0 ? "File" : issue.row) },
-                { key: "column", header: "Column", cell: (issue) => issue.column },
+                { key: "row", header: "Row", isNumeric: true, cell: (issue) => issue.row ?? "File" },
+                { key: "column", header: "Column", cell: (issue) => issue.column ?? "" },
                 { key: "message", header: "Problem", cell: (issue) => issue.message },
               ]}
             />

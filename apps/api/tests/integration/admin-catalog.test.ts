@@ -322,7 +322,7 @@ describe("bulk import", () => {
     const tooBig = await importFile(randomBytes(3 * 1024 * 1024), "big.csv", false);
 
     expect(tooMany.statusCode).toBe(422);
-    expect(jsonOf(tooMany)["error"]).toMatchObject({ issues: [{ path: "0:" }] });
+    expect(jsonOf(tooMany)["error"]).toMatchObject({ issues: [{ path: "" }] });
     expect(tooBig.statusCode).toBe(413);
   });
 });

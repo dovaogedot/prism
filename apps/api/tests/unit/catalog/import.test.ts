@@ -111,7 +111,7 @@ describe("ImportFile.parseCsv", () => {
 
     expect(ImportFile.parseCsv(`${HEADER}${properties(30)}\n${row()}${",".repeat(30)}`).issues).toEqual([]);
     expect(ImportFile.parseCsv(`${HEADER}${properties(100_000)}\n${row()}${",".repeat(100_000)}`).issues).toEqual([
-      { row: 0, column: "", message: "The header has 100012 columns; an import takes at most 42." },
+      { message: "The header has 100012 columns; an import takes at most 42." },
     ]);
   });
 
@@ -133,7 +133,7 @@ describe("ImportFile.parseCsv", () => {
     const rows = Array.from({ length: 5001 }, (_, index) => row({ slug: `item-${index}` }));
 
     expect(ImportFile.parseCsv([HEADER, ...rows].join("\n")).issues).toEqual([
-      { row: 0, column: "", message: "The file has 5001 rows; an import takes at most 5000." },
+      { message: "The file has 5001 rows; an import takes at most 5000." },
     ]);
   });
 });
@@ -168,7 +168,7 @@ describe("ImportFile.parseJson", () => {
       { row: 1, column: "price", message: "This is not a field an import knows." },
     ]);
     expect(ImportFile.parseJson(JSON.stringify(product)).issues).toEqual([
-      { row: 0, column: "", message: "The file must hold one JSON array of products." },
+      { message: "The file must hold one JSON array of products." },
     ]);
   });
 });
@@ -181,7 +181,7 @@ describe("ImportFile.parse", () => {
     const parsed = ImportFile.parse({ filename: "lamps.csv", mimetype: "text/csv", bytes: latin });
 
     expect(parsed.rows).toEqual([]);
-    expect(parsed.issues).toEqual([{ row: 0, column: "", message: expect.stringContaining("not UTF-8") }]);
+    expect(parsed.issues).toEqual([{ message: expect.stringContaining("not UTF-8") }]);
   });
 
   it("reads the same file saved as UTF-8", () => {

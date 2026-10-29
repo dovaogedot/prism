@@ -114,7 +114,7 @@ export const ImportFile = {
   /** Too many rows is a problem with the whole file. */
   withinLimit: (count: number): readonly ImportIssue[] =>
     count > ImportFile.MAX_ROWS
-      ? [{ row: 0, column: "", message: `The file has ${count} rows; an import takes at most ${ImportFile.MAX_ROWS}.` }]
+      ? [{ message: `The file has ${count} rows; an import takes at most ${ImportFile.MAX_ROWS}.` }]
       : [],
 
   /** Reads a CSV file: a header row, then one product per row. A byte order mark is ignored. */
@@ -124,18 +124,18 @@ export const ImportFile = {
       records = parse(text, { bom: true, skip_empty_lines: true, relax_column_count: false });
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : "The file is not valid CSV.";
-      return { rows: [], issues: [{ row: 0, column: "", message: `The file is not valid CSV: ${message}` }] };
+      return { rows: [], issues: [{ message: `The file is not valid CSV: ${message}` }] };
     }
 
     const [header, ...body] = records;
-    if (header === undefined) return { rows: [], issues: [{ row: 0, column: "", message: "The file is empty." }] };
+    if (header === undefined) return { rows: [], issues: [{ message: "The file is empty." }] };
 
     const columns = header.map((name) => name.trim());
     const known = new Set<string>(Object.keys(ImportFile.COLUMNS));
     // Checked before any loop over the columns, so a huge header costs one comparison.
     const maxColumns = known.size + ProductFields.MAX_PROPERTIES;
     if (columns.length > maxColumns) {
-      return { rows: [], issues: [{ row: 0, column: "", message: `The header has ${columns.length} columns; an import takes at most ${maxColumns}.` }] };
+      return { rows: [], issues: [{ message: `The header has ${columns.length} columns; an import takes at most ${maxColumns}.` }] };
     }
 
     const issues: ImportIssue[] = [...ImportFile.withinLimit(body.length)];
@@ -215,11 +215,11 @@ export const ImportFile = {
     try {
       document = JSON.parse(text.replace(/^﻿/, ""));
     } catch {
-      return { rows: [], issues: [{ row: 0, column: "", message: "The file is not valid JSON." }] };
+      return { rows: [], issues: [{ message: "The file is not valid JSON." }] };
     }
 
     if (!Array.isArray(document)) {
-      return { rows: [], issues: [{ row: 0, column: "", message: "The file must hold one JSON array of products." }] };
+      return { rows: [], issues: [{ message: "The file must hold one JSON array of products." }] };
     }
 
     const issues: ImportIssue[] = [...ImportFile.withinLimit(document.length)];
@@ -269,7 +269,7 @@ export const ImportFile = {
     try {
       text = new TextDecoder("utf-8", { fatal: true }).decode(file.bytes);
     } catch {
-      return { rows: [], issues: [{ row: 0, column: "", message: "The file is not UTF-8 text. Save it as UTF-8, such as Excel's \"CSV UTF-8\", and try again." }] };
+      return { rows: [], issues: [{ message: "The file is not UTF-8 text. Save it as UTF-8, such as Excel's \"CSV UTF-8\", and try again." }] };
     }
 
     return file.filename.toLowerCase().endsWith(".json") || file.mimetype === "application/json"
