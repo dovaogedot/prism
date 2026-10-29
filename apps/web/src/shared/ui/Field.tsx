@@ -1,5 +1,4 @@
 import type { ComponentProps, ReactNode } from "react";
-import { match, P } from "ts-pattern";
 
 /**
  * `| undefined` is explicit because `exactOptionalPropertyTypes` is on and
@@ -52,18 +51,16 @@ export const Field = ({ label, hint, error, action, id, className = "", ...rest 
         </div>
       )}
 
-      {match({ hint, error })
-        .with({ error: P.string.select() }, (message) => (
-          <p id={`${fieldId}-error`} role="alert" className="text-sm text-danger">
-            {message}
-          </p>
-        ))
-        .with({ hint: P.string.select() }, (message) => (
-          <p id={`${fieldId}-hint`} className="text-sm text-ink-faint">
-            {message}
-          </p>
-        ))
-        .otherwise(() => null)}
+      {hint === undefined ? null : (
+        <p className="text-sm text-ink-faint" id={`${fieldId}-hint`}>
+          {hint}
+        </p>
+      )}
+      {error === undefined ? null : (
+        <p className="text-sm text-danger" id={`${fieldId}-error`} role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 };
