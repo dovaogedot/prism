@@ -149,6 +149,32 @@ describe("moderation", () => {
     expect((await publicPage()).items).toEqual([expect.objectContaining({ id: edited, helpfulCount: 1 })]);
   });
 
+  it("locks the product before the review, in the order a product delete takes", async () => {
+    const token = await customer("buyer@example.com", "delivered");
+    const id = String(jsonOf(await write(token))["id"]);
+    // Another session holds the product, as a product delete would before it reaches the reviews.
+    const holder = await harness.database.sql.reserve();
+    await holder`BEGIN`;
+    await holder`SELECT id FROM product WHERE slug = 'desk-lamp' FOR UPDATE`;
+
+    const moderation = approve(id);
+    try {
+      let waiting = 0;
+      while (waiting === 0) {
+        const [row] = await harness.database.sql`SELECT count(*)::int AS n FROM pg_locks WHERE NOT granted`;
+        waiting = Number(row?.["n"]);
+      }
+      // The waiting moderation has not touched the review row yet, so it can be locked at once.
+      const probe = await harness.database.sql.begin((tx) => tx`SELECT id FROM product_review WHERE id = ${id} FOR UPDATE NOWAIT`);
+
+      expect(probe).toHaveLength(1);
+    } finally {
+      await holder`ROLLBACK`;
+      holder.release();
+    }
+    expect((await moderation).statusCode).toBe(204);
+  });
+
   it("shows the author why a review was rejected", async () => {
     const token = await customer("buyer@example.com", "delivered");
     const id = String(jsonOf(await write(token))["id"]);

@@ -20,7 +20,7 @@ import {
   type UserId,
 } from "@prism/shared";
 import { and, asc, count, desc, eq, sql, type SQL } from "drizzle-orm";
-import type { Database } from "../../db/client.ts";
+import type { Database, Transaction } from "../../db/client.ts";
 import { orderLines, orders, productReviews, products, reviewVotes } from "../../db/schema.ts";
 import type { AuditLog, StaffActor } from "../staff/audit.ts";
 
@@ -70,6 +70,24 @@ export type ReviewRepository = Readonly<{
 type ReviewRow = typeof productReviews.$inferSelect;
 
 export const ReviewRepository = {
+  /**
+   * Locks the product before any of its reviews, the order a product delete
+   * takes too, so the rating trigger's lock on the product never waits in a
+   * cycle with one.
+   */
+  lockProduct: async (tx: Transaction, productId: ProductId): Promise<void> => {
+    await tx.select({ id: products.id }).from(products).where(eq(products.id, productId)).for("update");
+  },
+
+  /** Locks the product of a review, as `lockProduct` does; resolves to whether the review exists. */
+  lockProductOf: async (tx: Transaction, reviewId: ReviewId): Promise<boolean> => {
+    const [review] = await tx.select({ productId: productReviews.productId }).from(productReviews).where(eq(productReviews.id, reviewId));
+    if (review === undefined) return false;
+
+    await ReviewRepository.lockProduct(tx, review.productId);
+    return true;
+  },
+
   /** Every sort ends in the id, so paging is stable when the keys tie. */
   ordering: {
     helpful: [desc(productReviews.helpfulCount), desc(productReviews.createdAt), asc(productReviews.id)],
@@ -174,7 +192,7 @@ export const ReviewRepository = {
           .where(and(eq(productReviews.productId, productId), eq(reviewVotes.userId, userId)))
       ).map((row) => row.id),
 
-    saveOwn: async ({ productId, userId, review, now }) => {
+    saveOwn: ({ productId, userId, review, now }) => {
       const written = {
         rating: review.rating,
         authorName: review.authorName,
@@ -187,23 +205,28 @@ export const ReviewRepository = {
         updatedAt: now,
       };
 
-      await db
-        .insert(productReviews)
-        .values({ productId, userId, ...written, createdAt: now })
-        .onConflictDoUpdate({
-          target: [productReviews.productId, productReviews.userId],
-          set: { ...written, id: sql`gen_random_uuid()` },
-        });
+      return db.transaction(async (tx) => {
+        await ReviewRepository.lockProduct(tx, productId);
+        await tx
+          .insert(productReviews)
+          .values({ productId, userId, ...written, createdAt: now })
+          .onConflictDoUpdate({
+            target: [productReviews.productId, productReviews.userId],
+            set: { ...written, id: sql`gen_random_uuid()` },
+          });
+      });
     },
 
-    deleteOwn: async (productId, userId) => {
-      const deleted = await db
-        .delete(productReviews)
-        .where(and(eq(productReviews.productId, productId), eq(productReviews.userId, userId)))
-        .returning({ id: productReviews.id });
+    deleteOwn: (productId, userId) =>
+      db.transaction(async (tx) => {
+        await ReviewRepository.lockProduct(tx, productId);
+        const deleted = await tx
+          .delete(productReviews)
+          .where(and(eq(productReviews.productId, productId), eq(productReviews.userId, userId)))
+          .returning({ id: productReviews.id });
 
-      return deleted.length > 0;
-    },
+        return deleted.length > 0;
+      }),
 
     vote: (reviewId, userId, now) =>
       db.transaction(async (tx): Promise<VoteOutcome> => {
@@ -277,6 +300,8 @@ export const ReviewRepository = {
 
     moderate: ({ reviewId, decision, actor, now }) =>
       db.transaction(async (tx): Promise<ModerationOutcome> => {
+        if (!(await ReviewRepository.lockProductOf(tx, reviewId))) return { _tag: "NotFound" };
+
         const [changed] = await tx
           .update(productReviews)
           .set({
@@ -301,6 +326,8 @@ export const ReviewRepository = {
 
     remove: ({ reviewId, actor }) =>
       db.transaction(async (tx): Promise<ModerationOutcome> => {
+        if (!(await ReviewRepository.lockProductOf(tx, reviewId))) return { _tag: "NotFound" };
+
         const [removed] = await tx
           .delete(productReviews)
           .where(eq(productReviews.id, reviewId))
