@@ -7,6 +7,7 @@
 
 import {
   Cart,
+  Quantity,
   type CartView,
   type DomainError,
   type ProductId,
@@ -118,6 +119,7 @@ export const CartService = {
       owner: CartOwner,
       productId: ProductId,
       decide: (current: number, stock: number) => QuantityCheck,
+      write: (cartId: CartId, quantity: number, stock: number) => Promise<void>,
     ): ResultAsync<CartOutcome<CartView>, DomainError> => {
       const run = async (): Promise<Result<CartOutcome<CartView>, DomainError>> => {
         const product = await repository.findProduct(productId);
@@ -134,7 +136,7 @@ export const CartService = {
         const resolved = await resolve(owner, true);
         if (resolved.value === undefined) return err({ _tag: "Conflict" });
 
-        await repository.setQuantity(resolved.value, productId, decision.quantity);
+        await write(resolved.value, decision.quantity, product.stock);
 
         return ok({ value: await repository.view(resolved.value), cookie: resolved.cookie });
       };
@@ -148,11 +150,22 @@ export const CartService = {
         return { value: await viewOf(resolved.value), cookie: resolved.cookie };
       },
 
+      // The line grows by the amount added, not to the total read before, so an add that runs beside another still counts.
       add: (owner, productId, quantity) =>
-        change(owner, productId, (current, stock) => Cart.add(current, quantity, stock)),
+        change(
+          owner,
+          productId,
+          (current, stock) => Cart.add(current, quantity, stock),
+          (cartId, _total, stock) => repository.addQuantity(cartId, productId, quantity, Math.min(stock, Quantity.MAX)),
+        ),
 
       setQuantity: (owner, productId, quantity) =>
-        change(owner, productId, (_current, stock) => Cart.set(quantity, stock)),
+        change(
+          owner,
+          productId,
+          (_current, stock) => Cart.set(quantity, stock),
+          (cartId, total) => repository.setQuantity(cartId, productId, total),
+        ),
 
       remove: async (owner, productId) => {
         const resolved = await resolve(owner, false);

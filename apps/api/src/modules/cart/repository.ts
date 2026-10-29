@@ -29,6 +29,8 @@ export type CartRepository = Readonly<{
   quantityOf: (cartId: CartId, productId: ProductId) => Promise<number>;
   /** Puts a line at `quantity`, adding it if absent. */
   setQuantity: (cartId: CartId, productId: ProductId, quantity: number) => Promise<void>;
+  /** Adds `adding` to the line in one statement, never past `cap`, so two adds at once both count. */
+  addQuantity: (cartId: CartId, productId: ProductId, adding: number, cap: number) => Promise<void>;
   removeItem: (cartId: CartId, productId: ProductId) => Promise<void>;
   /** Removes every line. */
   empty: (cartId: CartId) => Promise<void>;
@@ -124,6 +126,16 @@ export const CartRepository = {
         .insert(cartItems)
         .values({ cartId, productId, quantity })
         .onConflictDoUpdate({ target: [cartItems.cartId, cartItems.productId], set: { quantity } });
+    },
+
+    addQuantity: async (cartId, productId, adding, cap) => {
+      await db
+        .insert(cartItems)
+        .values({ cartId, productId, quantity: Math.min(adding, cap) })
+        .onConflictDoUpdate({
+          target: [cartItems.cartId, cartItems.productId],
+          set: { quantity: sql`LEAST(${cartItems.quantity} + ${adding}, ${cap})` },
+        });
     },
 
     removeItem: async (cartId, productId) => {
