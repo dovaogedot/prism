@@ -16,6 +16,11 @@ export type PricedOption = Pick<ShippingOption, "priceCents" | "freeFromCents">;
 export type Totals = Readonly<{ subtotalCents: number; shippingCents: number; totalCents: number }>;
 
 export const Pricing = {
+  /** Stripe's smallest charge in euros, which every order total has to reach. */
+  MINIMUM_TOTAL_CENTS: 50,
+  /** Stripe's largest charge in euros, which also keeps every order sum inside its integer column. */
+  MAXIMUM_TOTAL_CENTS: 99_999_999,
+
   lineTotal: (line: PricedLine): number => line.unitPriceCents * line.quantity,
 
   subtotal: (lines: readonly PricedLine[]): number =>

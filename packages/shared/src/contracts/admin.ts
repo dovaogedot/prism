@@ -245,6 +245,12 @@ export const ImageAlt = {
     .max(200, "Use at most 200 characters."),
 } as const;
 
+/** The pictures of one product. */
+export const ProductPictures = {
+  /** The most pictures one product shows. */
+  MAX: 12,
+} as const;
+
 /** A validated `PUT /admin/products/:id/images` body: every picture of the product, in its new order, with its text. */
 export type ImageOrderInput = z.infer<typeof ImageOrderInput.schema>;
 export const ImageOrderInput = {
@@ -252,7 +258,7 @@ export const ImageOrderInput = {
     images: z
       .array(z.strictObject({ id: ImageId.schema, alt: ImageAlt.schema }))
       .min(1)
-      .max(12)
+      .max(ProductPictures.MAX)
       .refine((images) => new Set(images.map((image) => image.id)).size === images.length, "Each picture appears once."),
   }),
 } as const;

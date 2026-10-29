@@ -25,6 +25,7 @@ import type {
   ProductInput,
   ProductUpdate,
 } from "@prism/shared";
+import { ProductPictures } from "@prism/shared";
 import { errAsync, okAsync, ResultAsync } from "neverthrow";
 import type { Clock } from "../../platform/clock.ts";
 import type { ImageStore } from "../../platform/image-store.ts";
@@ -79,9 +80,6 @@ export type CatalogAdminService = Readonly<{
 }>;
 
 export const CatalogAdminService = {
-  /** The most pictures one product shows. */
-  MAX_IMAGES: 12,
-
   /** What a refused save of something named `noun` tells the person. */
   saveFailure: <T>(outcome: Exclude<SaveOutcome<T>, { _tag: "Saved" }>, notFound: DomainError, noun: string): DomainError => {
     if (outcome._tag === "NotFound") return notFound;
@@ -216,7 +214,7 @@ export const CatalogAdminService = {
               image: stored,
               alt: upload.alt,
               isPixelArt: upload.isPixelArt,
-              maxImages: CatalogAdminService.MAX_IMAGES,
+              maxImages: ProductPictures.MAX,
               actor,
             }),
           ).andThen((outcome) => {

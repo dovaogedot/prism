@@ -7,6 +7,11 @@
  * a message is a compile error.
  */
 
+import { SavedAddress } from "../contracts/account.ts";
+import { ProductPictures } from "../contracts/admin.ts";
+import { Price } from "../contracts/catalog.ts";
+import { Pricing } from "./pricing.ts";
+
 /** One rejected field: where it is in the body, and what is wrong with it. */
 export type ValidationIssue = Readonly<{ path: string; message: string }>;
 
@@ -209,17 +214,17 @@ export const DomainError = {
     BrandInUse: "Products carry this brand. Move or delete them first.",
     SlugTaken: "Another item already uses that slug.",
     ImageNotFound: "We could not find that image.",
-    ImageLimitReached: "A product can have at most 12 images.",
+    ImageLimitReached: `A product can have at most ${ProductPictures.MAX} images.`,
     UnsupportedImage: "Upload a JPEG, PNG or WebP image.",
     PayloadTooLarge: "That file is too large.",
     ImportInvalid: "The file has problems. Nothing was imported.",
     ShippingMethodNotFound: "We could not find that delivery option.",
     ShippingMethodInUse: "Orders use this delivery option, so it can be deactivated but not deleted.",
     OrderTransitionNotAllowed: "The order cannot move to that status from where it is.",
-    OrderTotalTooSmall: "The order total must be at least €0.50.",
-    OrderTotalTooLarge: "The order total can be at most €999,999.99. Split it into smaller orders.",
+    OrderTotalTooSmall: `The order total must be at least ${Price.format(Pricing.MINIMUM_TOTAL_CENTS)}.`,
+    OrderTotalTooLarge: `The order total can be at most ${Price.format(Pricing.MAXIMUM_TOTAL_CENTS)}. Split it into smaller orders.`,
     AddressNotFound: "We could not find that address.",
-    AddressLimitReached: "You can save at most 10 addresses. Delete one first.",
+    AddressLimitReached: `You can save at most ${SavedAddress.MAX} addresses. Delete one first.`,
     RateLimited: "Too many attempts. Please wait a moment and try again.",
     Conflict: "That conflicts with something that already exists.",
   } as const satisfies Record<DomainErrorTag, string>,
