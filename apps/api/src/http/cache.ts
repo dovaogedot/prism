@@ -32,6 +32,11 @@ export const CachePolicy = {
         reply.statusCode < 400;
 
       reply.header("Cache-Control", isShared ? CachePolicy.PUBLIC : CachePolicy.PRIVATE);
+      // The same URL is answered for everyone and, signed in, for one person: a cache keys it on the header too.
+      if (request.routeOptions.config.cache === "public") {
+        const vary = reply.getHeader("vary");
+        reply.header("Vary", vary === undefined ? "Authorization" : `${String(vary)}, Authorization`);
+      }
     });
   },
 } as const;

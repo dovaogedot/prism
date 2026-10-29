@@ -314,6 +314,8 @@ describe("cache headers", () => {
     expect(anonymous.headers["cache-control"]).toBe("public, max-age=60, stale-while-revalidate=300");
     expect(signedIn.headers["cache-control"]).toBe("private, no-store");
     expect(personal.headers["cache-control"]).toBe("private, no-store");
+    // A cache keys the shared answer on the header too, beside the Origin that CORS names.
+    expect([anonymous.headers["vary"], signedIn.headers["vary"]]).toEqual(["Origin, Authorization", "Origin, Authorization"]);
   });
 
   it("marks an answer whose path spells the prefix with percent escapes", async () => {
