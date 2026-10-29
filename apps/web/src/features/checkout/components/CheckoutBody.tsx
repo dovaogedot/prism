@@ -112,7 +112,9 @@ export const CheckoutBody = ({ cart, options, payments, prefill, savedAddresses 
       })
       .with("OutOfStock", "CartChanged", "CartEmpty", () => {
         setCartProblem(failure.message);
+        // The total the server compared also takes the delivery option's price, which may have changed too.
         void client.invalidateQueries({ queryKey: ["cart"] });
+        void client.invalidateQueries({ queryKey: ["shipping-methods"] });
       })
       .with("PaymentGatewayUnavailable", "PaymentsUnavailable", () => setPaymentError(failure.message))
       .otherwise(() => setProblem(failure.message));
