@@ -81,7 +81,7 @@ export const ReviewsSection = ({ slug }: ReviewsSectionProps) => {
                 <label className="mb-2 flex items-center justify-end gap-2 text-sm text-ink-soft">
                   Sort reviews by
                   <select
-                    className="h-9 rounded-lg border border-line bg-surface px-2 text-sm text-ink hover:border-line-strong"
+                    className="h-9 rounded-lg border border-edge bg-surface px-2 text-sm text-ink hover:border-ink-faint"
                     value={sort}
                     onChange={(event) => {
                       setSort(ReviewSort.schema.catch("helpful").parse(event.target.value));

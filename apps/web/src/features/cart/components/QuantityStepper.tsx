@@ -40,7 +40,7 @@ export const QuantityStepper = ({ value, max, onChange, label, disabled = false 
     "grid size-8 place-items-center text-ink-soft transition-colors hover:bg-sunken hover:text-ink disabled:opacity-40";
 
   return (
-    <div className="inline-flex items-center overflow-hidden rounded-lg border border-line bg-surface">
+    <div className="inline-flex items-center overflow-hidden rounded-lg border border-edge bg-surface">
       <button
         type="button"
         aria-label={`One fewer ${label}`}

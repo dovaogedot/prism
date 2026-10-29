@@ -25,7 +25,7 @@ export const TextAreaField = ({ label, hint, error, id, className = "", ...rest 
         {...rest}
         className={[
           "w-full rounded-lg border bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-ink-faint transition-colors",
-          error === undefined ? "border-line hover:border-line-strong" : "border-danger",
+          error === undefined ? "border-edge hover:border-ink-faint" : "border-danger",
           className,
         ].join(" ")}
         id={fieldId}

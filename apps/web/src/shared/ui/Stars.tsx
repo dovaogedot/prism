@@ -32,7 +32,7 @@ export const Stars = ({ rating, count, isCountShown = true, isTextShown = true }
             <defs>
               <linearGradient id={`${gradientId}-${index}`}>
                 <stop offset={`${Math.max(0, Math.min(1, rating - index)) * 100}%`} stopColor="var(--color-accent)" />
-                <stop offset="0%" stopColor="var(--color-line-strong)" />
+                <stop offset="0%" stopColor="var(--color-edge)" />
               </linearGradient>
             </defs>
             <path fill={`url(#${gradientId}-${index})`} d="M10 1.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L10 14.9 4.7 17.6l1-5.8L1.5 7.7l5.9-.9z" />

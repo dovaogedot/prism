@@ -113,7 +113,7 @@ export const SearchCombobox = () => {
         <path d="m16 16 4.5 4.5" />
       </svg>
       <input
-        className="h-10 w-full rounded-lg border border-line bg-surface pl-9 pr-9 text-sm text-ink placeholder:text-ink-faint hover:border-line-strong"
+        className="h-10 w-full rounded-lg border border-edge bg-surface pl-9 pr-9 text-sm text-ink placeholder:text-ink-faint hover:border-ink-faint"
         ref={input}
         id={`${listboxId}-input`}
         type="text"

@@ -39,7 +39,7 @@ export const NotFoundPage = ({ heading = "Page not found" }: NotFoundPageProps) 
           Search products
         </label>
         <input
-          className="h-10 min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 text-sm text-ink placeholder:text-ink-faint hover:border-line-strong"
+          className="h-10 min-w-0 flex-1 rounded-lg border border-edge bg-surface px-3 text-sm text-ink placeholder:text-ink-faint hover:border-ink-faint"
           id="not-found-search"
           type="search"
           placeholder="Search products"

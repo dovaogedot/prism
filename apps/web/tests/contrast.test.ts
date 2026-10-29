@@ -2,7 +2,7 @@
  * The palette's contrast, read from the color tokens in `styles.css` the way
  * a browser draws them: every text color on every background color passes
  * 4.5:1 in both themes, text on a filled button passes it too, and the focus
- * ring passes 3:1 against the page.
+ * ring and the edge of a control pass 3:1 against the page.
  */
 
 import { readFileSync } from "node:fs";
@@ -80,6 +80,10 @@ describe.each(themes)("the $name theme", ({ tokens }) => {
 
   it("gives the focus ring 3:1 against the page and the panels", () => {
     for (const background of ["canvas", "surface"]) expect(Oklch.contrast(color("accent"), color(background))).toBeGreaterThanOrEqual(3);
+  });
+
+  it("gives the edge of a control and an empty star 3:1 on every background", () => {
+    for (const background of backgrounds) expect(Oklch.contrast(color("edge"), color(background)), background).toBeGreaterThanOrEqual(3);
   });
 });
 

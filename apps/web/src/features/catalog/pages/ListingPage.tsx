@@ -189,7 +189,7 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
             <label className="flex items-center gap-2 text-sm text-ink-soft">
               <span className="sr-only sm:not-sr-only">Sort by</span>
               <select
-                className="h-10 rounded-lg border border-line bg-surface px-3 text-sm text-ink hover:border-line-strong"
+                className="h-10 rounded-lg border border-edge bg-surface px-3 text-sm text-ink hover:border-ink-faint"
                 value={sort}
                 onChange={(event) => filter(CatalogParams.set(params, "sort", event.target.value))}
               >

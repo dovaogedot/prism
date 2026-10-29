@@ -106,7 +106,7 @@ const StarRow = ({ filled }: Readonly<{ filled: number }>) => (
     {[0, 1, 2, 3, 4].map((index) => (
       <svg key={index} viewBox="0 0 20 20" className="size-4">
         <path
-          fill={index < filled ? "var(--color-accent)" : "var(--color-line-strong)"}
+          fill={index < filled ? "var(--color-accent)" : "var(--color-edge)"}
           d="M10 1.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L10 14.9 4.7 17.6l1-5.8L1.5 7.7l5.9-.9z"
         />
       </svg>
