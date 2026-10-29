@@ -228,6 +228,7 @@ export const OrderPage = () => {
           isOpen={confirming === "cancel"}
           title={`Cancel order #${data.number}?`}
           confirmLabel="Cancel order"
+          cancelLabel="Keep the order"
           isBusy={cancel.isPending}
           onCancel={() => setConfirming("none")}
           onConfirm={() => cancel.mutate(undefined, { onSuccess: done("The order is canceled, and its payment refunded."), onError: refused })}

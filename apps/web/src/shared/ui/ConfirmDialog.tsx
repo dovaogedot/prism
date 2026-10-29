@@ -9,6 +9,8 @@ export type ConfirmDialogProps = Readonly<{
   children: ReactNode;
   /** What the confirming button says, such as "Delete product". */
   confirmLabel: string;
+  /** What the dismissing button says; "Cancel" unless that is what the confirming one does, as in "Keep the order". */
+  cancelLabel?: string;
   tone?: ButtonTone;
   isBusy?: boolean;
   onConfirm: () => void;
@@ -16,12 +18,22 @@ export type ConfirmDialogProps = Readonly<{
 }>;
 
 /** Asks before something that cannot be undone. Cancel is the default, and the first button focus reaches. */
-export const ConfirmDialog = ({ isOpen, title, children, confirmLabel, tone = "danger", isBusy = false, onConfirm, onCancel }: ConfirmDialogProps) => (
+export const ConfirmDialog = ({
+  isOpen,
+  title,
+  children,
+  confirmLabel,
+  cancelLabel = "Cancel",
+  tone = "danger",
+  isBusy = false,
+  onConfirm,
+  onCancel,
+}: ConfirmDialogProps) => (
   <Dialog isOpen={isOpen} title={title} onClose={onCancel}>
     <div className="text-sm text-ink-soft">{children}</div>
     <div className="flex flex-wrap justify-end gap-2">
       <Button tone="quiet" type="button" data-autofocus onClick={onCancel}>
-        Cancel
+        {cancelLabel}
       </Button>
       <Button tone={tone} type="button" busy={isBusy} onClick={onConfirm}>
         {confirmLabel}
