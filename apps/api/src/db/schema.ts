@@ -406,7 +406,8 @@ export const productReviews = pgTable(
       table.helpfulCount.desc(),
       table.createdAt.desc(),
     ),
-    index("product_review_status_idx").on(table.status, table.createdAt),
+    // The moderation queue: one status, oldest change first, read in order a page at a time.
+    index("product_review_status_idx").on(table.status, table.updatedAt, table.id),
     check("product_review_rating_range", sql`${table.rating} BETWEEN 1 AND 5`),
     check("product_review_author_length", sql`char_length(${table.authorName}) BETWEEN 2 AND 40`),
     check("product_review_title_length", sql`char_length(${table.title}) BETWEEN 1 AND 120`),

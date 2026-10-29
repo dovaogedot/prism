@@ -64,6 +64,13 @@
       "when": 1793275795816,
       "tag": "0008_customer_order_cart_index",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793275863485,
+      "tag": "0009_review_queue_index",
+      "breakpoints": true
     }
   ]
 }

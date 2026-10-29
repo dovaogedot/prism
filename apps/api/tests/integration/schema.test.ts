@@ -71,6 +71,13 @@ describe("plans", () => {
   it("finds a deleted cart's orders through an index", async () => {
     expect(await planOf("UPDATE customer_order SET cart_id = NULL WHERE cart_id = '5b1d8f3e-6f0a-4c2b-9a7e-1d2c3b4a5f60'")).toContain("customer_order_cart_idx");
   });
+
+  it("reads a page of the moderation queue in order, with no sort", async () => {
+    const plan = await planOf("SELECT id FROM product_review WHERE status = 'pending' ORDER BY updated_at, id LIMIT 20");
+
+    expect(plan).toContain("product_review_status_idx");
+    expect(plan).not.toContain("Sort");
+  });
 });
 
 describe("cart", () => {
