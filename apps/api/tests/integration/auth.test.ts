@@ -9,7 +9,7 @@
 import { Email } from "@prism/shared";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
-  cookieValue,
+  requiredCookie,
   jsonOf,
   registerUser,
   startHarness,
@@ -104,10 +104,14 @@ describe("POST /auth/register", () => {
 
   it("normalizes the email so one person cannot hold two accounts", async () => {
     await registerUser(harness, "Someone@Example.COM");
-    const duplicate = await registerUser(harness, "someone@example.com");
+    const duplicate = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/register",
+      payload: { email: "someone@example.com", password: VALID_PASSWORD, captchaToken: "test-token" },
+    });
 
-    expect(duplicate.response.statusCode).toBe(409);
-    expect(jsonOf(duplicate.response)["error"]).toMatchObject({
+    expect(duplicate.statusCode).toBe(409);
+    expect(jsonOf(duplicate)["error"]).toMatchObject({
       code: "EmailAlreadyRegistered",
     });
   });
@@ -198,7 +202,7 @@ describe("POST /auth/refresh — rotation and reuse", () => {
 
     expect(response.statusCode).toBe(200);
 
-    const rotated = cookieValue(response, "prism_refresh");
+    const rotated = requiredCookie(response, "prism_refresh");
     expect(rotated).not.toBe(refreshToken);
     expect(rotated).not.toBe("");
 
@@ -236,7 +240,7 @@ describe("POST /auth/refresh — rotation and reuse", () => {
       url: "/api/v1/auth/refresh",
       cookies: { prism_refresh: refreshToken },
     });
-    const goodToken = cookieValue(rotation, "prism_refresh");
+    const goodToken = requiredCookie(rotation, "prism_refresh");
 
     // The attacker replays the stolen, already-used token…
     await harness.app.inject({

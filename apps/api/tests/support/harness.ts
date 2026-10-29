@@ -248,8 +248,8 @@ export const startHarness = async (options: HarnessOptions = {}): Promise<Harnes
 
 export const jsonOf = (response: { body: string }): Record<string, unknown> => JSON.parse(response.body);
 
-/** Reads a Set-Cookie value by name from an inject response. */
-export const cookieValue = (response: { cookies: readonly unknown[] }, name: string): string => {
+/** Reads a Set-Cookie value by name from an inject response; `undefined` when the answer set no such cookie. */
+export const cookieValue = (response: { cookies: readonly unknown[] }, name: string): string | undefined => {
   for (const cookie of response.cookies) {
     if (
       typeof cookie === "object" &&
@@ -263,7 +263,15 @@ export const cookieValue = (response: { cookies: readonly unknown[] }, name: str
     }
   }
 
-  return "";
+  return undefined;
+};
+
+/** Reads a Set-Cookie value the test needs, and fails at once when the answer set none. */
+export const requiredCookie = (response: { cookies: readonly unknown[]; body: string }, name: string): string => {
+  const value = cookieValue(response, name);
+  if (value === undefined) throw new Error(`The answer set no ${name} cookie: ${response.body}`);
+
+  return value;
 };
 
 /** Opens an account and hands back the response along with the token it granted. */
@@ -274,13 +282,12 @@ export const registerUser = async (harness: Harness, email: string, password: st
     payload: { email, password, captchaToken: "test-token" },
   });
 
-  const body = jsonOf(response);
+  if (response.statusCode !== 201) throw new Error(`Registering ${email} failed: ${response.statusCode} ${response.body}`);
 
-  return {
-    response,
-    accessToken: typeof body["accessToken"] === "string" ? body["accessToken"] : "",
-    refreshToken: cookieValue(response, "prism_refresh"),
-  };
+  const accessToken = jsonOf(response)["accessToken"];
+  if (typeof accessToken !== "string") throw new Error(`Registering ${email} granted no access token: ${response.body}`);
+
+  return { response, accessToken, refreshToken: requiredCookie(response, "prism_refresh") };
 };
 
 /** One product as a test describes it; everything but the name and price has a default. */

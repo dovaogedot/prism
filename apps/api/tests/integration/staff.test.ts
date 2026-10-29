@@ -16,7 +16,7 @@ import { MockAuthorizationCode } from "../../src/platform/oauth.ts";
 import { MessageQueue } from "../../src/platform/queue.ts";
 import { TotpSecret } from "../../src/platform/totp.ts";
 import {
-  cookieValue,
+  requiredCookie,
   fastHasher,
   jsonOf,
   registerUser,
@@ -102,7 +102,7 @@ describe("the staff guard", () => {
 
   it("counts a provider sign-in that passed the 2FA challenge as checked", async () => {
     const begin = await harness.app.inject({ method: "GET", url: "/api/v1/auth/oauth/github" });
-    const state = cookieValue(begin, "prism_oauth_state");
+    const state = requiredCookie(begin, "prism_oauth_state");
     const callbackOf = (code: string) =>
       harness.app.inject({
         method: "GET",
@@ -116,7 +116,7 @@ describe("the staff guard", () => {
     const refreshed = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
-      cookies: { prism_refresh: cookieValue(first, "prism_refresh") },
+      cookies: { prism_refresh: requiredCookie(first, "prism_refresh") },
     });
     const userId = await userIdOf(harness, "oauth-staff@example.com");
     if (userId === undefined) throw new Error("no account");
@@ -130,7 +130,7 @@ describe("the staff guard", () => {
 
     // The next provider sign-in is challenged, and answering it checks the session.
     const begin2 = await harness.app.inject({ method: "GET", url: "/api/v1/auth/oauth/github" });
-    const state2 = cookieValue(begin2, "prism_oauth_state");
+    const state2 = requiredCookie(begin2, "prism_oauth_state");
     const second = await harness.app.inject({
       method: "GET",
       url: `/api/v1/auth/oauth/github/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state2)}`,
@@ -142,7 +142,7 @@ describe("the staff guard", () => {
     const answered = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/login/2fa",
-      cookies: { prism_2fa_challenge: cookieValue(second, "prism_2fa_challenge") },
+      cookies: { prism_2fa_challenge: requiredCookie(second, "prism_2fa_challenge") },
       payload: { code: harness.totpCodeFor(secret) },
     });
     const grant = jsonOf(answered)["grant"] as { accessToken: string; user: { isSecondFactorVerified: boolean } };

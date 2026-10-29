@@ -9,6 +9,7 @@ import { Email, OAuthProvider } from "@prism/shared";
 import { MockAuthorizationCode, ProviderSubject } from "../../src/platform/oauth.ts";
 import {
   cookieValue,
+  requiredCookie,
   emailIndexOf,
   jsonOf,
   registerUser,
@@ -40,7 +41,7 @@ const signInWith = async (provider: string, email: string) => {
     url: `/api/v1/auth/oauth/${provider}`,
   });
 
-  const state = cookieValue(begin, OAUTH_STATE_COOKIE);
+  const state = requiredCookie(begin, OAUTH_STATE_COOKIE);
 
   const code = MockAuthorizationCode.issue(
     provider === "github" ? "github" : "google",
@@ -54,7 +55,7 @@ const signInWith = async (provider: string, email: string) => {
     cookies: { [OAUTH_STATE_COOKIE]: state },
   });
 
-  return { begin, state, callback, refreshToken: cookieValue(callback, "prism_refresh") };
+  return { begin, state, callback };
 };
 
 describe("GET /auth/oauth/providers", () => {
@@ -78,14 +79,15 @@ describe.each(OAuthProvider.NAMES)("signing in with %s", (provider) => {
 
     expect(begin.statusCode).toBe(302);
     expect(begin.headers["location"]).toContain(`/oauth/${provider}/consent`);
-    expect(cookieValue(begin, OAUTH_STATE_COOKIE)).not.toBe("");
+    expect(cookieValue(begin, OAUTH_STATE_COOKIE)).toMatch(/.+/);
   });
 
   it("creates an account with no password on first sign-in", async () => {
-    const { callback, refreshToken } = await signInWith(
+    const { callback } = await signInWith(
       provider,
       `${provider}-newcomer@example.com`,
     );
+    const refreshToken = requiredCookie(callback, "prism_refresh");
 
     expect(callback.statusCode).toBe(302);
     expect(callback.headers["location"]).toContain("/oauth/complete");
@@ -154,10 +156,10 @@ describe.each(OAuthProvider.NAMES)("signing in with %s", (provider) => {
   it("reports the provider it was actually signed in with", async () => {
     // The account page reads this, so the provider has to travel on the
     // wire rather than be guessed at the far end.
-    const { refreshToken } = await signInWith(
+    const refreshToken = requiredCookie((await signInWith(
       provider,
       `${provider}-named@example.com`,
-    );
+    )).callback, "prism_refresh");
 
     const grant = await harness.app.inject({
       method: "POST",
@@ -173,10 +175,10 @@ describe.each(OAuthProvider.NAMES)("signing in with %s", (provider) => {
 
   it("adds the provider to an account that already had a password", async () => {
     await registerUser(harness, `${provider}-fresh@example.com`);
-    const { refreshToken } = await signInWith(
+    const refreshToken = requiredCookie((await signInWith(
       provider,
       `${provider}-fresh@example.com`,
-    );
+    )).callback, "prism_refresh");
 
     const grant = await harness.app.inject({
       method: "POST",
@@ -235,7 +237,7 @@ describe("an account with more than one provider", () => {
     // the second sign-in links rather than duplicating — and the account has
     // to be able to say both.
     await signInWith("google", "both@example.com");
-    const { refreshToken } = await signInWith("github", "both@example.com");
+    const refreshToken = requiredCookie((await signInWith("github", "both@example.com")).callback, "prism_refresh");
 
     const users = await harness.database
       .sql`SELECT id FROM app_user WHERE email_index = ${emailIndexOf(harness, "both@example.com")}`;
@@ -271,7 +273,7 @@ describe("adding a password to a provider account", () => {
 
   /** Signs in through a provider and returns a usable access token. */
   const tokenFor = async (email: string): Promise<string> => {
-    const { refreshToken } = await signInWith("google", email);
+    const refreshToken = requiredCookie((await signInWith("google", email)).callback, "prism_refresh");
     const grant = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
@@ -404,7 +406,7 @@ describe("a provider sign-in into an account with two-factor", () => {
   };
 
   const signedInToken = async (email: string): Promise<string> => {
-    const { refreshToken } = await signInWith("google", email);
+    const refreshToken = requiredCookie((await signInWith("google", email)).callback, "prism_refresh");
     const grant = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
@@ -423,8 +425,8 @@ describe("a provider sign-in into an account with two-factor", () => {
 
     expect(callback.statusCode).toBe(302);
     expect(callback.headers["location"]).toContain("/login/2fa");
-    expect(cookieValue(callback, "prism_refresh")).toBe("");
-    expect(cookieValue(callback, "prism_2fa_challenge")).not.toBe("");
+    expect(cookieValue(callback, "prism_refresh")).toBeUndefined();
+    expect(cookieValue(callback, "prism_2fa_challenge")).toMatch(/.+/);
   });
 
   it("keeps the challenge out of the redirect URL", async () => {
@@ -452,7 +454,7 @@ describe("a provider sign-in into an account with two-factor", () => {
     });
 
     const { callback } = await signInWith("google", "finishes@example.com");
-    const challenge = cookieValue(callback, "prism_2fa_challenge");
+    const challenge = requiredCookie(callback, "prism_2fa_challenge");
 
     // A code is accepted once, so the sign-in waits for the next one.
     harness.clock.advanceSeconds(30);
@@ -468,7 +470,7 @@ describe("a provider sign-in into an account with two-factor", () => {
 
     expect(done.statusCode).toBe(200);
     expect(jsonOf(done)["status"]).toBe("authenticated");
-    expect(cookieValue(done, "prism_refresh")).not.toBe("");
+    expect(cookieValue(done, "prism_refresh")).toMatch(/.+/);
   });
 
   it("refuses a code with no challenge anywhere", async () => {
@@ -488,7 +490,7 @@ describe("provider isolation", () => {
       method: "GET",
       url: "/api/v1/auth/oauth/google",
     });
-    const state = cookieValue(begin, OAUTH_STATE_COOKIE);
+    const state = requiredCookie(begin, OAUTH_STATE_COOKIE);
 
     // Signed for GitHub, presented at Google's callback.
     const code = MockAuthorizationCode.issue(

@@ -10,7 +10,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { MockAuthorizationCode, ProviderSubject } from "../../src/platform/oauth.ts";
 import { TotpSecret } from "../../src/platform/totp.ts";
-import { cookieValue, jsonOf, registerUser, startHarness, type Harness } from "../support/harness.ts";
+import { requiredCookie, jsonOf, registerUser, startHarness, type Harness } from "../support/harness.ts";
 
 let harness: Harness;
 
@@ -65,7 +65,7 @@ describe("the provider identity", () => {
   it("seals the subject, and finds the account by it on the next sign-in", async () => {
     const signIn = async () => {
       const begin = await harness.app.inject({ method: "GET", url: "/api/v1/auth/oauth/github" });
-      const state = cookieValue(begin, "prism_oauth_state");
+      const state = requiredCookie(begin, "prism_oauth_state");
       const code = MockAuthorizationCode.issue("github", Email.schema.parse("linked@example.com"), harness.config.tokens.secret);
 
       return harness.app.inject({

@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { products } from "../../src/db/schema.ts";
 import {
-  cookieValue,
+  requiredCookie,
   jsonOf,
   registerUser,
   seedCatalog,
@@ -62,7 +62,7 @@ const viewOf = (response: { body: string }) => JSON.parse(response.body) as View
 const guestWith = async (slug: string, quantity: number): Promise<string> => {
   const response = await request("POST", "/cart/items", {}, { productId: await idOf(slug), quantity });
   expect(response.statusCode).toBe(200);
-  return cookieValue(response, "prism_cart");
+  return requiredCookie(response, "prism_cart");
 };
 
 const signIn = async (email: string): Promise<string> => {

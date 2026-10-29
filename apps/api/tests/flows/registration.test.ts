@@ -41,7 +41,7 @@ describe("a guest who registers", () => {
     expect(registered.statusCode).toBe(201);
     const grant = jsonOf(registered) as { accessToken: string; user: { email: string } };
     expect(grant.user.email).toBe("new.shopper@example.com");
-    expect(cookieValue(registered, "prism_refresh")).not.toBe("");
+    expect(cookieValue(registered, "prism_refresh")).toMatch(/.+/);
 
     // Who the session says it is.
     const me = await harness.app.inject({

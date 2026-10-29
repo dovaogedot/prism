@@ -68,7 +68,7 @@ export const Shop = {
       if (response.statusCode !== 200) throw new Error(`adding ${slug} failed: ${response.body}`);
 
       const cookie = cookieValue(response, "prism_cart");
-      if (cookie.length > 0) current = { ...current, guest: cookie };
+      if (cookie !== undefined && cookie.length > 0) current = { ...current, guest: cookie };
     }
 
     return current;
