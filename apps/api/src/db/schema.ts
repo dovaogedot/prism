@@ -295,6 +295,8 @@ export const products = pgTable(
     index("product_search_idx").using("gin", table.search),
     // Substring matches and the similar-name fallback both read trigrams of the name.
     index("product_name_trgm_idx").using("gin", table.name.op("gin_trgm_ops")),
+    // A product page asks whether another product of its category has the same name, however capitalized.
+    index("product_category_name_idx").on(table.categoryId, sql`lower(${table.name})`),
     index("product_featured_idx").on(table.featuredAt).where(sql`${table.featuredAt} IS NOT NULL`),
     // A category's shelf in display order: its picture is the first product here that has one.
     index("product_category_shelf_idx").on(table.categoryId, table.featuredAt.desc().nullsLast(), table.name),

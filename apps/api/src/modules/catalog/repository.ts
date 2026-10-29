@@ -391,6 +391,10 @@ export const CatalogRepository = {
           .select({
             ...summaryColumns,
             description: products.description,
+            weightGrams: products.weightGrams,
+            widthMm: products.widthMm,
+            heightMm: products.heightMm,
+            depthMm: products.depthMm,
             isNameShared: sql<boolean>`EXISTS (
               SELECT 1 FROM product namesake
               WHERE namesake.category_id = ${products.categoryId} AND lower(namesake.name) = lower(${products.name}) AND namesake.id <> ${products.id}
@@ -404,30 +408,22 @@ export const CatalogRepository = {
 
         if (row === undefined) return undefined;
 
-        const [measures, properties] = await Promise.all([
-          db.query.products.findFirst({
-            columns: { weightGrams: true, widthMm: true, heightMm: true, depthMm: true },
-            where: eq(products.id, row.id),
-          }),
-          db.query.productProperties.findMany({
-            columns: { name: true, value: true },
-            where: eq(productProperties.productId, row.id),
-            orderBy: asc(productProperties.name),
-          }),
-        ]);
-
-        if (measures === undefined) return undefined;
+        const properties = await db.query.productProperties.findMany({
+          columns: { name: true, value: true },
+          where: eq(productProperties.productId, row.id),
+          orderBy: asc(productProperties.name),
+        });
 
         return {
           ...toSummary(row),
           description: row.description,
           properties,
           isNameShared: row.isNameShared,
-          weight: Weight.fromGrams(measures.weightGrams),
+          weight: Weight.fromGrams(row.weightGrams),
           dimensions: Dimensions.fromMillimeters({
-            width: measures.widthMm,
-            height: measures.heightMm,
-            depth: measures.depthMm,
+            width: row.widthMm,
+            height: row.heightMm,
+            depth: row.depthMm,
           }),
         };
       },
