@@ -56,8 +56,8 @@ export type CatalogRepository = Readonly<{
 export const CatalogRepository = {
   /** How many products each row of the home page shows. */
   HOME_ROW: 8,
-  /** How long a listing's facets are kept: as long as a public listing may be kept anyway. */
-  FACET_TTL_MS: 60_000,
+  /** How long a listing's facets are kept, which is the most its counts may lag its results. */
+  FACET_TTL_MS: 5_000,
   /** The most filter sets whose facets are kept at once; the oldest goes first. */
   FACET_ENTRIES: 500,
 

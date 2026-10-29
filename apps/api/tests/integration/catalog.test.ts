@@ -168,13 +168,13 @@ describe("GET /api/v1/products", () => {
     expect(search).toMatchObject({ items: [], matched: "exact", total: 2, totalPages: 2 });
   });
 
-  it("keeps a listing's facets for a minute, whatever page or sort is asked for", async () => {
+  it("keeps a listing's facets for at most 5 seconds, whatever page or sort is asked for", async () => {
     const facetsOf = async (url: string) => jsonOf(await get(url))["facets"] as { price: { maxCents: number } };
 
     const first = await facetsOf("/api/v1/products?category=lighting");
     await harness.database.sql`UPDATE product SET price_cents = 99900 WHERE slug = 'desk-lamp'`;
     const otherPage = await facetsOf("/api/v1/products?category=lighting&page=2&sort=price_desc");
-    harness.clock.advanceSeconds(61);
+    harness.clock.advanceSeconds(5);
     const later = await facetsOf("/api/v1/products?category=lighting&page=2");
 
     expect(otherPage).toEqual(first);
