@@ -1,4 +1,4 @@
-import { Price, ShippingOption } from "@prism/shared";
+import { Country, Price, ShippingOption } from "@prism/shared";
 import { Link } from "react-router";
 import { match, P } from "ts-pattern";
 import { PageText } from "../../../shared/seo/page-text.ts";
@@ -49,7 +49,7 @@ export const FaqPage = () => {
 
       <details>
         <summary>Where do you deliver?</summary>
-        <p>To addresses across the European Union. Checkout lists every country we deliver to.</p>
+        <p>To {new Intl.ListFormat("en", { type: "conjunction" }).format(Country.CODES.map((code) => Country.name[code]))}.</p>
       </details>
 
       <h2>Payment</h2>
@@ -64,7 +64,7 @@ export const FaqPage = () => {
 
       <details>
         <summary>When is my card charged?</summary>
-        <p>When you place the order. If the payment fails, the order waits for a new attempt and nothing is shipped.</p>
+        <p>When you place the order. If the payment fails, the order closes, your cart keeps its items, and you can place the order again.</p>
       </details>
 
       <details>
