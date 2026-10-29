@@ -1,21 +1,21 @@
-import { ProductFields, type AdminBrand, type AdminCategory, type ProductInput } from "@prism/shared";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useState, type ReactNode } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
-import { Alert, Button, Card, Field, SelectField, TextAreaField } from "../../../shared/ui/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { ProductForm as ProductFormSchema, Slugs } from "../forms.ts";
-import { ServerIssues } from "../../../shared/ui/server-issues.ts";
+import { ProductFields, type AdminBrand, type AdminCategory, type ProductInput } from "@prism/shared"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useState, type ReactNode } from "react"
+import { useFieldArray, useForm } from "react-hook-form"
+import { Alert, Button, Card, Field, SelectField, TextAreaField } from "../../../shared/ui/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { ProductForm as ProductFormSchema, Slugs } from "../forms.ts"
+import { ServerIssues } from "../../../shared/ui/server-issues.ts"
 
 /** What the form starts from, what it chooses among, and what saving does. */
 export type ProductFormProps = Readonly<{
   /** Absent for a new product. */
-  initial?: ProductFormSchema;
-  categories: readonly AdminCategory[];
-  brands: readonly AdminBrand[];
-  submitLabel: string;
-  onSave: (product: ProductInput) => Promise<unknown>;
-}>;
+  initial?: ProductFormSchema
+  categories: readonly AdminCategory[]
+  brands: readonly AdminBrand[]
+  submitLabel: string
+  onSave: (product: ProductInput) => Promise<unknown>
+}>
 
 /**
  * A product's fields: what it is called and where it lives, what it costs
@@ -24,9 +24,9 @@ export type ProductFormProps = Readonly<{
  * until the slug is typed into.
  */
 export const ProductForm = ({ initial, categories, brands, submitLabel, onSave }: ProductFormProps) => {
-  const [failure, setFailure] = useState<ReactNode | undefined>(undefined);
+  const [failure, setFailure] = useState<ReactNode | undefined>(undefined)
 
-  const [isSlugTyped, setSlugTyped] = useState(initial !== undefined);
+  const [isSlugTyped, setSlugTyped] = useState(initial !== undefined)
 
   const form = useForm({
     resolver: zodResolver(ProductFormSchema.schema),
@@ -40,21 +40,34 @@ export const ProductForm = ({ initial, categories, brands, submitLabel, onSave }
       properties: [],
       isFeatured: false,
     },
-  });
+  })
 
-  const properties = useFieldArray({ control: form.control, name: "properties" });
+  const properties = useFieldArray({ control: form.control, name: "properties" })
 
-  const errors = form.formState.errors;
-  const number = { valueAsNumber: true } as const;
+  const errors = form.formState.errors
+  const number = { valueAsNumber: true } as const
 
   const submit = form.handleSubmit(async ({ price, ...rest }) => {
-    setFailure(undefined);
+    setFailure(undefined)
 
     await onSave({ ...rest, priceCents: price }).catch((reason: unknown) => {
-      const fields = ["name", "slug", "description", "price", "stock", "categoryId", "brandId", "weightGrams", "widthMm", "heightMm", "depthMm", "properties"];
-      setFailure(Failure.describeUnplaced(reason, (issues) => ServerIssues.place(issues, fields, form.setError, { priceCents: "price" })));
-    });
-  });
+      const fields = [
+        "name",
+        "slug",
+        "description",
+        "price",
+        "stock",
+        "categoryId",
+        "brandId",
+        "weightGrams",
+        "widthMm",
+        "heightMm",
+        "depthMm",
+        "properties",
+      ]
+      setFailure(Failure.describeUnplaced(reason, (issues) => ServerIssues.place(issues, fields, form.setError, { priceCents: "price" })))
+    })
+  })
 
   return (
     <form className="space-y-6" onSubmit={(event) => void submit(event)} noValidate>
@@ -66,9 +79,9 @@ export const ProductForm = ({ initial, categories, brands, submitLabel, onSave }
           error={errors.name?.message}
           {...form.register("name", {
             onChange: (event: { target: { value: string } }) => {
-              if (isSlugTyped) return;
+              if (isSlugTyped) return
 
-              form.setValue("slug", Slugs.fromName(event.target.value));
+              form.setValue("slug", Slugs.fromName(event.target.value))
             },
           })}
         />
@@ -79,7 +92,13 @@ export const ProductForm = ({ initial, categories, brands, submitLabel, onSave }
           error={errors.slug?.message}
           {...form.register("slug", { onChange: () => setSlugTyped(true) })}
         />
-        <TextAreaField label="Description" id="product-description" rows={6} error={errors.description?.message} {...form.register("description")} />
+        <TextAreaField
+          label="Description"
+          id="product-description"
+          rows={6}
+          error={errors.description?.message}
+          {...form.register("description")}
+        />
         <div className="grid gap-4 sm:grid-cols-2">
           <SelectField label="Category" id="product-category-id" error={errors.categoryId?.message} {...form.register("categoryId")}>
             {categories.map((category) => (
@@ -105,18 +124,60 @@ export const ProductForm = ({ initial, categories, brands, submitLabel, onSave }
       <Card className="space-y-4 p-5">
         <h2 className="font-semibold text-ink">Price and stock</h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Price in euros" id="product-price" inputMode="decimal" placeholder="12.50" error={errors.price?.message} {...form.register("price")} />
-          <Field label="In stock" id="product-stock" type="number" min={0} error={errors.stock?.message} {...form.register("stock", number)} />
+          <Field
+            label="Price in euros"
+            id="product-price"
+            inputMode="decimal"
+            placeholder="12.50"
+            error={errors.price?.message}
+            {...form.register("price")}
+          />
+          <Field
+            label="In stock"
+            id="product-stock"
+            type="number"
+            min={0}
+            error={errors.stock?.message}
+            {...form.register("stock", number)}
+          />
         </div>
       </Card>
 
       <Card className="space-y-4 p-5">
         <h2 className="font-semibold text-ink">Measurements</h2>
         <div className="grid gap-4 sm:grid-cols-4">
-          <Field label="Weight in grams" id="product-weight" type="number" min={1} error={errors.weightGrams?.message} {...form.register("weightGrams", number)} />
-          <Field label="Width in mm" id="product-width" type="number" min={1} error={errors.widthMm?.message} {...form.register("widthMm", number)} />
-          <Field label="Height in mm" id="product-height" type="number" min={1} error={errors.heightMm?.message} {...form.register("heightMm", number)} />
-          <Field label="Depth in mm" id="product-depth" type="number" min={1} error={errors.depthMm?.message} {...form.register("depthMm", number)} />
+          <Field
+            label="Weight in grams"
+            id="product-weight"
+            type="number"
+            min={1}
+            error={errors.weightGrams?.message}
+            {...form.register("weightGrams", number)}
+          />
+          <Field
+            label="Width in mm"
+            id="product-width"
+            type="number"
+            min={1}
+            error={errors.widthMm?.message}
+            {...form.register("widthMm", number)}
+          />
+          <Field
+            label="Height in mm"
+            id="product-height"
+            type="number"
+            min={1}
+            error={errors.heightMm?.message}
+            {...form.register("heightMm", number)}
+          />
+          <Field
+            label="Depth in mm"
+            id="product-depth"
+            type="number"
+            min={1}
+            error={errors.depthMm?.message}
+            {...form.register("depthMm", number)}
+          />
         </div>
       </Card>
 
@@ -137,12 +198,24 @@ export const ProductForm = ({ initial, categories, brands, submitLabel, onSave }
             {errors.properties.root?.message ?? errors.properties.message}
           </p>
         )}
-        {properties.fields.length === 0 ? <p className="text-sm text-ink-soft">No properties yet, such as a color or a material. The shop's filters are made from them.</p> : null}
+        {properties.fields.length === 0 ? (
+          <p className="text-sm text-ink-soft">No properties yet, such as a color or a material. The shop's filters are made from them.</p>
+        ) : null}
         <ul className="space-y-3">
           {properties.fields.map((property, index) => (
             <li className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end" key={property.id}>
-              <Field label="Name" id={`property-${property.id}-name`} error={errors.properties?.[index]?.name?.message} {...form.register(`properties.${index}.name`)} />
-              <Field label="Value" id={`property-${property.id}-value`} error={errors.properties?.[index]?.value?.message} {...form.register(`properties.${index}.value`)} />
+              <Field
+                label="Name"
+                id={`property-${property.id}-name`}
+                error={errors.properties?.[index]?.name?.message}
+                {...form.register(`properties.${index}.name`)}
+              />
+              <Field
+                label="Value"
+                id={`property-${property.id}-value`}
+                error={errors.properties?.[index]?.value?.message}
+                {...form.register(`properties.${index}.value`)}
+              />
               <Button tone="ghost" type="button" onClick={() => properties.remove(index)} aria-label={`Remove property ${index + 1}`}>
                 Remove
               </Button>
@@ -158,5 +231,5 @@ export const ProductForm = ({ initial, categories, brands, submitLabel, onSave }
         {submitLabel}
       </Button>
     </form>
-  );
-};
+  )
+}

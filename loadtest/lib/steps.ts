@@ -10,4 +10,4 @@ export const StressSteps = {
   RAMP_SECONDS: 30,
   /** How long a step then holds its users. */
   HOLD_SECONDS: 60,
-} as const;
+} as const

@@ -2,8 +2,8 @@
   "name": "@prism/e2e",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
   "description": "The browser suite: every page in both themes against a running stack.",
+  "type": "module",
   "scripts": {
     "e2e": "playwright test",
     "typecheck": "tsc -p tsconfig.json --noEmit"

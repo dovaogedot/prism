@@ -1,15 +1,15 @@
-import { StaffRole, type AuditEventView, type Page } from "@prism/shared";
-import { Link, useSearchParams } from "react-router";
-import { match, P } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { Alert, Button, DataTable, EmptyState, Field, Pagination, Skeleton } from "../../../shared/ui/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { DateFilter, useDateFilter } from "../../../shared/hooks/use-date-filter.ts";
-import { useAdminRead, useParamDraft } from "../admin.ts";
-import { AdminPage } from "../components/index.ts";
-import { DateTime } from "../../../shared/format/date-time.ts";
-import { UrlParams } from "../../../shared/url/url-params.ts";
+import { StaffRole, type AuditEventView, type Page } from "@prism/shared"
+import { Link, useSearchParams } from "react-router"
+import { match, P } from "ts-pattern"
+import { Api } from "../../../shared/api/client.ts"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { Alert, Button, DataTable, EmptyState, Field, Pagination, Skeleton } from "../../../shared/ui/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { DateFilter, useDateFilter } from "../../../shared/hooks/use-date-filter.ts"
+import { useAdminRead, useParamDraft } from "../admin.ts"
+import { AdminPage } from "../components/index.ts"
+import { DateTime } from "../../../shared/format/date-time.ts"
+import { UrlParams } from "../../../shared/url/url-params.ts"
 
 /**
  * The audit log, newest first: every change staff made, who made it and
@@ -18,38 +18,60 @@ import { UrlParams } from "../../../shared/url/url-params.ts";
  * its own changes.
  */
 export const AuditPage = () => {
-  const [params, setParams] = useSearchParams();
+  const [params, setParams] = useSearchParams()
 
   /** Filters or sorts in place, so the page keeps its scroll. */
   const filter = (next: URLSearchParams): void => {
-    setParams(next, { preventScrollReset: true });
-  };
+    setParams(next, { preventScrollReset: true })
+  }
 
-  const query = params.toString();
+  const query = params.toString()
 
-  const events = useAdminRead<Page<AuditEventView>>(Api.withQuery("/audit", query));
+  const events = useAdminRead<Page<AuditEventView>>(Api.withQuery("/audit", query))
 
-  const from = useDateFilter(params.get("from") ?? "", (date) => filter(UrlParams.set(params, "from", date)), { max: DateFilter.boundOf(params.get("to")) });
+  const from = useDateFilter(params.get("from") ?? "", (date) => filter(UrlParams.set(params, "from", date)), {
+    max: DateFilter.boundOf(params.get("to")),
+  })
 
-  const to = useDateFilter(params.get("to") ?? "", (date) => filter(UrlParams.set(params, "to", date)), { min: DateFilter.boundOf(params.get("from")) });
+  const to = useDateFilter(params.get("to") ?? "", (date) => filter(UrlParams.set(params, "to", date)), {
+    min: DateFilter.boundOf(params.get("from")),
+  })
 
-  const [action, setAction] = useParamDraft(params, "action");
+  const [action, setAction] = useParamDraft(params, "action")
 
-  const [targetType, setTargetType] = useParamDraft(params, "targetType");
+  const [targetType, setTargetType] = useParamDraft(params, "targetType")
 
-  const [targetId, setTargetId] = useParamDraft(params, "targetId");
+  const [targetId, setTargetId] = useParamDraft(params, "targetId")
 
   return (
     <AdminPage text={PageText.adminAudit} heading="Audit log">
       <form
         className="grid gap-3 rounded-lg border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end"
         onSubmit={(event) => {
-          event.preventDefault();
-          filter(UrlParams.set(UrlParams.set(UrlParams.set(params, "action", action.trim()), "targetType", targetType.trim()), "targetId", targetId.trim()));
+          event.preventDefault()
+          filter(
+            UrlParams.set(
+              UrlParams.set(UrlParams.set(params, "action", action.trim()), "targetType", targetType.trim()),
+              "targetId",
+              targetId.trim(),
+            ),
+          )
         }}
       >
-        <Field label="Action" id="audit-action" placeholder="product. or order.refund" value={action} onChange={(event) => setAction(event.target.value)} />
-        <Field label="Target type" id="audit-target-type" placeholder="product" value={targetType} onChange={(event) => setTargetType(event.target.value)} />
+        <Field
+          label="Action"
+          id="audit-action"
+          placeholder="product. or order.refund"
+          value={action}
+          onChange={(event) => setAction(event.target.value)}
+        />
+        <Field
+          label="Target type"
+          id="audit-target-type"
+          placeholder="product"
+          value={targetType}
+          onChange={(event) => setTargetType(event.target.value)}
+        />
         <Field label="Target id" id="audit-target-id" value={targetId} onChange={(event) => setTargetId(event.target.value)} />
         <Button type="submit" tone="quiet">
           Find
@@ -59,7 +81,11 @@ export const AuditPage = () => {
         {params.get("actor") === null ? null : (
           <p className="self-center text-sm text-ink-soft">
             One person's changes.{" "}
-            <button className="font-medium text-accent underline underline-offset-2" type="button" onClick={() => filter(UrlParams.set(params, "actor", ""))}>
+            <button
+              className="font-medium text-accent underline underline-offset-2"
+              type="button"
+              onClick={() => filter(UrlParams.set(params, "actor", ""))}
+            >
               Show everyone's
             </button>
           </p>
@@ -89,10 +115,15 @@ export const AuditPage = () => {
                       <span className="text-ink-soft">The shop itself</span>
                     ) : (
                       <span className="block min-w-40">
-                        <Link className="break-all text-accent underline-offset-2 hover:underline" to={`/admin/audit?actor=${event.actor.id}`}>
+                        <Link
+                          className="break-all text-accent underline-offset-2 hover:underline"
+                          to={`/admin/audit?actor=${event.actor.id}`}
+                        >
                           {event.actor.email}
                         </Link>
-                        <span className="block text-xs text-ink-soft">{event.actorRoles.map((role) => StaffRole.label[role]).join(", ")}</span>
+                        <span className="block text-xs text-ink-soft">
+                          {event.actorRoles.map((role) => StaffRole.label[role]).join(", ")}
+                        </span>
                       </span>
                     ),
                 },
@@ -116,7 +147,9 @@ export const AuditPage = () => {
                       {event.changes === undefined ? null : (
                         <details className="mt-1 text-xs">
                           <summary className="cursor-pointer text-accent">
-                            {Object.keys(event.changes).length === 1 ? "1 field changed" : `${Object.keys(event.changes).length} fields changed`}
+                            {Object.keys(event.changes).length === 1
+                              ? "1 field changed"
+                              : `${Object.keys(event.changes).length} fields changed`}
                           </summary>
                           <dl className="mt-1 space-y-1">
                             {Object.entries(event.changes).map(([field, [before, after]]) => (
@@ -136,9 +169,14 @@ export const AuditPage = () => {
                 { key: "ip", header: "From", cell: (event) => <span className="font-mono text-xs">{event.ip ?? ""}</span> },
               ]}
             />
-            <Pagination page={data.page} totalPages={data.totalPages} label="Log pages" onPage={(page) => setParams(UrlParams.set(params, "page", String(page)))} />
+            <Pagination
+              page={data.page}
+              totalPages={data.totalPages}
+              label="Log pages"
+              onPage={(page) => setParams(UrlParams.set(params, "page", String(page)))}
+            />
           </>
         ))}
     </AdminPage>
-  );
-};
+  )
+}

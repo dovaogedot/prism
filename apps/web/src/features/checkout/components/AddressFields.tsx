@@ -1,14 +1,14 @@
-import { AddressCheck, ShippingAddress } from "@prism/shared";
-import { useQuery } from "@tanstack/react-query";
-import { useWatch } from "react-hook-form";
-import { match, P } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
-import { PostalAddressFields } from "../../../shared/ui/index.ts";
-import type { CheckoutFormApi } from "../checkout.ts";
-import { useDebounced } from "../../../shared/hooks/use-debounced.ts";
+import { AddressCheck, ShippingAddress } from "@prism/shared"
+import { useQuery } from "@tanstack/react-query"
+import { useWatch } from "react-hook-form"
+import { match, P } from "ts-pattern"
+import { Api } from "../../../shared/api/client.ts"
+import { PostalAddressFields } from "../../../shared/ui/index.ts"
+import type { CheckoutFormApi } from "../checkout.ts"
+import { useDebounced } from "../../../shared/hooks/use-debounced.ts"
 
 /** The form the fields belong to. */
-export type AddressFieldsProps = Readonly<{ form: CheckoutFormApi }>;
+export type AddressFieldsProps = Readonly<{ form: CheckoutFormApi }>
 
 /**
  * Where the parcel goes. Once the address passes the format check and the
@@ -16,13 +16,13 @@ export type AddressFieldsProps = Readonly<{ form: CheckoutFormApi }>;
  * says so under the fields. Placing the order asks again on the server.
  */
 export const AddressFields = ({ form }: AddressFieldsProps) => {
-  const errors = form.formState.errors.address;
+  const errors = form.formState.errors.address
 
-  const typed = useWatch({ control: form.control, name: "address" });
+  const typed = useWatch({ control: form.control, name: "address" })
 
-  const parsed = ShippingAddress.schema.safeParse(typed);
+  const parsed = ShippingAddress.schema.safeParse(typed)
 
-  const settled = useDebounced(parsed.success ? JSON.stringify(parsed.data) : undefined, 700);
+  const settled = useDebounced(parsed.success ? JSON.stringify(parsed.data) : undefined, 700)
 
   const check = useQuery({
     queryKey: ["checkout", "address", settled],
@@ -30,9 +30,9 @@ export const AddressFields = ({ form }: AddressFieldsProps) => {
     enabled: settled !== undefined,
     staleTime: Number.POSITIVE_INFINITY,
     retry: false,
-  });
+  })
 
-  const country = typed.country;
+  const country = typed.country
 
   return (
     <fieldset className="space-y-4">
@@ -61,5 +61,5 @@ export const AddressFields = ({ form }: AddressFieldsProps) => {
           ))}
       </div>
     </fieldset>
-  );
-};
+  )
+}

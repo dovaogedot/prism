@@ -1,21 +1,21 @@
-import type { CartView, CheckoutPrefill, SavedAddress, ShippingOption } from "@prism/shared";
-import { useElements, useStripe } from "@stripe/react-stripe-js";
-import { CheckoutBody } from "./CheckoutBody.tsx";
+import type { CartView, CheckoutPrefill, SavedAddress, ShippingOption } from "@prism/shared"
+import { useElements, useStripe } from "@stripe/react-stripe-js"
+import { CheckoutBody } from "./CheckoutBody.tsx"
 
 /** The cart being bought, the delivery options, and what a signed-in customer starts with. */
 export type StripeCheckoutProps = Readonly<{
-  cart: CartView;
-  options: readonly [ShippingOption, ...ShippingOption[]];
-  prefill?: CheckoutPrefill;
+  cart: CartView
+  options: readonly [ShippingOption, ...ShippingOption[]]
+  prefill?: CheckoutPrefill
   /** The signed-in customer's saved addresses; absent for a guest. */
-  savedAddresses?: readonly SavedAddress[];
-}>;
+  savedAddresses?: readonly SavedAddress[]
+}>
 
 /** The checkout inside Stripe's `Elements`, handed the Stripe objects once Stripe.js has loaded. */
 export const StripeCheckout = ({ cart, options, prefill, savedAddresses }: StripeCheckoutProps) => {
-  const stripe = useStripe();
+  const stripe = useStripe()
 
-  const elements = useElements();
+  const elements = useElements()
 
   return (
     <CheckoutBody
@@ -25,5 +25,5 @@ export const StripeCheckout = ({ cart, options, prefill, savedAddresses }: Strip
       {...(prefill === undefined ? {} : { prefill })}
       {...(savedAddresses === undefined ? {} : { savedAddresses })}
     />
-  );
-};
+  )
+}

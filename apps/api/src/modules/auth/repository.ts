@@ -4,49 +4,42 @@
  * nothing above this file sees `null` or ciphertext.
  */
 
-import { and, eq, getTableColumns, gt, isNull, lt, ne, or, sql } from "drizzle-orm";
-import { Email, type DomainError, type OAuthProvider, type SessionUser, type StaffRole, type UserId } from "@prism/shared";
-import { err, ok, ResultAsync, type Result } from "neverthrow";
-import type { Database, Transaction } from "../../db/client.ts";
-import { PgError } from "../../db/pg-error.ts";
-import type { SessionId } from "../../db/ids.ts";
-import {
-  oauthIdentities,
-  passwordResetTokens,
-  refreshTokens,
-  sessions,
-  users,
-  type RevocationReason,
-} from "../../db/schema.ts";
-import type { FieldCipher } from "../../platform/cipher.ts";
-import type { AuditEntry, AuditLog } from "../staff/audit.ts";
-import type { PasswordHash } from "../../platform/hasher.ts";
-import type { ProviderSubject } from "../../platform/oauth.ts";
-import type { Digest } from "../../platform/tokens.ts";
-import { TotpSecret } from "../../platform/totp.ts";
+import { and, eq, getTableColumns, gt, isNull, lt, ne, or, sql } from "drizzle-orm"
+import { Email, type DomainError, type OAuthProvider, type SessionUser, type StaffRole, type UserId } from "@prism/shared"
+import { err, ok, ResultAsync, type Result } from "neverthrow"
+import type { Database, Transaction } from "../../db/client.ts"
+import { PgError } from "../../db/pg-error.ts"
+import type { SessionId } from "../../db/ids.ts"
+import { oauthIdentities, passwordResetTokens, refreshTokens, sessions, users, type RevocationReason } from "../../db/schema.ts"
+import type { FieldCipher } from "../../platform/cipher.ts"
+import type { AuditEntry, AuditLog } from "../staff/audit.ts"
+import type { PasswordHash } from "../../platform/hasher.ts"
+import type { ProviderSubject } from "../../platform/oauth.ts"
+import type { Digest } from "../../platform/tokens.ts"
+import { TotpSecret } from "../../platform/totp.ts"
 
 /** An account as the rest of the module sees it. */
 export type UserRecord = Readonly<{
-  id: UserId;
-  email: Email;
+  id: UserId
+  email: Email
   /** Left out for an account that only ever signed in through a provider. */
-  passwordHash?: PasswordHash;
+  passwordHash?: PasswordHash
   /** Present once setup begins; confirmed only when `totpEnabledAt` is set. */
-  totpSecret?: TotpSecret;
-  totpEnabledAt?: Date;
+  totpSecret?: TotpSecret
+  totpEnabledAt?: Date
   /** The time step of the last code accepted; absent before the first. */
-  totpLastStep?: number;
+  totpLastStep?: number
   /** The account's staff roles; empty for a customer. */
-  roles: readonly StaffRole[];
+  roles: readonly StaffRole[]
   /** Present while an admin has the account disabled. */
-  disabledAt?: Date;
+  disabledAt?: Date
   /** Every provider linked to this account, alphabetically. */
-  providers: readonly OAuthProvider[];
-  createdAt: Date;
-}>;
+  providers: readonly OAuthProvider[]
+  createdAt: Date
+}>
 
 /** The row as the driver returns it, with the linked providers alongside. */
-type UserRow = typeof users.$inferSelect & Readonly<{ providers: readonly OAuthProvider[] }>;
+type UserRow = typeof users.$inferSelect & Readonly<{ providers: readonly OAuthProvider[] }>
 
 export const UserRecord = {
   /** The row, opened. */
@@ -86,18 +79,18 @@ export const UserRecord = {
     ...user,
     providers: [...new Set([...user.providers, provider])].sort(),
   }),
-} as const;
+} as const
 
 /** One sign-in, which is both the revocation unit and the refresh family. */
-export type SessionRecord = Readonly<{ id: SessionId; userId: UserId; expiresAt: Date }>;
+export type SessionRecord = Readonly<{ id: SessionId; userId: UserId; expiresAt: Date }>
 
 /** What the guard learns about a live session and its account, in one query. */
 export type SessionState = Readonly<{
-  roles: readonly StaffRole[];
-  hasTwoFactor: boolean;
+  roles: readonly StaffRole[]
+  hasTwoFactor: boolean
   /** When the session last passed a TOTP check; absent when it never did. */
-  secondFactorAt?: Date;
-}>;
+  secondFactorAt?: Date
+}>
 
 /**
  * The outcome of presenting a refresh token. A union rather than an
@@ -108,74 +101,73 @@ export type RotationOutcome =
   | Readonly<{ _tag: "Replayed" }>
   | Readonly<{ _tag: "Unknown" }>
   | Readonly<{ _tag: "SessionEnded" }>
-  | Readonly<{ _tag: "AccountDisabled" }>;
+  | Readonly<{ _tag: "AccountDisabled" }>
 
 /** What turning an account's own 2FA off did. */
 export type TotpOffOutcome =
   /** `revoked` holds the staff roles the account lost with it; it is empty for a customer. */
-  | Readonly<{ _tag: "Disabled"; revoked: readonly StaffRole[] }>
-  | Readonly<{ _tag: "LastAdmin" }>;
+  Readonly<{ _tag: "Disabled"; revoked: readonly StaffRole[] }> | Readonly<{ _tag: "LastAdmin" }>
 
 /** The outcome of presenting a password-reset token with a replacement password. */
-export type PasswordResetOutcome = Readonly<{ _tag: "Reset" }> | Readonly<{ _tag: "TokenInvalid" }>;
+export type PasswordResetOutcome = Readonly<{ _tag: "Reset" }> | Readonly<{ _tag: "TokenInvalid" }>
 
 /** Every read and write the auth module makes against the database. */
 export type AuthRepository = Readonly<{
-  findUserByEmail: (email: Email) => Promise<UserRecord | undefined>;
-  findUserById: (id: UserId) => Promise<UserRecord | undefined>;
-  findUserByOAuthIdentity: (provider: OAuthProvider, subject: ProviderSubject) => Promise<UserRecord | undefined>;
-  createUser: (input: { email: Email; passwordHash?: PasswordHash }) => ResultAsync<UserRecord, DomainError>;
-  linkOAuthIdentity: (input: { userId: UserId; provider: OAuthProvider; subject: ProviderSubject }) => Promise<void>;
+  findUserByEmail: (email: Email) => Promise<UserRecord | undefined>
+  findUserById: (id: UserId) => Promise<UserRecord | undefined>
+  findUserByOAuthIdentity: (provider: OAuthProvider, subject: ProviderSubject) => Promise<UserRecord | undefined>
+  createUser: (input: { email: Email; passwordHash?: PasswordHash }) => ResultAsync<UserRecord, DomainError>
+  linkOAuthIdentity: (input: { userId: UserId; provider: OAuthProvider; subject: ProviderSubject }) => Promise<void>
   /** Stores a new password and ends every other session of the account, in one transaction. */
-  setPasswordHash: (userId: UserId, passwordHash: PasswordHash, keep: SessionId, now: Date) => Promise<void>;
-  setTotpSecret: (userId: UserId, secret: TotpSecret) => Promise<void>;
-  enableTotp: (userId: UserId, enabledAt: Date) => Promise<void>;
+  setPasswordHash: (userId: UserId, passwordHash: PasswordHash, keep: SessionId, now: Date) => Promise<void>
+  setTotpSecret: (userId: UserId, secret: TotpSecret) => Promise<void>
+  enableTotp: (userId: UserId, enabledAt: Date) => Promise<void>
   /**
    * Turns the account's 2FA off. Staff keep 2FA on, so the account loses
    * every staff role in the same transaction, recorded in the audit log as
    * its own act from `ipAddress`. Refused for the shop's last admin.
    */
-  disableTotp: (userId: UserId, ipAddress: string) => Promise<TotpOffOutcome>;
+  disableTotp: (userId: UserId, ipAddress: string) => Promise<TotpOffOutcome>
   createSession: (input: {
-    userId: UserId;
-    expiresAt: Date;
+    userId: UserId
+    expiresAt: Date
     /** Left out when the request sent none. */
-    userAgent?: string;
-    ipAddress: string;
-    refreshTokenDigest: Digest;
-    refreshExpiresAt: Date;
+    userAgent?: string
+    ipAddress: string
+    refreshTokenDigest: Digest
+    refreshExpiresAt: Date
     /** Set when the sign-in itself passed a TOTP check. */
-    secondFactorAt?: Date;
-  }) => Promise<SessionRecord>;
+    secondFactorAt?: Date
+  }) => Promise<SessionRecord>
   /**
    * The guard's hot path: the session's state while it is live, belongs to
    * `userId`, and its account is enabled; `undefined` otherwise.
    */
-  liveSession: (sessionId: SessionId, userId: UserId, now: Date) => Promise<SessionState | undefined>;
-  revokeSession: (sessionId: SessionId, reason: RevocationReason) => Promise<void>;
+  liveSession: (sessionId: SessionId, userId: UserId, now: Date) => Promise<SessionState | undefined>
+  revokeSession: (sessionId: SessionId, reason: RevocationReason) => Promise<void>
   /**
    * Records `step` as the account's last accepted TOTP step when it is later
    * than the one stored. Resolves to whether it was, so a code is accepted
    * once however many requests carry it.
    */
-  acceptTotpStep: (userId: UserId, step: number) => Promise<boolean>;
+  acceptTotpStep: (userId: UserId, step: number) => Promise<boolean>
   /** Marks the session as having passed a TOTP check at `at`, with `audit` in the same transaction. */
-  markSecondFactor: (sessionId: SessionId, at: Date, audit?: AuditEntry) => Promise<void>;
+  markSecondFactor: (sessionId: SessionId, at: Date, audit?: AuditEntry) => Promise<void>
   rotateRefreshToken: (input: {
-    presentedDigest: Digest;
-    replacementDigest: Digest;
-    now: Date;
-    replacementExpiresAt: Date;
-  }) => Promise<RotationOutcome>;
-  createPasswordResetToken: (input: { userId: UserId; digest: Digest; expiresAt: Date }) => Promise<void>;
+    presentedDigest: Digest
+    replacementDigest: Digest
+    now: Date
+    replacementExpiresAt: Date
+  }) => Promise<RotationOutcome>
+  createPasswordResetToken: (input: { userId: UserId; digest: Digest; expiresAt: Date }) => Promise<void>
   /**
    * Spends a live, unused reset token, stores `passwordHash` on its user and
    * signs every session of that user out, as one transaction: all three
    * happen or none does. A token that is unknown, spent or expired changes
    * nothing.
    */
-  resetPassword: (input: { digest: Digest; passwordHash: PasswordHash; now: Date }) => Promise<PasswordResetOutcome>;
-}>;
+  resetPassword: (input: { digest: Digest; passwordHash: PasswordHash; now: Date }) => Promise<PasswordResetOutcome>
+}>
 
 export const AuthRepository = {
   /**
@@ -203,21 +195,21 @@ export const AuthRepository = {
       .from(users)
       .where(sql`(${users.id} = ${userId} OR ('admin' = ANY(${users.roles}) AND ${users.disabledAt} IS NULL))`)
       .orderBy(users.id)
-      .for("update");
+      .for("update")
 
     return {
       admins: locked.filter((row) => row.roles.includes("admin") && row.disabledAt === null),
       target: locked.find((row) => row.id === userId),
-    };
+    }
   },
 
   create: (db: Database, cipher: FieldCipher, audit: AuditLog): AuthRepository => {
-    const columns = { ...getTableColumns(users), providers: AuthRepository.linkedProviders };
+    const columns = { ...getTableColumns(users), providers: AuthRepository.linkedProviders }
 
     const firstUser = (rows: readonly UserRow[]): UserRecord | undefined => {
-      const row = rows[0];
-      return row === undefined ? undefined : UserRecord.fromRow(row, cipher);
-    };
+      const row = rows[0]
+      return row === undefined ? undefined : UserRecord.fromRow(row, cipher)
+    }
 
     return {
       findUserByEmail: async (email) =>
@@ -229,8 +221,7 @@ export const AuthRepository = {
             .limit(1),
         ),
 
-      findUserById: async (id) =>
-        firstUser(await db.select(columns).from(users).where(eq(users.id, id)).limit(1)),
+      findUserById: async (id) => firstUser(await db.select(columns).from(users).where(eq(users.id, id)).limit(1)),
 
       findUserByOAuthIdentity: async (provider, subject) => {
         // Nested under a key: bare column names are ambiguous once two tables
@@ -239,15 +230,10 @@ export const AuthRepository = {
           .select({ user: users, providers: AuthRepository.linkedProviders })
           .from(oauthIdentities)
           .innerJoin(users, eq(users.id, oauthIdentities.userId))
-          .where(
-            and(
-              eq(oauthIdentities.provider, provider),
-              eq(oauthIdentities.subjectIndex, cipher.index("oauth-subject", subject)),
-            ),
-          )
-          .limit(1);
+          .where(and(eq(oauthIdentities.provider, provider), eq(oauthIdentities.subjectIndex, cipher.index("oauth-subject", subject))))
+          .limit(1)
 
-        return firstUser(rows.map((row) => ({ ...row.user, providers: row.providers })));
+        return firstUser(rows.map((row) => ({ ...row.user, providers: row.providers })))
       },
 
       // Detected rather than pre-checked: SELECT-then-INSERT races, a unique index does not.
@@ -263,14 +249,14 @@ export const AuthRepository = {
             })
             .returning()
             .then((rows): Result<UserRecord, DomainError> => {
-              const created = firstUser(rows.map((row) => ({ ...row, providers: [] })));
-              if (created === undefined) throw new Error("user insert returned no row");
+              const created = firstUser(rows.map((row) => ({ ...row, providers: [] })))
+              if (created === undefined) throw new Error("user insert returned no row")
 
-              return ok(created);
+              return ok(created)
             })
             .catch((reason: unknown): Result<UserRecord, DomainError> => {
-              if (PgError.isUniqueViolation(reason)) return err({ _tag: "EmailAlreadyRegistered" });
-              throw reason;
+              if (PgError.isUniqueViolation(reason)) return err({ _tag: "EmailAlreadyRegistered" })
+              throw reason
             }),
         ),
 
@@ -283,16 +269,16 @@ export const AuthRepository = {
             subject: cipher.seal(subject),
             subjectIndex: cipher.index("oauth-subject", subject),
           })
-          .onConflictDoNothing();
+          .onConflictDoNothing()
       },
 
       setPasswordHash: (userId, passwordHash, keep, now) =>
         db.transaction(async (tx) => {
-          await tx.update(users).set({ passwordHash }).where(eq(users.id, userId));
+          await tx.update(users).set({ passwordHash }).where(eq(users.id, userId))
           await tx
             .update(sessions)
             .set({ revokedAt: now, revokedReason: "password_change" })
-            .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt), ne(sessions.id, keep)));
+            .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt), ne(sessions.id, keep)))
         }),
 
       acceptTotpStep: async (userId, step) => {
@@ -300,40 +286,37 @@ export const AuthRepository = {
           .update(users)
           .set({ totpLastStep: step })
           .where(and(eq(users.id, userId), or(isNull(users.totpLastStep), lt(users.totpLastStep, step))))
-          .returning({ id: users.id });
+          .returning({ id: users.id })
 
-        return accepted.length > 0;
+        return accepted.length > 0
       },
 
       markSecondFactor: (sessionId, at, entry) =>
         db.transaction(async (tx) => {
-          await tx.update(sessions).set({ secondFactorAt: at }).where(eq(sessions.id, sessionId));
-          if (entry !== undefined) await audit.record(tx, entry);
+          await tx.update(sessions).set({ secondFactorAt: at }).where(eq(sessions.id, sessionId))
+          if (entry !== undefined) await audit.record(tx, entry)
         }),
 
       setTotpSecret: async (userId, secret) => {
         await db
           .update(users)
           .set({ totpSecret: cipher.seal(secret), totpEnabledAt: null, totpLastStep: null })
-          .where(eq(users.id, userId));
+          .where(eq(users.id, userId))
       },
 
       enableTotp: async (userId, enabledAt) => {
-        await db.update(users).set({ totpEnabledAt: enabledAt }).where(eq(users.id, userId));
+        await db.update(users).set({ totpEnabledAt: enabledAt }).where(eq(users.id, userId))
       },
 
       disableTotp: (userId, ipAddress) =>
         db.transaction(async (tx): Promise<TotpOffOutcome> => {
-          const { admins, target } = await AuthRepository.lockAdminsAnd(tx, userId);
-          const revoked = target?.roles ?? [];
-          if (revoked.includes("admin") && target?.disabledAt === null && admins.length <= 1) return { _tag: "LastAdmin" };
+          const { admins, target } = await AuthRepository.lockAdminsAnd(tx, userId)
+          const revoked = target?.roles ?? []
+          if (revoked.includes("admin") && target?.disabledAt === null && admins.length <= 1) return { _tag: "LastAdmin" }
 
-          await tx
-            .update(users)
-            .set({ totpSecret: null, totpEnabledAt: null, totpLastStep: null, roles: [] })
-            .where(eq(users.id, userId));
+          await tx.update(users).set({ totpSecret: null, totpEnabledAt: null, totpLastStep: null, roles: [] }).where(eq(users.id, userId))
           // A check passed under the old secret counts for nothing once it is gone.
-          await tx.update(sessions).set({ secondFactorAt: null }).where(eq(sessions.userId, userId));
+          await tx.update(sessions).set({ secondFactorAt: null }).where(eq(sessions.userId, userId))
           if (revoked.length > 0) {
             await audit.record(tx, {
               actor: { id: userId, roles: revoked, ip: ipAddress },
@@ -341,10 +324,10 @@ export const AuthRepository = {
               target: { type: "user", id: userId },
               summary: "Turned off two-factor authentication, which took every staff role from the account",
               changes: { roles: [revoked, []] },
-            });
+            })
           }
 
-          return { _tag: "Disabled", revoked };
+          return { _tag: "Disabled", revoked }
         }),
 
       // The session and its first refresh token are one unit.
@@ -359,17 +342,17 @@ export const AuthRepository = {
               ipAddress: cipher.seal(input.ipAddress),
               secondFactorAt: input.secondFactorAt ?? null,
             })
-            .returning({ id: sessions.id, userId: sessions.userId, expiresAt: sessions.expiresAt });
+            .returning({ id: sessions.id, userId: sessions.userId, expiresAt: sessions.expiresAt })
 
-          if (session === undefined) throw new Error("session insert returned no row");
+          if (session === undefined) throw new Error("session insert returned no row")
 
           await tx.insert(refreshTokens).values({
             sessionId: session.id,
             tokenHash: input.refreshTokenDigest,
             expiresAt: input.refreshExpiresAt,
-          });
+          })
 
-          return session;
+          return session
         }),
 
       liveSession: async (sessionId, userId, now) => {
@@ -390,22 +373,22 @@ export const AuthRepository = {
               isNull(users.disabledAt),
             ),
           )
-          .limit(1);
+          .limit(1)
 
-        if (row === undefined) return undefined;
+        if (row === undefined) return undefined
 
         return {
           roles: row.roles,
           hasTwoFactor: row.totpEnabledAt !== null,
           ...(row.secondFactorAt === null ? {} : { secondFactorAt: row.secondFactorAt }),
-        };
+        }
       },
 
       revokeSession: async (sessionId, reason) => {
         await db
           .update(sessions)
           .set({ revokedAt: new Date(), revokedReason: reason })
-          .where(and(eq(sessions.id, sessionId), isNull(sessions.revokedAt)));
+          .where(and(eq(sessions.id, sessionId), isNull(sessions.revokedAt)))
       },
 
       /**
@@ -434,43 +417,43 @@ export const AuthRepository = {
             .innerJoin(users, eq(users.id, sessions.userId))
             .where(eq(refreshTokens.tokenHash, presentedDigest))
             .for("update", { of: refreshTokens })
-            .limit(1);
+            .limit(1)
 
-          if (row === undefined) return { _tag: "Unknown" };
+          if (row === undefined) return { _tag: "Unknown" }
 
           if (row.usedAt !== null) {
             // Someone holds a copy. End the whole family, not just this token.
             await tx
               .update(sessions)
               .set({ revokedAt: now, revokedReason: "token_reuse" })
-              .where(and(eq(sessions.id, row.sessionId), isNull(sessions.revokedAt)));
+              .where(and(eq(sessions.id, row.sessionId), isNull(sessions.revokedAt)))
 
-            return { _tag: "Replayed" };
+            return { _tag: "Replayed" }
           }
 
-          if (row.disabledAt !== null) return { _tag: "AccountDisabled" };
+          if (row.disabledAt !== null) return { _tag: "AccountDisabled" }
 
           if (row.sessionRevokedAt !== null || row.tokenExpiresAt <= now || row.sessionExpiresAt <= now) {
-            return { _tag: "SessionEnded" };
+            return { _tag: "SessionEnded" }
           }
 
-          await tx.update(refreshTokens).set({ usedAt: now }).where(eq(refreshTokens.id, row.tokenId));
+          await tx.update(refreshTokens).set({ usedAt: now }).where(eq(refreshTokens.id, row.tokenId))
           await tx.insert(refreshTokens).values({
             sessionId: row.sessionId,
             tokenHash: replacementDigest,
             expiresAt: replacementExpiresAt,
-          });
+          })
 
           return {
             _tag: "Rotated",
             userId: row.userId,
             sessionId: row.sessionId,
             ...(row.secondFactorAt === null ? {} : { secondFactorAt: row.secondFactorAt }),
-          };
+          }
         }),
 
       createPasswordResetToken: async ({ userId, digest, expiresAt }) => {
-        await db.insert(passwordResetTokens).values({ userId, tokenHash: digest, expiresAt });
+        await db.insert(passwordResetTokens).values({ userId, tokenHash: digest, expiresAt })
       },
 
       resetPassword: ({ digest, passwordHash, now }) =>
@@ -481,26 +464,22 @@ export const AuthRepository = {
             .update(passwordResetTokens)
             .set({ usedAt: now })
             .where(
-              and(
-                eq(passwordResetTokens.tokenHash, digest),
-                isNull(passwordResetTokens.usedAt),
-                gt(passwordResetTokens.expiresAt, now),
-              ),
+              and(eq(passwordResetTokens.tokenHash, digest), isNull(passwordResetTokens.usedAt), gt(passwordResetTokens.expiresAt, now)),
             )
-            .returning({ userId: passwordResetTokens.userId });
+            .returning({ userId: passwordResetTokens.userId })
 
-          if (spent === undefined) return { _tag: "TokenInvalid" };
+          if (spent === undefined) return { _tag: "TokenInvalid" }
 
-          await tx.update(users).set({ passwordHash }).where(eq(users.id, spent.userId));
+          await tx.update(users).set({ passwordHash }).where(eq(users.id, spent.userId))
 
           // Whoever knew the old password no longer has a way in.
           await tx
             .update(sessions)
             .set({ revokedAt: now, revokedReason: "password_reset" })
-            .where(and(eq(sessions.userId, spent.userId), isNull(sessions.revokedAt)));
+            .where(and(eq(sessions.userId, spent.userId), isNull(sessions.revokedAt)))
 
-          return { _tag: "Reset" };
+          return { _tag: "Reset" }
         }),
-    };
+    }
   },
-} as const;
+} as const

@@ -7,12 +7,12 @@
  * Every operation returns a new `URLSearchParams` and leaves its input alone.
  */
 
-import { Price, ProductQuery, type FacetBucket, type ProductFacets } from "@prism/shared";
-import { match } from "ts-pattern";
-import { UrlParams } from "../../shared/url/url-params.ts";
+import { Price, ProductQuery, type FacetBucket, type ProductFacets } from "@prism/shared"
+import { match } from "ts-pattern"
+import { UrlParams } from "../../shared/url/url-params.ts"
 
 /** One filter in force: the query pair it stands for, what to call it, and the params without it. */
-export type ActiveFilter = Readonly<{ key: string; value: string; label: string; next: URLSearchParams }>;
+export type ActiveFilter = Readonly<{ key: string; value: string; label: string; next: URLSearchParams }>
 
 export const CatalogParams = {
   /** Keys that shape the list without narrowing it: the shelf, the order, the paging and how it is drawn. */
@@ -39,8 +39,8 @@ export const CatalogParams = {
 
   /** Whether anything narrows the results. */
   isFiltered: (params: URLSearchParams): boolean => {
-    for (const key of params.keys()) if (CatalogParams.isFilterKey(key)) return true;
-    return false;
+    for (const key of params.keys()) if (CatalogParams.isFilterKey(key)) return true
+    return false
   },
 
   /**
@@ -50,40 +50,42 @@ export const CatalogParams = {
    */
   active: (params: URLSearchParams, facets: ProductFacets): readonly ActiveFilter[] => {
     const labelOf = (buckets: readonly FacetBucket[], value: string): string =>
-      buckets.find((bucket) => bucket.value === value)?.label ?? value;
-    const priceMin = params.get("priceMin");
-    const priceMax = params.get("priceMax");
-    const filters: ActiveFilter[] = [];
+      buckets.find((bucket) => bucket.value === value)?.label ?? value
+    const priceMin = params.get("priceMin")
+    const priceMax = params.get("priceMax")
+    const filters: ActiveFilter[] = []
 
     for (const [key, value] of params) {
-      if (!CatalogParams.isFilterKey(key) || (key === "priceMax" && priceMin !== null)) continue;
+      if (!CatalogParams.isFilterKey(key) || (key === "priceMax" && priceMin !== null)) continue
 
       const label = match(key)
-        .with("priceMin", "priceMax", () =>
-          `${Price.format(Number(priceMin ?? facets.price.minCents))} – ${Price.format(Number(priceMax ?? facets.price.maxCents))}`,
+        .with(
+          "priceMin",
+          "priceMax",
+          () => `${Price.format(Number(priceMin ?? facets.price.minCents))} – ${Price.format(Number(priceMax ?? facets.price.maxCents))}`,
         )
         .with("brand", () => labelOf(facets.brands, value))
         .with("rating", () => labelOf(facets.ratings, value))
-        .otherwise(() => `${key.startsWith(ProductQuery.PROPERTY_PREFIX) ? key.slice(ProductQuery.PROPERTY_PREFIX.length) : key}: ${value}`);
+        .otherwise(() => `${key.startsWith(ProductQuery.PROPERTY_PREFIX) ? key.slice(ProductQuery.PROPERTY_PREFIX.length) : key}: ${value}`)
 
       const next = match(key)
         .with("priceMin", "priceMax", () => CatalogParams.set(CatalogParams.set(params, "priceMin", ""), "priceMax", ""))
-        .otherwise(() => CatalogParams.toggle(params, key, value));
+        .otherwise(() => CatalogParams.toggle(params, key, value))
 
-      filters.push({ key, value, label, next });
+      filters.push({ key, value, label, next })
     }
 
-    return filters;
+    return filters
   },
 
   /** `params` with every narrowing filter removed; the text, category, sort and page size stay. */
   cleared: (params: URLSearchParams): URLSearchParams => {
-    const next = new URLSearchParams();
+    const next = new URLSearchParams()
 
     for (const [key, value] of params) {
-      if (CatalogParams.UNFILTERED.has(key) && key !== "page") next.append(key, value);
+      if (CatalogParams.UNFILTERED.has(key) && key !== "page") next.append(key, value)
     }
 
-    return next;
+    return next
   },
-} as const;
+} as const

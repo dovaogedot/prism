@@ -1,14 +1,14 @@
-import { RejectReviewInput } from "@prism/shared";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { Button, TextAreaField } from "../../../shared/ui/index.ts";
+import { RejectReviewInput } from "@prism/shared"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import { Button, TextAreaField } from "../../../shared/ui/index.ts"
 
 /** What rejecting does with the reason, and how to leave without rejecting. */
-export type RejectFormProps = Readonly<{ isBusy: boolean; onReject: (reason: string) => void; onCancel: () => void }>;
+export type RejectFormProps = Readonly<{ isBusy: boolean; onReject: (reason: string) => void; onCancel: () => void }>
 
 /** The reason a review is not published, which its author reads. */
 export const RejectForm = ({ isBusy, onReject, onCancel }: RejectFormProps) => {
-  const form = useForm({ resolver: zodResolver(RejectReviewInput.schema), defaultValues: { reason: "" } });
+  const form = useForm({ resolver: zodResolver(RejectReviewInput.schema), defaultValues: { reason: "" } })
 
   return (
     <form className="space-y-4" onSubmit={(event) => void form.handleSubmit((values) => onReject(values.reason))(event)} noValidate>
@@ -29,5 +29,5 @@ export const RejectForm = ({ isBusy, onReject, onCancel }: RejectFormProps) => {
         </Button>
       </div>
     </form>
-  );
-};
+  )
+}

@@ -4,31 +4,31 @@
  * Content-Security-Policy refused.
  */
 
-import { AxeBuilder } from "@axe-core/playwright";
-import type { BrowserContext, ConsoleMessage, Locator, Page } from "@playwright/test";
+import { AxeBuilder } from "@axe-core/playwright"
+import type { BrowserContext, ConsoleMessage, Locator, Page } from "@playwright/test"
 
 declare global {
   // The one place an interface is unavoidable: merging into the DOM's declaration.
   interface Window {
     /** Every Content-Security-Policy violation the page reported. */
-    cspViolations?: string[];
+    cspViolations?: string[]
   }
 }
 
 /** One of the two looks the shop is drawn in. */
-export type Theme = "light" | "dark";
+export type Theme = "light" | "dark"
 
 /** Where an element sits on the page, in CSS pixels. */
-export type Box = Readonly<{ x: number; y: number; width: number; height: number }>;
+export type Box = Readonly<{ x: number; y: number; width: number; height: number }>
 
 /** What a page says about itself in its head and headings. */
 export type PageFacts = Readonly<{
-  headings: number;
-  title: string;
-  descriptions: readonly string[];
-  robots: string;
-  canonical: string;
-}>;
+  headings: number
+  title: string
+  descriptions: readonly string[]
+  robots: string
+  canonical: string
+}>
 
 export const Checks = {
   /** The widths every page must fit without spilling sideways; 640 is a 1,280-pixel window at 200% zoom. */
@@ -39,9 +39,9 @@ export const Checks = {
 
   /** The box `locator` takes up on the page. */
   boxOf: async (locator: Locator): Promise<Box> => {
-    const box = await locator.boundingBox();
-    if (box === null) throw new Error(`${locator.toString()} takes up no space on the page`);
-    return box;
+    const box = await locator.boundingBox()
+    if (box === null) throw new Error(`${locator.toString()} takes up no space on the page`)
+    return box
   },
 
   /**
@@ -55,17 +55,24 @@ export const Checks = {
         // Each child by its own box, so a closed <details> counts its summary and not the hidden rest.
         const rects = [...element.childNodes]
           .flatMap((node) => {
-            if (node instanceof Element) return [node.getBoundingClientRect()];
-            const range = document.createRange();
-            range.selectNodeContents(node);
-            return [...range.getClientRects()];
+            if (node instanceof Element) return [node.getBoundingClientRect()]
+            const range = document.createRange()
+            range.selectNodeContents(node)
+            return [...range.getClientRects()]
           })
-          .filter((rect) => rect.width > 0 && rect.height > 0);
-        if (rects.length === 0) return [];
+          .filter((rect) => rect.width > 0 && rect.height > 0)
+        if (rects.length === 0) return []
 
-        const top = Math.min(...rects.map((rect) => rect.top));
-        const left = Math.min(...rects.map((rect) => rect.left));
-        return [{ x: left, y: top, width: Math.max(...rects.map((rect) => rect.right)) - left, height: Math.max(...rects.map((rect) => rect.bottom)) - top }];
+        const top = Math.min(...rects.map((rect) => rect.top))
+        const left = Math.min(...rects.map((rect) => rect.left))
+        return [
+          {
+            x: left,
+            y: top,
+            width: Math.max(...rects.map((rect) => rect.right)) - left,
+            height: Math.max(...rects.map((rect) => rect.bottom)) - top,
+          },
+        ]
       }),
     ),
 
@@ -77,15 +84,17 @@ export const Checks = {
 
   /** Stores the theme before any page script runs, as the theme switch does. */
   useTheme: async (context: BrowserContext, theme: Theme): Promise<void> => {
-    await context.addInitScript((chosen) => localStorage.setItem("prism-theme", chosen), theme);
+    await context.addInitScript((chosen) => localStorage.setItem("prism-theme", chosen), theme)
   },
 
   /** Records every Content-Security-Policy violation the context's pages report. */
   watchCsp: async (context: BrowserContext): Promise<void> => {
     await context.addInitScript(() => {
-      window.cspViolations = [];
-      document.addEventListener("securitypolicyviolation", (event) => window.cspViolations?.push(`${event.violatedDirective} ${event.blockedURI}`));
-    });
+      window.cspViolations = []
+      document.addEventListener("securitypolicyviolation", (event) =>
+        window.cspViolations?.push(`${event.violatedDirective} ${event.blockedURI}`),
+      )
+    })
   },
 
   cspViolations: (page: Page): Promise<readonly string[]> => page.evaluate(() => window.cspViolations ?? []),
@@ -109,15 +118,15 @@ export const Checks = {
           reset: () => {},
         };`,
       }),
-    );
+    )
   },
 
   /** Opens `path` and waits until the page's data has arrived. */
   open: async (page: Page, path: string) => {
-    const response = await page.goto(path, { waitUntil: "load" });
-    await page.locator("main h1").first().waitFor({ state: "attached" });
-    await page.waitForLoadState("networkidle");
-    return response;
+    const response = await page.goto(path, { waitUntil: "load" })
+    await page.locator("main h1").first().waitFor({ state: "attached" })
+    await page.waitForLoadState("networkidle")
+    return response
   },
 
   facts: (page: Page): Promise<PageFacts> =>
@@ -131,17 +140,17 @@ export const Checks = {
 
   /** How many pixels the page is wider than the window at each width, by width; 0 when it fits. */
   overflowAt: async (page: Page, widths: readonly number[]): Promise<Readonly<Record<number, number>>> => {
-    const overflow: Record<number, number> = {};
+    const overflow: Record<number, number> = {}
 
     for (const width of widths) {
-      await page.setViewportSize({ width, height: 900 });
+      await page.setViewportSize({ width, height: 900 })
       // Two frames: the resize lays the page out again before it is measured.
-      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
       // A page narrower than the window measures below zero, which fits as well as zero does.
-      overflow[width] = Math.max(0, await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
+      overflow[width] = Math.max(0, await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
     }
 
-    return overflow;
+    return overflow
   },
 
   /**
@@ -152,12 +161,16 @@ export const Checks = {
 
   /** What axe-core finds against WCAG 2.1 Level A, and against the AA color contrast the task asks for, in the shop's own markup. */
   axe: async (page: Page): Promise<readonly string[]> => {
-    const levelA = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag21a"]).exclude(Checks.CAPTCHA_FRAMES).analyze();
-    const contrast = await new AxeBuilder({ page }).withRules(["color-contrast"]).exclude(Checks.CAPTCHA_FRAMES).analyze();
+    const levelA = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag21a"]).exclude(Checks.CAPTCHA_FRAMES).analyze()
+    const contrast = await new AxeBuilder({ page }).withRules(["color-contrast"]).exclude(Checks.CAPTCHA_FRAMES).analyze()
 
     return [...levelA.violations, ...contrast.violations].map(
-      (violation) => `${violation.id}: ${violation.nodes.slice(0, 4).map((node) => node.target.join(" ")).join(" | ")}`,
-    );
+      (violation) =>
+        `${violation.id}: ${violation.nodes
+          .slice(0, 4)
+          .map((node) => node.target.join(" "))
+          .join(" | ")}`,
+    )
   },
 
   /**
@@ -171,11 +184,11 @@ export const Checks = {
    * shop's and changes nothing.
    */
   isOwnError: (message: ConsoleMessage, origin: string): boolean => {
-    const source = message.location().url;
-    const text = message.text();
-    const framed = /^Framing '([^']+)' violates the following report-only/.exec(text)?.[1];
-    const isAnotherSitesPolicy = framed !== undefined && !framed.startsWith(origin);
+    const source = message.location().url
+    const text = message.text()
+    const framed = /^Framing '([^']+)' violates the following report-only/.exec(text)?.[1]
+    const isAnotherSitesPolicy = framed !== undefined && !framed.startsWith(origin)
 
-    return (source.length === 0 || source.startsWith(origin)) && !text.startsWith("Failed to load resource") && !isAnotherSitesPolicy;
+    return (source.length === 0 || source.startsWith(origin)) && !text.startsWith("Failed to load resource") && !isAnotherSitesPolicy
   },
-} as const;
+} as const

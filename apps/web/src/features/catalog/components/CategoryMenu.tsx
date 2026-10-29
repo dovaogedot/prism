@@ -1,15 +1,15 @@
-import { useId } from "react";
-import { Link } from "react-router";
-import { Popover } from "../../../shared/ui/index.ts";
-import { useCategories } from "../catalog.ts";
+import { useId } from "react"
+import { Link } from "react-router"
+import { Popover } from "../../../shared/ui/index.ts"
+import { useCategories } from "../catalog.ts"
 
 /** The header's way into the shop: the whole catalog, and each category with how many items it holds. */
 export const CategoryMenu = () => {
-  const categories = useCategories();
+  const categories = useCategories()
 
-  const panelId = useId();
+  const panelId = useId()
 
-  const linkClass = "flex items-center justify-between gap-4 rounded-md px-3 py-2 text-sm text-ink hover:bg-sunken";
+  const linkClass = "flex items-center justify-between gap-4 rounded-md px-3 py-2 text-sm text-ink hover:bg-sunken"
 
   return (
     <>
@@ -19,7 +19,16 @@ export const CategoryMenu = () => {
         popoverTarget={panelId}
       >
         Shop
-        <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg
+          className="size-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
           <path d="m6 9 6 6 6-6" />
         </svg>
       </button>
@@ -42,5 +51,5 @@ export const CategoryMenu = () => {
         </ul>
       </Popover>
     </>
-  );
-};
+  )
+}

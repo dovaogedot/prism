@@ -1,44 +1,55 @@
-import { AdminProductQuery, AdminProductSort, Price, type AdminBrand, type AdminCategory, type AdminProductSummary, type Page } from "@prism/shared";
-import { Link, useSearchParams } from "react-router";
-import { match, P } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { Alert, Button, DataTable, EmptyState, Field, ImageSet, Pagination, SelectField, Skeleton } from "../../../shared/ui/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { useAdminRead, useParamDraft } from "../admin.ts";
-import { AdminPage } from "../components/index.ts";
-import { UrlParams } from "../../../shared/url/url-params.ts";
+import {
+  AdminProductQuery,
+  AdminProductSort,
+  Price,
+  type AdminBrand,
+  type AdminCategory,
+  type AdminProductSummary,
+  type Page,
+} from "@prism/shared"
+import { Link, useSearchParams } from "react-router"
+import { match, P } from "ts-pattern"
+import { Api } from "../../../shared/api/client.ts"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { Alert, Button, DataTable, EmptyState, Field, ImageSet, Pagination, SelectField, Skeleton } from "../../../shared/ui/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { useAdminRead, useParamDraft } from "../admin.ts"
+import { AdminPage } from "../components/index.ts"
+import { UrlParams } from "../../../shared/url/url-params.ts"
 
 /**
  * The catalog for its content managers: found by name or slug, filtered by
  * category, brand, featuring and low stock, sorted, a page at a time.
  */
 export const ProductsPage = () => {
-  const [params, setParams] = useSearchParams();
+  const [params, setParams] = useSearchParams()
 
   /** Filters or sorts in place, so the page keeps its scroll. */
   const filter = (next: URLSearchParams): void => {
-    setParams(next, { preventScrollReset: true });
-  };
+    setParams(next, { preventScrollReset: true })
+  }
 
-  const query = params.toString();
+  const query = params.toString()
 
-  const products = useAdminRead<Page<AdminProductSummary>>(Api.withQuery("/products", query));
+  const products = useAdminRead<Page<AdminProductSummary>>(Api.withQuery("/products", query))
 
-  const categories = useAdminRead<{ items: readonly AdminCategory[] }>("/categories");
+  const categories = useAdminRead<{ items: readonly AdminCategory[] }>("/categories")
 
-  const brands = useAdminRead<{ items: readonly AdminBrand[] }>("/brands");
+  const brands = useAdminRead<{ items: readonly AdminBrand[] }>("/brands")
 
-  const [text, setText] = useParamDraft(params, "q");
+  const [text, setText] = useParamDraft(params, "q")
 
-  const checkboxClass = "flex items-center gap-2 text-sm text-ink";
+  const checkboxClass = "flex items-center gap-2 text-sm text-ink"
 
   return (
     <AdminPage
       text={PageText.adminProducts}
       heading="Products"
       actions={
-        <Link className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink hover:bg-accent-hover" to="/admin/products/new">
+        <Link
+          className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink hover:bg-accent-hover"
+          to="/admin/products/new"
+        >
           New product
         </Link>
       }
@@ -48,8 +59,8 @@ export const ProductsPage = () => {
           className="flex flex-wrap items-end gap-3"
           role="search"
           onSubmit={(event) => {
-            event.preventDefault();
-            filter(UrlParams.set(params, "q", text.trim()));
+            event.preventDefault()
+            filter(UrlParams.set(params, "q", text.trim()))
           }}
         >
           <div className="min-w-48 flex-1">
@@ -61,7 +72,12 @@ export const ProductsPage = () => {
         </form>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <SelectField label="Category" id="product-category" value={params.get("category") ?? ""} onChange={(event) => filter(UrlParams.set(params, "category", event.target.value))}>
+          <SelectField
+            label="Category"
+            id="product-category"
+            value={params.get("category") ?? ""}
+            onChange={(event) => filter(UrlParams.set(params, "category", event.target.value))}
+          >
             <option value="">Any category</option>
             {(categories.data?.items ?? []).map((category) => (
               <option key={category.id} value={category.slug}>
@@ -69,7 +85,12 @@ export const ProductsPage = () => {
               </option>
             ))}
           </SelectField>
-          <SelectField label="Brand" id="product-brand" value={params.get("brand") ?? ""} onChange={(event) => filter(UrlParams.set(params, "brand", event.target.value))}>
+          <SelectField
+            label="Brand"
+            id="product-brand"
+            value={params.get("brand") ?? ""}
+            onChange={(event) => filter(UrlParams.set(params, "brand", event.target.value))}
+          >
             <option value="">Any brand</option>
             {(brands.data?.items ?? []).map((brand) => (
               <option key={brand.id} value={brand.slug}>
@@ -77,7 +98,12 @@ export const ProductsPage = () => {
               </option>
             ))}
           </SelectField>
-          <SelectField label="Sort by" id="product-sort" value={params.get("sort") ?? "name_asc"} onChange={(event) => filter(UrlParams.set(params, "sort", event.target.value))}>
+          <SelectField
+            label="Sort by"
+            id="product-sort"
+            value={params.get("sort") ?? "name_asc"}
+            onChange={(event) => filter(UrlParams.set(params, "sort", event.target.value))}
+          >
             {AdminProductSort.NAMES.map((sort) => (
               <option key={sort} value={sort}>
                 {AdminProductSort.label[sort]}
@@ -131,7 +157,12 @@ export const ProductsPage = () => {
                       {product.image === undefined ? (
                         <span className="size-10 shrink-0 rounded bg-sunken" aria-hidden="true" />
                       ) : (
-                        <ImageSet className="size-10 shrink-0 rounded bg-sunken object-contain" image={product.image} sizes="2.5rem" isDecorative />
+                        <ImageSet
+                          className="size-10 shrink-0 rounded bg-sunken object-contain"
+                          image={product.image}
+                          sizes="2.5rem"
+                          isDecorative
+                        />
                       )}
                       <span className="min-w-0">
                         <Link className="font-medium text-accent underline-offset-2 hover:underline" to={`/admin/products/${product.id}`}>
@@ -149,14 +180,21 @@ export const ProductsPage = () => {
                   key: "stock",
                   header: "Stock",
                   isNumeric: true,
-                  cell: (product) => <span className={product.stock <= AdminProductQuery.LOW_STOCK ? "font-semibold text-warn" : ""}>{product.stock}</span>,
+                  cell: (product) => (
+                    <span className={product.stock <= AdminProductQuery.LOW_STOCK ? "font-semibold text-warn" : ""}>{product.stock}</span>
+                  ),
                 },
                 { key: "featured", header: "Featured", cell: (product) => (product.isFeatured ? "Yes" : "") },
               ]}
             />
-            <Pagination page={data.page} totalPages={data.totalPages} label="Product pages" onPage={(page) => setParams(UrlParams.set(params, "page", String(page)))} />
+            <Pagination
+              page={data.page}
+              totalPages={data.totalPages}
+              label="Product pages"
+              onPage={(page) => setParams(UrlParams.set(params, "page", String(page)))}
+            />
           </>
         ))}
     </AdminPage>
-  );
-};
+  )
+}

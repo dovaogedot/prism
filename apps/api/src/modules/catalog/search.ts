@@ -5,29 +5,28 @@
  * bound parameter; nothing is concatenated into the statement.
  */
 
-import type { ProductQuery, PropertyFilter } from "@prism/shared";
-import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql, type SQL } from "drizzle-orm";
-import { brands, categories, productProperties, products } from "../../db/schema.ts";
+import type { ProductQuery, PropertyFilter } from "@prism/shared"
+import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql, type SQL } from "drizzle-orm"
+import { brands, categories, productProperties, products } from "../../db/schema.ts"
 
 /**
  * The facet whose own filter a condition list leaves out, so the facet can
  * count what choosing another of its values would match.
  */
-export type LiftedFacet = "none" | "brand" | "price" | "rating" | "property";
+export type LiftedFacet = "none" | "brand" | "price" | "rating" | "property"
 
 /**
  * How the search text matches: `exact` finds its words and its substring;
  * `similar` finds names whose trigrams resemble it, which is what catches a
  * misspelling once nothing matched exactly.
  */
-export type TextMatch = "exact" | "similar";
+export type TextMatch = "exact" | "similar"
 
 export const ProductSearch = {
   RATING_THRESHOLDS: [5, 4, 3, 2, 1] as const,
 
   /** What a rating threshold reads as in the facet rail. */
-  ratingLabel: (threshold: number): string =>
-    threshold >= 5 ? "5 stars" : `${threshold} stars & up`,
+  ratingLabel: (threshold: number): string => (threshold >= 5 ? "5 stars" : `${threshold} stars & up`),
 
   /**
    * Whether a card shows `average` at `threshold` stars or more. A rating
@@ -66,12 +65,12 @@ export const ProductSearch = {
    * stays in view when a filter of the rail excludes it.
    */
   shelf: (query: ProductQuery, match: TextMatch = "exact"): SQL[] => {
-    const where: SQL[] = [];
+    const where: SQL[] = []
 
-    if (query.text !== undefined) where.push(ProductSearch.textCondition(query.text, match));
-    if (query.category !== undefined) where.push(eq(categories.slug, query.category));
+    if (query.text !== undefined) where.push(ProductSearch.textCondition(query.text, match))
+    if (query.category !== undefined) where.push(eq(categories.slug, query.category))
 
-    return where;
+    return where
   },
 
   /**
@@ -82,28 +81,27 @@ export const ProductSearch = {
    * sibling values.
    */
   narrowing: (query: ProductQuery, lifted: LiftedFacet = "none"): SQL[] => {
-    const where: SQL[] = [];
+    const where: SQL[] = []
 
-    if (lifted !== "brand" && query.brands.length > 0) where.push(inArray(brands.slug, [...query.brands]));
+    if (lifted !== "brand" && query.brands.length > 0) where.push(inArray(brands.slug, [...query.brands]))
     if (lifted !== "price" && query.priceMinCents !== undefined) {
-      where.push(gte(products.priceCents, query.priceMinCents));
+      where.push(gte(products.priceCents, query.priceMinCents))
     }
     if (lifted !== "price" && query.priceMaxCents !== undefined) {
-      where.push(lte(products.priceCents, query.priceMaxCents));
+      where.push(lte(products.priceCents, query.priceMaxCents))
     }
     if (lifted !== "rating" && query.minRating !== undefined) {
       // As `isShownAtLeast` compares, so the filter keeps every product whose card shows the rating or more.
-      where.push(sql`${products.ratingAverage} * 10 >= ${query.minRating * 10 - 0.5}`);
+      where.push(sql`${products.ratingAverage} * 10 >= ${query.minRating * 10 - 0.5}`)
     }
 
     for (const filter of query.properties) {
-      const owns = ProductSearch.propertyCondition(filter);
-      const condition =
-        lifted === "property" ? or(eq(productProperties.name, filter.name), owns) : owns;
-      if (condition !== undefined) where.push(condition);
+      const owns = ProductSearch.propertyCondition(filter)
+      const condition = lifted === "property" ? or(eq(productProperties.name, filter.name), owns) : owns
+      if (condition !== undefined) where.push(condition)
     }
 
-    return where;
+    return where
   },
 
   /** Every active filter as a condition, except the one named by `lifted`. */
@@ -116,23 +114,22 @@ export const ProductSearch = {
   filter: (conditions: readonly SQL[]): SQL => and(...conditions) ?? sql`true`,
 
   /** `and` over the conditions, or nothing when there are none. */
-  where: (conditions: readonly SQL[]): SQL | undefined =>
-    conditions.length === 0 ? undefined : and(...conditions),
+  where: (conditions: readonly SQL[]): SQL | undefined => (conditions.length === 0 ? undefined : and(...conditions)),
 
   /** Every sort ends in the slug, so paging is stable when keys tie. */
   orderBy: (query: ProductQuery, match: TextMatch = "exact"): SQL[] => {
     switch (query.sort) {
       case "newest":
-        return [desc(products.createdAt), asc(products.slug)];
+        return [desc(products.createdAt), asc(products.slug)]
       case "price_asc":
-        return [asc(products.priceCents), asc(products.slug)];
+        return [asc(products.priceCents), asc(products.slug)]
       case "price_desc":
-        return [desc(products.priceCents), asc(products.slug)];
+        return [desc(products.priceCents), asc(products.slug)]
       case "rating":
-        return [desc(products.ratingAverage), desc(products.ratingCount), asc(products.slug)];
+        return [desc(products.ratingAverage), desc(products.ratingCount), asc(products.slug)]
       case "relevance":
         if (query.text !== undefined && match === "similar") {
-          return [desc(sql`similarity(${products.name}, ${query.text})`), asc(products.name), asc(products.slug)];
+          return [desc(sql`similarity(${products.name}, ${query.text})`), asc(products.name), asc(products.slug)]
         }
         return query.text === undefined
           ? [asc(products.name), asc(products.slug)]
@@ -142,17 +139,14 @@ export const ProductSearch = {
               desc(sql`ts_rank(${products.search}, ${ProductSearch.tsQuery(query.text)})`),
               asc(products.name),
               asc(products.slug),
-            ];
+            ]
     }
   },
 
   /** Typed prefixes first, then any other substring match, alphabetically. */
-  suggestionOrder: (text: string): SQL[] => [
-    desc(ilike(products.name, ProductSearch.prefixPattern(text))),
-    asc(products.name),
-  ],
+  suggestionOrder: (text: string): SQL[] => [desc(ilike(products.name, ProductSearch.prefixPattern(text))), asc(products.name)],
 
   offset: (query: ProductQuery): number => (query.page - 1) * query.perPage,
 
   totalPages: (total: number, perPage: number): number => Math.max(1, Math.ceil(total / perPage)),
-} as const;
+} as const

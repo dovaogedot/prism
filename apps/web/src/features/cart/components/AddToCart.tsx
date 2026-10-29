@@ -1,27 +1,27 @@
-import { Quantity, type ProductDetail } from "@prism/shared";
-import { useState } from "react";
-import { Link } from "react-router";
-import { match } from "ts-pattern";
-import { Alert, Button } from "../../../shared/ui/index.ts";
-import { CartPreview } from "../cart-preview.ts";
-import { CartFailure, useCartChanges } from "../cart.ts";
-import { QuantityStepper } from "./QuantityStepper.tsx";
+import { Quantity, type ProductDetail } from "@prism/shared"
+import { useState } from "react"
+import { Link } from "react-router"
+import { match } from "ts-pattern"
+import { Alert, Button } from "../../../shared/ui/index.ts"
+import { CartPreview } from "../cart-preview.ts"
+import { CartFailure, useCartChanges } from "../cart.ts"
+import { QuantityStepper } from "./QuantityStepper.tsx"
 
 /** The product the buttons add. */
-export type AddToCartProps = Readonly<{ product: ProductDetail }>;
+export type AddToCartProps = Readonly<{ product: ProductDetail }>
 
 /** A quantity and an add button, or a sold-out notice when there is nothing to add. */
 export const AddToCart = ({ product }: AddToCartProps) => {
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(1)
 
-  const { add } = useCartChanges();
+  const { add } = useCartChanges()
 
   if (product.stock <= 0) {
     return (
       <Button type="button" tone="quiet" disabled className="w-full sm:w-auto">
         Sold out
       </Button>
-    );
+    )
   }
 
   return (
@@ -56,5 +56,5 @@ export const AddToCart = ({ product }: AddToCartProps) => {
         ))
         .otherwise(() => null)}
     </div>
-  );
-};
+  )
+}

@@ -1,8 +1,8 @@
-import { Price, type CartView, type Totals } from "@prism/shared";
-import { CartLineItem } from "../../cart/components/index.ts";
+import { Price, type CartView, type Totals } from "@prism/shared"
+import { CartLineItem } from "../../cart/components/index.ts"
 
 /** The cart being bought and its totals. */
-export type OrderSummaryProps = Readonly<{ cart: CartView; totals: Totals }>;
+export type OrderSummaryProps = Readonly<{ cart: CartView; totals: Totals }>
 
 /** Every line with a stepper and a remove button, then the subtotal, shipping and total. */
 export const OrderSummary = ({ cart, totals }: OrderSummaryProps) => (
@@ -29,4 +29,4 @@ export const OrderSummary = ({ cart, totals }: OrderSummaryProps) => (
     </dl>
     <p className="text-xs text-ink-faint">Prices include VAT.</p>
   </div>
-);
+)

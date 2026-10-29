@@ -1,12 +1,12 @@
-import type { ReactNode } from "react";
+import type { ReactNode } from "react"
 
 /** What is missing, what it means, and what to do about it. */
 export type EmptyStateProps = Readonly<{
-  title: string;
-  children?: ReactNode;
+  title: string
+  children?: ReactNode
   /** A link or button that gets the reader somewhere with content. */
-  action?: ReactNode;
-}>;
+  action?: ReactNode
+}>
 
 /** Stands where a list would be when the list is empty. */
 export const EmptyState = ({ title, children, action }: EmptyStateProps) => (
@@ -15,4 +15,4 @@ export const EmptyState = ({ title, children, action }: EmptyStateProps) => (
     {children === undefined ? null : <div className="mx-auto mt-1 max-w-md text-sm text-ink-soft">{children}</div>}
     {action === undefined ? null : <div className="mt-4">{action}</div>}
   </div>
-);
+)

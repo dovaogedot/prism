@@ -4,22 +4,22 @@
  * value is escaped before it reaches the HTML body.
  */
 
-import { OrderStatus, PaymentFailure, Price, type OrderNumber } from "@prism/shared";
-import { Html } from "../../http/html.ts";
-import type { OutboundEmail } from "../../platform/mailer.ts";
-import type { OrderRecord } from "./repository.ts";
+import { OrderStatus, PaymentFailure, Price, type OrderNumber } from "@prism/shared"
+import { Html } from "../../http/html.ts"
+import type { OutboundEmail } from "../../platform/mailer.ts"
+import type { OrderRecord } from "./repository.ts"
 
 /** The parts every order email shares. */
 type Letter = Readonly<{
-  subject: string;
-  heading: string;
+  subject: string
+  heading: string
   /** Plain sentences, escaped when rendered. */
-  paragraphs: readonly string[];
-  order: OrderRecord;
-  orderUrl: string;
+  paragraphs: readonly string[]
+  order: OrderRecord
+  orderUrl: string
   /** Further links under the summary, each on its own line. */
-  links?: readonly Readonly<{ label: string; url: string }>[];
-}>;
+  links?: readonly Readonly<{ label: string; url: string }>[]
+}>
 
 export const OrderEmail = {
   /** The order page, with the key a guest needs to open it. */
@@ -41,7 +41,7 @@ export const OrderEmail = {
   summaryHtml: (order: OrderRecord): string => {
     const row = (label: string, amount: string, strong: boolean): string =>
       `<div style="display:flex;justify-content:space-between;gap:16px;padding:6px 0;${strong ? "font-weight:700;" : ""}">` +
-      `<span>${Html.escape(label)}</span><span>${Html.escape(amount)}</span></div>`;
+      `<span>${Html.escape(label)}</span><span>${Html.escape(amount)}</span></div>`
 
     return [
       `<div style="border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;padding:8px 0;margin:0 0 12px">`,
@@ -50,7 +50,7 @@ export const OrderEmail = {
       row("Subtotal", Price.format(order.subtotalCents), false),
       row("Shipping", order.shippingCents === 0 ? "Free" : Price.format(order.shippingCents), false),
       row("Total", Price.format(order.totalCents), true),
-    ].join("\n");
+    ].join("\n")
   },
 
   compose: (letter: Letter): OutboundEmail => ({
@@ -142,7 +142,7 @@ export const OrderEmail = {
   delivered: (order: OrderRecord, orderUrl: string, webOrigin: string): OutboundEmail => {
     const links = order.lines
       .filter((line) => line.productId !== undefined)
-      .map((line) => ({ label: `Review ${line.name}`, url: `${webOrigin}/products/${line.slug}#reviews-heading` }));
+      .map((line) => ({ label: `Review ${line.name}`, url: `${webOrigin}/products/${line.slug}#reviews-heading` }))
 
     return OrderEmail.compose({
       subject: `Order ${OrderEmail.numberOf(order.number)} delivered`,
@@ -154,7 +154,7 @@ export const OrderEmail = {
       order,
       orderUrl,
       links,
-    });
+    })
   },
 
   /** The parcel left the warehouse. */
@@ -162,10 +162,8 @@ export const OrderEmail = {
     OrderEmail.compose({
       subject: `Order ${OrderEmail.numberOf(order.number)} shipped`,
       heading: "Your order is on its way",
-      paragraphs: [
-        `Your order is ${OrderStatus.label.shipped.toLowerCase()}. The tracking number is ${trackingNumber}.`,
-      ],
+      paragraphs: [`Your order is ${OrderStatus.label.shipped.toLowerCase()}. The tracking number is ${trackingNumber}.`],
       order,
       orderUrl,
     }),
-} as const;
+} as const

@@ -1,26 +1,26 @@
-import { Link, useLocation, useNavigate } from "react-router";
-import { useSession, useSignOut } from "../features/auth/session.ts";
-import { useCategories } from "../features/catalog/catalog.ts";
-import { AccountLinks } from "./account-links.ts";
-import { LookClass } from "../shared/layout/look.ts";
-import { ThemeToggle } from "../shared/layout/ThemeToggle.tsx";
+import { Link, useLocation, useNavigate } from "react-router"
+import { useSession, useSignOut } from "../features/auth/session.ts"
+import { useCategories } from "../features/catalog/catalog.ts"
+import { AccountLinks } from "./account-links.ts"
+import { LookClass } from "../shared/layout/look.ts"
+import { ThemeToggle } from "../shared/layout/ThemeToggle.tsx"
 
 /** What signing out from the drawer does first: close it. */
-export type DrawerMenuProps = Readonly<{ onClose: () => void }>;
+export type DrawerMenuProps = Readonly<{ onClose: () => void }>
 
 /** What the header holds, as rows for a narrow page: the theme, the categories and the account. */
 export const DrawerMenu = ({ onClose }: DrawerMenuProps) => {
-  const session = useSession();
+  const session = useSession()
 
-  const signOut = useSignOut();
+  const signOut = useSignOut()
 
-  const navigate = useNavigate();
+  const navigate = useNavigate()
 
-  const categories = useCategories();
+  const categories = useCategories()
 
-  const { pathname, search } = useLocation();
+  const { pathname, search } = useLocation()
 
-  const headingClass = "px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-ink-faint";
+  const headingClass = "px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-ink-faint"
 
   return (
     <div className="space-y-5">
@@ -75,8 +75,8 @@ export const DrawerMenu = ({ onClose }: DrawerMenuProps) => {
                 className={LookClass.row}
                 type="button"
                 onClick={() => {
-                  onClose();
-                  void signOut().then(() => navigate("/"));
+                  onClose()
+                  void signOut().then(() => navigate("/"))
                 }}
               >
                 Sign out
@@ -86,5 +86,5 @@ export const DrawerMenu = ({ onClose }: DrawerMenuProps) => {
         )}
       </nav>
     </div>
-  );
-};
+  )
+}

@@ -11,13 +11,13 @@
  * force, so every component that reads the theme sees the same one.
  */
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useSyncExternalStore } from "react"
 
 /** Which of the two looks the page is drawn in. */
-export type Theme = "light" | "dark";
+export type Theme = "light" | "dark"
 
 /** Whether the visitor picked a theme in this tab, which still holds when storage is blocked. */
-const Picked: { inTab: boolean } = { inTab: false };
+const Picked: { inTab: boolean } = { inTab: false }
 
 export const Theme = {
   STORAGE_KEY: "prism-theme",
@@ -26,24 +26,23 @@ export const Theme = {
 
   /** Whether the visitor has picked a theme, rather than being shown the system's. */
   chosen: (): boolean => {
-    if (Picked.inTab) return true;
+    if (Picked.inTab) return true
 
     try {
-      return Theme.is(localStorage.getItem(Theme.STORAGE_KEY));
+      return Theme.is(localStorage.getItem(Theme.STORAGE_KEY))
     } catch {
       // Storage can be blocked; nothing was stored then.
-      return false;
+      return false
     }
   },
 
-  systemPrefers: (): Theme =>
-    window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
+  systemPrefers: (): Theme => (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
 
   /** The theme the page is drawn in right now. */
   shown: (): Theme => (document.documentElement.classList.contains("dark") ? "dark" : "light"),
 
   apply: (theme: Theme): void => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.classList.toggle("dark", theme === "dark")
   },
 
   /** Every component reading the theme, told when it changes. */
@@ -51,16 +50,16 @@ export const Theme = {
 
   /** Stores `theme` over the system preference, draws the page in it, and tells every reader. */
   choose: (theme: Theme): void => {
-    Picked.inTab = true;
+    Picked.inTab = true
 
     try {
-      localStorage.setItem(Theme.STORAGE_KEY, theme);
+      localStorage.setItem(Theme.STORAGE_KEY, theme)
     } catch {
       // Storage can be blocked; the choice then lasts as long as the tab.
     }
 
-    Theme.apply(theme);
-    for (const listener of Theme.listeners) listener();
+    Theme.apply(theme)
+    for (const listener of Theme.listeners) listener()
   },
 
   /**
@@ -68,28 +67,28 @@ export const Theme = {
    * preference changes while no theme is stored. Shaped for `useSyncExternalStore`.
    */
   subscribe: (listener: () => void): (() => void) => {
-    const query = window.matchMedia("(prefers-color-scheme: dark)");
+    const query = window.matchMedia("(prefers-color-scheme: dark)")
     const followSystem = (): void => {
-      if (Theme.chosen()) return;
-      Theme.apply(Theme.systemPrefers());
-      listener();
-    };
+      if (Theme.chosen()) return
+      Theme.apply(Theme.systemPrefers())
+      listener()
+    }
 
-    Theme.listeners.add(listener);
-    query.addEventListener("change", followSystem);
+    Theme.listeners.add(listener)
+    query.addEventListener("change", followSystem)
 
     return () => {
-      Theme.listeners.delete(listener);
-      query.removeEventListener("change", followSystem);
-    };
+      Theme.listeners.delete(listener)
+      query.removeEventListener("change", followSystem)
+    }
   },
-} as const;
+} as const
 
 /** The current theme, the same in every component, and the toggle that stores a choice over the system preference. */
 export const useTheme = (): Readonly<{ theme: Theme; toggle: () => void }> => {
-  const theme = useSyncExternalStore(Theme.subscribe, Theme.shown);
+  const theme = useSyncExternalStore(Theme.subscribe, Theme.shown)
 
-  const toggle = useCallback(() => Theme.choose(theme === "dark" ? "light" : "dark"), [theme]);
+  const toggle = useCallback(() => Theme.choose(theme === "dark" ? "light" : "dark"), [theme])
 
-  return { theme, toggle };
-};
+  return { theme, toggle }
+}

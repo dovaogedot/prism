@@ -1,22 +1,22 @@
-import { Cart, Price, Quantity, type CartLine } from "@prism/shared";
-import { Link } from "react-router";
-import { match, P } from "ts-pattern";
-import { Picture } from "../../catalog/components/index.ts";
-import { CartFailure, useCartChanges } from "../cart.ts";
-import { QuantityStepper } from "./QuantityStepper.tsx";
+import { Cart, Price, Quantity, type CartLine } from "@prism/shared"
+import { Link } from "react-router"
+import { match, P } from "ts-pattern"
+import { Picture } from "../../catalog/components/index.ts"
+import { CartFailure, useCartChanges } from "../cart.ts"
+import { QuantityStepper } from "./QuantityStepper.tsx"
 
 /** One line, and whether it is drawn in the narrow checkout summary. */
-export type CartLineItemProps = Readonly<{ line: CartLine; compact?: boolean }>;
+export type CartLineItemProps = Readonly<{ line: CartLine; compact?: boolean }>
 
 /**
  * A cart line: its picture, name, unit price, quantity, total and a remove
  * button. A line the shop cannot supply in full says so, with a way to fix it.
  */
 export const CartLineItem = ({ line, compact = false }: CartLineItemProps) => {
-  const { setQuantity, remove } = useCartChanges();
+  const { setQuantity, remove } = useCartChanges()
 
-  const short = line.quantity > line.stock;
-  const failure = setQuantity.error ?? remove.error;
+  const short = line.quantity > line.stock
+  const failure = setQuantity.error ?? remove.error
 
   return (
     <li className="flex gap-3 py-4 sm:gap-4">
@@ -85,5 +85,5 @@ export const CartLineItem = ({ line, compact = false }: CartLineItemProps) => {
         )}
       </div>
     </li>
-  );
-};
+  )
+}

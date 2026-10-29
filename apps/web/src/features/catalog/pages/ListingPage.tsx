@@ -1,24 +1,24 @@
-import { ProductSort, type ProductSearchResult } from "@prism/shared";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Navigate, useParams, useSearchParams } from "react-router";
-import { match, P } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
-import { useDrawer } from "../../../shared/layout/drawer.ts";
-import { useWide } from "../../../shared/layout/use-wide.ts";
-import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { Alert, Button, EmptyState, Pagination, Skeleton } from "../../../shared/ui/index.ts";
-import { NotFoundPage } from "../../pages/pages/NotFoundPage.tsx";
-import { CatalogSeo } from "../catalog-seo.ts";
-import { useCategories } from "../catalog.ts";
-import { CategoryNav, Facets, ProductCard, ProductListItem, ViewToggle, type CategoryLink } from "../components/index.ts";
-import { CatalogParams } from "../filters.ts";
-import { Listing, type ListingKind } from "../listing.ts";
+import { ProductSort, type ProductSearchResult } from "@prism/shared"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { useEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
+import { Navigate, useParams, useSearchParams } from "react-router"
+import { match, P } from "ts-pattern"
+import { Api } from "../../../shared/api/client.ts"
+import { useDrawer } from "../../../shared/layout/drawer.ts"
+import { useWide } from "../../../shared/layout/use-wide.ts"
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { Alert, Button, EmptyState, Pagination, Skeleton } from "../../../shared/ui/index.ts"
+import { NotFoundPage } from "../../pages/pages/NotFoundPage.tsx"
+import { CatalogSeo } from "../catalog-seo.ts"
+import { useCategories } from "../catalog.ts"
+import { CategoryNav, Facets, ProductCard, ProductListItem, ViewToggle, type CategoryLink } from "../components/index.ts"
+import { CatalogParams } from "../filters.ts"
+import { Listing, type ListingKind } from "../listing.ts"
 
 /** Which address the listing is drawn for. */
-export type ListingPageProps = Readonly<{ kind: ListingKind }>;
+export type ListingPageProps = Readonly<{ kind: ListingKind }>
 
 /**
  * The catalog's one listing, behind `/shop`, `/categories/:slug` and
@@ -29,72 +29,72 @@ export type ListingPageProps = Readonly<{ kind: ListingKind }>;
  * drawer on a narrow one.
  */
 export const ListingPage = ({ kind }: ListingPageProps) => {
-  const { slug } = useParams();
+  const { slug } = useParams()
 
-  const [params, setParams] = useSearchParams();
+  const [params, setParams] = useSearchParams()
 
   /** Filters or sorts in place, so the page keeps its scroll. */
   const filter = (next: URLSearchParams): void => {
-    setParams(next, { preventScrollReset: true });
-  };
+    setParams(next, { preventScrollReset: true })
+  }
 
-  const wide = useWide();
+  const wide = useWide()
 
-  const drawer = useDrawer();
+  const drawer = useDrawer()
 
-  const categories = useCategories();
+  const categories = useCategories()
 
-  const category = kind === "category" ? slug : undefined;
-  const query = Listing.apiQuery(params, category);
+  const category = kind === "category" ? slug : undefined
+  const query = Listing.apiQuery(params, category)
 
   const results = useQuery({
     queryKey: ["products", query],
     queryFn: ({ signal }) => Api.getPublic<ProductSearchResult>(Api.withQuery("/products", query), signal),
     placeholderData: keepPreviousData,
-  });
+  })
 
-  const activeChips = results.data === undefined ? [] : CatalogParams.active(params, results.data.facets);
+  const activeChips = results.data === undefined ? [] : CatalogParams.active(params, results.data.facets)
 
-  const chipKeys = activeChips.map((chip) => `${chip.key}=${chip.value}`).join("&");
+  const chipKeys = activeChips.map((chip) => `${chip.key}=${chip.value}`).join("&")
 
   // Where the chip just removed sat, so focus goes to the chip now there, the one before it, or the results heading.
-  const [removedChipAt, setRemovedChipAt] = useState<number | undefined>(undefined);
+  const [removedChipAt, setRemovedChipAt] = useState<number | undefined>(undefined)
 
-  const chipList = useRef<HTMLDivElement>(null);
+  const chipList = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (removedChipAt === undefined) return;
+    if (removedChipAt === undefined) return
 
-    const left = chipList.current?.querySelectorAll<HTMLElement>("button");
-    const chip = left?.[removedChipAt] ?? left?.[removedChipAt - 1];
-    const heading = document.getElementById("results-heading");
+    const left = chipList.current?.querySelectorAll<HTMLElement>("button")
+    const chip = left?.[removedChipAt] ?? left?.[removedChipAt - 1]
+    const heading = document.getElementById("results-heading")
 
     if (chip !== undefined) {
-      chip.focus();
+      chip.focus()
     } else if (heading !== null) {
-      heading.tabIndex = -1;
-      heading.focus({ preventScroll: true });
+      heading.tabIndex = -1
+      heading.focus({ preventScroll: true })
     }
 
-    setRemovedChipAt(undefined);
-  }, [chipKeys]);
+    setRemovedChipAt(undefined)
+  }, [chipKeys])
 
-  const redirect = kind === "shop" ? Listing.categoryRedirect(params) : undefined;
-  if (redirect !== undefined) return <Navigate to={redirect} replace />;
+  const redirect = kind === "shop" ? Listing.categoryRedirect(params) : undefined
+  if (redirect !== undefined) return <Navigate to={redirect} replace />
 
-  const shelf = categories.data?.find((candidate) => candidate.slug === category);
-  if (kind === "category" && categories.data !== undefined && shelf === undefined) return <NotFoundPage heading="Category not found" />;
+  const shelf = categories.data?.find((candidate) => candidate.slug === category)
+  if (kind === "category" && categories.data !== undefined && shelf === undefined) return <NotFoundPage heading="Category not found" />
 
-  const text = params.get("q") ?? "";
-  const itemsOf = (count: number): string => `${count} ${count === 1 ? "item" : "items"}`;
-  const view = Listing.view(params);
-  const sort = ProductSort.schema.catch("relevance").parse(params.get("sort") ?? "relevance");
+  const text = params.get("q") ?? ""
+  const itemsOf = (count: number): string => `${count} ${count === 1 ? "item" : "items"}`
+  const view = Listing.view(params)
+  const sort = ProductSort.schema.catch("relevance").parse(params.get("sort") ?? "relevance")
 
   const heading = match(kind)
     .with("shop", () => PageText.shop.title)
     .with("category", () => shelf?.name ?? "Category")
     .with("search", () => (text.length === 0 ? "Search" : `Results for "${text}"`))
-    .exhaustive();
+    .exhaustive()
 
   const meta = match(kind)
     .with("shop", () => <PageMeta title={PageText.shop.title} description={PageText.shop.description} />)
@@ -102,15 +102,19 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
       shelf === undefined ? (
         <PageMeta title={heading} description={PageText.shop.description} isIndexed={false} />
       ) : (
-        <PageMeta title={CatalogSeo.categoryTitle(shelf)} description={CatalogSeo.categoryDescription(shelf)} canonicalPath={`/categories/${shelf.slug}`} />
+        <PageMeta
+          title={CatalogSeo.categoryTitle(shelf)}
+          description={CatalogSeo.categoryDescription(shelf)}
+          canonicalPath={`/categories/${shelf.slug}`}
+        />
       ),
     )
     .with("search", () => <PageMeta title={heading} description={PageText.search.description} isIndexed={false} />)
-    .exhaustive();
+    .exhaustive()
 
   // On a search, a category narrows the results and drops every other filter,
   // which may not exist there; elsewhere each one is its own page.
-  const searchIn = (slug: string): string => `/search?${CatalogParams.set(CatalogParams.cleared(params), "category", slug).toString()}`;
+  const searchIn = (slug: string): string => `/search?${CatalogParams.set(CatalogParams.cleared(params), "category", slug).toString()}`
   const links: readonly CategoryLink[] = match(kind)
     .with("search", () => [
       { label: "All categories", href: searchIn(""), isCurrent: params.get("category") === null },
@@ -128,17 +132,17 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
         isCurrent: candidate.slug === category,
         count: candidate.productCount,
       })),
-    ]);
+    ])
 
   const goToPage = (page: number): void => {
-    setParams(CatalogParams.set(params, "page", String(page)));
-  };
+    setParams(CatalogParams.set(params, "page", String(page)))
+  }
 
   const sortOptions = ProductSort.NAMES.map((option) => (
     <option key={option} value={option}>
       {ProductSort.label[option]}
     </option>
-  ));
+  ))
 
   const rail = match(results.data)
     .with(undefined, () => (
@@ -148,7 +152,7 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
         ))}
       </div>
     ))
-    .otherwise((data) => <Facets facets={data.facets} params={params} onChange={filter} />);
+    .otherwise((data) => <Facets facets={data.facets} params={params} onChange={filter} />)
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -179,7 +183,13 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
             </h2>
 
             {wide ? null : (
-              <Button tone="quiet" type="button" aria-haspopup="dialog" onClick={drawer.openAtSlot} className={CatalogParams.isFiltered(params) ? "!border-accent" : ""}>
+              <Button
+                tone="quiet"
+                type="button"
+                aria-haspopup="dialog"
+                onClick={drawer.openAtSlot}
+                className={CatalogParams.isFiltered(params) ? "!border-accent" : ""}
+              >
                 Filters
               </Button>
             )}
@@ -212,8 +222,8 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
                   key={`${chip.key}=${chip.value}`}
                   type="button"
                   onClick={() => {
-                    setRemovedChipAt(index);
-                    filter(chip.next);
+                    setRemovedChipAt(index)
+                    filter(chip.next)
                   }}
                   aria-label={`Remove ${chip.label}`}
                 >
@@ -225,7 +235,9 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
           )}
 
           {match(results)
-            .with({ status: "error" }, () => <Alert title="We could not load the products">Something went wrong at our end. Try again in a moment.</Alert>)
+            .with({ status: "error" }, () => (
+              <Alert title="We could not load the products">Something went wrong at our end. Try again in a moment.</Alert>
+            ))
             .with({ data: P.nullish }, () => (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
                 {Array.from({ length: 8 }, (_, index) => (
@@ -271,5 +283,5 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
         </section>
       </div>
     </div>
-  );
-};
+  )
+}

@@ -14,7 +14,7 @@
  * properties; every filter is derived from those rows.
  */
 
-import { relations, sql } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm"
 import {
   OrderStatus,
   ReviewStatus,
@@ -29,7 +29,7 @@ import {
   type ShippingMethodCode,
   type Slug,
   type UserId,
-} from "@prism/shared";
+} from "@prism/shared"
 import {
   bigint,
   boolean,
@@ -47,30 +47,30 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
-} from "drizzle-orm/pg-core";
-import type { BlindIndex } from "../platform/cipher.ts";
-import type { PasswordHash } from "../platform/hasher.ts";
-import type { Digest } from "../platform/tokens.ts";
-import type { AuditEventId, BrandId, CartId, CategoryId, PaymentId, SessionId } from "./ids.ts";
+} from "drizzle-orm/pg-core"
+import type { BlindIndex } from "../platform/cipher.ts"
+import type { PasswordHash } from "../platform/hasher.ts"
+import type { Digest } from "../platform/tokens.ts"
+import type { AuditEventId, BrandId, CartId, CategoryId, PaymentId, SessionId } from "./ids.ts"
 
 /** Postgres full-text search vectors, which drizzle has no built-in for. */
 const tsvector = customType<{ data: string; driverData: string }>({
   dataType: () => "tsvector",
-});
+})
 
 /** Raw bytes, which drizzle has no built-in for. Every encrypted column and blind index is one. */
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   dataType: () => "bytea",
-});
+})
 
 /** A SQL list of string literals, for a CHECK over a closed set of names. */
-const literals = (names: readonly string[]) => sql.raw(names.map((name) => `'${name}'`).join(", "));
+const literals = (names: readonly string[]) => sql.raw(names.map((name) => `'${name}'`).join(", "))
 
 /** What a payment row records: money taken, or money given back. */
-export type PaymentKind = "charge" | "refund";
+export type PaymentKind = "charge" | "refund"
 
 /** Where a payment row stands at the provider. */
-export type PaymentStatus = "pending" | "succeeded" | "failed" | "canceled";
+export type PaymentStatus = "pending" | "succeeded" | "failed" | "canceled"
 
 /* ----------------------------------------------------------------- identity */
 
@@ -106,13 +106,10 @@ export const users = pgTable(
   },
   (table) => [
     uniqueIndex("app_user_email_index_key").on(table.emailIndex),
-    check(
-      "app_user_totp_needs_secret",
-      sql`${table.totpEnabledAt} IS NULL OR ${table.totpSecret} IS NOT NULL`,
-    ),
+    check("app_user_totp_needs_secret", sql`${table.totpEnabledAt} IS NULL OR ${table.totpSecret} IS NOT NULL`),
     check("app_user_roles_known", sql`${table.roles} <@ ARRAY[${literals(StaffRole.NAMES)}]::text[]`),
   ],
-);
+)
 
 /** One provider account linked to one user. A user may have several. */
 export const oauthIdentities = pgTable(
@@ -133,7 +130,7 @@ export const oauthIdentities = pgTable(
     uniqueIndex("oauth_identity_provider_subject_index_key").on(table.provider, table.subjectIndex),
     index("oauth_identity_user_idx").on(table.userId),
   ],
-);
+)
 
 /** Why a session ended, so an investigation can tell logout from attack. */
 export type RevocationReason =
@@ -143,7 +140,7 @@ export type RevocationReason =
   | "account_disabled"
   | "signed_out_by_staff"
   | "two_factor_reset"
-  | "password_change";
+  | "password_change"
 
 /**
  * A session is both the revocation unit and the refresh-token family. The
@@ -172,12 +169,9 @@ export const sessions = pgTable(
   },
   (table) => [
     index("session_user_idx").on(table.userId),
-    check(
-      "session_revocation_has_reason",
-      sql`(${table.revokedAt} IS NULL) = (${table.revokedReason} IS NULL)`,
-    ),
+    check("session_revocation_has_reason", sql`(${table.revokedAt} IS NULL) = (${table.revokedReason} IS NULL)`),
   ],
-);
+)
 
 /**
  * One row per issued refresh token. `usedAt` is what makes rotation
@@ -197,11 +191,8 @@ export const refreshTokens = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     usedAt: timestamp("used_at", { withTimezone: true }),
   },
-  (table) => [
-    uniqueIndex("refresh_token_hash_key").on(table.tokenHash),
-    index("refresh_token_session_idx").on(table.sessionId),
-  ],
-);
+  (table) => [uniqueIndex("refresh_token_hash_key").on(table.tokenHash), index("refresh_token_session_idx").on(table.sessionId)],
+)
 
 /** Outstanding reset links, stored as digests and usable once. */
 export const passwordResetTokens = pgTable(
@@ -217,11 +208,8 @@ export const passwordResetTokens = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     usedAt: timestamp("used_at", { withTimezone: true }),
   },
-  (table) => [
-    uniqueIndex("password_reset_token_hash_key").on(table.tokenHash),
-    index("password_reset_token_user_idx").on(table.userId),
-  ],
-);
+  (table) => [uniqueIndex("password_reset_token_hash_key").on(table.tokenHash), index("password_reset_token_user_idx").on(table.userId)],
+)
 
 /* ------------------------------------------------------------------ catalog */
 
@@ -236,7 +224,7 @@ export const categories = pgTable(
     description: text("description"),
   },
   (table) => [uniqueIndex("category_slug_key").on(table.slug)],
-);
+)
 
 /** Who makes a product. */
 export const brands = pgTable(
@@ -247,7 +235,7 @@ export const brands = pgTable(
     name: text("name").notNull(),
   },
   (table) => [uniqueIndex("brand_slug_key").on(table.slug)],
-);
+)
 
 /** Anything the shop sells. Measurements are metric; the API derives imperial. */
 export const products = pgTable(
@@ -286,9 +274,7 @@ export const products = pgTable(
     /** What full-text search matches: the name weighted above the description. */
     search: tsvector("search")
       .notNull()
-      .generatedAlwaysAs(
-        sql`setweight(to_tsvector('english', name), 'A') || setweight(to_tsvector('english', description), 'C')`,
-      ),
+      .generatedAlwaysAs(sql`setweight(to_tsvector('english', name), 'A') || setweight(to_tsvector('english', description), 'C')`),
   },
   (table) => [
     uniqueIndex("product_slug_key").on(table.slug),
@@ -300,7 +286,9 @@ export const products = pgTable(
     index("product_name_trgm_idx").using("gin", table.name.op("gin_trgm_ops")),
     // A product page asks whether another product of its category has the same name, however capitalized.
     index("product_category_name_idx").on(table.categoryId, sql`lower(${table.name})`),
-    index("product_featured_idx").on(table.featuredAt).where(sql`${table.featuredAt} IS NOT NULL`),
+    index("product_featured_idx")
+      .on(table.featuredAt)
+      .where(sql`${table.featuredAt} IS NOT NULL`),
     // The home page's newest and top-rated rows, read in order up to their first few products.
     // NULLS FIRST is what a plain DESC in ORDER BY means, so the queries read these in order.
     index("product_newest_idx").on(table.createdAt.desc().nullsFirst(), table.slug),
@@ -318,7 +306,7 @@ export const products = pgTable(
       sql`(${table.ratingCount} = 0 AND ${table.ratingAverage} = 0) OR (${table.ratingCount} > 0 AND ${table.ratingAverage} BETWEEN 1 AND 5)`,
     ),
   ],
-);
+)
 
 /**
  * One named fact about one product. The names are data: whatever the rows
@@ -334,11 +322,8 @@ export const productProperties = pgTable(
     name: text("name").notNull(),
     value: text("value").notNull(),
   },
-  (table) => [
-    primaryKey({ columns: [table.productId, table.name] }),
-    index("product_property_name_value_idx").on(table.name, table.value),
-  ],
-);
+  (table) => [primaryKey({ columns: [table.productId, table.name] }), index("product_property_name_value_idx").on(table.name, table.value)],
+)
 
 /** The pictures of a product, in the order they are shown. */
 export const productImages = pgTable(
@@ -364,7 +349,7 @@ export const productImages = pgTable(
     check("product_image_size_whole", sql`(${table.width} IS NULL) = (${table.height} IS NULL)`),
     check("product_image_size_positive", sql`${table.width} > 0 AND ${table.height} > 0`),
   ],
-);
+)
 
 /**
  * What shoppers said. One review per person per product. A review counts
@@ -403,12 +388,7 @@ export const productReviews = pgTable(
   (table) => [
     uniqueIndex("product_review_one_per_user_key").on(table.productId, table.userId),
     // The product page's default order: most helpful, then newest.
-    index("product_review_listing_idx").on(
-      table.productId,
-      table.status,
-      table.helpfulCount.desc(),
-      table.createdAt.desc(),
-    ),
+    index("product_review_listing_idx").on(table.productId, table.status, table.helpfulCount.desc(), table.createdAt.desc()),
     // The moderation queue: one status, oldest change first, read in order a page at a time.
     index("product_review_status_idx").on(table.status, table.updatedAt, table.id),
     check("product_review_rating_range", sql`${table.rating} BETWEEN 1 AND 5`),
@@ -416,13 +396,10 @@ export const productReviews = pgTable(
     check("product_review_title_length", sql`char_length(${table.title}) BETWEEN 1 AND 120`),
     check("product_review_body_length", sql`char_length(${table.body}) BETWEEN 1 AND 2000`),
     check("product_review_status_known", sql`${table.status} IN (${literals(ReviewStatus.NAMES)})`),
-    check(
-      "product_review_reason_when_rejected",
-      sql`(${table.rejectionReason} IS NOT NULL) = (${table.status} = 'rejected')`,
-    ),
+    check("product_review_reason_when_rejected", sql`(${table.rejectionReason} IS NOT NULL) = (${table.status} = 'rejected')`),
     check("product_review_helpful_not_negative", sql`${table.helpfulCount} >= 0`),
   ],
-);
+)
 
 /** One person finding one review helpful. */
 export const reviewVotes = pgTable(
@@ -440,7 +417,7 @@ export const reviewVotes = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.reviewId, table.userId] }), index("review_vote_user_idx").on(table.userId)],
-);
+)
 
 /* ----------------------------------------------------------------- commerce */
 
@@ -469,12 +446,9 @@ export const shippingMethods = pgTable(
   (table) => [
     check("shipping_method_price_not_negative", sql`${table.priceCents} >= 0`),
     check("shipping_method_free_from_positive", sql`${table.freeFromCents} IS NULL OR ${table.freeFromCents} > 0`),
-    check(
-      "shipping_method_days_range",
-      sql`1 <= ${table.minDays} AND ${table.minDays} <= ${table.maxDays} AND ${table.maxDays} <= 30`,
-    ),
+    check("shipping_method_days_range", sql`1 <= ${table.minDays} AND ${table.minDays} <= ${table.maxDays} AND ${table.maxDays} <= 30`),
   ],
-);
+)
 
 /**
  * A cart belongs to a user or to a guest's cookie, never both. A guest cart
@@ -498,11 +472,13 @@ export const carts = pgTable(
     uniqueIndex("cart_user_key").on(table.userId),
     uniqueIndex("cart_token_hash_key").on(table.tokenHash),
     // The cleanup scans guest carts by expiry.
-    index("cart_guest_expiry_idx").on(table.expiresAt).where(sql`${table.userId} IS NULL`),
+    index("cart_guest_expiry_idx")
+      .on(table.expiresAt)
+      .where(sql`${table.userId} IS NULL`),
     check("cart_one_owner", sql`(${table.userId} IS NULL) <> (${table.tokenHash} IS NULL)`),
     check("cart_guest_expires", sql`${table.userId} IS NOT NULL OR ${table.expiresAt} IS NOT NULL`),
   ],
-);
+)
 
 /** One product in one cart. Prices are read from the product, never stored here. */
 export const cartItems = pgTable(
@@ -524,7 +500,7 @@ export const cartItems = pgTable(
     index("cart_item_product_idx").on(table.productId),
     check("cart_item_quantity_range", sql`${table.quantity} BETWEEN 1 AND 99`),
   ],
-);
+)
 
 /**
  * A placed order. The contact, the address and a guest's access key are
@@ -601,12 +577,9 @@ export const orders = pgTable(
       "customer_order_tracking_after_shipping",
       sql`${table.trackingNumber} IS NULL OR ${table.status} IN ('shipped', 'delivered', 'refunded')`,
     ),
-    check(
-      "customer_order_delivery_window",
-      sql`${table.estimatedDeliveryFrom} <= ${table.estimatedDeliveryTo}`,
-    ),
+    check("customer_order_delivery_window", sql`${table.estimatedDeliveryFrom} <= ${table.estimatedDeliveryTo}`),
   ],
-);
+)
 
 /**
  * One product of an order, as it was sold. The name, slug and price are a
@@ -637,7 +610,7 @@ export const orderLines = pgTable(
     check("order_line_price_not_negative", sql`${table.unitPriceCents} >= 0`),
     check("order_line_total_adds_up", sql`${table.lineTotalCents} = ${table.unitPriceCents} * ${table.quantity}`),
   ],
-);
+)
 
 /** An order's timeline: one row per status it reached. */
 export const orderEvents = pgTable(
@@ -658,7 +631,7 @@ export const orderEvents = pgTable(
     index("order_event_order_created_idx").on(table.orderId, table.createdAt),
     check("order_event_status_known", sql`${table.status} IN (${literals(OrderStatus.NAMES)})`),
   ],
-);
+)
 
 /**
  * Money moving for an order: one charge, and at most one refund. The
@@ -689,7 +662,7 @@ export const payments = pgTable(
     check("payment_status_known", sql`${table.status} IN ('pending', 'succeeded', 'failed', 'canceled')`),
     check("payment_amount_not_negative", sql`${table.amountCents} >= 0`),
   ],
-);
+)
 
 /**
  * Messages waiting to be published. A module writes one in the same
@@ -707,8 +680,12 @@ export const outboxMessages = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     publishedAt: timestamp("published_at", { withTimezone: true }),
   },
-  (table) => [index("outbox_message_unpublished_idx").on(table.createdAt).where(sql`${table.publishedAt} IS NULL`)],
-);
+  (table) => [
+    index("outbox_message_unpublished_idx")
+      .on(table.createdAt)
+      .where(sql`${table.publishedAt} IS NULL`),
+  ],
+)
 
 /* ---------------------------------------------------------------- accounts */
 
@@ -729,9 +706,11 @@ export const addresses = pgTable(
   },
   (table) => [
     index("address_user_idx").on(table.userId),
-    uniqueIndex("address_one_default_key").on(table.userId).where(sql`${table.isDefault}`),
+    uniqueIndex("address_one_default_key")
+      .on(table.userId)
+      .where(sql`${table.isDefault}`),
   ],
-);
+)
 
 /* -------------------------------------------------------------------- staff */
 
@@ -768,7 +747,7 @@ export const auditEvents = pgTable(
     index("audit_event_actor_created_idx").on(table.actorId, table.createdAt.desc()),
     index("audit_event_target_idx").on(table.targetType, table.targetId),
   ],
-);
+)
 
 /* ---------------------------------------------------------------- relations */
 
@@ -779,19 +758,19 @@ export const productRelations = relations(products, ({ one, many }) => ({
   images: many(productImages),
   properties: many(productProperties),
   reviews: many(productReviews),
-}));
+}))
 
 export const productImageRelations = relations(productImages, ({ one }) => ({
   product: one(products, { fields: [productImages.productId], references: [products.id] }),
-}));
+}))
 
 export const productPropertyRelations = relations(productProperties, ({ one }) => ({
   product: one(products, { fields: [productProperties.productId], references: [products.id] }),
-}));
+}))
 
 export const productReviewRelations = relations(productReviews, ({ one }) => ({
   product: one(products, { fields: [productReviews.productId], references: [products.id] }),
-}));
+}))
 
 /** Every table and relation, as the query builder is typed against. */
 export const schema = {
@@ -821,4 +800,4 @@ export const schema = {
   productImageRelations,
   productPropertyRelations,
   productReviewRelations,
-};
+}

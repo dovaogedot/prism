@@ -5,24 +5,24 @@
  * check alone decides.
  */
 
-import type { ShippingAddress } from "@prism/shared";
+import type { ShippingAddress } from "@prism/shared"
 
 /** What a lookup found. `unavailable` means nobody could say. */
-export type AddressVerdict = "verified" | "not_found" | "unavailable";
+export type AddressVerdict = "verified" | "not_found" | "unavailable"
 
 /** Looking an address up. Never rejects. */
 export type AddressVerifier = Readonly<{
-  verify: (address: ShippingAddress) => Promise<AddressVerdict>;
-}>;
+  verify: (address: ShippingAddress) => Promise<AddressVerdict>
+}>
 
 /** A verifier whose answer a test chooses, and which records what it was asked. */
 export type FakeAddressVerifier = AddressVerifier &
   Readonly<{
-    asked: readonly ShippingAddress[];
-    answer: (verdict: AddressVerdict) => void;
+    asked: readonly ShippingAddress[]
+    answer: (verdict: AddressVerdict) => void
     /** Forgets what was asked and answers `verified` again. */
-    clear: () => void;
-  }>;
+    clear: () => void
+  }>
 
 export const AddressVerifier = {
   TIMEOUT_MS: 5000,
@@ -41,22 +41,22 @@ export const AddressVerifier = {
         city: address.city,
         postalcode: address.postalCode,
         countrycodes: address.country.toLowerCase(),
-      });
+      })
 
       try {
         const response = await fetch(`${baseUrl}/search?${query}`, {
           headers: { "user-agent": userAgent, accept: "application/json" },
           signal: AbortSignal.timeout(AddressVerifier.TIMEOUT_MS),
-        });
+        })
 
-        if (!response.ok) return "unavailable";
+        if (!response.ok) return "unavailable"
 
-        const results: unknown = await response.json();
-        if (!Array.isArray(results)) return "unavailable";
+        const results: unknown = await response.json()
+        if (!Array.isArray(results)) return "unavailable"
 
-        return results.length > 0 ? "verified" : "not_found";
+        return results.length > 0 ? "verified" : "not_found"
       } catch {
-        return "unavailable";
+        return "unavailable"
       }
     },
   }),
@@ -66,22 +66,22 @@ export const AddressVerifier = {
 
   /** Answers `verified` until told otherwise. */
   fake: (): FakeAddressVerifier => {
-    const asked: ShippingAddress[] = [];
-    let verdict: AddressVerdict = "verified";
+    const asked: ShippingAddress[] = []
+    let verdict: AddressVerdict = "verified"
 
     return {
       asked,
       answer: (next) => {
-        verdict = next;
+        verdict = next
       },
       clear: () => {
-        asked.length = 0;
-        verdict = "verified";
+        asked.length = 0
+        verdict = "verified"
       },
       verify: async (address) => {
-        asked.push(address);
-        return verdict;
+        asked.push(address)
+        return verdict
       },
-    };
+    }
   },
-} as const;
+} as const

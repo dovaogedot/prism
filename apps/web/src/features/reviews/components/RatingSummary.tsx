@@ -1,12 +1,12 @@
-import type { RatingDistribution } from "@prism/shared";
-import { Stars } from "../../../shared/ui/index.ts";
+import type { RatingDistribution } from "@prism/shared"
+import { Stars } from "../../../shared/ui/index.ts"
 
 /** The average, how many reviews make it, and how many gave each number of stars. */
-export type RatingSummaryProps = Readonly<{ average: number | undefined; count: number; distribution: RatingDistribution }>;
+export type RatingSummaryProps = Readonly<{ average: number | undefined; count: number; distribution: RatingDistribution }>
 
 /** The product's rating at a glance: the average in stars, and a bar per number of stars. */
 export const RatingSummary = ({ average, count, distribution }: RatingSummaryProps) => {
-  const stars = ["5", "4", "3", "2", "1"] as const;
+  const stars = ["5", "4", "3", "2", "1"] as const
 
   return (
     <div className="space-y-4">
@@ -25,7 +25,7 @@ export const RatingSummary = ({ average, count, distribution }: RatingSummaryPro
 
       <ul className="space-y-1.5" aria-label="Reviews by stars">
         {stars.map((star) => {
-          const share = count === 0 ? 0 : distribution[star] / count;
+          const share = count === 0 ? 0 : distribution[star] / count
 
           return (
             <li className="flex items-center gap-3 text-sm" key={star}>
@@ -35,9 +35,9 @@ export const RatingSummary = ({ average, count, distribution }: RatingSummaryPro
               </span>
               <span className="w-10 shrink-0 text-right tabular-nums text-ink-soft">{distribution[star]}</span>
             </li>
-          );
+          )
         })}
       </ul>
     </div>
-  );
-};
+  )
+}

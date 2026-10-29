@@ -1,9 +1,9 @@
-import { QueryCache, QueryClient, QueryObserver } from "@tanstack/react-query";
-import { describe, expect, it } from "vitest";
-import { AdminAccess, AdminKeys } from "../src/features/admin/admin.ts";
-import { ApiError } from "../src/shared/api/client.ts";
+import { QueryCache, QueryClient, QueryObserver } from "@tanstack/react-query"
+import { describe, expect, it } from "vitest"
+import { AdminAccess, AdminKeys } from "../src/features/admin/admin.ts"
+import { ApiError } from "../src/shared/api/client.ts"
 
-const stepUp = new ApiError(403, { code: "TwoFactorVerificationRequired", message: "Confirm it is you.", issues: [] });
+const stepUp = new ApiError(403, { code: "TwoFactorVerificationRequired", message: "Confirm it is you.", issues: [] })
 
 /**
  * A client wired the way main.tsx wires it, whose summary the API refuses for
@@ -11,56 +11,64 @@ const stepUp = new ApiError(403, { code: "TwoFactorVerificationRequired", messag
  * the count instead of hanging the run.
  */
 const clientRefusingTheSummary = () => {
-  let fetches = 0;
+  let fetches = 0
 
   const client: QueryClient = new QueryClient({
     queryCache: new QueryCache({ onError: (reason, query) => AdminAccess.onFailure(client, reason, query.queryKey) }),
-  });
+  })
 
   const observer = new QueryObserver(client, {
     queryKey: AdminKeys.summary,
     queryFn: async () => {
-      fetches += 1;
-      if (fetches > 5) return {};
-      throw stepUp;
+      fetches += 1
+      if (fetches > 5) return {}
+      throw stepUp
     },
     retry: false,
-  });
-  const unsubscribe = observer.subscribe(() => {});
+  })
+  const unsubscribe = observer.subscribe(() => {})
 
-  return { client, fetches: () => fetches, unsubscribe };
-};
+  return { client, fetches: () => fetches, unsubscribe }
+}
 
 describe("AdminAccess.onFailure", () => {
   it("fetches a summary that asks for a step-up once, so the gate can show the code form", async () => {
-    const { client, fetches, unsubscribe } = clientRefusingTheSummary();
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    const { client, fetches, unsubscribe } = clientRefusingTheSummary()
+    await new Promise((resolve) => setTimeout(resolve, 100))
 
-    expect(fetches()).toBe(1);
-    expect(client.getQueryState(AdminKeys.summary)?.status).toBe("error");
-    unsubscribe();
-  });
+    expect(fetches()).toBe(1)
+    expect(client.getQueryState(AdminKeys.summary)?.status).toBe("error")
+    unsubscribe()
+  })
 
   it("asks the summary again when another admin read is refused for a step-up", async () => {
-    const { client, fetches, unsubscribe } = clientRefusingTheSummary();
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    const { client, fetches, unsubscribe } = clientRefusingTheSummary()
+    await new Promise((resolve) => setTimeout(resolve, 50))
 
-    AdminAccess.onFailure(client, stepUp, AdminKeys.of("/orders"));
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    AdminAccess.onFailure(client, stepUp, AdminKeys.of("/orders"))
+    await new Promise((resolve) => setTimeout(resolve, 50))
 
-    expect(fetches()).toBe(2);
-    unsubscribe();
-  });
+    expect(fetches()).toBe(2)
+    unsubscribe()
+  })
 
   it("asks the summary again when an admin read is refused because the staff roles are gone", async () => {
-    const { client, fetches, unsubscribe } = clientRefusingTheSummary();
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    const { client, fetches, unsubscribe } = clientRefusingTheSummary()
+    await new Promise((resolve) => setTimeout(resolve, 50))
 
-    AdminAccess.onFailure(client, new ApiError(403, { code: "Forbidden", message: "Your account cannot do that.", issues: [] }), AdminKeys.of("/orders"));
-    AdminAccess.onFailure(client, new ApiError(404, { code: "OrderNotFound", message: "We could not find that order.", issues: [] }), AdminKeys.of("/orders/x"));
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    AdminAccess.onFailure(
+      client,
+      new ApiError(403, { code: "Forbidden", message: "Your account cannot do that.", issues: [] }),
+      AdminKeys.of("/orders"),
+    )
+    AdminAccess.onFailure(
+      client,
+      new ApiError(404, { code: "OrderNotFound", message: "We could not find that order.", issues: [] }),
+      AdminKeys.of("/orders/x"),
+    )
+    await new Promise((resolve) => setTimeout(resolve, 50))
 
-    expect(fetches()).toBe(2);
-    unsubscribe();
-  });
-});
+    expect(fetches()).toBe(2)
+    unsubscribe()
+  })
+})

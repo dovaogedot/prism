@@ -19,63 +19,63 @@ import type {
   ReviewViewer,
   Slug,
   UserId,
-} from "@prism/shared";
-import { errAsync, okAsync, ResultAsync } from "neverthrow";
-import type { Clock } from "../../platform/clock.ts";
-import type { StaffActor } from "../staff/audit.ts";
-import type { Decision, ModerationOutcome, ReviewRepository, VoteOutcome } from "./repository.ts";
+} from "@prism/shared"
+import { errAsync, okAsync, ResultAsync } from "neverthrow"
+import type { Clock } from "../../platform/clock.ts"
+import type { StaffActor } from "../staff/audit.ts"
+import type { Decision, ModerationOutcome, ReviewRepository, VoteOutcome } from "./repository.ts"
 
 /** What the reviews service works through. */
 export type ReviewDependencies = Readonly<{
-  repository: ReviewRepository;
+  repository: ReviewRepository
   /** The first word of the reader's profile name, to start a byline with. */
-  firstNameOf: (userId: UserId) => Promise<string | undefined>;
-  clock: Clock;
-}>;
+  firstNameOf: (userId: UserId) => Promise<string | undefined>
+  clock: Clock
+}>
 
 /** Everything the reviews module does. */
 export type ReviewService = Readonly<{
-  published: (slug: Slug, query: ReviewQueryParams) => ResultAsync<ReviewPage, DomainError>;
-  viewer: (slug: Slug, userId: UserId) => ResultAsync<ReviewViewer, DomainError>;
+  published: (slug: Slug, query: ReviewQueryParams) => ResultAsync<ReviewPage, DomainError>
+  viewer: (slug: Slug, userId: UserId) => ResultAsync<ReviewViewer, DomainError>
   /** Writes or edits the reader's review, which then waits for a moderator. */
-  saveOwn: (slug: Slug, userId: UserId, review: ReviewInput) => ResultAsync<OwnReview, DomainError>;
-  deleteOwn: (slug: Slug, userId: UserId) => ResultAsync<void, DomainError>;
-  vote: (reviewId: ReviewId, userId: UserId) => ResultAsync<void, DomainError>;
-  unvote: (reviewId: ReviewId, userId: UserId) => ResultAsync<void, DomainError>;
-  listQueue: (query: AdminReviewQuery) => Promise<Page<AdminReviewView>>;
-  moderate: (actor: StaffActor, reviewId: ReviewId, decision: Decision) => ResultAsync<void, DomainError>;
-  remove: (actor: StaffActor, reviewId: ReviewId) => ResultAsync<void, DomainError>;
-}>;
+  saveOwn: (slug: Slug, userId: UserId, review: ReviewInput) => ResultAsync<OwnReview, DomainError>
+  deleteOwn: (slug: Slug, userId: UserId) => ResultAsync<void, DomainError>
+  vote: (reviewId: ReviewId, userId: UserId) => ResultAsync<void, DomainError>
+  unvote: (reviewId: ReviewId, userId: UserId) => ResultAsync<void, DomainError>
+  listQueue: (query: AdminReviewQuery) => Promise<Page<AdminReviewView>>
+  moderate: (actor: StaffActor, reviewId: ReviewId, decision: Decision) => ResultAsync<void, DomainError>
+  remove: (actor: StaffActor, reviewId: ReviewId) => ResultAsync<void, DomainError>
+}>
 
 export const ReviewService = {
   PER_PAGE: 10,
 
   /** A refusal for a vote that changed nothing for a reason the reader should hear. */
   voteFailure: (outcome: VoteOutcome): DomainError | undefined => {
-    if (outcome._tag === "NotFound") return { _tag: "ReviewNotFound" };
-    if (outcome._tag === "OwnReview") return { _tag: "Forbidden" };
-    return undefined;
+    if (outcome._tag === "NotFound") return { _tag: "ReviewNotFound" }
+    if (outcome._tag === "OwnReview") return { _tag: "Forbidden" }
+    return undefined
   },
 
   moderationFailure: (outcome: ModerationOutcome): DomainError | undefined =>
     outcome._tag === "NotFound" ? { _tag: "ReviewNotFound" } : undefined,
 
   create: (deps: ReviewDependencies): ReviewService => {
-    const { repository, clock } = deps;
+    const { repository, clock } = deps
 
     const productOf = (slug: Slug): ResultAsync<ProductId, DomainError> =>
       ResultAsync.fromSafePromise(repository.productIdOf(slug)).andThen((productId) =>
         productId === undefined
           ? errAsync<ProductId, DomainError>({ _tag: "ProductNotFound" })
           : okAsync<ProductId, DomainError>(productId),
-      );
+      )
 
     /** Succeeds unless `failureOf` names a refusal for what `outcome` found. */
     const settle = <O>(outcome: Promise<O>, failureOf: (settled: O) => DomainError | undefined): ResultAsync<void, DomainError> =>
       ResultAsync.fromSafePromise(outcome).andThen((settled) => {
-        const failure = failureOf(settled);
-        return failure === undefined ? okAsync<void, DomainError>(undefined) : errAsync<void, DomainError>(failure);
-      });
+        const failure = failureOf(settled)
+        return failure === undefined ? okAsync<void, DomainError>(undefined) : errAsync<void, DomainError>(failure)
+      })
 
     return {
       published: (slug, query) =>
@@ -104,15 +104,13 @@ export const ReviewService = {
       saveOwn: (slug, userId, review) =>
         productOf(slug).andThen((productId) =>
           ResultAsync.fromSafePromise(repository.isDeliveredTo(productId, userId)).andThen((isDelivered) => {
-            if (!isDelivered) return errAsync<OwnReview, DomainError>({ _tag: "ReviewNotAllowed" });
+            if (!isDelivered) return errAsync<OwnReview, DomainError>({ _tag: "ReviewNotAllowed" })
 
             return ResultAsync.fromSafePromise(
-              repository
-                .saveOwn({ productId, userId, review, now: clock.now() })
-                .then(() => repository.findOwn(productId, userId)),
+              repository.saveOwn({ productId, userId, review, now: clock.now() }).then(() => repository.findOwn(productId, userId)),
             ).andThen((saved) =>
               saved === undefined ? errAsync<OwnReview, DomainError>({ _tag: "ReviewNotFound" }) : okAsync<OwnReview, DomainError>(saved),
-            );
+            )
           }),
         ),
 
@@ -133,6 +131,6 @@ export const ReviewService = {
         settle(repository.moderate({ reviewId, decision, actor, now: clock.now() }), ReviewService.moderationFailure),
 
       remove: (actor, reviewId) => settle(repository.remove({ reviewId, actor }), ReviewService.moderationFailure),
-    };
+    }
   },
-} as const;
+} as const

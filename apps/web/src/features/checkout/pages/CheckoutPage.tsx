@@ -1,21 +1,21 @@
-import { Pricing, type CheckoutPrefill, type ShippingOption } from "@prism/shared";
-import { Elements } from "@stripe/react-stripe-js";
-import { useQuery } from "@tanstack/react-query";
-import { useRef } from "react";
-import { Link } from "react-router";
-import { match, P } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
-import { useTheme } from "../../../shared/theme/use-theme.ts";
-import { Alert, Button, Card, Skeleton } from "../../../shared/ui/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { useSession } from "../../auth/session.ts";
-import { AccountKeys, useSavedAddresses } from "../../account/account.ts";
-import { useCart } from "../../cart/cart.ts";
-import { StripeFields, usePaymentsConfig, useStripeJs } from "../checkout.ts";
-import { CheckoutBody, StripeCheckout } from "../components/index.ts";
-import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { useShippingOptions } from "../../../shared/api/shipping-options.ts";
+import { Pricing, type CheckoutPrefill, type ShippingOption } from "@prism/shared"
+import { Elements } from "@stripe/react-stripe-js"
+import { useQuery } from "@tanstack/react-query"
+import { useRef } from "react"
+import { Link } from "react-router"
+import { match, P } from "ts-pattern"
+import { Api } from "../../../shared/api/client.ts"
+import { useTheme } from "../../../shared/theme/use-theme.ts"
+import { Alert, Button, Card, Skeleton } from "../../../shared/ui/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { useSession } from "../../auth/session.ts"
+import { AccountKeys, useSavedAddresses } from "../../account/account.ts"
+import { useCart } from "../../cart/cart.ts"
+import { StripeFields, usePaymentsConfig, useStripeJs } from "../checkout.ts"
+import { CheckoutBody, StripeCheckout } from "../components/index.ts"
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { useShippingOptions } from "../../../shared/api/shipping-options.ts"
 
 /**
  * Checkout on one page. It waits for the cart, the payment settings, the
@@ -23,35 +23,35 @@ import { useShippingOptions } from "../../../shared/api/shipping-options.ts";
  * starts complete.
  */
 export const CheckoutPage = () => {
-  const session = useSession();
+  const session = useSession()
 
-  const { theme } = useTheme();
+  const { theme } = useTheme()
 
-  const cart = useCart();
+  const cart = useCart()
 
-  const config = usePaymentsConfig();
+  const config = usePaymentsConfig()
 
-  const options = useShippingOptions();
+  const options = useShippingOptions()
 
   // Starts as soon as the shop says it takes cards, beside the other reads.
-  const stripeJs = useStripeJs(config.data?.provider === "stripe" ? config.data.publishableKey : undefined);
+  const stripeJs = useStripeJs(config.data?.provider === "stripe" ? config.data.publishableKey : undefined)
 
   const prefill = useQuery({
     queryKey: AccountKeys.checkoutPrefill(session?.id),
     queryFn: ({ signal }) => Api.get<CheckoutPrefill>("/checkout/prefill", signal),
     enabled: session !== undefined,
     retry: false,
-  });
+  })
 
-  const saved = useSavedAddresses();
+  const saved = useSavedAddresses()
 
   // The amount Stripe's fields start from. Elements applies an option it sees
   // change after CheckoutBody has set the chosen option's total, so it only
   // ever sees this first one, and CheckoutBody keeps the amount current.
-  const startingAmount = useRef<number | undefined>(undefined);
+  const startingAmount = useRef<number | undefined>(undefined)
 
   // A failed prefill only means an empty form; it never blocks checkout.
-  const prefillSettled = session === undefined || (prefill.status !== "pending" && saved.status !== "pending");
+  const prefillSettled = session === undefined || (prefill.status !== "pending" && saved.status !== "pending")
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
@@ -91,31 +91,31 @@ export const CheckoutPage = () => {
           </Card>
         ))
         .otherwise(({ cart: { data: view }, config: { data: payments }, options: { data: offered } }) => {
-          if (view === undefined || payments === undefined || offered === undefined) return null;
+          if (view === undefined || payments === undefined || offered === undefined) return null
 
-          const [first, ...rest] = offered;
+          const [first, ...rest] = offered
           if (first === undefined) {
             return (
               <Alert title="Delivery is paused">
                 No delivery options are offered right now, so orders cannot be placed. Try again later.
               </Alert>
-            );
+            )
           }
 
-          const choices: readonly [ShippingOption, ...ShippingOption[]] = [first, ...rest];
+          const choices: readonly [ShippingOption, ...ShippingOption[]] = [first, ...rest]
           const known = {
             ...(prefill.data === undefined ? {} : { prefill: prefill.data }),
             ...(session === undefined ? {} : { savedAddresses: saved.data ?? [] }),
-          };
+          }
 
           if (payments.provider === "unavailable") {
-            return <CheckoutBody cart={view} options={choices} payments={{ status: "unavailable" }} {...known} />;
+            return <CheckoutBody cart={view} options={choices} payments={{ status: "unavailable" }} {...known} />
           }
           if (payments.provider === "simulated") {
-            return <CheckoutBody cart={view} options={choices} payments={{ status: "simulated" }} {...known} />;
+            return <CheckoutBody cart={view} options={choices} payments={{ status: "simulated" }} {...known} />
           }
 
-          startingAmount.current ??= Pricing.totals(view.lines, first).totalCents;
+          startingAmount.current ??= Pricing.totals(view.lines, first).totalCents
 
           return (
             <div className="space-y-6">
@@ -141,8 +141,8 @@ export const CheckoutPage = () => {
                 <StripeCheckout cart={view} options={choices} {...known} />
               </Elements>
             </div>
-          );
+          )
         })}
     </div>
-  );
-};
+  )
+}

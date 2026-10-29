@@ -16,8 +16,8 @@ export const Seo = {
 
   /** `text` cleaned, and ended with a full stop unless it already ends a sentence. */
   sentence: (text: string): string => {
-    const cleaned = Seo.clean(text);
-    return cleaned.length === 0 || /[.!?…]$/.test(cleaned) ? cleaned : `${cleaned}.`;
+    const cleaned = Seo.clean(text)
+    return cleaned.length === 0 || /[.!?…]$/.test(cleaned) ? cleaned : `${cleaned}.`
   },
 
   /**
@@ -27,19 +27,19 @@ export const Seo = {
    * inside the word.
    */
   cut: (text: string, max: number): string => {
-    if (text.length <= max) return text;
+    if (text.length <= max) return text
 
-    const room = text.slice(0, max + 1);
-    const boundary = room.lastIndexOf(" ");
-    const kept = boundary > 0 ? room.slice(0, boundary) : text.slice(0, max);
+    const room = text.slice(0, max + 1)
+    const boundary = room.lastIndexOf(" ")
+    const kept = boundary > 0 ? room.slice(0, boundary) : text.slice(0, max)
 
-    return kept.replace(/[\s,;:(-]+$/, "");
+    return kept.replace(/[\s,;:(-]+$/, "")
   },
 
   /** "<page> | Prism", the page part cut at a word boundary so the whole stays within 60 characters. */
   title: (page: string): string => {
-    const suffix = ` | ${Seo.SITE}`;
-    return `${Seo.cut(Seo.clean(page), Seo.TITLE_MAX - suffix.length)}${suffix}`;
+    const suffix = ` | ${Seo.SITE}`
+    return `${Seo.cut(Seo.clean(page), Seo.TITLE_MAX - suffix.length)}${suffix}`
   },
 
   /**
@@ -51,36 +51,36 @@ export const Seo = {
    * longest text within 160 is returned.
    */
   description: (fragments: readonly string[]): string => {
-    const [lead = "", ...rest] = fragments.map(Seo.sentence).filter((fragment) => fragment.length > 0);
-    let best = "";
+    const [lead = "", ...rest] = fragments.map(Seo.sentence).filter((fragment) => fragment.length > 0)
+    let best = ""
 
     for (const opening of Seo.openings(lead)) {
       // Masks count down, so a set holding an earlier fragment comes before one without it.
       for (let mask = 2 ** rest.length - 1; mask >= 0; mask -= 1) {
-        let text = opening;
+        let text = opening
 
         for (let index = 0; index < rest.length; index += 1) {
-          if ((mask & (1 << (rest.length - 1 - index))) !== 0) text = `${text} ${rest[index] ?? ""}`;
+          if ((mask & (1 << (rest.length - 1 - index))) !== 0) text = `${text} ${rest[index] ?? ""}`
         }
 
-        if (text.length > Seo.DESCRIPTION_MAX) continue;
-        if (text.length >= Seo.DESCRIPTION_MIN) return text;
-        if (text.length > best.length) best = text;
+        if (text.length > Seo.DESCRIPTION_MAX) continue
+        if (text.length >= Seo.DESCRIPTION_MIN) return text
+        if (text.length > best.length) best = text
       }
     }
 
-    return best;
+    return best
   },
 
   /** The ways a description can open with `lead`: whole when it fits, then cut shorter word by word. */
   openings: (lead: string): readonly string[] => {
-    const openings: string[] = lead.length <= Seo.DESCRIPTION_MAX ? [lead] : [];
+    const openings: string[] = lead.length <= Seo.DESCRIPTION_MAX ? [lead] : []
 
     for (let max = Math.min(lead.length, Seo.DESCRIPTION_MAX) - 1; max >= Seo.OPENING_MIN; max -= 1) {
-      const opening = `${Seo.cut(lead, max - 1)}…`;
-      if (opening !== openings.at(-1)) openings.push(opening);
+      const opening = `${Seo.cut(lead, max - 1)}…`
+      if (opening !== openings.at(-1)) openings.push(opening)
     }
 
-    return openings;
+    return openings
   },
-} as const;
+} as const

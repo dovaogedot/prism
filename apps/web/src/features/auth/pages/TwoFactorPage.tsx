@@ -1,18 +1,18 @@
-import { TwoFactorLoginInput, type AccessGrant } from "@prism/shared";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useState, type ReactNode } from "react";
-import { useForm } from "react-hook-form";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
-import { match, P } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
-import { Alert, Button, Field } from "../../../shared/ui/index.ts";
-import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { ChallengeState } from "../challenge-state.ts";
-import { NextPath } from "../next-path.ts";
-import { AuthShell } from "../components/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { TokenStore } from "../../../shared/api/token-store.ts";
+import { TwoFactorLoginInput, type AccessGrant } from "@prism/shared"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useState, type ReactNode } from "react"
+import { useForm } from "react-hook-form"
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router"
+import { match, P } from "ts-pattern"
+import { Api } from "../../../shared/api/client.ts"
+import { Alert, Button, Field } from "../../../shared/ui/index.ts"
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { ChallengeState } from "../challenge-state.ts"
+import { NextPath } from "../next-path.ts"
+import { AuthShell } from "../components/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { TokenStore } from "../../../shared/api/token-store.ts"
 
 /**
  * What the person types. The challenge token is no field of the form, so
@@ -20,41 +20,41 @@ import { TokenStore } from "../../../shared/api/token-store.ts";
  */
 const CodeForm = {
   schema: TwoFactorLoginInput.schema.pick({ code: true }),
-} as const;
+} as const
 
 /**
  * The second step of a challenged sign-in. Opened without a challenge, it
  * still takes a code, and the server refuses it.
  */
 export const TwoFactorPage = () => {
-  const navigate = useNavigate();
-  const { state } = useLocation();
-  const [params] = useSearchParams();
+  const navigate = useNavigate()
+  const { state } = useLocation()
+  const [params] = useSearchParams()
   // A provider's sign-in arrives with no `?next=`; the path it remembered waits in storage. Read once, since recalling it forgets it.
-  const [next] = useState(() => (params.has("next") ? NextPath.of(params.get("next")) : NextPath.recall()));
-  const [failure, setFailure] = useState<ReactNode | undefined>(undefined);
+  const [next] = useState(() => (params.has("next") ? NextPath.of(params.get("next")) : NextPath.recall()))
+  const [failure, setFailure] = useState<ReactNode | undefined>(undefined)
   // Read once, at mount: the token for this attempt cannot change.
-  const [challengeToken] = useState(() => ChallengeState.read(state));
+  const [challengeToken] = useState(() => ChallengeState.read(state))
 
   const form = useForm({
     resolver: zodResolver(CodeForm.schema),
     defaultValues: { code: "" },
-  });
+  })
 
   const submit = form.handleSubmit(async ({ code }) => {
-    setFailure(undefined);
+    setFailure(undefined)
 
     // Without a token the code goes alone, and the server reads the
     // challenge from its cookie.
-    const body: TwoFactorLoginInput = challengeToken === undefined ? { code } : { challengeToken, code };
+    const body: TwoFactorLoginInput = challengeToken === undefined ? { code } : { challengeToken, code }
 
     await Api.postWithoutRetry<{ status: "authenticated"; grant: AccessGrant }>("/auth/login/2fa", body)
       .then((outcome) => {
-        TokenStore.set(outcome.grant.accessToken, outcome.grant.user);
-        void navigate(next, { replace: true });
+        TokenStore.set(outcome.grant.accessToken, outcome.grant.user)
+        void navigate(next, { replace: true })
       })
-      .catch((reason: unknown) => setFailure(Failure.describe(reason)));
-  });
+      .catch((reason: unknown) => setFailure(Failure.describe(reason)))
+  })
 
   return (
     <AuthShell
@@ -70,7 +70,9 @@ export const TwoFactorPage = () => {
       <form onSubmit={(event) => void submit(event)} className="space-y-4" noValidate>
         {match(failure)
           .with(P.nullish, () => null)
-          .otherwise((message) => <Alert>{message}</Alert>)}
+          .otherwise((message) => (
+            <Alert>{message}</Alert>
+          ))}
 
         <Field
           label="Six-digit code"
@@ -88,5 +90,5 @@ export const TwoFactorPage = () => {
         </Button>
       </form>
     </AuthShell>
-  );
-};
+  )
+}

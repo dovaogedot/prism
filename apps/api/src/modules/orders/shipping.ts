@@ -5,36 +5,30 @@
  * they were, and an option that orders use cannot be deleted.
  */
 
-import type {
-  DomainError,
-  ShippingMethodCode,
-  ShippingMethodInput,
-  ShippingMethodView,
-  ShippingOption,
-} from "@prism/shared";
-import { asc, count, eq } from "drizzle-orm";
-import { errAsync, okAsync, ResultAsync } from "neverthrow";
-import type { Database } from "../../db/client.ts";
-import { PgError } from "../../db/pg-error.ts";
-import { orders, shippingMethods } from "../../db/schema.ts";
-import type { Clock } from "../../platform/clock.ts";
-import { AuditLog, type StaffActor } from "../staff/audit.ts";
+import type { DomainError, ShippingMethodCode, ShippingMethodInput, ShippingMethodView, ShippingOption } from "@prism/shared"
+import { asc, count, eq } from "drizzle-orm"
+import { errAsync, okAsync, ResultAsync } from "neverthrow"
+import type { Database } from "../../db/client.ts"
+import { PgError } from "../../db/pg-error.ts"
+import { orders, shippingMethods } from "../../db/schema.ts"
+import type { Clock } from "../../platform/clock.ts"
+import { AuditLog, type StaffActor } from "../staff/audit.ts"
 
 /** Every read and write of the delivery options. */
 export type ShippingMethods = Readonly<{
   /** The options checkout offers, in their order. */
-  listActive: () => Promise<readonly ShippingOption[]>;
+  listActive: () => Promise<readonly ShippingOption[]>
   /** The active option with `code`, or `undefined`. */
-  findActive: (code: ShippingMethodCode) => Promise<ShippingOption | undefined>;
+  findActive: (code: ShippingMethodCode) => Promise<ShippingOption | undefined>
   /** Every option, inactive ones included, with how many orders used each. */
-  listAll: () => Promise<readonly ShippingMethodView[]>;
-  create: (actor: StaffActor, input: ShippingMethodInput) => ResultAsync<ShippingMethodView, DomainError>;
-  update: (actor: StaffActor, code: ShippingMethodCode, input: ShippingMethodInput) => ResultAsync<ShippingMethodView, DomainError>;
-  remove: (actor: StaffActor, code: ShippingMethodCode) => ResultAsync<void, DomainError>;
-}>;
+  listAll: () => Promise<readonly ShippingMethodView[]>
+  create: (actor: StaffActor, input: ShippingMethodInput) => ResultAsync<ShippingMethodView, DomainError>
+  update: (actor: StaffActor, code: ShippingMethodCode, input: ShippingMethodInput) => ResultAsync<ShippingMethodView, DomainError>
+  remove: (actor: StaffActor, code: ShippingMethodCode) => ResultAsync<void, DomainError>
+}>
 
 /** A row as the reads return it. */
-type MethodRow = typeof shippingMethods.$inferSelect;
+type MethodRow = typeof shippingMethods.$inferSelect
 
 export const ShippingMethods = {
   optionOf: (row: MethodRow): ShippingOption => ({
@@ -47,15 +41,17 @@ export const ShippingMethods = {
   }),
 
   /** The fields an audit entry compares, none of them personal. */
-  auditedOf: (option: Readonly<{
-    name: string;
-    priceCents: number;
-    freeFromCents?: number | undefined;
-    minDays: number;
-    maxDays: number;
-    isActive: boolean;
-    position: number;
-  }>) => ({
+  auditedOf: (
+    option: Readonly<{
+      name: string
+      priceCents: number
+      freeFromCents?: number | undefined
+      minDays: number
+      maxDays: number
+      isActive: boolean
+      position: number
+    }>,
+  ) => ({
     name: option.name,
     priceCents: option.priceCents,
     freeFromCents: option.freeFromCents ?? null,
@@ -67,13 +63,13 @@ export const ShippingMethods = {
 
   create: (db: Database, audit: AuditLog, clock: Clock): ShippingMethods => {
     const viewOf = async (code: ShippingMethodCode): Promise<ShippingMethodView | undefined> => {
-      const [row] = await db.select().from(shippingMethods).where(eq(shippingMethods.code, code));
-      if (row === undefined) return undefined;
+      const [row] = await db.select().from(shippingMethods).where(eq(shippingMethods.code, code))
+      if (row === undefined) return undefined
 
-      const [used] = await db.select({ total: count() }).from(orders).where(eq(orders.shippingMethod, code));
+      const [used] = await db.select({ total: count() }).from(orders).where(eq(orders.shippingMethod, code))
 
-      return { ...ShippingMethods.optionOf(row), isActive: row.isActive, position: row.position, orderCount: used?.total ?? 0 };
-    };
+      return { ...ShippingMethods.optionOf(row), isActive: row.isActive, position: row.position, orderCount: used?.total ?? 0 }
+    }
 
     const valuesOf = (input: ShippingMethodInput) => ({
       name: input.name,
@@ -83,14 +79,14 @@ export const ShippingMethods = {
       maxDays: input.maxDays,
       isActive: input.isActive,
       position: input.position,
-    });
+    })
 
     const found = (code: ShippingMethodCode): ResultAsync<ShippingMethodView, DomainError> =>
       ResultAsync.fromSafePromise(viewOf(code)).andThen((view) =>
         view === undefined
           ? errAsync<ShippingMethodView, DomainError>({ _tag: "ShippingMethodNotFound" })
           : okAsync<ShippingMethodView, DomainError>(view),
-      );
+      )
 
     return {
       listActive: async () =>
@@ -103,39 +99,33 @@ export const ShippingMethods = {
         ).map(ShippingMethods.optionOf),
 
       findActive: async (code) => {
-        const [row] = await db.select().from(shippingMethods).where(eq(shippingMethods.code, code));
-        return row === undefined || !row.isActive ? undefined : ShippingMethods.optionOf(row);
+        const [row] = await db.select().from(shippingMethods).where(eq(shippingMethods.code, code))
+        return row === undefined || !row.isActive ? undefined : ShippingMethods.optionOf(row)
       },
 
       listAll: async () => {
-        const rows = await db
-          .select()
-          .from(shippingMethods)
-          .orderBy(asc(shippingMethods.position), asc(shippingMethods.code));
-        const used = await db
-          .select({ code: orders.shippingMethod, total: count() })
-          .from(orders)
-          .groupBy(orders.shippingMethod);
-        const counts = new Map(used.map((row) => [row.code, row.total]));
+        const rows = await db.select().from(shippingMethods).orderBy(asc(shippingMethods.position), asc(shippingMethods.code))
+        const used = await db.select({ code: orders.shippingMethod, total: count() }).from(orders).groupBy(orders.shippingMethod)
+        const counts = new Map(used.map((row) => [row.code, row.total]))
 
         return rows.map((row) => ({
           ...ShippingMethods.optionOf(row),
           isActive: row.isActive,
           position: row.position,
           orderCount: counts.get(row.code) ?? 0,
-        }));
+        }))
       },
 
       create: (actor, input) =>
         ResultAsync.fromPromise(
           db.transaction(async (tx) => {
-            await tx.insert(shippingMethods).values({ code: input.code, ...valuesOf(input) });
+            await tx.insert(shippingMethods).values({ code: input.code, ...valuesOf(input) })
             await audit.record(tx, {
               actor,
               action: "shipping_method.create",
               target: { type: "shipping_method", id: input.code },
               summary: `Created the delivery option ${input.name}`,
-            });
+            })
           }),
           (reason): DomainError =>
             PgError.isUniqueViolation(reason)
@@ -145,7 +135,7 @@ export const ShippingMethods = {
 
       update: (actor, code, input) => {
         if (input.code !== code) {
-          return errAsync({ _tag: "ValidationFailed", issues: [{ path: "code", message: "A delivery option keeps its code." }] });
+          return errAsync({ _tag: "ValidationFailed", issues: [{ path: "code", message: "A delivery option keeps its code." }] })
         }
 
         return found(code).andThen((before) =>
@@ -154,9 +144,9 @@ export const ShippingMethods = {
               await tx
                 .update(shippingMethods)
                 .set({ ...valuesOf(input), updatedAt: clock.now() })
-                .where(eq(shippingMethods.code, code));
+                .where(eq(shippingMethods.code, code))
 
-              const changes = AuditLog.diff(ShippingMethods.auditedOf(before), ShippingMethods.auditedOf(input));
+              const changes = AuditLog.diff(ShippingMethods.auditedOf(before), ShippingMethods.auditedOf(input))
               if (changes !== undefined) {
                 await audit.record(tx, {
                   actor,
@@ -164,36 +154,37 @@ export const ShippingMethods = {
                   target: { type: "shipping_method", id: code },
                   summary: `Edited the delivery option ${input.name}`,
                   changes,
-                });
+                })
               }
             }),
           ).andThen(() => found(code)),
-        );
+        )
       },
 
       remove: (actor, code) =>
         found(code).andThen((before) => {
-          if (before.orderCount > 0) return errAsync<void, DomainError>({ _tag: "ShippingMethodInUse" });
+          if (before.orderCount > 0) return errAsync<void, DomainError>({ _tag: "ShippingMethodInUse" })
 
           return ResultAsync.fromPromise(
             db.transaction(async (tx) => {
-              await tx.delete(shippingMethods).where(eq(shippingMethods.code, code));
+              await tx.delete(shippingMethods).where(eq(shippingMethods.code, code))
               await audit.record(tx, {
                 actor,
                 action: "shipping_method.delete",
                 target: { type: "shipping_method", id: code },
                 summary: `Deleted the delivery option ${before.name}`,
-              });
+              })
             }),
             // An order placed between the check and the delete holds the row.
-            (reason): DomainError => (PgError.isForeignKeyViolation(reason) ? { _tag: "ShippingMethodInUse" } : ShippingMethods.rethrow(reason)),
-          );
+            (reason): DomainError =>
+              PgError.isForeignKeyViolation(reason) ? { _tag: "ShippingMethodInUse" } : ShippingMethods.rethrow(reason),
+          )
         }),
-    };
+    }
   },
 
   /** Lets an unexpected database failure surface as the 500 it is, rather than a domain error. */
   rethrow: (reason: unknown): never => {
-    throw reason;
+    throw reason
   },
-} as const;
+} as const

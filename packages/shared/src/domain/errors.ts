@@ -7,13 +7,13 @@
  * a message is a compile error.
  */
 
-import { SavedAddress } from "../contracts/account.ts";
-import { ProductPictures } from "../contracts/admin.ts";
-import { Price } from "../contracts/catalog.ts";
-import { Pricing } from "./pricing.ts";
+import { SavedAddress } from "../contracts/account.ts"
+import { ProductPictures } from "../contracts/admin.ts"
+import { Price } from "../contracts/catalog.ts"
+import { Pricing } from "./pricing.ts"
 
 /** One rejected field: where it is in the body, and what is wrong with it. */
-export type ValidationIssue = Readonly<{ path: string; message: string }>;
+export type ValidationIssue = Readonly<{ path: string; message: string }>
 
 /** A failure the domain knows how to name. */
 export type DomainError =
@@ -82,24 +82,24 @@ export type DomainError =
   | Readonly<{ _tag: "AddressLimitReached" }>
   /** Carries how long until the next attempt can pass. */
   | Readonly<{ _tag: "RateLimited"; retryAfterSeconds: number }>
-  | Readonly<{ _tag: "Conflict" }>;
+  | Readonly<{ _tag: "Conflict" }>
 
 /** The name of a domain error, which is also the `code` clients match on. */
-export type DomainErrorTag = DomainError["_tag"];
+export type DomainErrorTag = DomainError["_tag"]
 
 /** Every code a non-2xx response can carry: the domain tags plus the three the transport adds. `RequestRefused` is a refusal by the server itself, such as an unsupported content type, under its own status. */
-export type ErrorCode = DomainErrorTag | "NotFound" | "RequestRefused" | "InternalError";
+export type ErrorCode = DomainErrorTag | "NotFound" | "RequestRefused" | "InternalError"
 
 /** The wire shape of every non-2xx response. */
 export type ErrorResponse = Readonly<{
   error: Readonly<{
-    code: ErrorCode;
-    message: string;
-    issues: readonly ValidationIssue[];
+    code: ErrorCode
+    message: string
+    issues: readonly ValidationIssue[]
     /** Present on `RateLimited`: whole seconds until the next attempt can pass. */
-    retryAfterSeconds?: number;
-  }>;
-}>;
+    retryAfterSeconds?: number
+  }>
+}>
 
 /** The tables and conversions every layer reads a `DomainError` through. */
 export const DomainError = {
@@ -185,8 +185,7 @@ export const DomainError = {
     TwoFactorNotEnabled: "Two-factor authentication is not turned on.",
     TwoFactorNotInitialized: "Start the two-factor setup before confirming it.",
     ResetTokenInvalid: "This reset link is invalid or has expired.",
-    PasswordLoginUnavailable:
-      "This account signs in through a provider. Use the provider button instead.",
+    PasswordLoginUnavailable: "This account signs in through a provider. Use the provider button instead.",
     OAuthStateInvalid: "That sign-in attempt expired. Please try again.",
     OAuthCanceled: "Signing in with that account was canceled.",
     OAuthExchangeFailed: "That sign-in provider is unavailable right now.",
@@ -239,16 +238,16 @@ export const DomainError = {
   /** The sentence a person is shown for an error, with the details it carries. */
   messageOf: (error: DomainError): string => {
     if (error._tag === "RateLimited") {
-      return `Too many attempts. Try again in ${DomainError.durationOf(error.retryAfterSeconds)}.`;
+      return `Too many attempts. Try again in ${DomainError.durationOf(error.retryAfterSeconds)}.`
     }
-    return DomainError.message[error._tag];
+    return DomainError.message[error._tag]
   },
 
   /** A wait in words: seconds below a minute and a half, whole minutes from there. */
   durationOf: (seconds: number): string => {
-    if (seconds <= 1) return "a second";
-    if (seconds < 90) return `${seconds} seconds`;
-    return `${Math.ceil(seconds / 60)} minutes`;
+    if (seconds <= 1) return "a second"
+    if (seconds < 90) return `${seconds} seconds`
+    return `${Math.ceil(seconds / 60)} minutes`
   },
 
   /** An error as the body it is served as. Issues are empty unless it carries some. */
@@ -260,4 +259,4 @@ export const DomainError = {
       ...("retryAfterSeconds" in error ? { retryAfterSeconds: error.retryAfterSeconds } : {}),
     },
   }),
-} as const;
+} as const

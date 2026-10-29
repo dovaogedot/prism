@@ -1,13 +1,13 @@
-import { ProfileInput, type Profile } from "@prism/shared";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useState, type ReactNode } from "react";
-import { useForm } from "react-hook-form";
-import { Alert, Button, Field, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { useAccountChanges } from "../account.ts";
+import { ProfileInput, type Profile } from "@prism/shared"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useState, type ReactNode } from "react"
+import { useForm } from "react-hook-form"
+import { Alert, Button, Field, Toast } from "../../../shared/ui/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { useAccountChanges } from "../account.ts"
 
 /** The profile as the server has it. */
-export type ProfileFormProps = Readonly<{ profile: Profile }>;
+export type ProfileFormProps = Readonly<{ profile: Profile }>
 
 /**
  * The customer's name and phone, which checkout starts from. The email is
@@ -15,26 +15,26 @@ export type ProfileFormProps = Readonly<{ profile: Profile }>;
  * does not have.
  */
 export const ProfileForm = ({ profile }: ProfileFormProps) => {
-  const { saveProfile } = useAccountChanges();
+  const { saveProfile } = useAccountChanges()
 
-  const [failure, setFailure] = useState<ReactNode | undefined>(undefined);
+  const [failure, setFailure] = useState<ReactNode | undefined>(undefined)
 
   const form = useForm({
     resolver: zodResolver(ProfileInput.schema),
     defaultValues: { fullName: profile.fullName ?? "", phone: profile.phone ?? "" },
-  });
+  })
 
   const submit = form.handleSubmit(async (values) => {
-    setFailure(undefined);
+    setFailure(undefined)
 
     await saveProfile
       .mutateAsync(values)
       .then((saved) => {
-        form.reset({ fullName: saved.fullName ?? "", phone: saved.phone ?? "" });
-        Toast.show("Your profile is saved.");
+        form.reset({ fullName: saved.fullName ?? "", phone: saved.phone ?? "" })
+        Toast.show("Your profile is saved.")
       })
-      .catch((reason: unknown) => setFailure(Failure.describe(reason)));
-  });
+      .catch((reason: unknown) => setFailure(Failure.describe(reason)))
+  })
 
   return (
     <form className="space-y-4" onSubmit={(event) => void submit(event)} noValidate>
@@ -54,5 +54,5 @@ export const ProfileForm = ({ profile }: ProfileFormProps) => {
         Save profile
       </Button>
     </form>
-  );
-};
+  )
+}

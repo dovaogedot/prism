@@ -1,15 +1,15 @@
-import { Price, type Suggestion } from "@prism/shared";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useEffect, useId, useRef, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router";
-import { match } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
-import { useDebounced } from "../../../shared/hooks/use-debounced.ts";
-import { ImageSet } from "../../../shared/ui/index.ts";
-import { Combobox, type ComboboxState } from "../combobox.ts";
+import { Price, type Suggestion } from "@prism/shared"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { useEffect, useId, useRef, useState } from "react"
+import { useLocation, useNavigate, useSearchParams } from "react-router"
+import { match } from "ts-pattern"
+import { Api } from "../../../shared/api/client.ts"
+import { useDebounced } from "../../../shared/hooks/use-debounced.ts"
+import { ImageSet } from "../../../shared/ui/index.ts"
+import { Combobox, type ComboboxState } from "../combobox.ts"
 
 /** One entry of the list: a product to open, or the search for what is typed. */
-type SearchOption = Readonly<{ kind: "product"; product: Suggestion }> | Readonly<{ kind: "search"; text: string }>;
+type SearchOption = Readonly<{ kind: "product"; product: Suggestion }> | Readonly<{ kind: "search"; text: string }>
 
 /**
  * The header's search box, on every page. From two typed characters it
@@ -19,82 +19,83 @@ type SearchOption = Readonly<{ kind: "product"; product: Suggestion }> | Readonl
  * text field jumps to the box.
  */
 export const SearchCombobox = () => {
-  const navigate = useNavigate();
+  const navigate = useNavigate()
 
-  const { pathname } = useLocation();
+  const { pathname } = useLocation()
 
-  const [params] = useSearchParams();
+  const [params] = useSearchParams()
 
-  const [text, setText] = useState("");
+  const [text, setText] = useState("")
 
-  const [state, setState] = useState<ComboboxState>(Combobox.CLOSED);
+  const [state, setState] = useState<ComboboxState>(Combobox.CLOSED)
 
-  const input = useRef<HTMLInputElement>(null);
+  const input = useRef<HTMLInputElement>(null)
 
-  const listboxId = useId();
+  const listboxId = useId()
 
-  const typed = useDebounced(text.trim(), 150);
+  const typed = useDebounced(text.trim(), 150)
 
   const suggestions = useQuery({
     queryKey: ["suggest", typed],
-    queryFn: ({ signal }) => Api.getPublic<{ items: readonly Suggestion[] }>(`/products/suggest?q=${encodeURIComponent(typed)}&limit=6`, signal),
+    queryFn: ({ signal }) =>
+      Api.getPublic<{ items: readonly Suggestion[] }>(`/products/suggest?q=${encodeURIComponent(typed)}&limit=6`, signal),
     enabled: typed.length >= 2,
     placeholderData: keepPreviousData,
-  });
+  })
 
   // The search results page keeps its query in the box.
-  const query = pathname === "/search" ? (params.get("q") ?? "") : undefined;
+  const query = pathname === "/search" ? (params.get("q") ?? "") : undefined
 
   useEffect(() => {
     if (query !== undefined) {
-      setText(query);
+      setText(query)
     }
-  }, [query]);
+  }, [query])
 
   useEffect(() => {
     const jump = (event: KeyboardEvent): void => {
-      if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey || Combobox.isTyping(event.target)) return;
+      if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey || Combobox.isTyping(event.target)) return
 
-      event.preventDefault();
-      input.current?.focus();
-    };
-
-    document.addEventListener("keydown", jump);
-    return () => document.removeEventListener("keydown", jump);
-  }, []);
-
-  const trimmed = text.trim();
-  const products = trimmed.length >= 2 ? (suggestions.data?.items ?? []) : [];
-  const options: readonly SearchOption[] =
-    trimmed.length >= 2 ? [...products.map((product) => ({ kind: "product" as const, product })), { kind: "search", text: trimmed }] : [];
-  const shown = Combobox.clamp(state, options.length);
-  const isExpanded = shown.isOpen && options.length > 0;
-  const optionId = (index: number) => `${listboxId}-${index}`;
-
-  const choose = (option: SearchOption | undefined): void => {
-    setState(Combobox.CLOSED);
-
-    if (option?.kind === "product") {
-      setText("");
-      input.current?.blur();
-      void navigate(`/products/${option.product.slug}`);
-      return;
+      event.preventDefault()
+      input.current?.focus()
     }
 
-    const searched = option?.text ?? trimmed;
-    if (searched.length === 0) return;
+    document.addEventListener("keydown", jump)
+    return () => document.removeEventListener("keydown", jump)
+  }, [])
 
-    input.current?.blur();
-    void navigate(`/search?q=${encodeURIComponent(searched)}`);
-  };
+  const trimmed = text.trim()
+  const products = trimmed.length >= 2 ? (suggestions.data?.items ?? []) : []
+  const options: readonly SearchOption[] =
+    trimmed.length >= 2 ? [...products.map((product) => ({ kind: "product" as const, product })), { kind: "search", text: trimmed }] : []
+  const shown = Combobox.clamp(state, options.length)
+  const isExpanded = shown.isOpen && options.length > 0
+  const optionId = (index: number) => `${listboxId}-${index}`
+
+  const choose = (option: SearchOption | undefined): void => {
+    setState(Combobox.CLOSED)
+
+    if (option?.kind === "product") {
+      setText("")
+      input.current?.blur()
+      void navigate(`/products/${option.product.slug}`)
+      return
+    }
+
+    const searched = option?.text ?? trimmed
+    if (searched.length === 0) return
+
+    input.current?.blur()
+    void navigate(`/search?q=${encodeURIComponent(searched)}`)
+  }
 
   return (
     <form
       className="relative w-full"
       role="search"
       onSubmit={(event) => {
-        event.preventDefault();
-        choose(undefined);
+        event.preventDefault()
+        choose(undefined)
       }}
     >
       <label className="sr-only" htmlFor={`${listboxId}-input`}>
@@ -129,31 +130,34 @@ export const SearchCombobox = () => {
         aria-keyshortcuts="/"
         value={text}
         onChange={(event) => {
-          setText(event.target.value);
-          setState(Combobox.OPEN);
+          setText(event.target.value)
+          setState(Combobox.OPEN)
         }}
         onFocus={() => setState(Combobox.OPEN)}
         onBlur={() => setState(Combobox.CLOSED)}
         onKeyDown={(event) => {
-          const step = Combobox.key(shown, event.key, options.length);
+          const step = Combobox.key(shown, event.key, options.length)
           if (step.isHandled) {
-            event.preventDefault();
+            event.preventDefault()
           }
 
-          setState(step.state);
+          setState(step.state)
 
           if (step.action.kind === "choose") {
-            choose(options[step.action.index]);
+            choose(options[step.action.index])
           }
           if (step.action.kind === "submit") {
-            choose(undefined);
+            choose(undefined)
           }
           if (step.action.kind === "clear") {
-            setText("");
+            setText("")
           }
         }}
       />
-      <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-line px-1.5 font-mono text-xs text-ink-faint sm:block" aria-hidden="true">
+      <kbd
+        className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-line px-1.5 font-mono text-xs text-ink-faint sm:block"
+        aria-hidden="true"
+      >
         /
       </kbd>
 
@@ -181,7 +185,12 @@ export const SearchCombobox = () => {
                   {product.image === undefined ? (
                     <span className="size-10 shrink-0 rounded bg-sunken" aria-hidden="true" />
                   ) : (
-                    <ImageSet className="size-10 shrink-0 rounded bg-sunken object-contain" image={product.image} sizes="2.5rem" isDecorative />
+                    <ImageSet
+                      className="size-10 shrink-0 rounded bg-sunken object-contain"
+                      image={product.image}
+                      sizes="2.5rem"
+                      isDecorative
+                    />
                   )}
                   <span className="min-w-0 flex-1 truncate text-ink">{product.name}</span>
                   <span className="shrink-0 tabular-nums text-ink-soft">{Price.format(product.priceCents)}</span>
@@ -197,5 +206,5 @@ export const SearchCombobox = () => {
         ))}
       </ul>
     </form>
-  );
-};
+  )
+}

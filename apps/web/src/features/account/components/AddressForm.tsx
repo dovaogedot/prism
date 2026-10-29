@@ -1,23 +1,23 @@
-import { SavedAddressInput, type SavedAddress } from "@prism/shared";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useId, useState, type ReactNode } from "react";
-import { useForm, useWatch } from "react-hook-form";
-import { Alert, Button, Field, PostalAddressFields } from "../../../shared/ui/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
+import { SavedAddressInput, type SavedAddress } from "@prism/shared"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useId, useState, type ReactNode } from "react"
+import { useForm, useWatch } from "react-hook-form"
+import { Alert, Button, Field, PostalAddressFields } from "../../../shared/ui/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
 
 /** The address being changed, or none for a new one; what saving does; and how to leave without saving. */
 export type AddressFormProps = Readonly<{
-  address?: SavedAddress;
-  onSave: (input: SavedAddressInput) => Promise<unknown>;
-  onCancel: () => void;
-}>;
+  address?: SavedAddress
+  onSave: (input: SavedAddressInput) => Promise<unknown>
+  onCancel: () => void
+}>
 
 /** One saved address: what to call it, who receives the parcel, and where. */
 export const AddressForm = ({ address, onSave, onCancel }: AddressFormProps) => {
-  const [failure, setFailure] = useState<ReactNode | undefined>(undefined);
+  const [failure, setFailure] = useState<ReactNode | undefined>(undefined)
 
   // Two forms can be open at once, so every field id is unique to its form.
-  const prefix = useId();
+  const prefix = useId()
 
   const form = useForm({
     resolver: zodResolver(SavedAddressInput.schema),
@@ -34,25 +34,44 @@ export const AddressForm = ({ address, onSave, onCancel }: AddressFormProps) => 
       },
       isDefault: address?.isDefault ?? false,
     },
-  });
+  })
 
   const submit = form.handleSubmit(async (values) => {
-    setFailure(undefined);
-    await onSave(values).catch((reason: unknown) => setFailure(Failure.describe(reason)));
-  });
+    setFailure(undefined)
+    await onSave(values).catch((reason: unknown) => setFailure(Failure.describe(reason)))
+  })
 
-  const errors = form.formState.errors;
+  const errors = form.formState.errors
 
-  const country = useWatch({ control: form.control, name: "address.country" });
+  const country = useWatch({ control: form.control, name: "address.country" })
 
   return (
     <form className="space-y-4 rounded-lg border border-line bg-surface p-5" onSubmit={(event) => void submit(event)} noValidate>
       {failure === undefined ? null : <Alert>{failure}</Alert>}
 
-      <Field label="Name of the address" id={`${prefix}-label`} placeholder="Home" error={errors.label?.message} {...form.register("label")} />
+      <Field
+        label="Name of the address"
+        id={`${prefix}-label`}
+        placeholder="Home"
+        error={errors.label?.message}
+        {...form.register("label")}
+      />
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Full name" id={`${prefix}-name`} autoComplete="name" error={errors.fullName?.message} {...form.register("fullName")} />
-        <Field label="Phone" id={`${prefix}-phone`} type="tel" autoComplete="tel" error={errors.phone?.message} {...form.register("phone")} />
+        <Field
+          label="Full name"
+          id={`${prefix}-name`}
+          autoComplete="name"
+          error={errors.fullName?.message}
+          {...form.register("fullName")}
+        />
+        <Field
+          label="Phone"
+          id={`${prefix}-phone`}
+          type="tel"
+          autoComplete="tel"
+          error={errors.phone?.message}
+          {...form.register("phone")}
+        />
       </div>
       <PostalAddressFields
         idPrefix={prefix}
@@ -80,5 +99,5 @@ export const AddressForm = ({ address, onSave, onCancel }: AddressFormProps) => 
         </Button>
       </div>
     </form>
-  );
-};
+  )
+}

@@ -3,39 +3,33 @@
  * description for each product and each category, built from their data.
  */
 
-import { Price, type ProductDetail, type Rating } from "@prism/shared";
-import { Seo } from "../../shared/seo/seo.ts";
+import { Price, type ProductDetail, type Rating } from "@prism/shared"
+import { Seo } from "../../shared/seo/seo.ts"
 
 /** What a product page's title and description are made from. */
 export type ProductText = Readonly<{
-  name: string;
-  slug: string;
-  description: string;
-  priceCents: number;
-  stock: number;
-  category: Readonly<{ name: string }>;
-  brand: Readonly<{ name: string }>;
-  rating: Rating;
-  properties: readonly Readonly<{ name: string; value: string }>[];
+  name: string
+  slug: string
+  description: string
+  priceCents: number
+  stock: number
+  category: Readonly<{ name: string }>
+  brand: Readonly<{ name: string }>
+  rating: Rating
+  properties: readonly Readonly<{ name: string; value: string }>[]
   /** Whether another product in the same category has the same name. */
-  isNameShared: boolean;
-}>;
+  isNameShared: boolean
+}>
 
 /** What a category page's title and description are made from. */
-export type CategoryText = Readonly<{ name: string; description?: string; productCount: number }>;
+export type CategoryText = Readonly<{ name: string; description?: string; productCount: number }>
 
 export const CatalogSeo = {
   /**
    * What every catalog description may close with. Their lengths differ, so
    * some of them always fill what the page's own facts leave short of 155.
    */
-  CLOSING: [
-    "Tracked delivery across Europe.",
-    "Returns within 14 days.",
-    "Secure card payment.",
-    "Order today at Prism.",
-    "Buy now.",
-  ],
+  CLOSING: ["Tracked delivery across Europe.", "Returns within 14 days.", "Secure card payment.", "Order today at Prism.", "Buy now."],
 
   /**
    * The product's name and category. Two products of one category that
@@ -43,17 +37,17 @@ export const CatalogSeo = {
    * kind of thing each is, or by their slug when they have none.
    */
   productTitle: (product: ProductText): string => {
-    const base = `${product.name} - ${product.category.name}`;
-    if (!product.isNameShared) return base;
+    const base = `${product.name} - ${product.category.name}`
+    if (!product.isNameShared) return base
 
-    const type = product.properties.find((property) => property.name.toLowerCase() === "type")?.value ?? product.slug;
-    return `${product.name} (${type}) - ${product.category.name}`;
+    const type = product.properties.find((property) => property.name.toLowerCase() === "type")?.value ?? product.slug
+    return `${product.name} (${type}) - ${product.category.name}`
   },
 
   /** The product's own description first, then what it is, how it rates, its price and how it ships. */
   productDescription: (product: ProductText): string => {
-    const { count, average } = product.rating;
-    const price = Price.format(product.priceCents);
+    const { count, average } = product.rating
+    const price = Price.format(product.priceCents)
 
     return Seo.description([
       product.description,
@@ -61,7 +55,7 @@ export const CatalogSeo = {
       ...(average === undefined ? [] : [`Rated ${average.toFixed(1)} out of 5 by ${count} ${count === 1 ? "customer" : "customers"}.`]),
       product.stock > 0 ? `In stock at ${price}.` : `${price}, currently out of stock.`,
       ...CatalogSeo.CLOSING,
-    ]);
+    ])
   },
 
   categoryTitle: (category: CategoryText): string => `${category.name} items`,
@@ -72,7 +66,7 @@ export const CatalogSeo = {
    * breadcrumb trail to it. Every address is absolute, under `origin`.
    */
   productJsonLd: (product: ProductDetail, origin: string): Readonly<Record<string, unknown>> => {
-    const url = `${origin}/products/${product.slug}`;
+    const url = `${origin}/products/${product.slug}`
 
     return {
       "@context": "https://schema.org",
@@ -96,7 +90,13 @@ export const CatalogSeo = {
           },
           ...(product.rating.average === undefined
             ? {}
-            : { aggregateRating: { "@type": "AggregateRating", ratingValue: product.rating.average.toFixed(1), reviewCount: product.rating.count } }),
+            : {
+                aggregateRating: {
+                  "@type": "AggregateRating",
+                  ratingValue: product.rating.average.toFixed(1),
+                  reviewCount: product.rating.count,
+                },
+              }),
         },
         {
           "@type": "BreadcrumbList",
@@ -107,18 +107,18 @@ export const CatalogSeo = {
           ],
         },
       ],
-    };
+    }
   },
 
   /** The category's own description when it has one, then how many items it holds and how to find one. */
   categoryDescription: (category: CategoryText): string => {
-    const items = `${category.productCount} ${category.name} ${category.productCount === 1 ? "item" : "items"}`;
+    const items = `${category.productCount} ${category.name} ${category.productCount === 1 ? "item" : "items"}`
 
     return Seo.description([
       category.description ?? `Shop ${items} at Prism.`,
       ...(category.description === undefined ? [] : [`Shop ${items} at Prism.`]),
       "Filter by price, rating and properties, and sort by price, rating or what is new.",
       ...CatalogSeo.CLOSING,
-    ]);
+    ])
   },
-} as const;
+} as const

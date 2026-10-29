@@ -1,16 +1,16 @@
-import { SupportMessageInput, SupportTopic } from "@prism/shared";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useState, type ReactNode } from "react";
-import { useForm } from "react-hook-form";
-import { Link } from "react-router";
-import { Api } from "../../../shared/api/client.ts";
-import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { useTheme } from "../../../shared/theme/use-theme.ts";
-import { Alert, Button, Field, SelectField, TextAreaField } from "../../../shared/ui/index.ts";
-import { Captcha } from "../../auth/components/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { useSession } from "../../auth/session.ts";
+import { SupportMessageInput, SupportTopic } from "@prism/shared"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useState, type ReactNode } from "react"
+import { useForm } from "react-hook-form"
+import { Link } from "react-router"
+import { Api } from "../../../shared/api/client.ts"
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { useTheme } from "../../../shared/theme/use-theme.ts"
+import { Alert, Button, Field, SelectField, TextAreaField } from "../../../shared/ui/index.ts"
+import { Captcha } from "../../auth/components/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { useSession } from "../../auth/session.ts"
 
 /**
  * The contact form: a name, an email to answer, a topic, the order it is
@@ -18,35 +18,35 @@ import { useSession } from "../../auth/session.ts";
  * an email, and the sender gets a confirmation; nothing is stored in the shop.
  */
 export const ContactPage = () => {
-  const session = useSession();
+  const session = useSession()
 
-  const { theme } = useTheme();
+  const { theme } = useTheme()
 
-  const [failure, setFailure] = useState<ReactNode | undefined>(undefined);
+  const [failure, setFailure] = useState<ReactNode | undefined>(undefined)
 
-  const [sentTo, setSentTo] = useState<string | undefined>(undefined);
+  const [sentTo, setSentTo] = useState<string | undefined>(undefined)
 
   // Google accepts a token once, and a failed send may have spent it, so each failure draws a fresh challenge.
-  const [captchaRound, setCaptchaRound] = useState(0);
+  const [captchaRound, setCaptchaRound] = useState(0)
 
   const form = useForm({
     resolver: zodResolver(SupportMessageInput.schema),
     defaultValues: { name: "", email: session?.email ?? "", topic: "order", orderNumber: "", message: "", captchaToken: "" },
-  });
+  })
 
   const submit = form.handleSubmit(async (values) => {
-    setFailure(undefined);
+    setFailure(undefined)
 
     await Api.postEmptyWithoutRetry("/support/messages", values)
       .then(() => setSentTo(values.email))
       .catch((reason: unknown) => {
-        setFailure(Failure.describe(reason));
-        form.setValue("captchaToken", "");
-        setCaptchaRound((round) => round + 1);
-      });
-  });
+        setFailure(Failure.describe(reason))
+        form.setValue("captchaToken", "")
+        setCaptchaRound((round) => round + 1)
+      })
+  })
 
-  const errors = form.formState.errors;
+  const errors = form.formState.errors
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6 sm:py-14">
@@ -54,8 +54,8 @@ export const ContactPage = () => {
       <header className="mb-8 space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight text-ink">Contact us</h1>
         <p className="text-ink-soft">
-          Questions about an order, a payment or your account? Write to us and we answer by email within two business days. Many
-          answers are in the{" "}
+          Questions about an order, a payment or your account? Write to us and we answer by email within two business days. Many answers are
+          in the{" "}
           <Link className="text-accent underline underline-offset-2" to="/faq">
             FAQ
           </Link>{" "}
@@ -92,7 +92,11 @@ export const ContactPage = () => {
           <TextAreaField label="Message" rows={6} error={errors.message?.message} {...form.register("message")} />
 
           <div className="space-y-1.5">
-            <Captcha key={captchaRound} dark={theme === "dark"} onToken={(token) => form.setValue("captchaToken", token, { shouldValidate: form.formState.isSubmitted })} />
+            <Captcha
+              key={captchaRound}
+              dark={theme === "dark"}
+              onToken={(token) => form.setValue("captchaToken", token, { shouldValidate: form.formState.isSubmitted })}
+            />
             {errors.captchaToken?.message === undefined ? null : (
               <p className="text-sm text-danger" role="alert">
                 {errors.captchaToken.message}
@@ -110,5 +114,5 @@ export const ContactPage = () => {
         </Alert>
       )}
     </div>
-  );
-};
+  )
+}

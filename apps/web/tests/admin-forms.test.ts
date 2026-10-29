@@ -1,53 +1,57 @@
-import { describe, expect, it } from "vitest";
-import { Cents, Euros, ProductForm, ShippingFields, Slugs } from "../src/features/admin/forms.ts";
+import { describe, expect, it } from "vitest"
+import { Cents, Euros, ProductForm, ShippingFields, Slugs } from "../src/features/admin/forms.ts"
 
 describe("prices typed in euros", () => {
   it("become whole cents, with a dot or a comma, without floating point", () => {
-    expect(Euros.schema.parse("12.50")).toBe(1250);
-    expect(Euros.schema.parse("12,5")).toBe(1250);
-    expect(Euros.schema.parse("0.29")).toBe(29);
-    expect(Euros.schema.parse(" 1999 ")).toBe(199_900);
-    expect(Euros.schema.parse("1.10")).toBe(110);
-  });
+    expect(Euros.schema.parse("12.50")).toBe(1250)
+    expect(Euros.schema.parse("12,5")).toBe(1250)
+    expect(Euros.schema.parse("0.29")).toBe(29)
+    expect(Euros.schema.parse(" 1999 ")).toBe(199_900)
+    expect(Euros.schema.parse("1.10")).toBe(110)
+  })
 
   it("refuse anything but euros and cents", () => {
-    for (const text of ["", "12.505", "-1", "1e3", "12.5.0", "€12"]) expect(Euros.schema.safeParse(text).success, text).toBe(false);
-  });
+    for (const text of ["", "12.505", "-1", "1e3", "12.5.0", "€12"]) expect(Euros.schema.safeParse(text).success, text).toBe(false)
+  })
 
   it("let an optional amount stay empty", () => {
-    expect(Euros.optional.parse("")).toBeUndefined();
-    expect(Euros.optional.parse("50")).toBe(5000);
-  });
+    expect(Euros.optional.parse("")).toBeUndefined()
+    expect(Euros.optional.parse("50")).toBe(5000)
+  })
 
   it("are shown back as staff type them", () => {
-    expect(Cents.toEuros(1250)).toBe("12.50");
-    expect(Cents.toEuros(5)).toBe("0.05");
-    expect(Cents.toEuros(100_000)).toBe("1000.00");
-  });
-});
+    expect(Cents.toEuros(1250)).toBe("12.50")
+    expect(Cents.toEuros(5)).toBe("0.05")
+    expect(Cents.toEuros(100_000)).toBe("1000.00")
+  })
+})
 
 describe("the prices of the product and delivery forms", () => {
   it("hold to the API's limits in cents before anything is sent", () => {
-    const price = ProductForm.schema.shape.price;
-    const shipping = ShippingFields.schema.shape;
+    const price = ProductForm.schema.shape.price
+    const shipping = ShippingFields.schema.shape
 
-    expect([price.safeParse("0").success, price.safeParse("200000").success, price.safeParse("12.50").success]).toEqual([false, false, true]);
-    expect([shipping.price.safeParse("1500").success, shipping.price.safeParse("0").success]).toEqual([false, true]);
-    expect([shipping.freeFrom.safeParse("0").success, shipping.freeFrom.safeParse("").success]).toEqual([false, true]);
-  });
-});
+    expect([price.safeParse("0").success, price.safeParse("200000").success, price.safeParse("12.50").success]).toEqual([
+      false,
+      false,
+      true,
+    ])
+    expect([shipping.price.safeParse("1500").success, shipping.price.safeParse("0").success]).toEqual([false, true])
+    expect([shipping.freeFrom.safeParse("0").success, shipping.freeFrom.safeParse("").success]).toEqual([false, true])
+  })
+})
 
 describe("a slug made from a name", () => {
   it("joins lowercase words with dashes and drops accents and punctuation", () => {
-    expect(Slugs.fromName("Diamond Sword")).toBe("diamond-sword");
-    expect(Slugs.fromName("  Ace of Spades (Card)! ")).toBe("ace-of-spades-card");
-    expect(Slugs.fromName("Crème brûlée")).toBe("creme-brulee");
-  });
+    expect(Slugs.fromName("Diamond Sword")).toBe("diamond-sword")
+    expect(Slugs.fromName("  Ace of Spades (Card)! ")).toBe("ace-of-spades-card")
+    expect(Slugs.fromName("Crème brûlée")).toBe("creme-brulee")
+  })
 
   it("never ends on a dash when cut to 120 characters", () => {
-    const slug = Slugs.fromName(`${"a".repeat(119)} b`);
+    const slug = Slugs.fromName(`${"a".repeat(119)} b`)
 
-    expect(slug.length).toBeLessThanOrEqual(120);
-    expect(slug.endsWith("-")).toBe(false);
-  });
-});
+    expect(slug.length).toBeLessThanOrEqual(120)
+    expect(slug.endsWith("-")).toBe(false)
+  })
+})

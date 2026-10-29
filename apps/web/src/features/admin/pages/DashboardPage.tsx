@@ -1,41 +1,55 @@
-import { Delivery, OrderStatus, Permission, type AdminSummary } from "@prism/shared";
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router";
-import { Api } from "../../../shared/api/client.ts";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { Card } from "../../../shared/ui/index.ts";
-import { useSession } from "../../auth/session.ts";
-import { AdminKeys } from "../admin.ts";
-import { AdminPage } from "../components/index.ts";
+import { Delivery, OrderStatus, Permission, type AdminSummary } from "@prism/shared"
+import { useQuery } from "@tanstack/react-query"
+import { Link } from "react-router"
+import { Api } from "../../../shared/api/client.ts"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { Card } from "../../../shared/ui/index.ts"
+import { useSession } from "../../auth/session.ts"
+import { AdminKeys } from "../admin.ts"
+import { AdminPage } from "../components/index.ts"
 
 /** One count on the dashboard, and the list it leads to. */
-type Tile = Readonly<{ label: string; value: number; href: string }>;
+type Tile = Readonly<{ label: string; value: number; href: string }>
 
 /**
  * Where the admin opens: what waits for this staff member's roles, as
  * counts that lead to the lists, and what the roles allow.
  */
 export const DashboardPage = () => {
-  const session = useSession();
+  const session = useSession()
 
   const summary = useQuery({
     queryKey: AdminKeys.summary,
     queryFn: ({ signal }) => Api.get<AdminSummary>("/admin/summary", signal),
-  });
+  })
 
-  const roles = session?.roles ?? [];
-  const counts = summary.data ?? {};
-  const today = Delivery.dayOf(new Date());
+  const roles = session?.roles ?? []
+  const counts = summary.data ?? {}
+  const today = Delivery.dayOf(new Date())
   const tiles: readonly Tile[] = [
     ...(counts.ordersToFulfill === undefined
       ? []
-      : [{ label: "Orders to fulfill", value: counts.ordersToFulfill, href: `/admin/orders?${OrderStatus.TO_FULFILL.map((status) => `status=${status}&`).join("")}sort=oldest` }]),
+      : [
+          {
+            label: "Orders to fulfill",
+            value: counts.ordersToFulfill,
+            href: `/admin/orders?${OrderStatus.TO_FULFILL.map((status) => `status=${status}&`).join("")}sort=oldest`,
+          },
+        ]),
     ...(counts.paidToday === undefined
       ? []
-      : [{ label: "Paid today", value: counts.paidToday, href: `/admin/orders?${OrderStatus.PAID.map((status) => `status=${status}&`).join("")}from=${today}&to=${today}` }]),
+      : [
+          {
+            label: "Paid today",
+            value: counts.paidToday,
+            href: `/admin/orders?${OrderStatus.PAID.map((status) => `status=${status}&`).join("")}from=${today}&to=${today}`,
+          },
+        ]),
     ...(counts.reviewsWaiting === undefined ? [] : [{ label: "Reviews waiting", value: counts.reviewsWaiting, href: "/admin/reviews" }]),
-    ...(counts.lowStockProducts === undefined ? [] : [{ label: "Low on stock", value: counts.lowStockProducts, href: "/admin/products?lowStock=true&sort=stock_asc" }]),
-  ];
+    ...(counts.lowStockProducts === undefined
+      ? []
+      : [{ label: "Low on stock", value: counts.lowStockProducts, href: "/admin/products?lowStock=true&sort=stock_asc" }]),
+  ]
 
   return (
     <AdminPage text={PageText.adminDashboard} heading="Dashboard">
@@ -43,7 +57,10 @@ export const DashboardPage = () => {
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {tiles.map((tile) => (
             <li key={tile.label}>
-              <Link className="block rounded-lg border border-line bg-surface p-5 transition-colors hover:border-line-strong" to={tile.href}>
+              <Link
+                className="block rounded-lg border border-line bg-surface p-5 transition-colors hover:border-line-strong"
+                to={tile.href}
+              >
                 <span className="block text-sm text-ink-soft">{tile.label}</span>
                 <span className="mt-1 block text-3xl font-semibold tabular-nums text-ink">{tile.value}</span>
               </Link>
@@ -61,5 +78,5 @@ export const DashboardPage = () => {
         </ul>
       </Card>
     </AdminPage>
-  );
-};
+  )
+}

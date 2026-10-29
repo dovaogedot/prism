@@ -3,25 +3,25 @@
  * everywhere else.
  */
 
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-import { schema } from "./schema.ts";
+import { drizzle } from "drizzle-orm/postgres-js"
+import postgres from "postgres"
+import { schema } from "./schema.ts"
 
 /** The query builder, typed against this schema. */
-export type Database = ReturnType<typeof drizzle<typeof schema>>;
+export type Database = ReturnType<typeof drizzle<typeof schema>>
 
 /** The query builder inside `db.transaction`, where every statement shares one commit. */
-export type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+export type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0]
 
 /** The driver, for the statements the builder cannot express. */
-export type Sql = ReturnType<typeof postgres>;
+export type Sql = ReturnType<typeof postgres>
 
 /** Both ways into the database, and the one way to shut them. */
 export type DatabaseHandle = Readonly<{
-  db: Database;
-  sql: Sql;
-  close: () => Promise<void>;
-}>;
+  db: Database
+  sql: Sql
+  close: () => Promise<void>
+}>
 
 export const Database = {
   /** The longest one statement may run, in milliseconds; far above any query the shop makes. */
@@ -42,12 +42,12 @@ export const Database = {
         // A runaway query gives its connection back instead of holding it, and the pool with it.
         statement_timeout: Database.STATEMENT_TIMEOUT_MS,
       },
-    });
+    })
 
     return {
       db: drizzle(sql, { schema }),
       sql,
       close: () => sql.end({ timeout: 5 }),
-    };
+    }
   },
-} as const;
+} as const

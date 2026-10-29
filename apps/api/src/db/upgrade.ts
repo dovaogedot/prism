@@ -8,13 +8,13 @@
  * database as it was. On a database without legacy columns it does nothing.
  */
 
-import { Contact, Email } from "@prism/shared";
-import { sql } from "drizzle-orm";
-import { z } from "zod";
-import type { FieldCipher } from "../platform/cipher.ts";
-import { ProviderSubject } from "../platform/oauth.ts";
-import { TotpSecret } from "../platform/totp.ts";
-import type { Transaction } from "./client.ts";
+import { Contact, Email } from "@prism/shared"
+import { sql } from "drizzle-orm"
+import { z } from "zod"
+import type { FieldCipher } from "../platform/cipher.ts"
+import { ProviderSubject } from "../platform/oauth.ts"
+import { TotpSecret } from "../platform/totp.ts"
+import type { Transaction } from "./client.ts"
 
 export const Upgrade = {
   /** The tables this step deletes plain text from, which a rewrite then clears from disk. */
@@ -30,9 +30,9 @@ export const Upgrade = {
   isPending: async (tx: Transaction): Promise<boolean> => {
     const rows = await tx.execute(sql`
       SELECT 1 FROM information_schema.columns
-      WHERE table_schema = current_schema() AND table_name = 'app_user' AND column_name = 'legacy_email'`);
+      WHERE table_schema = current_schema() AND table_name = 'app_user' AND column_name = 'legacy_email'`)
 
-    return rows.length > 0;
+    return rows.length > 0
   },
 
   /** A legacy session column held "" for a request that sent none; the sealed column holds null. */
@@ -45,13 +45,12 @@ export const Upgrade = {
    * new row version carries it. Resolves to whether there was anything to do.
    */
   sealLegacyColumns: async (tx: Transaction, cipher: FieldCipher): Promise<boolean> => {
-    if (!(await Upgrade.isPending(tx))) return false;
+    if (!(await Upgrade.isPending(tx))) return false
 
     for (const raw of await tx.execute(sql`SELECT id, legacy_email, legacy_totp_secret FROM app_user`)) {
-      const account = Upgrade.accountRow.parse(raw);
-      const email = Email.schema.parse(account.legacy_email);
-      const secret =
-        account.legacy_totp_secret === null ? null : cipher.seal(TotpSecret.schema.parse(account.legacy_totp_secret));
+      const account = Upgrade.accountRow.parse(raw)
+      const email = Email.schema.parse(account.legacy_email)
+      const secret = account.legacy_totp_secret === null ? null : cipher.seal(TotpSecret.schema.parse(account.legacy_totp_secret))
 
       await tx.execute(sql`
         UPDATE app_user SET
@@ -60,23 +59,23 @@ export const Upgrade = {
           totp_secret = ${secret},
           legacy_email = NULL,
           legacy_totp_secret = NULL
-        WHERE id = ${account.id}`);
+        WHERE id = ${account.id}`)
     }
 
     for (const raw of await tx.execute(sql`SELECT id, legacy_subject FROM oauth_identity`)) {
-      const identity = Upgrade.identityRow.parse(raw);
-      const subject = ProviderSubject.schema.parse(identity.legacy_subject);
+      const identity = Upgrade.identityRow.parse(raw)
+      const subject = ProviderSubject.schema.parse(identity.legacy_subject)
 
       await tx.execute(sql`
         UPDATE oauth_identity SET
           subject = ${cipher.seal(subject)},
           subject_index = ${cipher.index("oauth-subject", subject)},
           legacy_subject = NULL
-        WHERE id = ${identity.id}`);
+        WHERE id = ${identity.id}`)
     }
 
     for (const raw of await tx.execute(sql`SELECT id, legacy_user_agent, legacy_ip_address FROM session`)) {
-      const session = Upgrade.sessionRow.parse(raw);
+      const session = Upgrade.sessionRow.parse(raw)
 
       await tx.execute(sql`
         UPDATE session SET
@@ -84,17 +83,15 @@ export const Upgrade = {
           ip_address = ${Upgrade.sealedOrNull(cipher, session.legacy_ip_address)},
           legacy_user_agent = NULL,
           legacy_ip_address = NULL
-        WHERE id = ${session.id}`);
+        WHERE id = ${session.id}`)
     }
 
     // The order's contact was sealed already; its email gains the index staff search by.
     for (const raw of await tx.execute(sql`SELECT id, contact FROM customer_order`)) {
-      const order = Upgrade.orderRow.parse(raw);
-      const contact = cipher.open(order.contact, Contact.schema);
+      const order = Upgrade.orderRow.parse(raw)
+      const contact = cipher.open(order.contact, Contact.schema)
 
-      await tx.execute(
-        sql`UPDATE customer_order SET email_index = ${cipher.index("order-email", contact.email)} WHERE id = ${order.id}`,
-      );
+      await tx.execute(sql`UPDATE customer_order SET email_index = ${cipher.index("order-email", contact.email)} WHERE id = ${order.id}`)
     }
 
     await tx.execute(sql`
@@ -103,15 +100,15 @@ export const Upgrade = {
         DROP COLUMN legacy_totp_secret,
         ALTER COLUMN email SET NOT NULL,
         ALTER COLUMN email_index SET NOT NULL,
-        ADD CONSTRAINT app_user_totp_needs_secret CHECK (totp_enabled_at IS NULL OR totp_secret IS NOT NULL)`);
+        ADD CONSTRAINT app_user_totp_needs_secret CHECK (totp_enabled_at IS NULL OR totp_secret IS NOT NULL)`)
     await tx.execute(sql`
       ALTER TABLE oauth_identity
         DROP COLUMN legacy_subject,
         ALTER COLUMN subject SET NOT NULL,
-        ALTER COLUMN subject_index SET NOT NULL`);
-    await tx.execute(sql`ALTER TABLE session DROP COLUMN legacy_user_agent, DROP COLUMN legacy_ip_address`);
-    await tx.execute(sql`ALTER TABLE customer_order ALTER COLUMN email_index SET NOT NULL`);
+        ALTER COLUMN subject_index SET NOT NULL`)
+    await tx.execute(sql`ALTER TABLE session DROP COLUMN legacy_user_agent, DROP COLUMN legacy_ip_address`)
+    await tx.execute(sql`ALTER TABLE customer_order ALTER COLUMN email_index SET NOT NULL`)
 
-    return true;
+    return true
   },
-} as const;
+} as const

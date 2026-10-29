@@ -12,8 +12,7 @@ export const NextPath = {
    * `value` when it is a path on this site, and the home page otherwise, so
    * a crafted link cannot send anyone to another site after signing in.
    */
-  of: (value: string | null): string =>
-    value !== null && /^\/(?![/\\])[^\s\p{Cc}]*$/u.test(value) ? value : NextPath.HOME,
+  of: (value: string | null): string => (value !== null && /^\/(?![/\\])[^\s\p{Cc}]*$/u.test(value) ? value : NextPath.HOME),
 
   /** The query that names `path` as the place to return to. */
   query: (path: string): string => `?next=${encodeURIComponent(path)}`,
@@ -21,7 +20,7 @@ export const NextPath = {
   /** Keeps `path` for the return from a provider's sign-in. Blocked storage keeps nothing. */
   remember: (path: string): void => {
     try {
-      sessionStorage.setItem(NextPath.STORAGE_KEY, path);
+      sessionStorage.setItem(NextPath.STORAGE_KEY, path)
     } catch {
       // The return lands on the home page instead.
     }
@@ -30,11 +29,11 @@ export const NextPath = {
   /** The path kept for the return from a provider, which it then forgets; the home page when none was kept. */
   recall: (): string => {
     try {
-      const kept = sessionStorage.getItem(NextPath.STORAGE_KEY);
-      sessionStorage.removeItem(NextPath.STORAGE_KEY);
-      return NextPath.of(kept);
+      const kept = sessionStorage.getItem(NextPath.STORAGE_KEY)
+      sessionStorage.removeItem(NextPath.STORAGE_KEY)
+      return NextPath.of(kept)
     } catch {
-      return NextPath.HOME;
+      return NextPath.HOME
     }
   },
-} as const;
+} as const

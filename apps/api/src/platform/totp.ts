@@ -4,14 +4,14 @@
  * over still work; wider than that hands out replay windows.
  */
 
-import { OtpauthUri, type Email, type TotpCode } from "@prism/shared";
-import { generateSecret, generateURI, verifySync } from "otplib";
-import QRCode from "qrcode";
-import { z } from "zod";
-import type { Clock } from "./clock.ts";
+import { OtpauthUri, type Email, type TotpCode } from "@prism/shared"
+import { generateSecret, generateURI, verifySync } from "otplib"
+import QRCode from "qrcode"
+import { z } from "zod"
+import type { Clock } from "./clock.ts"
 
 /** The secret an authenticator app and the server share. Only this service makes one. */
-export type TotpSecret = z.infer<typeof TotpSecret.schema>;
+export type TotpSecret = z.infer<typeof TotpSecret.schema>
 export const TotpSecret = {
   schema: z.string().min(1).brand<"TotpSecret">(),
   /**
@@ -38,27 +38,27 @@ export const TotpSecret = {
   /** Whether the code library can make codes from `secret`, which it refuses for some lengths and endings. */
   isReadable: (secret: string): boolean => {
     try {
-      verifySync({ secret, token: "000000", strategy: "totp", period: 30, digits: 6, epoch: 0 });
-      return true;
+      verifySync({ secret, token: "000000", strategy: "totp", period: 30, digits: 6, epoch: 0 })
+      return true
     } catch {
-      return false;
+      return false
     }
   },
-} as const;
+} as const
 
 /** Enrolling a second factor, and checking the codes it produces. */
 export type TotpService = Readonly<{
-  generateSecret: () => TotpSecret;
+  generateSecret: () => TotpSecret
   /** The URI an authenticator app consumes. */
-  keyUri: (accountEmail: Email, secret: TotpSecret) => OtpauthUri;
+  keyUri: (accountEmail: Email, secret: TotpSecret) => OtpauthUri
   /**
    * The time step `code` belongs to, when it is a live code for `secret` from
    * a step after `afterStep`; `undefined` otherwise. A caller stores the step
    * it accepted, so each code works once.
    */
-  acceptedStep: (secret: TotpSecret, code: TotpCode, afterStep?: number) => number | undefined;
-  qrCodeSvg: (uri: OtpauthUri) => Promise<string>;
-}>;
+  acceptedStep: (secret: TotpSecret, code: TotpCode, afterStep?: number) => number | undefined
+  qrCodeSvg: (uri: OtpauthUri) => Promise<string>
+}>
 
 export const TotpService = {
   ISSUER: "Prism",
@@ -90,9 +90,9 @@ export const TotpService = {
         epoch: Math.floor(clock.now().getTime() / 1000),
         epochTolerance: TotpService.PERIOD_SECONDS,
         ...(afterStep === undefined ? {} : { afterTimeStep: afterStep }),
-      });
+      })
 
-      return result.valid && "timeStep" in result ? result.timeStep : undefined;
+      return result.valid && "timeStep" in result ? result.timeStep : undefined
     },
 
     qrCodeSvg: (uri) =>
@@ -103,4 +103,4 @@ export const TotpService = {
         color: { dark: "#000000", light: "#00000000" },
       }),
   }),
-} as const;
+} as const

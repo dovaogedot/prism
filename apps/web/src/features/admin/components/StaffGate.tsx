@@ -1,20 +1,20 @@
-import type { AdminSummary } from "@prism/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ReactNode } from "react";
-import { Link } from "react-router";
-import { match } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
-import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { Alert, Card, Spinner } from "../../../shared/ui/index.ts";
-import { SignInFirst } from "../../auth/components/index.ts";
-import { useSession } from "../../auth/session.ts";
-import { AdminAccess, AdminKeys } from "../admin.ts";
-import { StepUpDialog } from "./StepUpDialog.tsx";
-import { StepUpForm } from "./StepUpForm.tsx";
+import type { AdminSummary } from "@prism/shared"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import type { ReactNode } from "react"
+import { Link } from "react-router"
+import { match } from "ts-pattern"
+import { Api } from "../../../shared/api/client.ts"
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { Alert, Card, Spinner } from "../../../shared/ui/index.ts"
+import { SignInFirst } from "../../auth/components/index.ts"
+import { useSession } from "../../auth/session.ts"
+import { AdminAccess, AdminKeys } from "../admin.ts"
+import { StepUpDialog } from "./StepUpDialog.tsx"
+import { StepUpForm } from "./StepUpForm.tsx"
 
 /** The admin's pages, which open only past the gate. */
-export type StaffGateProps = Readonly<{ children: ReactNode }>;
+export type StaffGateProps = Readonly<{ children: ReactNode }>
 
 /**
  * Lets a staff member into the admin. A guest is sent to sign in. A
@@ -24,25 +24,25 @@ export type StaffGateProps = Readonly<{ children: ReactNode }>;
  * API asks for both, and this is where the page answers.
  */
 export const StaffGate = ({ children }: StaffGateProps) => {
-  const session = useSession();
+  const session = useSession()
 
-  const client = useQueryClient();
+  const client = useQueryClient()
 
   const summary = useQuery({
     queryKey: AdminKeys.summary,
     queryFn: ({ signal }) => Api.get<AdminSummary>("/admin/summary", signal),
     enabled: session !== undefined,
     retry: false,
-  });
+  })
 
-  if (session === undefined) return <SignInFirst />;
+  if (session === undefined) return <SignInFirst />
 
   const reopen = (): void => {
-    void client.invalidateQueries({ queryKey: AdminKeys.all });
-  };
+    void client.invalidateQueries({ queryKey: AdminKeys.all })
+  }
 
-  const gate = summary.status === "error" ? AdminAccess.gateOf(Api.failureOf(summary.error)) : "open";
-  const frameClass = "mx-auto max-w-lg space-y-6 px-4 py-14 sm:px-6";
+  const gate = summary.status === "error" ? AdminAccess.gateOf(Api.failureOf(summary.error)) : "open"
+  const frameClass = "mx-auto max-w-lg space-y-6 px-4 py-14 sm:px-6"
 
   // Once the admin has opened, a lapsed code is asked for over the page, so the page and anything typed into it stay.
   if (gate === "verify" && summary.data !== undefined) {
@@ -51,7 +51,7 @@ export const StaffGate = ({ children }: StaffGateProps) => {
         {children}
         <StepUpDialog onDone={reopen} />
       </>
-    );
+    )
   }
 
   return match({ gate, status: summary.status })
@@ -102,5 +102,5 @@ export const StaffGate = ({ children }: StaffGateProps) => {
         <h1 className="text-base font-medium">Opening the admin…</h1>
       </div>
     ))
-    .otherwise(() => children);
-};
+    .otherwise(() => children)
+}

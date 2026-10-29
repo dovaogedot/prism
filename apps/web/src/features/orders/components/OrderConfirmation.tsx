@@ -1,11 +1,11 @@
-import { PaymentFailure, type OrderDetail } from "@prism/shared";
-import { Link } from "react-router";
-import { match } from "ts-pattern";
-import { DeliveryDates } from "../../../shared/format/delivery-dates.ts";
-import { Alert, Spinner } from "../../../shared/ui/index.ts";
+import { PaymentFailure, type OrderDetail } from "@prism/shared"
+import { Link } from "react-router"
+import { match } from "ts-pattern"
+import { DeliveryDates } from "../../../shared/format/delivery-dates.ts"
+import { Alert, Spinner } from "../../../shared/ui/index.ts"
 
 /** The order just placed, and whether the page is still watching for its payment. */
-export type OrderConfirmationProps = Readonly<{ order: OrderDetail; watching: boolean }>;
+export type OrderConfirmationProps = Readonly<{ order: OrderDetail; watching: boolean }>
 
 /** What the customer sees first right after paying, as the payment settles. */
 export const OrderConfirmation = ({ order, watching }: OrderConfirmationProps) =>
@@ -25,8 +25,8 @@ export const OrderConfirmation = ({ order, watching }: OrderConfirmationProps) =
     )
     .with("payment_failed", () => (
       <Alert title="The payment did not go through">
-        {order.payment?.failure === undefined ? "The payment could not be completed." : PaymentFailure.message[order.payment.failure]}{" "}
-        You have not been charged, and your cart still holds the items.{" "}
+        {order.payment?.failure === undefined ? "The payment could not be completed." : PaymentFailure.message[order.payment.failure]} You
+        have not been charged, and your cart still holds the items.{" "}
         <Link to="/checkout" className="font-medium text-accent underline underline-offset-2">
           Try again
         </Link>
@@ -38,5 +38,4 @@ export const OrderConfirmation = ({ order, watching }: OrderConfirmationProps) =
         Your order number is <strong className="text-ink">#{order.number}</strong>, and it should arrive{" "}
         {DeliveryDates.phrase(order.estimatedDelivery)}. We sent the confirmation to {order.contact.email}.
       </Alert>
-    ));
-
+    ))

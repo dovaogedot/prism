@@ -4,16 +4,16 @@
  * is in whole cents, so no sum rounds.
  */
 
-import type { ShippingOption } from "../contracts/checkout.ts";
+import type { ShippingOption } from "../contracts/checkout.ts"
 
 /** What a line costs before shipping. */
-export type PricedLine = Readonly<{ unitPriceCents: number; quantity: number }>;
+export type PricedLine = Readonly<{ unitPriceCents: number; quantity: number }>
 
 /** What pricing reads from a delivery option. */
-export type PricedOption = Pick<ShippingOption, "priceCents" | "freeFromCents">;
+export type PricedOption = Pick<ShippingOption, "priceCents" | "freeFromCents">
 
 /** The three figures of an order summary. */
-export type Totals = Readonly<{ subtotalCents: number; shippingCents: number; totalCents: number }>;
+export type Totals = Readonly<{ subtotalCents: number; shippingCents: number; totalCents: number }>
 
 export const Pricing = {
   /** Stripe's smallest charge in euros, which every order total has to reach. */
@@ -23,8 +23,7 @@ export const Pricing = {
 
   lineTotal: (line: PricedLine): number => line.unitPriceCents * line.quantity,
 
-  subtotal: (lines: readonly PricedLine[]): number =>
-    lines.reduce((sum, line) => sum + Pricing.lineTotal(line), 0),
+  subtotal: (lines: readonly PricedLine[]): number => lines.reduce((sum, line) => sum + Pricing.lineTotal(line), 0),
 
   /** An option with a free-from threshold ships free once the subtotal reaches it. */
   shipping: (option: PricedOption, subtotalCents: number): number =>
@@ -35,9 +34,9 @@ export const Pricing = {
     option.freeFromCents === undefined ? undefined : Math.max(0, option.freeFromCents - subtotalCents),
 
   totals: (lines: readonly PricedLine[], option: PricedOption): Totals => {
-    const subtotalCents = Pricing.subtotal(lines);
-    const shippingCents = Pricing.shipping(option, subtotalCents);
+    const subtotalCents = Pricing.subtotal(lines)
+    const shippingCents = Pricing.shipping(option, subtotalCents)
 
-    return { subtotalCents, shippingCents, totalCents: subtotalCents + shippingCents };
+    return { subtotalCents, shippingCents, totalCents: subtotalCents + shippingCents }
   },
-} as const;
+} as const

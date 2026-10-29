@@ -4,27 +4,25 @@
  * the shop does not have.
  */
 
-import { z } from "zod";
-import type { Email } from "./auth.ts";
-import { Contact, ShippingAddress } from "./checkout.ts";
-import { OptionalText } from "./reviews.ts";
+import { z } from "zod"
+import type { Email } from "./auth.ts"
+import { Contact, ShippingAddress } from "./checkout.ts"
+import { OptionalText } from "./reviews.ts"
 
 /** The identity of a saved address, as the database assigns it. */
-export type AddressId = z.infer<typeof AddressId.schema>;
+export type AddressId = z.infer<typeof AddressId.schema>
 export const AddressId = {
   schema: z.uuid().brand<"AddressId">(),
-} as const;
+} as const
 
 /** A customer's profile as `GET /account/profile` serves it. Each field is absent until set. */
-export type Profile = Readonly<{ email: Email; fullName?: string; phone?: string }>;
+export type Profile = Readonly<{ email: Email; fullName?: string; phone?: string }>
 
 /** A validated `PUT /account/profile` body. An empty field clears it. */
-export type ProfileInput = z.infer<typeof ProfileInput.schema>;
+export type ProfileInput = z.infer<typeof ProfileInput.schema>
 export const ProfileInput = {
   schema: z.strictObject({
-    fullName: OptionalText.of(100, "Use at most 100 characters.").pipe(
-      z.string().min(2, "Enter at least 2 characters.").optional(),
-    ),
+    fullName: OptionalText.of(100, "Use at most 100 characters.").pipe(z.string().min(2, "Enter at least 2 characters.").optional()),
     phone: z
       .string()
       .trim()
@@ -32,10 +30,10 @@ export const ProfileInput = {
       .pipe(Contact.schema.shape.phone.optional())
       .optional(),
   }),
-} as const;
+} as const
 
 /** A validated saved address, as `POST` and `PUT /account/addresses` take it. */
-export type SavedAddressInput = z.infer<typeof SavedAddressInput.schema>;
+export type SavedAddressInput = z.infer<typeof SavedAddressInput.schema>
 export const SavedAddressInput = {
   schema: z.strictObject({
     /** What the customer calls it, such as "Home". */
@@ -46,19 +44,19 @@ export const SavedAddressInput = {
     /** Makes this the address checkout starts with. */
     isDefault: z.boolean().default(false),
   }),
-} as const;
+} as const
 
 /** A saved address as the account serves it. */
 export type SavedAddress = Readonly<{
-  id: AddressId;
-  label: string;
-  fullName: string;
-  phone: string;
-  address: ShippingAddress;
-  isDefault: boolean;
-}>;
+  id: AddressId
+  label: string
+  fullName: string
+  phone: string
+  address: ShippingAddress
+  isDefault: boolean
+}>
 
 export const SavedAddress = {
   /** The most addresses one account keeps. */
   MAX: 10,
-} as const;
+} as const

@@ -1,13 +1,13 @@
-import { ReviewInput, type ReviewViewer } from "@prism/shared";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useState, type ReactNode } from "react";
-import { useForm, useWatch } from "react-hook-form";
-import { Alert, Button, ConfirmDialog, Field, TextAreaField, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { ReviewNotice, useReviewChanges } from "../reviews.ts";
+import { ReviewInput, type ReviewViewer } from "@prism/shared"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useState, type ReactNode } from "react"
+import { useForm, useWatch } from "react-hook-form"
+import { Alert, Button, ConfirmDialog, Field, TextAreaField, Toast } from "../../../shared/ui/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { ReviewNotice, useReviewChanges } from "../reviews.ts"
 
 /** The product, and what the reader may do with its reviews. */
-export type ReviewFormProps = Readonly<{ slug: string; viewer: ReviewViewer }>;
+export type ReviewFormProps = Readonly<{ slug: string; viewer: ReviewViewer }>
 
 /**
  * Writing or changing the reader's review: the stars, the name to sign it
@@ -15,13 +15,13 @@ export type ReviewFormProps = Readonly<{ slug: string; viewer: ReviewViewer }>;
  * written, or why there is no form.
  */
 export const ReviewForm = ({ slug, viewer }: ReviewFormProps) => {
-  const { save, remove } = useReviewChanges(slug);
+  const { save, remove } = useReviewChanges(slug)
 
-  const [failure, setFailure] = useState<ReactNode | undefined>(undefined);
+  const [failure, setFailure] = useState<ReactNode | undefined>(undefined)
 
-  const [isConfirming, setConfirming] = useState(false);
+  const [isConfirming, setConfirming] = useState(false)
 
-  const own = viewer.own;
+  const own = viewer.own
 
   const form = useForm({
     resolver: zodResolver(ReviewInput.schema),
@@ -31,22 +31,22 @@ export const ReviewForm = ({ slug, viewer }: ReviewFormProps) => {
       title: own?.title ?? "",
       body: own?.body ?? "",
     },
-  });
+  })
 
-  const rating = useWatch({ control: form.control, name: "rating" });
+  const rating = useWatch({ control: form.control, name: "rating" })
 
-  const notice = ReviewNotice.of(viewer);
+  const notice = ReviewNotice.of(viewer)
 
   const submit = form.handleSubmit(async (values) => {
-    setFailure(undefined);
+    setFailure(undefined)
 
     await save
       .mutateAsync(values)
       .then(() => Toast.show("Thank you. Your review is waiting for a moderator."))
-      .catch((reason: unknown) => setFailure(Failure.describe(reason)));
-  });
+      .catch((reason: unknown) => setFailure(Failure.describe(reason)))
+  })
 
-  const errors = form.formState.errors;
+  const errors = form.formState.errors
 
   return (
     <div className="space-y-4 rounded-lg border border-line bg-surface p-5">
@@ -66,7 +66,10 @@ export const ReviewForm = ({ slug, viewer }: ReviewFormProps) => {
             <legend className="mb-1.5 text-sm font-medium text-ink">Your rating</legend>
             <div className="flex gap-1">
               {[1, 2, 3, 4, 5].map((stars) => (
-                <label className="cursor-pointer rounded p-0.5 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent" key={stars}>
+                <label
+                  className="cursor-pointer rounded p-0.5 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent"
+                  key={stars}
+                >
                   <input
                     className="sr-only"
                     type="radio"
@@ -94,7 +97,12 @@ export const ReviewForm = ({ slug, viewer }: ReviewFormProps) => {
             )}
           </fieldset>
 
-          <Field label="Sign it as" hint="Shown with your review instead of your email." error={errors.authorName?.message} {...form.register("authorName")} />
+          <Field
+            label="Sign it as"
+            hint="Shown with your review instead of your email."
+            error={errors.authorName?.message}
+            {...form.register("authorName")}
+          />
           <Field label="Title (optional)" error={errors.title?.message} {...form.register("title")} />
           <TextAreaField label="Your review (optional)" error={errors.body?.message} {...form.register("body")} />
 
@@ -120,13 +128,13 @@ export const ReviewForm = ({ slug, viewer }: ReviewFormProps) => {
         onConfirm={() =>
           remove.mutate(undefined, {
             onSuccess: () => {
-              setConfirming(false);
-              form.reset({ authorName: viewer.suggestedAuthorName ?? "", title: "", body: "" });
-              Toast.show("Your review is deleted.");
+              setConfirming(false)
+              form.reset({ authorName: viewer.suggestedAuthorName ?? "", title: "", body: "" })
+              Toast.show("Your review is deleted.")
             },
             onError: (reason) => {
-              setConfirming(false);
-              setFailure(Failure.describe(reason));
+              setConfirming(false)
+              setFailure(Failure.describe(reason))
             },
           })
         }
@@ -134,5 +142,5 @@ export const ReviewForm = ({ slug, viewer }: ReviewFormProps) => {
         The review and its helpful votes go for good. You can write a new one afterwards.
       </ConfirmDialog>
     </div>
-  );
-};
+  )
+}

@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router";
-import { PageHeading } from "./page-heading.ts";
+import { useEffect, useRef, useState } from "react"
+import { useLocation } from "react-router"
+import { PageHeading } from "./page-heading.ts"
 
 /**
  * Keeping focus on a newly opened page's heading while the page loads. A
@@ -20,47 +20,47 @@ const Settling = {
    * focused itself, such as a code field, keeps focus.
    */
   watch: (announce: (title: string) => void): (() => void) => {
-    const state: { focused: HTMLElement | undefined; quiet: number | undefined } = { focused: undefined, quiet: undefined };
+    const state: { focused: HTMLElement | undefined; quiet: number | undefined } = { focused: undefined, quiet: undefined }
 
     const refocus = (): void => {
-      const heading = PageHeading.find();
-      if (heading === null || heading === state.focused) return;
+      const heading = PageHeading.find()
+      if (heading === null || heading === state.focused) return
 
-      const active = document.activeElement;
+      const active = document.activeElement
       if (state.focused === undefined && active instanceof HTMLElement && active.matches("main input, main select, main textarea")) {
-        state.focused = active;
-        return;
+        state.focused = active
+        return
       }
 
       // A heading counts as focused only once focus has landed on it, so one
       // behind the closing drawer is tried again.
-      const isFocusLost = state.focused === undefined || (!state.focused.isConnected && document.activeElement === document.body);
+      const isFocusLost = state.focused === undefined || (!state.focused.isConnected && document.activeElement === document.body)
       if (isFocusLost && PageHeading.focus(heading)) {
-        state.focused = heading;
+        state.focused = heading
       }
-    };
+    }
 
     // Only the title restarts the wait; the rest of the page may keep changing for a while.
     const scheduleAnnouncement = (): void => {
-      window.clearTimeout(state.quiet);
-      state.quiet = window.setTimeout(() => announce(document.title), Settling.QUIET_MS);
-    };
+      window.clearTimeout(state.quiet)
+      state.quiet = window.setTimeout(() => announce(document.title), Settling.QUIET_MS)
+    }
 
-    const page = new MutationObserver(refocus);
-    const head = new MutationObserver(scheduleAnnouncement);
-    page.observe(document.body, { childList: true, subtree: true });
-    head.observe(document.head, { childList: true, subtree: true, characterData: true });
+    const page = new MutationObserver(refocus)
+    const head = new MutationObserver(scheduleAnnouncement)
+    page.observe(document.body, { childList: true, subtree: true })
+    head.observe(document.head, { childList: true, subtree: true, characterData: true })
 
-    refocus();
-    scheduleAnnouncement();
+    refocus()
+    scheduleAnnouncement()
 
     return () => {
-      page.disconnect();
-      head.disconnect();
-      window.clearTimeout(state.quiet);
-    };
+      page.disconnect()
+      head.disconnect()
+      window.clearTimeout(state.quiet)
+    }
   },
-} as const;
+} as const
 
 /**
  * Tells a screen reader that the page changed, which a page swapped in
@@ -69,23 +69,23 @@ const Settling = {
  * left alone, because the browser announces a page it loads.
  */
 export const RouteAnnouncer = () => {
-  const { pathname } = useLocation();
+  const { pathname } = useLocation()
 
-  const [announcement, setAnnouncement] = useState("");
+  const [announcement, setAnnouncement] = useState("")
 
   // The path last announced, so the first render and its development-mode repeat announce nothing.
-  const announced = useRef(pathname);
+  const announced = useRef(pathname)
 
   useEffect(() => {
-    if (announced.current === pathname) return;
-    announced.current = pathname;
+    if (announced.current === pathname) return
+    announced.current = pathname
 
-    return Settling.watch(setAnnouncement);
-  }, [pathname]);
+    return Settling.watch(setAnnouncement)
+  }, [pathname])
 
   return (
     <p className="sr-only" aria-live="polite" aria-atomic="true">
       {announcement}
     </p>
-  );
-};
+  )
+}

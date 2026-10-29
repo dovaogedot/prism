@@ -4,27 +4,27 @@
  * sheet through a CSS class.
  */
 
-import { faker } from "@faker-js/faker";
-import { Sourced, type Picture } from "./sourced.ts";
+import { faker } from "@faker-js/faker"
+import { Sourced, type Picture } from "./sourced.ts"
 
-const SITE = "https://www.tboi.com/";
+const SITE = "https://www.tboi.com/"
 
 /** One CSS rule: its selector and its declarations as written. */
-export type CssRule = Readonly<{ selector: string; declarations: string }>;
+export type CssRule = Readonly<{ selector: string; declarations: string }>
 
 /** One entry of the page, under the heading above it. */
 export type Entry = Readonly<{
-  classes: readonly string[];
-  section: string;
-  name: string;
-  quote: string;
-  paragraphs: readonly string[];
-  quality: string | undefined;
-  type: string;
-  recharge: string | undefined;
-  tags: readonly string[];
-  card: boolean;
-}>;
+  classes: readonly string[]
+  section: string
+  name: string
+  quote: string
+  paragraphs: readonly string[]
+  quality: string | undefined
+  type: string
+  recharge: string | undefined
+  tags: readonly string[]
+  card: boolean
+}>
 
 export const Isaac = {
   /** Every rule of a stylesheet, in order. */
@@ -50,21 +50,21 @@ export const Isaac = {
       .split("<h2>")
       .slice(1)
       .flatMap((chunk) => {
-        const section = Isaac.text(chunk.slice(0, chunk.indexOf("</h2>")));
-        return [...chunk.matchAll(/<li class="textbox"[^>]*>([\s\S]*?)<\/li>/g)].map((found) => Isaac.entry(section, found[1] ?? ""));
+        const section = Isaac.text(chunk.slice(0, chunk.indexOf("</h2>")))
+        return [...chunk.matchAll(/<li class="textbox"[^>]*>([\s\S]*?)<\/li>/g)].map((found) => Isaac.entry(section, found[1] ?? ""))
       }),
 
   /** One entry from the inside of its list item. */
   entry: (section: string, item: string): Entry => {
     const field = (pattern: RegExp): string | undefined => {
-      const found = pattern.exec(item)?.[1];
-      return found === undefined ? undefined : Isaac.text(found);
-    };
+      const found = pattern.exec(item)?.[1]
+      return found === undefined ? undefined : Isaac.text(found)
+    }
     const words = (text: string | undefined, separator: string): readonly string[] =>
       (text ?? "")
         .split(separator)
         .map((word) => word.trim())
-        .filter((word) => word.length > 0);
+        .filter((word) => word.length > 0)
 
     return {
       classes: words(field(/class="([^"]*)"/), " "),
@@ -80,7 +80,7 @@ export const Isaac = {
       recharge: field(/Recharge Time: ([^<]*)/),
       tags: words(field(/class="tags">([\s\S]*?)<\/p>/), ","),
       card: item.includes("CardID:"),
-    };
+    }
   },
 
   /**
@@ -90,33 +90,46 @@ export const Isaac = {
    * through a rule with a background position that may also size it.
    */
   sprite: (rules: readonly CssRule[], classes: readonly string[]): Picture | undefined => {
-    const url = (rule: CssRule | undefined): string | undefined => /background[^;]*url\(["']?([^"')]+)/.exec(rule?.declarations ?? "")?.[1];
-    const sheet = classes.map((cls) => rules.find((rule) => rule.selector.endsWith(`.${cls}`) && url(rule) !== undefined)).find((rule) => rule !== undefined);
-    if (sheet === undefined) return undefined;
+    const url = (rule: CssRule | undefined): string | undefined => /background[^;]*url\(["']?([^"')]+)/.exec(rule?.declarations ?? "")?.[1]
+    const sheet = classes
+      .map((cls) => rules.find((rule) => rule.selector.endsWith(`.${cls}`) && url(rule) !== undefined))
+      .find((rule) => rule !== undefined)
+    if (sheet === undefined) return undefined
 
     const placed = rules.filter(
-      (rule) => rule.declarations.includes("background-position") && classes.some((cls) => rule.selector.endsWith(`.${cls}`) && !sheet.selector.endsWith(`.${cls}`)),
-    );
-    const slice = placed.find((rule) => rule.selector.includes(sheet.selector.slice(sheet.selector.lastIndexOf(".")))) ?? placed[0];
-    const position = /background-position:\s*(-?\d+)(?:px)?\s+(-?\d+)(?:px)?/.exec(slice?.declarations ?? "");
-    const address = url(slice) ?? url(sheet);
-    if (slice === undefined || position === null || address === undefined) return undefined;
+      (rule) =>
+        rule.declarations.includes("background-position") &&
+        classes.some((cls) => rule.selector.endsWith(`.${cls}`) && !sheet.selector.endsWith(`.${cls}`)),
+    )
+    const slice = placed.find((rule) => rule.selector.includes(sheet.selector.slice(sheet.selector.lastIndexOf(".")))) ?? placed[0]
+    const position = /background-position:\s*(-?\d+)(?:px)?\s+(-?\d+)(?:px)?/.exec(slice?.declarations ?? "")
+    const address = url(slice) ?? url(sheet)
+    if (slice === undefined || position === null || address === undefined) return undefined
 
     const size = (side: string): number =>
-      Number(new RegExp(`${side}:(\\d+)px`).exec(slice.declarations)?.[1] ?? new RegExp(`${side}:(\\d+)px`).exec(sheet.declarations)?.[1] ?? 50);
+      Number(
+        new RegExp(`${side}:(\\d+)px`).exec(slice.declarations)?.[1] ?? new RegExp(`${side}:(\\d+)px`).exec(sheet.declarations)?.[1] ?? 50,
+      )
 
-    return { url: new URL(address, `${SITE}assets/`).href, left: 0 - Number(position[1]), top: 0 - Number(position[2]), width: size("width"), height: size("height"), unit: 1 };
+    return {
+      url: new URL(address, `${SITE}assets/`).href,
+      left: 0 - Number(position[1]),
+      top: 0 - Number(position[2]),
+      width: size("width"),
+      height: size("height"),
+      unit: 1,
+    }
   },
 
   /** What an entry is, as the shop's type property names it. */
   kind: (entry: Entry): string => {
-    if (entry.section.includes("Trinket")) return "Trinket";
-    if (entry.section.includes("Item")) return entry.type.startsWith("Active") ? "Active item" : "Passive item";
-    if (entry.tags.includes("tarot")) return entry.name.endsWith("?") ? "Reversed tarot card" : "Tarot card";
-    if (entry.name.includes("Rune")) return "Rune";
-    if (entry.name.startsWith("Soul of")) return "Soul";
-    if (entry.name.includes("Pill")) return "Pill";
-    return entry.card ? "Card" : "Pickup";
+    if (entry.section.includes("Trinket")) return "Trinket"
+    if (entry.section.includes("Item")) return entry.type.startsWith("Active") ? "Active item" : "Passive item"
+    if (entry.tags.includes("tarot")) return entry.name.endsWith("?") ? "Reversed tarot card" : "Tarot card"
+    if (entry.name.includes("Rune")) return "Rune"
+    if (entry.name.startsWith("Soul of")) return "Soul"
+    if (entry.name.includes("Pill")) return "Pill"
+    return entry.card ? "Card" : "Pickup"
   },
 
   /** An entry as a product, drawn from `picture`. */
@@ -136,16 +149,16 @@ export const Isaac = {
 
   /** Every entry of the page that the stylesheet draws, as a product. */
   fetch: async (): Promise<readonly Sourced[]> => {
-    const html = await (await Sourced.get(`${SITE}all-items`)).text();
-    const rules = Isaac.rules(await (await Sourced.get(`${SITE}assets/main.css`)).text());
+    const html = await (await Sourced.get(`${SITE}all-items`)).text()
+    const rules = Isaac.rules(await (await Sourced.get(`${SITE}assets/main.css`)).text())
 
     return Isaac.entries(html).flatMap((entry) => {
-      const picture = Isaac.sprite(rules, entry.classes);
+      const picture = Isaac.sprite(rules, entry.classes)
       if (picture === undefined) {
-        process.stderr.write(`Skipping ${entry.name}: the stylesheet does not draw it.\n`);
-        return [];
+        process.stderr.write(`Skipping ${entry.name}: the stylesheet does not draw it.\n`)
+        return []
       }
-      return [Isaac.product(entry, picture)];
-    });
+      return [Isaac.product(entry, picture)]
+    })
   },
-} as const;
+} as const

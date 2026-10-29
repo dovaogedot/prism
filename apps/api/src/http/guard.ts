@@ -6,52 +6,52 @@
  * passed a TOTP check, which is all the staff guard needs.
  */
 
-import { Permission, type DomainError, type StaffRole, type UserId } from "@prism/shared";
-import type { FastifyInstance, FastifyRequest, onRequestHookHandler } from "fastify";
-import { errAsync, okAsync, ResultAsync } from "neverthrow";
-import type { SessionId } from "../db/ids.ts";
-import type { AuthRepository } from "../modules/auth/repository.ts";
-import type { StaffActor } from "../modules/staff/audit.ts";
-import type { Clock } from "../platform/clock.ts";
-import type { RateLimitPolicyName } from "../platform/rate-limit.ts";
-import type { TokenService } from "../platform/tokens.ts";
-import { HttpErrors } from "./errors.ts";
+import { Permission, type DomainError, type StaffRole, type UserId } from "@prism/shared"
+import type { FastifyInstance, FastifyRequest, onRequestHookHandler } from "fastify"
+import { errAsync, okAsync, ResultAsync } from "neverthrow"
+import type { SessionId } from "../db/ids.ts"
+import type { AuthRepository } from "../modules/auth/repository.ts"
+import type { StaffActor } from "../modules/staff/audit.ts"
+import type { Clock } from "../platform/clock.ts"
+import type { RateLimitPolicyName } from "../platform/rate-limit.ts"
+import type { TokenService } from "../platform/tokens.ts"
+import { HttpErrors } from "./errors.ts"
 
 /** Who a request is from, once its token has been checked against a live session. */
 export type AuthenticatedUser = Readonly<{
-  id: UserId;
-  sessionId: SessionId;
+  id: UserId
+  sessionId: SessionId
   /** The account's staff roles; empty for a customer. */
-  roles: readonly StaffRole[];
-  hasTwoFactor: boolean;
+  roles: readonly StaffRole[]
+  hasTwoFactor: boolean
   /** When the session last passed a TOTP check; absent when it never did. */
-  secondFactorAt?: Date;
-}>;
+  secondFactorAt?: Date
+}>
 
 /** What an admin route requires: one permission, or any staff role at all. */
-export type StaffRequirement = Permission | "any-staff";
+export type StaffRequirement = Permission | "any-staff"
 
 declare module "fastify" {
   // The one place an interface is unavoidable: merging into Fastify's declaration.
   interface FastifyRequest {
     /** Undefined until the guard has run. */
-    authenticated: AuthenticatedUser | undefined;
+    authenticated: AuthenticatedUser | undefined
   }
 
   interface FastifyContextConfig {
     /** What the staff guard of an admin route requires, so tests can walk every admin route. */
-    permission?: StaffRequirement;
+    permission?: StaffRequirement
   }
 }
 
 /** What a guard needs to turn a bearer token into a user. */
 export type GuardDependencies = Readonly<{
-  tokens: TokenService;
-  repository: AuthRepository;
-  clock: Clock;
+  tokens: TokenService
+  repository: AuthRepository
+  clock: Clock
   /** How long a session's TOTP check opens the admin. */
-  staffVerificationTtlSeconds: number;
-}>;
+  staffVerificationTtlSeconds: number
+}>
 
 /**
  * The route options of an admin route: its guard, and the config that names
@@ -60,9 +60,9 @@ export type GuardDependencies = Readonly<{
  * nothing about what the route accepts.
  */
 export type AdminRouteOptions = Readonly<{
-  onRequest: onRequestHookHandler;
-  config: Readonly<{ permission: StaffRequirement; rateLimit: RateLimitPolicyName }>;
-}>;
+  onRequest: onRequestHookHandler
+  config: Readonly<{ permission: StaffRequirement; rateLimit: RateLimitPolicyName }>
+}>
 
 /**
  * The hooks that turn a bearer token into `request.authenticated`. Each runs
@@ -71,13 +71,13 @@ export type AdminRouteOptions = Readonly<{
  */
 export type Guards = Readonly<{
   /** Answers 401 to a request without a live session. */
-  requireUser: onRequestHookHandler;
+  requireUser: onRequestHookHandler
   /**
    * Lets a request without an `Authorization` header through as a guest. A
    * header that fails verification still answers 401, so the browser
    * refreshes and retries instead of acting as a guest by mistake.
    */
-  optionalUser: onRequestHookHandler;
+  optionalUser: onRequestHookHandler
   /**
    * Admits a staff account whose roles grant `requirement`, that has 2FA on,
    * and whose session passed a TOTP check within the verification window.
@@ -85,10 +85,10 @@ export type Guards = Readonly<{
    * and 403 `TwoFactorSetupRequired` or `TwoFactorVerificationRequired`
    * when the second factor is missing or stale.
    */
-  staff: (requirement: StaffRequirement) => onRequestHookHandler;
+  staff: (requirement: StaffRequirement) => onRequestHookHandler
   /** The options of an admin route that requires `requirement`, under the `rateLimit` policy. */
-  admin: (requirement: StaffRequirement, rateLimit?: RateLimitPolicyName) => AdminRouteOptions;
-}>;
+  admin: (requirement: StaffRequirement, rateLimit?: RateLimitPolicyName) => AdminRouteOptions
+}>
 
 export const Guards = {
   BEARER: /^Bearer (.+)$/,
@@ -104,30 +104,25 @@ export const Guards = {
   decorate: (app: FastifyInstance): void => {
     app.decorateRequest("authenticated", {
       getter(this: FastifyRequest) {
-        return Guards.attached.get(this);
+        return Guards.attached.get(this)
       },
       setter(this: FastifyRequest, value: AuthenticatedUser | undefined) {
-        if (value === undefined) Guards.attached.delete(this);
-        else Guards.attached.set(this, value);
+        if (value === undefined) Guards.attached.delete(this)
+        else Guards.attached.set(this, value)
       },
-    });
+    })
   },
 
-  authenticate: (
-    deps: GuardDependencies,
-    request: FastifyRequest,
-  ): ResultAsync<AuthenticatedUser, DomainError> => {
-    const token = Guards.BEARER.exec(request.headers.authorization ?? "")?.[1];
+  authenticate: (deps: GuardDependencies, request: FastifyRequest): ResultAsync<AuthenticatedUser, DomainError> => {
+    const token = Guards.BEARER.exec(request.headers.authorization ?? "")?.[1]
 
     if (token === undefined) {
-      return errAsync<AuthenticatedUser, DomainError>({ _tag: "Unauthenticated" });
+      return errAsync<AuthenticatedUser, DomainError>({ _tag: "Unauthenticated" })
     }
 
     return deps.tokens.verifyAccessToken(token).andThen((claims) =>
       // fromSafePromise: a database outage is a 500, not a revoked session.
-      ResultAsync.fromSafePromise(
-        deps.repository.liveSession(claims.sessionId, claims.subject, deps.clock.now()),
-      ).andThen((state) =>
+      ResultAsync.fromSafePromise(deps.repository.liveSession(claims.sessionId, claims.subject, deps.clock.now())).andThen((state) =>
         state === undefined
           ? errAsync<AuthenticatedUser, DomainError>({ _tag: "SessionRevoked" })
           : okAsync<AuthenticatedUser, DomainError>({
@@ -138,7 +133,7 @@ export const Guards = {
               ...(state.secondFactorAt === undefined ? {} : { secondFactorAt: state.secondFactorAt }),
             }),
       ),
-    );
+    )
   },
 
   /** Why `user` may not use a route that requires `requirement`, or `undefined` when it may. */
@@ -148,66 +143,68 @@ export const Guards = {
     now: Date,
     verificationTtlSeconds: number,
   ): DomainError | undefined => {
-    const isPermitted =
-      requirement === "any-staff" ? user.roles.length > 0 : Permission.can(user.roles, requirement);
+    const isPermitted = requirement === "any-staff" ? user.roles.length > 0 : Permission.can(user.roles, requirement)
 
-    if (!isPermitted) return { _tag: "Forbidden" };
-    if (!user.hasTwoFactor) return { _tag: "TwoFactorSetupRequired" };
+    if (!isPermitted) return { _tag: "Forbidden" }
+    if (!user.hasTwoFactor) return { _tag: "TwoFactorSetupRequired" }
 
-    const checkedAt = user.secondFactorAt;
+    const checkedAt = user.secondFactorAt
     if (checkedAt === undefined || now.getTime() - checkedAt.getTime() >= verificationTtlSeconds * 1000) {
-      return { _tag: "TwoFactorVerificationRequired" };
+      return { _tag: "TwoFactorVerificationRequired" }
     }
 
-    return undefined;
+    return undefined
   },
 
   /** The user of a request that passed `requireUser` or a staff guard, which set it. */
   userOf: (request: FastifyRequest): AuthenticatedUser => {
-    if (request.authenticated === undefined) throw new Error(`${request.method} ${request.url} reads its user without the guard that sets it.`);
+    if (request.authenticated === undefined)
+      throw new Error(`${request.method} ${request.url} reads its user without the guard that sets it.`)
 
-    return request.authenticated;
+    return request.authenticated
   },
 
   /** The staff member behind an admin request, as the audit log records it. */
   actorOf: (request: FastifyRequest): StaffActor => {
-    const user = Guards.userOf(request);
+    const user = Guards.userOf(request)
 
-    return { id: user.id, roles: user.roles, ip: request.ip };
+    return { id: user.id, roles: user.roles, ip: request.ip }
   },
 
   create: (deps: GuardDependencies): Guards => {
-    const staff = (requirement: StaffRequirement): onRequestHookHandler => async (request, reply) => {
-      const result = await Guards.authenticate(deps, request);
+    const staff =
+      (requirement: StaffRequirement): onRequestHookHandler =>
+      async (request, reply) => {
+        const result = await Guards.authenticate(deps, request)
 
-      if (result.isErr()) return HttpErrors.send(reply, result.error);
+        if (result.isErr()) return HttpErrors.send(reply, result.error)
 
-      const refusal = Guards.staffRefusal(result.value, requirement, deps.clock.now(), deps.staffVerificationTtlSeconds);
-      if (refusal !== undefined) return HttpErrors.send(reply, refusal);
+        const refusal = Guards.staffRefusal(result.value, requirement, deps.clock.now(), deps.staffVerificationTtlSeconds)
+        if (refusal !== undefined) return HttpErrors.send(reply, refusal)
 
-      request.authenticated = result.value;
-      return undefined;
-    };
+        request.authenticated = result.value
+        return undefined
+      }
 
     return {
       requireUser: async (request, reply) => {
-        const result = await Guards.authenticate(deps, request);
+        const result = await Guards.authenticate(deps, request)
 
-        if (result.isErr()) return HttpErrors.send(reply, result.error);
+        if (result.isErr()) return HttpErrors.send(reply, result.error)
 
-        request.authenticated = result.value;
-        return undefined;
+        request.authenticated = result.value
+        return undefined
       },
 
       optionalUser: async (request, reply) => {
-        if (request.headers.authorization === undefined) return undefined;
+        if (request.headers.authorization === undefined) return undefined
 
-        const result = await Guards.authenticate(deps, request);
+        const result = await Guards.authenticate(deps, request)
 
-        if (result.isErr()) return HttpErrors.send(reply, result.error);
+        if (result.isErr()) return HttpErrors.send(reply, result.error)
 
-        request.authenticated = result.value;
-        return undefined;
+        request.authenticated = result.value
+        return undefined
       },
 
       staff,
@@ -216,6 +213,6 @@ export const Guards = {
         onRequest: staff(requirement),
         config: { permission: requirement, rateLimit },
       }),
-    };
+    }
   },
-} as const;
+} as const

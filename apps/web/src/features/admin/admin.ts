@@ -6,16 +6,16 @@
  * and the staff gate shows what to do instead of the page.
  */
 
-import { Permission, type ErrorResponse, type StaffRole } from "@prism/shared";
-import { hashKey, keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { Api } from "../../shared/api/client.ts";
+import { Permission, type ErrorResponse, type StaffRole } from "@prism/shared"
+import { hashKey, keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query"
+import { useState } from "react"
+import { Api } from "../../shared/api/client.ts"
 
 /** What stands between a staff member and the admin. */
-export type GateState = "open" | "setup" | "verify" | "forbidden";
+export type GateState = "open" | "setup" | "verify" | "forbidden"
 
 /** One entry of the admin's navigation, and the permission that shows it. */
-export type AdminSection = Readonly<{ path: string; label: string; permission: Permission | "any-staff" }>;
+export type AdminSection = Readonly<{ path: string; label: string; permission: Permission | "any-staff" }>
 
 export const AdminAccess = {
   /** The admin's sections, in the order the navigation lists them. */
@@ -34,19 +34,21 @@ export const AdminAccess = {
 
   /** The sections `roles` may open. */
   sectionsFor: (roles: readonly StaffRole[]): readonly AdminSection[] =>
-    AdminAccess.SECTIONS.filter((section) => (section.permission === "any-staff" ? roles.length > 0 : Permission.can(roles, section.permission))),
+    AdminAccess.SECTIONS.filter((section) =>
+      section.permission === "any-staff" ? roles.length > 0 : Permission.can(roles, section.permission),
+    ),
 
   /** What a refusal of an admin request means for the gate; `open` for anything that is not about staff access. */
   gateOf: (failure: ErrorResponse["error"] | undefined): GateState => {
     switch (failure?.code) {
       case "TwoFactorSetupRequired":
-        return "setup";
+        return "setup"
       case "TwoFactorVerificationRequired":
-        return "verify";
+        return "verify"
       case "Forbidden":
-        return "forbidden";
+        return "forbidden"
       default:
-        return "open";
+        return "open"
     }
   },
 
@@ -60,20 +62,20 @@ export const AdminAccess = {
    * would only be refused again.
    */
   onFailure: (client: QueryClient, reason: unknown, failedKey?: readonly unknown[]): void => {
-    if (failedKey !== undefined && hashKey(failedKey) === hashKey(AdminKeys.summary)) return;
+    if (failedKey !== undefined && hashKey(failedKey) === hashKey(AdminKeys.summary)) return
 
     if (AdminAccess.gateOf(Api.failureOf(reason)) !== "open") {
-      void client.invalidateQueries({ queryKey: AdminKeys.summary });
+      void client.invalidateQueries({ queryKey: AdminKeys.summary })
     }
   },
-} as const;
+} as const
 
 export const AdminKeys = {
   all: ["admin"] as const,
   summary: ["admin", "summary"] as const,
   /** The key of an admin read: the path it asks for, query string included, so a key and its request never part. */
   of: (path: string) => ["admin", path] as const,
-} as const;
+} as const
 
 /** One admin read, by its path under `/admin`, query string included. */
 export const useAdminRead = <T>(path: string, isEnabled = true) =>
@@ -83,7 +85,7 @@ export const useAdminRead = <T>(path: string, isEnabled = true) =>
     placeholderData: keepPreviousData,
     enabled: isEnabled,
     retry: false,
-  });
+  })
 
 /**
  * A filter box's text. It starts from the URL parameter `name` and follows
@@ -91,26 +93,26 @@ export const useAdminRead = <T>(path: string, isEnabled = true) =>
  * change it, while typing changes only the box.
  */
 export const useParamDraft = (params: URLSearchParams, name: string) => {
-  const fromUrl = params.get(name) ?? "";
+  const fromUrl = params.get(name) ?? ""
 
-  const [draft, setDraft] = useState(fromUrl);
+  const [draft, setDraft] = useState(fromUrl)
 
-  const [seen, setSeen] = useState(fromUrl);
+  const [seen, setSeen] = useState(fromUrl)
 
   if (seen !== fromUrl) {
-    setSeen(fromUrl);
-    setDraft(fromUrl);
+    setSeen(fromUrl)
+    setDraft(fromUrl)
   }
 
-  return [draft, setDraft] as const;
-};
+  return [draft, setDraft] as const
+}
 
 /** One admin write. Every admin read is refreshed once it succeeds, so no list shows what it changed as it was. */
 export const useAdminWrite = <Input, Output>(write: (input: Input) => Promise<Output>) => {
-  const client = useQueryClient();
+  const client = useQueryClient()
 
   return useMutation({
     mutationFn: write,
     onSuccess: () => client.invalidateQueries({ queryKey: AdminKeys.all }),
-  });
-};
+  })
+}

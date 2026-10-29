@@ -1,44 +1,42 @@
-import type { OrderDetail } from "@prism/shared";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRef } from "react";
-import { Api } from "../../../shared/api/client.ts";
-import { PageHeading } from "../../../shared/seo/page-heading.ts";
-import { Alert, Button, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { OrderKeys } from "../orders.ts";
+import type { OrderDetail } from "@prism/shared"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useRef } from "react"
+import { Api } from "../../../shared/api/client.ts"
+import { PageHeading } from "../../../shared/seo/page-heading.ts"
+import { Alert, Button, Toast } from "../../../shared/ui/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { OrderKeys } from "../orders.ts"
 
 /** The order to cancel, and the guest key that opens it, if any. */
-export type CancelOrderButtonProps = Readonly<{ order: OrderDetail; orderKey?: string }>;
+export type CancelOrderButtonProps = Readonly<{ order: OrderDetail; orderKey?: string }>
 
 /**
  * Cancels the order after asking. A paid order is refunded in full; the
  * dialog says so before anything happens.
  */
 export const CancelOrderButton = ({ order, orderKey }: CancelOrderButtonProps) => {
-  const dialog = useRef<HTMLDialogElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null)
 
-  const client = useQueryClient();
+  const client = useQueryClient()
 
   const cancel = useMutation({
     mutationFn: () =>
-      Api.post<OrderDetail>(
-        `/orders/${order.id}/cancel${orderKey === undefined ? "" : `?key=${encodeURIComponent(orderKey)}`}`,
-      ),
+      Api.post<OrderDetail>(`/orders/${order.id}/cancel${orderKey === undefined ? "" : `?key=${encodeURIComponent(orderKey)}`}`),
     onSuccess: (detail) => {
-      client.setQueryData(OrderKeys.one(order.id, orderKey), detail);
-      void client.invalidateQueries({ queryKey: OrderKeys.lists });
-      dialog.current?.close();
-      Toast.show(`Order #${order.number} is canceled.`);
+      client.setQueryData(OrderKeys.one(order.id, orderKey), detail)
+      void client.invalidateQueries({ queryKey: OrderKeys.lists })
+      dialog.current?.close()
+      Toast.show(`Order #${order.number} is canceled.`)
 
       // This button goes with the order's cancelability, so the page heading keeps focus on the page.
-      const heading = PageHeading.find();
+      const heading = PageHeading.find()
       if (heading !== null) {
-        PageHeading.focus(heading);
+        PageHeading.focus(heading)
       }
     },
-  });
+  })
 
-  const paid = order.payment?.status === "succeeded";
+  const paid = order.payment?.status === "succeeded"
 
   return (
     <>
@@ -74,5 +72,5 @@ export const CancelOrderButton = ({ order, orderKey }: CancelOrderButtonProps) =
         </div>
       </dialog>
     </>
-  );
-};
+  )
+}

@@ -1,17 +1,17 @@
-import { ReviewSort } from "@prism/shared";
-import { useRef, useState } from "react";
-import { Link, useLocation } from "react-router";
-import { match, P } from "ts-pattern";
-import { Alert, EmptyState, Pagination, Skeleton } from "../../../shared/ui/index.ts";
-import { NextPath } from "../../auth/next-path.ts";
-import { useSession } from "../../auth/session.ts";
-import { useReviewPage, useReviewViewer } from "../reviews.ts";
-import { RatingSummary } from "./RatingSummary.tsx";
-import { ReviewCard } from "./ReviewCard.tsx";
-import { ReviewForm } from "./ReviewForm.tsx";
+import { ReviewSort } from "@prism/shared"
+import { useRef, useState } from "react"
+import { Link, useLocation } from "react-router"
+import { match, P } from "ts-pattern"
+import { Alert, EmptyState, Pagination, Skeleton } from "../../../shared/ui/index.ts"
+import { NextPath } from "../../auth/next-path.ts"
+import { useSession } from "../../auth/session.ts"
+import { useReviewPage, useReviewViewer } from "../reviews.ts"
+import { RatingSummary } from "./RatingSummary.tsx"
+import { ReviewCard } from "./ReviewCard.tsx"
+import { ReviewForm } from "./ReviewForm.tsx"
 
 /** The product whose reviews the section shows. */
-export type ReviewsSectionProps = Readonly<{ slug: string }>;
+export type ReviewsSectionProps = Readonly<{ slug: string }>
 
 /**
  * The product page's reviews: the rating summary, the reader's own review
@@ -19,22 +19,22 @@ export type ReviewsSectionProps = Readonly<{ slug: string }>;
  * a page at a time.
  */
 export const ReviewsSection = ({ slug }: ReviewsSectionProps) => {
-  const session = useSession();
+  const session = useSession()
 
   // A sign-in comes back to the same place, the reviews included when the address named them.
-  const { pathname, hash } = useLocation();
+  const { pathname, hash } = useLocation()
 
-  const [sort, setSort] = useState<ReviewSort>("helpful");
+  const [sort, setSort] = useState<ReviewSort>("helpful")
 
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(1)
 
-  const reviews = useReviewPage(slug, sort, page);
+  const reviews = useReviewPage(slug, sort, page)
 
-  const viewer = useReviewViewer(slug);
+  const viewer = useReviewViewer(slug)
 
-  const heading = useRef<HTMLHeadingElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null)
 
-  const voted = new Set(viewer.data?.votedReviewIds ?? []);
+  const voted = new Set(viewer.data?.votedReviewIds ?? [])
 
   return (
     <section className="space-y-6 border-t border-line pt-10" aria-labelledby="reviews-heading">
@@ -85,8 +85,8 @@ export const ReviewsSection = ({ slug }: ReviewsSectionProps) => {
                     className="h-9 rounded-lg border border-edge bg-surface px-2 text-sm text-ink hover:border-ink-faint"
                     value={sort}
                     onChange={(event) => {
-                      setSort(ReviewSort.schema.catch("helpful").parse(event.target.value));
-                      setPage(1);
+                      setSort(ReviewSort.schema.catch("helpful").parse(event.target.value))
+                      setPage(1)
                     }}
                   >
                     {ReviewSort.NAMES.map((option) => (
@@ -114,8 +114,8 @@ export const ReviewsSection = ({ slug }: ReviewsSectionProps) => {
                   totalPages={data.totalPages}
                   label="Review pages"
                   onPage={(next) => {
-                    setPage(next);
-                    heading.current?.scrollIntoView({ block: "start" });
+                    setPage(next)
+                    heading.current?.scrollIntoView({ block: "start" })
                   }}
                 />
               </>
@@ -123,5 +123,5 @@ export const ReviewsSection = ({ slug }: ReviewsSectionProps) => {
         </div>
       </div>
     </section>
-  );
-};
+  )
+}

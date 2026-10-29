@@ -1,20 +1,20 @@
-import { OAuthProvider, Permission, Price, StaffRole, type AdminUserDetail } from "@prism/shared";
-import { useState } from "react";
-import { Link, useParams } from "react-router";
-import { match, P } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { Alert, Button, Card, ConfirmDialog, Skeleton, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { useSession } from "../../auth/session.ts";
-import { StatusBadge } from "../../orders/components/index.ts";
-import { useAdminRead, useAdminWrite } from "../admin.ts";
-import { AdminPage } from "../components/index.ts";
-import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
-import { DateTime } from "../../../shared/format/date-time.ts";
+import { OAuthProvider, Permission, Price, StaffRole, type AdminUserDetail } from "@prism/shared"
+import { useState } from "react"
+import { Link, useParams } from "react-router"
+import { match, P } from "ts-pattern"
+import { Api } from "../../../shared/api/client.ts"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { Alert, Button, Card, ConfirmDialog, Skeleton, Toast } from "../../../shared/ui/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { useSession } from "../../auth/session.ts"
+import { StatusBadge } from "../../orders/components/index.ts"
+import { useAdminRead, useAdminWrite } from "../admin.ts"
+import { AdminPage } from "../components/index.ts"
+import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts"
+import { DateTime } from "../../../shared/format/date-time.ts"
 
 /** One of the account actions only staff managers take, which each ask first. */
-type AccountAction = "disable" | "enable" | "reset-two-factor" | "sign-out";
+type AccountAction = "disable" | "enable" | "reset-two-factor" | "sign-out"
 
 /**
  * One account for staff: who it is, how it signs in, its sessions and
@@ -23,30 +23,35 @@ type AccountAction = "disable" | "enable" | "reset-two-factor" | "sign-out";
  * those asks first, and the audit log records it.
  */
 export const UserPage = () => {
-  const { id = "" } = useParams();
+  const { id = "" } = useParams()
 
-  const session = useSession();
+  const session = useSession()
 
-  const user = useAdminRead<AdminUserDetail>(`/users/${id}`);
+  const user = useAdminRead<AdminUserDetail>(`/users/${id}`)
 
-  const [roles, setRoles] = useState<readonly StaffRole[] | undefined>(undefined);
+  const [roles, setRoles] = useState<readonly StaffRole[] | undefined>(undefined)
 
-  const [isConfirmingRoles, setConfirmingRoles] = useState(false);
+  const [isConfirmingRoles, setConfirmingRoles] = useState(false)
 
-  const [action, setAction] = useState<AccountAction | undefined>(undefined);
+  const [action, setAction] = useState<AccountAction | undefined>(undefined)
 
-  const [failure, setFailure] = useActionFailure();
+  const [failure, setFailure] = useActionFailure()
 
-  const saveRoles = useAdminWrite((chosen: readonly StaffRole[]) => Api.put<AdminUserDetail>(`/admin/users/${id}/roles`, { roles: chosen }));
+  const saveRoles = useAdminWrite((chosen: readonly StaffRole[]) => Api.put<AdminUserDetail>(`/admin/users/${id}/roles`, { roles: chosen }))
 
-  const act = useAdminWrite((chosen: AccountAction) => Api.post<AdminUserDetail>(`/admin/users/${id}/${chosen}`));
+  const act = useAdminWrite((chosen: AccountAction) => Api.post<AdminUserDetail>(`/admin/users/${id}/${chosen}`))
 
-  const viewerRoles = session?.roles ?? [];
-  const canManage = Permission.can(viewerRoles, "staff.manage");
-  const canSeeOrders = Permission.can(viewerRoles, "orders.view");
+  const viewerRoles = session?.roles ?? []
+  const canManage = Permission.can(viewerRoles, "staff.manage")
+  const canSeeOrders = Permission.can(viewerRoles, "orders.view")
 
   const actions = {
-    disable: { title: "Disable this account?", label: "Disable account", text: "It cannot sign in, and every session it has ends now.", done: "The account is disabled." },
+    disable: {
+      title: "Disable this account?",
+      label: "Disable account",
+      text: "It cannot sign in, and every session it has ends now.",
+      done: "The account is disabled.",
+    },
     enable: { title: "Enable this account?", label: "Enable account", text: "It can sign in again.", done: "The account is enabled." },
     "reset-two-factor": {
       title: "Reset two-factor authentication?",
@@ -54,8 +59,13 @@ export const UserPage = () => {
       text: "Its second factor is removed, every session ends, and it loses every staff role. Give the roles back once it has set up 2FA again.",
       done: "Two-factor authentication is reset.",
     },
-    "sign-out": { title: "Sign it out everywhere?", label: "Sign out everywhere", text: "Every session ends now; the account can sign in again.", done: "The account is signed out everywhere." },
-  } as const satisfies Record<AccountAction, Readonly<{ title: string; label: string; text: string; done: string }>>;
+    "sign-out": {
+      title: "Sign it out everywhere?",
+      label: "Sign out everywhere",
+      text: "Every session ends now; the account can sign in again.",
+      done: "The account is signed out everywhere.",
+    },
+  } as const satisfies Record<AccountAction, Readonly<{ title: string; label: string; text: string; done: string }>>
 
   return match(user)
     .with({ status: "error" }, ({ error }) => (
@@ -69,8 +79,8 @@ export const UserPage = () => {
       </AdminPage>
     ))
     .otherwise(({ data }) => {
-      const chosen = roles ?? data.roles;
-      const isChanged = chosen.length !== data.roles.length || chosen.some((role) => !data.roles.includes(role));
+      const chosen = roles ?? data.roles
+      const isChanged = chosen.length !== data.roles.length || chosen.some((role) => !data.roles.includes(role))
 
       return (
         <AdminPage text={{ ...PageText.adminUser, title: `${data.email} - Admin` }} heading={data.email}>
@@ -83,11 +93,16 @@ export const UserPage = () => {
               {data.phone === undefined ? null : <p className="text-ink-soft">{data.phone}</p>}
               <p className="text-ink-soft">Joined {DateTime.format(data.createdAt)}</p>
               <p className="text-ink-soft">
-                Signs in with {[...(data.hasPassword ? ["a password"] : []), ...data.providers.map((provider) => OAuthProvider.label[provider])].join(" and ")}
+                Signs in with{" "}
+                {[...(data.hasPassword ? ["a password"] : []), ...data.providers.map((provider) => OAuthProvider.label[provider])].join(
+                  " and ",
+                )}
               </p>
               <p className="text-ink-soft">Two-factor authentication {data.twoFactorEnabled ? "on" : "off"}</p>
               <p className="text-ink-soft">{data.liveSessions === 1 ? "1 session signed in" : `${data.liveSessions} sessions signed in`}</p>
-              {data.disabledAt === undefined ? null : <p className="font-medium text-danger">Disabled since {DateTime.format(data.disabledAt)}</p>}
+              {data.disabledAt === undefined ? null : (
+                <p className="font-medium text-danger">Disabled since {DateTime.format(data.disabledAt)}</p>
+              )}
             </Card>
 
             <Card className="p-5">
@@ -116,7 +131,8 @@ export const UserPage = () => {
 
           {canManage && data.id === session?.id ? (
             <p className="text-sm text-ink-soft">
-              This is your own account. Its staff roles, disabling it, resetting its 2FA and signing it out everywhere are for another admin.
+              This is your own account. Its staff roles, disabling it, resetting its 2FA and signing it out everywhere are for another
+              admin.
             </p>
           ) : null}
 
@@ -183,19 +199,21 @@ export const UserPage = () => {
             onConfirm={() =>
               saveRoles.mutate(chosen, {
                 onSuccess: () => {
-                  setConfirmingRoles(false);
-                  setRoles(undefined);
-                  Toast.show("The roles are saved, and the account holder is told by email.");
+                  setConfirmingRoles(false)
+                  setRoles(undefined)
+                  Toast.show("The roles are saved, and the account holder is told by email.")
                 },
                 onError: (reason) => {
-                  setConfirmingRoles(false);
-                  setFailure(Failure.message(reason));
+                  setConfirmingRoles(false)
+                  setFailure(Failure.message(reason))
                 },
               })
             }
           >
-            {chosen.length === 0 ? "The account becomes a customer's again." : `The account holds: ${chosen.map((role) => StaffRole.label[role]).join(", ")}.`} It takes effect on the
-            holder's next request.
+            {chosen.length === 0
+              ? "The account becomes a customer's again."
+              : `The account holds: ${chosen.map((role) => StaffRole.label[role]).join(", ")}.`}{" "}
+            It takes effect on the holder's next request.
           </ConfirmDialog>
 
           <ConfirmDialog
@@ -205,22 +223,22 @@ export const UserPage = () => {
             isBusy={act.isPending}
             onCancel={() => setAction(undefined)}
             onConfirm={() => {
-              if (action === undefined) return;
+              if (action === undefined) return
               act.mutate(action, {
                 onSuccess: () => {
-                  Toast.show(actions[action].done);
-                  setAction(undefined);
+                  Toast.show(actions[action].done)
+                  setAction(undefined)
                 },
                 onError: (reason) => {
-                  setAction(undefined);
-                  setFailure(Failure.message(reason));
+                  setAction(undefined)
+                  setFailure(Failure.message(reason))
                 },
-              });
+              })
             }}
           >
             {action === undefined ? "" : actions[action].text}
           </ConfirmDialog>
         </AdminPage>
-      );
-    });
-};
+      )
+    })
+}

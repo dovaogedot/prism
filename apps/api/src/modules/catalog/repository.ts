@@ -19,39 +19,39 @@ import type {
   PropertyFacet,
   Slug,
   Suggestion,
-} from "@prism/shared";
-import { Dimensions, Rating, Weight } from "@prism/shared";
-import { and, asc, count, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lte, max, min, not, sql, type SQL } from "drizzle-orm";
-import type { Database } from "../../db/client.ts";
-import { brands, categories, productImages, productProperties, products } from "../../db/schema.ts";
-import type { Clock } from "../../platform/clock.ts";
-import type { VariantSource } from "../../platform/image-store.ts";
-import { ProductSearch, type LiftedFacet, type TextMatch } from "./search.ts";
-import { ImageRows, type ImageRow } from "./images.ts";
+} from "@prism/shared"
+import { Dimensions, Rating, Weight } from "@prism/shared"
+import { and, asc, count, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lte, max, min, not, sql, type SQL } from "drizzle-orm"
+import type { Database } from "../../db/client.ts"
+import { brands, categories, productImages, productProperties, products } from "../../db/schema.ts"
+import type { Clock } from "../../platform/clock.ts"
+import type { VariantSource } from "../../platform/image-store.ts"
+import { ProductSearch, type LiftedFacet, type TextMatch } from "./search.ts"
+import { ImageRows, type ImageRow } from "./images.ts"
 
 /** Every read the catalog makes. */
 export type CatalogRepository = Readonly<{
-  search: (query: ProductQuery) => Promise<ProductSearchResult>;
-  suggest: (text: string, limit: number) => Promise<readonly Suggestion[]>;
-  findBySlug: (slug: Slug) => Promise<ProductDetail | undefined>;
+  search: (query: ProductQuery) => Promise<ProductSearchResult>
+  suggest: (text: string, limit: number) => Promise<readonly Suggestion[]>
+  findBySlug: (slug: Slug) => Promise<ProductDetail | undefined>
   /**
    * In-stock products outside `productIds`: those sharing a category with
    * them first, then the rest, each group best rated first.
    */
-  related: (productIds: readonly ProductId[], limit: number) => Promise<readonly ProductSummary[]>;
+  related: (productIds: readonly ProductId[], limit: number) => Promise<readonly ProductSummary[]>
   /** The home page's rows of products; its categories come from `categories`. */
-  home: () => Promise<HomeView>;
+  home: () => Promise<HomeView>
   /** Every category with its product count and a picture, by name. */
-  categories: () => Promise<readonly CategorySummary[]>;
+  categories: () => Promise<readonly CategorySummary[]>
   /** Up to `limit` other products from the category of the product with `slug`: in stock first, then best rated. */
-  sameCategory: (slug: Slug, limit: number) => Promise<readonly ProductSummary[]>;
+  sameCategory: (slug: Slug, limit: number) => Promise<readonly ProductSummary[]>
   /** How many products have `atMost` or fewer in stock. */
-  countLowStock: (atMost: number) => Promise<number>;
+  countLowStock: (atMost: number) => Promise<number>
   /** Up to `limit` pictures without their smaller copies yet, leaving out `skipped`. */
-  imagesWithoutVariants: (limit: number, skipped: ReadonlySet<ImageId>) => Promise<readonly VariantSource[]>;
+  imagesWithoutVariants: (limit: number, skipped: ReadonlySet<ImageId>) => Promise<readonly VariantSource[]>
   /** Records a picture's size, which marks its smaller copies as made. */
-  recordImageSize: (id: ImageId, size: Readonly<{ width: number; height: number }>) => Promise<void>;
-}>;
+  recordImageSize: (id: ImageId, size: Readonly<{ width: number; height: number }>) => Promise<void>
+}>
 
 export const CatalogRepository = {
   /** How many products each row of the home page shows. */
@@ -82,22 +82,22 @@ export const CatalogRepository = {
       )`,
       average: products.ratingAverage,
       count: products.ratingCount,
-    };
+    }
 
     type SummaryRow = Readonly<{
-      id: ProductId;
-      slug: Slug;
-      name: string;
-      priceCents: number;
-      stock: number;
-      categorySlug: Slug;
-      categoryName: string;
-      brandSlug: Slug;
-      brandName: string;
-      images: readonly ImageRow[];
-      average: number;
-      count: number;
-    }>;
+      id: ProductId
+      slug: Slug
+      name: string
+      priceCents: number
+      stock: number
+      categorySlug: Slug
+      categoryName: string
+      brandSlug: Slug
+      brandName: string
+      images: readonly ImageRow[]
+      average: number
+      count: number
+    }>
 
     const toSummary = (row: SummaryRow): ProductSummary => ({
       id: row.id,
@@ -109,17 +109,17 @@ export const CatalogRepository = {
       brand: { slug: row.brandSlug, name: row.brandName },
       images: row.images.map(ImageRows.view),
       rating: Rating.of(row.average, row.count),
-    });
+    })
 
     const conditions = (query: ProductQuery, lifted: LiftedFacet, match: TextMatch) =>
-      ProductSearch.where(ProductSearch.conditions(query, lifted, match));
+      ProductSearch.where(ProductSearch.conditions(query, lifted, match))
 
     /** The shelf a facet lists its values over. */
-    const shelf = (query: ProductQuery, match: TextMatch) => ProductSearch.where(ProductSearch.shelf(query, match));
+    const shelf = (query: ProductQuery, match: TextMatch) => ProductSearch.where(ProductSearch.shelf(query, match))
 
     /** How many shelf rows also pass the rail's other filters. */
     const counted = (query: ProductQuery, lifted: LiftedFacet) =>
-      sql<number>`count(*) filter (where ${ProductSearch.filter(ProductSearch.narrowing(query, lifted))})`.mapWith(Number);
+      sql<number>`count(*) filter (where ${ProductSearch.filter(ProductSearch.narrowing(query, lifted))})`.mapWith(Number)
 
     /** Every brand on the shelf, counted under the rail's other filters. */
     const brandsOf = async (query: ProductQuery, match: TextMatch): Promise<readonly FacetBucket[]> =>
@@ -130,7 +130,7 @@ export const CatalogRepository = {
         .innerJoin(brands, eq(products.brandId, brands.id))
         .where(shelf(query, match))
         .groupBy(brands.slug, brands.name)
-        .orderBy(asc(brands.name));
+        .orderBy(asc(brands.name))
 
     const priceOf = async (query: ProductQuery, match: TextMatch) => {
       const [row] = await db
@@ -138,10 +138,10 @@ export const CatalogRepository = {
         .from(products)
         .innerJoin(categories, eq(products.categoryId, categories.id))
         .innerJoin(brands, eq(products.brandId, brands.id))
-        .where(shelf(query, match));
+        .where(shelf(query, match))
 
-      return { minCents: row?.min ?? 0, maxCents: row?.max ?? 0 };
-    };
+      return { minCents: row?.min ?? 0, maxCents: row?.max ?? 0 }
+    }
 
     const ratingsOf = async (query: ProductQuery, match: TextMatch): Promise<readonly FacetBucket[]> => {
       const rows = await db
@@ -150,15 +150,15 @@ export const CatalogRepository = {
         .innerJoin(categories, eq(products.categoryId, categories.id))
         .innerJoin(brands, eq(products.brandId, brands.id))
         .where(shelf(query, match))
-        .groupBy(products.ratingAverage);
+        .groupBy(products.ratingAverage)
 
       // Cumulative: a product rated 4.5 counts toward "4 stars & up" and below.
       return ProductSearch.RATING_THRESHOLDS.map((threshold) => ({
         value: String(threshold),
         label: ProductSearch.ratingLabel(threshold),
         count: rows.reduce((sum, row) => (ProductSearch.isShownAtLeast(row.average, threshold) ? sum + row.matching : sum), 0),
-      }));
-    };
+      }))
+    }
 
     const propertiesOf = async (query: ProductQuery, match: TextMatch): Promise<readonly PropertyFacet[]> => {
       const rows = await db
@@ -169,26 +169,26 @@ export const CatalogRepository = {
         .innerJoin(brands, eq(products.brandId, brands.id))
         .where(shelf(query, match))
         .groupBy(productProperties.name, productProperties.value)
-        .orderBy(asc(productProperties.name), asc(productProperties.value));
+        .orderBy(asc(productProperties.name), asc(productProperties.value))
 
-      const facets: PropertyFacet[] = [];
+      const facets: PropertyFacet[] = []
 
       for (const row of rows) {
-        const bucket = { value: row.value, label: row.value, count: row.count };
-        const last = facets[facets.length - 1];
+        const bucket = { value: row.value, label: row.value, count: row.count }
+        const last = facets[facets.length - 1]
 
         if (last !== undefined && last.name === row.name) {
-          facets[facets.length - 1] = { name: last.name, buckets: [...last.buckets, bucket] };
+          facets[facets.length - 1] = { name: last.name, buckets: [...last.buckets, bucket] }
         } else {
-          facets.push({ name: row.name, buckets: [bucket] });
+          facets.push({ name: row.name, buckets: [bucket] })
         }
       }
 
-      return facets;
-    };
+      return facets
+    }
 
     /** Facets by the filters and text match that decide them; a page, a page size and a sort change nothing in them. */
-    const keptFacets = new Map<string, Readonly<{ until: number; facets: ProductFacets }>>();
+    const keptFacets = new Map<string, Readonly<{ until: number; facets: ProductFacets }>>()
 
     const facetsOf = async (query: ProductQuery, match: TextMatch): Promise<ProductFacets> => {
       const key = JSON.stringify([
@@ -200,27 +200,27 @@ export const CatalogRepository = {
         query.minRating,
         query.properties,
         match,
-      ]);
-      const now = clock.now().getTime();
-      const kept = keptFacets.get(key);
-      if (kept !== undefined && kept.until > now) return kept.facets;
+      ])
+      const now = clock.now().getTime()
+      const kept = keptFacets.get(key)
+      if (kept !== undefined && kept.until > now) return kept.facets
 
       const [brandBuckets, price, ratings, properties] = await Promise.all([
         brandsOf(query, match),
         priceOf(query, match),
         ratingsOf(query, match),
         propertiesOf(query, match),
-      ]);
-      const facets: ProductFacets = { brands: brandBuckets, ratings, price, properties };
+      ])
+      const facets: ProductFacets = { brands: brandBuckets, ratings, price, properties }
 
       // A Map iterates in insertion order, so the first key is the oldest entry.
-      keptFacets.delete(key);
-      const oldest = keptFacets.keys().next();
-      if (keptFacets.size >= CatalogRepository.FACET_ENTRIES && oldest.done !== true) keptFacets.delete(oldest.value);
-      keptFacets.set(key, { until: now + CatalogRepository.FACET_TTL_MS, facets });
+      keptFacets.delete(key)
+      const oldest = keptFacets.keys().next()
+      if (keptFacets.size >= CatalogRepository.FACET_ENTRIES && oldest.done !== true) keptFacets.delete(oldest.value)
+      keptFacets.set(key, { until: now + CatalogRepository.FACET_TTL_MS, facets })
 
-      return facets;
-    };
+      return facets
+    }
 
     /** How many products match `query`, whatever page it asks for. */
     const countOf = async (query: ProductQuery, match: TextMatch): Promise<number> => {
@@ -229,10 +229,10 @@ export const CatalogRepository = {
         .from(products)
         .innerJoin(categories, eq(products.categoryId, categories.id))
         .innerJoin(brands, eq(products.brandId, brands.id))
-        .where(conditions(query, "none", match));
+        .where(conditions(query, "none", match))
 
-      return row?.total ?? 0;
-    };
+      return row?.total ?? 0
+    }
 
     /** One page of products matching `query`, with its facets, matching the text as `match` says. */
     const searchWith = async (query: ProductQuery, match: TextMatch): Promise<Omit<ProductSearchResult, "matched">> => {
@@ -247,10 +247,10 @@ export const CatalogRepository = {
           .limit(query.perPage)
           .offset(ProductSearch.offset(query)),
         facetsOf(query, match),
-      ]);
+      ])
 
       // A page past the end has no row to carry the count, so it is counted on its own.
-      const total = rows[0]?.total ?? (query.page > 1 ? await countOf(query, match) : 0);
+      const total = rows[0]?.total ?? (query.page > 1 ? await countOf(query, match) : 0)
 
       return {
         items: rows.map(toSummary),
@@ -259,8 +259,8 @@ export const CatalogRepository = {
         page: query.page,
         perPage: query.perPage,
         totalPages: ProductSearch.totalPages(total, query.perPage),
-      };
-    };
+      }
+    }
 
     /** Products as cards, in the order and number given. */
     const summaries = async (where: SQL | undefined, order: readonly SQL[], limit: number): Promise<readonly ProductSummary[]> =>
@@ -273,7 +273,7 @@ export const CatalogRepository = {
           .where(where)
           .orderBy(...order)
           .limit(limit)
-      ).map(toSummary);
+      ).map(toSummary)
 
     const categorySummaries = async (): Promise<readonly CategorySummary[]> => {
       const rows = await db
@@ -294,7 +294,7 @@ export const CatalogRepository = {
           )`,
         })
         .from(categories)
-        .orderBy(asc(categories.name));
+        .orderBy(asc(categories.name))
 
       return rows.map((row) => ({
         slug: row.slug,
@@ -302,17 +302,17 @@ export const CatalogRepository = {
         ...(row.description === null ? {} : { description: row.description }),
         productCount: row.productCount,
         ...(row.image === null ? {} : { image: ImageRows.view(row.image) }),
-      }));
-    };
+      }))
+    }
 
     return {
       search: async (query) => {
-        const exact = await searchWith(query, "exact");
-        if (exact.total > 0 || query.text === undefined) return { matched: "exact", ...exact };
+        const exact = await searchWith(query, "exact")
+        if (exact.total > 0 || query.text === undefined) return { matched: "exact", ...exact }
 
         // Nothing matched as typed: names that resemble the text catch a misspelling.
-        const similar = await searchWith(query, "similar");
-        return similar.total > 0 ? { matched: "similar", ...similar } : { matched: "exact", ...exact };
+        const similar = await searchWith(query, "similar")
+        return similar.total > 0 ? { matched: "similar", ...similar } : { matched: "exact", ...exact }
       },
 
       suggest: async (text, limit) =>
@@ -348,9 +348,9 @@ export const CatalogRepository = {
             CatalogRepository.HOME_ROW,
           ),
           summaries(undefined, [desc(products.createdAt), asc(products.slug)], CatalogRepository.HOME_ROW),
-        ]);
+        ])
 
-        return { featured, topRated, newest };
+        return { featured, topRated, newest }
       },
 
       categories: categorySummaries,
@@ -369,53 +369,40 @@ export const CatalogRepository = {
         const listed = sql.join(
           productIds.map((id) => sql`${id}`),
           sql`, `,
-        );
+        )
         // Postgres refuses a constant in ORDER BY, so an empty cart leaves the term out.
         const byCategory =
           productIds.length === 0
             ? []
-            : [
-                desc(
-                  sql`${products.categoryId} IN (SELECT listed.category_id FROM product listed WHERE listed.id IN (${listed}))`,
-                ),
-              ];
+            : [desc(sql`${products.categoryId} IN (SELECT listed.category_id FROM product listed WHERE listed.id IN (${listed}))`)]
 
         const rows = await db
           .select(summaryColumns)
           .from(products)
           .innerJoin(categories, eq(products.categoryId, categories.id))
           .innerJoin(brands, eq(products.brandId, brands.id))
-          .where(
-            productIds.length === 0
-              ? gt(products.stock, 0)
-              : and(gt(products.stock, 0), not(inArray(products.id, [...productIds]))),
-          )
+          .where(productIds.length === 0 ? gt(products.stock, 0) : and(gt(products.stock, 0), not(inArray(products.id, [...productIds]))))
           .orderBy(...byCategory, desc(summaryColumns.average), desc(summaryColumns.count), asc(products.name))
-          .limit(limit);
+          .limit(limit)
 
-        return rows.map(toSummary);
+        return rows.map(toSummary)
       },
 
       imagesWithoutVariants: async (limit, skipped) =>
         db
           .select({ id: productImages.id, file: productImages.file, isPixelArt: productImages.isPixelArt })
           .from(productImages)
-          .where(
-            and(
-              isNull(productImages.width),
-              skipped.size === 0 ? undefined : not(inArray(productImages.id, [...skipped])),
-            ),
-          )
+          .where(and(isNull(productImages.width), skipped.size === 0 ? undefined : not(inArray(productImages.id, [...skipped]))))
           .orderBy(asc(productImages.id))
           .limit(limit),
 
       recordImageSize: async (id, size) => {
-        await db.update(productImages).set({ width: size.width, height: size.height }).where(eq(productImages.id, id));
+        await db.update(productImages).set({ width: size.width, height: size.height }).where(eq(productImages.id, id))
       },
 
       countLowStock: async (atMost) => {
-        const [row] = await db.select({ total: count() }).from(products).where(lte(products.stock, atMost));
-        return row?.total ?? 0;
+        const [row] = await db.select({ total: count() }).from(products).where(lte(products.stock, atMost))
+        return row?.total ?? 0
       },
 
       findBySlug: async (slug) => {
@@ -436,15 +423,15 @@ export const CatalogRepository = {
           .innerJoin(categories, eq(products.categoryId, categories.id))
           .innerJoin(brands, eq(products.brandId, brands.id))
           .where(eq(products.slug, slug))
-          .limit(1);
+          .limit(1)
 
-        if (row === undefined) return undefined;
+        if (row === undefined) return undefined
 
         const properties = await db.query.productProperties.findMany({
           columns: { name: true, value: true },
           where: eq(productProperties.productId, row.id),
           orderBy: asc(productProperties.name),
-        });
+        })
 
         return {
           ...toSummary(row),
@@ -457,8 +444,8 @@ export const CatalogRepository = {
             height: row.heightMm,
             depth: row.depthMm,
           }),
-        };
+        }
       },
-    };
+    }
   },
-} as const;
+} as const

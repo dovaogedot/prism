@@ -4,38 +4,39 @@
  * whatever names the matching products carry.
  */
 
-import { Price, type FacetBucket, type ProductFacets } from "@prism/shared";
-import { useState, type ReactNode } from "react";
-import { match } from "ts-pattern";
-import { CatalogParams } from "../filters.ts";
-import { RangeSlider } from "./RangeSlider.tsx";
+import { Price, type FacetBucket, type ProductFacets } from "@prism/shared"
+import { useState, type ReactNode } from "react"
+import { match } from "ts-pattern"
+import { CatalogParams } from "../filters.ts"
+import { RangeSlider } from "./RangeSlider.tsx"
 
 /** The facets, the filters as the URL has them, and where a change goes. */
 export type FacetsProps = Readonly<{
-  facets: ProductFacets;
-  params: URLSearchParams;
-  onChange: (next: URLSearchParams) => void;
-}>;
+  facets: ProductFacets
+  params: URLSearchParams
+  onChange: (next: URLSearchParams) => void
+}>
 
 /** How many values a group shows before the rest fold behind "Show more". */
-const FOLD_AT = 8;
+const FOLD_AT = 8
 
 /**
  * A group's frame: its heading, "Clear all" beside it while the group has a
  * choice, and its rows. The button sits outside the legend, so the group is
  * named by its heading alone.
  */
-const Group = ({ title, chosen, onClear, children }: Readonly<{ title: string; chosen: boolean; onClear: () => void; children: ReactNode }>) => (
+const Group = ({
+  title,
+  chosen,
+  onClear,
+  children,
+}: Readonly<{ title: string; chosen: boolean; onClear: () => void; children: ReactNode }>) => (
   // min-w-0: a fieldset is otherwise never narrower than its longest row, and would overflow the rail.
   <fieldset className="relative min-w-0 space-y-1.5">
     <legend className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-ink-faint">{title}</legend>
     {match(chosen)
       .with(true, () => (
-        <button
-          className="absolute right-0 top-0 text-xs font-medium text-accent hover:underline"
-          type="button"
-          onClick={onClear}
-        >
+        <button className="absolute right-0 top-0 text-xs font-medium text-accent hover:underline" type="button" onClick={onClear}>
           Clear all<span className="sr-only"> {title.toLowerCase()} filters</span>
         </button>
       ))
@@ -43,19 +44,15 @@ const Group = ({ title, chosen, onClear, children }: Readonly<{ title: string; c
       .exhaustive()}
     {children}
   </fieldset>
-);
+)
 
 /** A value's row, grayed rather than removed when the other filters leave it nothing. */
 const Row = {
   classes: (empty: boolean): string =>
-    empty
-      ? "flex items-center gap-2 text-sm text-ink-faint opacity-50"
-      : "flex items-center gap-2 text-sm text-ink-soft hover:text-ink",
-} as const;
+    empty ? "flex items-center gap-2 text-sm text-ink-faint opacity-50" : "flex items-center gap-2 text-sm text-ink-soft hover:text-ink",
+} as const
 
-const Count = ({ count }: Readonly<{ count: number }>) => (
-  <span className="text-xs tabular-nums text-ink-faint">{count}</span>
-);
+const Count = ({ count }: Readonly<{ count: number }>) => <span className="text-xs tabular-nums text-ink-faint">{count}</span>
 
 /**
  * A checkbox group over a repeatable key. Past `FOLD_AT` values the rest
@@ -67,10 +64,16 @@ const Checklist = ({
   buckets,
   params,
   onChange,
-}: Readonly<{ title: string; keyName: string; buckets: readonly FacetBucket[]; params: URLSearchParams; onChange: (next: URLSearchParams) => void }>) => {
-  const [expanded, setExpanded] = useState(false);
-  const ticked = (bucket: FacetBucket): boolean => CatalogParams.has(params, keyName, bucket.value);
-  const visible = expanded ? buckets : buckets.filter((bucket, index) => index < FOLD_AT || ticked(bucket));
+}: Readonly<{
+  title: string
+  keyName: string
+  buckets: readonly FacetBucket[]
+  params: URLSearchParams
+  onChange: (next: URLSearchParams) => void
+}>) => {
+  const [expanded, setExpanded] = useState(false)
+  const ticked = (bucket: FacetBucket): boolean => CatalogParams.has(params, keyName, bucket.value)
+  const visible = expanded ? buckets : buckets.filter((bucket, index) => index < FOLD_AT || ticked(bucket))
 
   return match(buckets.length)
     .with(0, () => null)
@@ -103,8 +106,8 @@ const Checklist = ({
           .with(false, () => null)
           .exhaustive()}
       </Group>
-    ));
-};
+    ))
+}
 
 /** Five stars, the first `filled` of them lit. */
 const StarRow = ({ filled }: Readonly<{ filled: number }>) => (
@@ -118,7 +121,7 @@ const StarRow = ({ filled }: Readonly<{ filled: number }>) => (
       </svg>
     ))}
   </span>
-);
+)
 
 /** The minimum rating as rows of stars; choosing the chosen row clears it. */
 const RatingFacet = ({ facets, params, onChange }: FacetsProps) =>
@@ -127,8 +130,8 @@ const RatingFacet = ({ facets, params, onChange }: FacetsProps) =>
     .otherwise(() => (
       <Group title="Rating" chosen={params.has("rating")} onClear={() => onChange(CatalogParams.set(params, "rating", ""))}>
         {facets.ratings.map((bucket) => {
-          const chosen = params.get("rating") === bucket.value;
-          const threshold = Number(bucket.value);
+          const chosen = params.get("rating") === bucket.value
+          const threshold = Number(bucket.value)
 
           return (
             <label key={bucket.value} className={Row.classes(bucket.count === 0 && !chosen)}>
@@ -145,18 +148,18 @@ const RatingFacet = ({ facets, params, onChange }: FacetsProps) =>
               <span className="flex-1 text-xs">{threshold < 5 ? "& up" : ""}</span>
               <Count count={bucket.count} />
             </label>
-          );
+          )
         })}
       </Group>
-    ));
+    ))
 
 /** Two thumbs between the cheapest and dearest matching product. */
 const PriceFacet = ({ facets, params, onChange }: FacetsProps) => {
-  const { minCents, maxCents } = facets.price;
+  const { minCents, maxCents } = facets.price
   const value = {
     min: Number(params.get("priceMin") ?? minCents),
     max: Number(params.get("priceMax") ?? maxCents),
-  };
+  }
 
   return match(maxCents > minCents)
     .with(false, () => null)
@@ -187,8 +190,8 @@ const PriceFacet = ({ facets, params, onChange }: FacetsProps) => {
         />
       </Group>
     ))
-    .exhaustive();
-};
+    .exhaustive()
+}
 
 /** Every filter the shelf can be narrowed by, apart from the category; the price and rating last. */
 export const Facets = ({ facets, params, onChange }: FacetsProps) => (
@@ -222,4 +225,4 @@ export const Facets = ({ facets, params, onChange }: FacetsProps) => (
     <PriceFacet facets={facets} params={params} onChange={onChange} />
     <RatingFacet facets={facets} params={params} onChange={onChange} />
   </div>
-);
+)

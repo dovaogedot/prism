@@ -1,11 +1,11 @@
-import { Price, type OrderSummary } from "@prism/shared";
-import { Link } from "react-router";
-import { Picture } from "../../catalog/components/index.ts";
-import { StatusBadge } from "./StatusBadge.tsx";
-import { DateTime } from "../../../shared/format/date-time.ts";
+import { Price, type OrderSummary } from "@prism/shared"
+import { Link } from "react-router"
+import { Picture } from "../../catalog/components/index.ts"
+import { StatusBadge } from "./StatusBadge.tsx"
+import { DateTime } from "../../../shared/format/date-time.ts"
 
 /** The order to show. */
-export type OrderRowProps = Readonly<{ order: OrderSummary }>;
+export type OrderRowProps = Readonly<{ order: OrderSummary }>
 
 /** One order in the list: its picture, number, date, size, total and status, all one link. */
 export const OrderRow = ({ order }: OrderRowProps) => (
@@ -30,4 +30,4 @@ export const OrderRow = ({ order }: OrderRowProps) => (
       </div>
     </Link>
   </li>
-);
+)

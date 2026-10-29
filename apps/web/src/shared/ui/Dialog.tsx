@@ -1,15 +1,15 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react"
 
 /** Whether the dialog shows, what it is called, and what closing it does. */
 export type DialogProps = Readonly<{
-  isOpen: boolean;
-  title: string;
+  isOpen: boolean
+  title: string
   /** Called when the dialog closes by itself: Escape, or its own close button. */
-  onClose: () => void;
+  onClose: () => void
   /** Room for a picture rather than a question. */
-  isWide?: boolean;
-  children: ReactNode;
-}>;
+  isWide?: boolean
+  children: ReactNode
+}>
 
 /**
  * A modal dialog on the native `<dialog>`. The browser makes the page behind
@@ -18,23 +18,23 @@ export type DialogProps = Readonly<{
  * else on the first one.
  */
 export const Dialog = ({ isOpen, title, onClose, isWide = false, children }: DialogProps) => {
-  const dialog = useRef<HTMLDialogElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null)
 
-  const titleId = useId();
+  const titleId = useId()
 
   useEffect(() => {
-    const element = dialog.current;
-    if (element === null) return;
+    const element = dialog.current
+    if (element === null) return
 
     if (isOpen && !element.open) {
-      element.showModal();
+      element.showModal()
       // A dialog may name the control focus starts on; otherwise the browser picks the first one.
-      element.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+      element.querySelector<HTMLElement>("[data-autofocus]")?.focus()
     }
     if (!isOpen && element.open) {
-      element.close();
+      element.close()
     }
-  }, [isOpen]);
+  }, [isOpen])
 
   return (
     <dialog
@@ -54,7 +54,15 @@ export const Dialog = ({ isOpen, title, onClose, isWide = false, children }: Dia
             aria-label="Close"
             onClick={() => dialog.current?.close()}
           >
-            <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <svg
+              className="size-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
               <path d="M6 6l12 12M18 6 6 18" />
             </svg>
           </button>
@@ -62,5 +70,5 @@ export const Dialog = ({ isOpen, title, onClose, isWide = false, children }: Dia
         {children}
       </div>
     </dialog>
-  );
-};
+  )
+}

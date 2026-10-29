@@ -1,35 +1,41 @@
-import type { AdminCategory, CategoryInput } from "@prism/shared";
-import { useState } from "react";
-import { match, P } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { Alert, Button, ConfirmDialog, DataTable, Dialog, Skeleton, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { useAdminRead, useAdminWrite } from "../admin.ts";
-import { AdminPage, CategoryForm } from "../components/index.ts";
-import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
+import type { AdminCategory, CategoryInput } from "@prism/shared"
+import { useState } from "react"
+import { match, P } from "ts-pattern"
+import { Api } from "../../../shared/api/client.ts"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { Alert, Button, ConfirmDialog, DataTable, Dialog, Skeleton, Toast } from "../../../shared/ui/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { useAdminRead, useAdminWrite } from "../admin.ts"
+import { AdminPage, CategoryForm } from "../components/index.ts"
+import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts"
 
 /** Which form is open: none, a new category, or the category given. */
-type Editing = Readonly<{ kind: "none" }> | Readonly<{ kind: "new" }> | Readonly<{ kind: "existing"; category: AdminCategory }>;
+type Editing = Readonly<{ kind: "none" }> | Readonly<{ kind: "new" }> | Readonly<{ kind: "existing"; category: AdminCategory }>
 
 /** The catalog's categories: created and changed in a dialog, and deleted once no product is filed under them. */
 export const CategoriesPage = () => {
-  const categories = useAdminRead<{ items: readonly AdminCategory[] }>("/categories");
+  const categories = useAdminRead<{ items: readonly AdminCategory[] }>("/categories")
 
-  const [editing, setEditing] = useState<Editing>({ kind: "none" });
+  const [editing, setEditing] = useState<Editing>({ kind: "none" })
 
-  const [deleting, setDeleting] = useState<AdminCategory | undefined>(undefined);
+  const [deleting, setDeleting] = useState<AdminCategory | undefined>(undefined)
 
-  const [failure, setFailure] = useActionFailure();
+  const [failure, setFailure] = useActionFailure()
 
-  const create = useAdminWrite((input: CategoryInput) => Api.post<AdminCategory>("/admin/categories", input));
+  const create = useAdminWrite((input: CategoryInput) => Api.post<AdminCategory>("/admin/categories", input))
 
-  const update = useAdminWrite((change: Readonly<{ id: string; input: CategoryInput }>) => Api.put<AdminCategory>(`/admin/categories/${change.id}`, change.input));
+  const update = useAdminWrite((change: Readonly<{ id: string; input: CategoryInput }>) =>
+    Api.put<AdminCategory>(`/admin/categories/${change.id}`, change.input),
+  )
 
-  const remove = useAdminWrite((id: string) => Api.requestEmpty(`/admin/categories/${id}`, { method: "DELETE" }));
+  const remove = useAdminWrite((id: string) => Api.requestEmpty(`/admin/categories/${id}`, { method: "DELETE" }))
 
   return (
-    <AdminPage text={PageText.adminCategories} heading="Categories" actions={<Button onClick={() => setEditing({ kind: "new" })}>New category</Button>}>
+    <AdminPage
+      text={PageText.adminCategories}
+      heading="Categories"
+      actions={<Button onClick={() => setEditing({ kind: "new" })}>New category</Button>}
+    >
       {failure === undefined ? null : <Alert>{failure}</Alert>}
 
       {match(categories)
@@ -44,13 +50,22 @@ export const CategoriesPage = () => {
               { key: "name", header: "Name", cell: (category) => <span className="font-medium text-ink">{category.name}</span> },
               { key: "slug", header: "Slug", cell: (category) => category.slug },
               { key: "products", header: "Products", isNumeric: true, cell: (category) => category.productCount },
-              { key: "description", header: "Description", cell: (category) => <span className="line-clamp-2 min-w-48 text-ink-soft">{category.description ?? ""}</span> },
+              {
+                key: "description",
+                header: "Description",
+                cell: (category) => <span className="line-clamp-2 min-w-48 text-ink-soft">{category.description ?? ""}</span>,
+              },
               {
                 key: "actions",
                 header: "Actions",
                 cell: (category) => (
                   <span className="flex gap-1">
-                    <Button tone="quiet" type="button" onClick={() => setEditing({ kind: "existing", category })} aria-label={`Edit ${category.name}`}>
+                    <Button
+                      tone="quiet"
+                      type="button"
+                      onClick={() => setEditing({ kind: "existing", category })}
+                      aria-label={`Edit ${category.name}`}
+                    >
                       Edit
                     </Button>
                     {category.productCount === 0 ? (
@@ -65,9 +80,15 @@ export const CategoriesPage = () => {
           />
         ))}
 
-      <p className="text-sm text-ink-soft">A category that products are filed under cannot be deleted. Move its products to another category first.</p>
+      <p className="text-sm text-ink-soft">
+        A category that products are filed under cannot be deleted. Move its products to another category first.
+      </p>
 
-      <Dialog isOpen={editing.kind !== "none"} title={editing.kind === "existing" ? `Edit ${editing.category.name}` : "New category"} onClose={() => setEditing({ kind: "none" })}>
+      <Dialog
+        isOpen={editing.kind !== "none"}
+        title={editing.kind === "existing" ? `Edit ${editing.category.name}` : "New category"}
+        onClose={() => setEditing({ kind: "none" })}
+      >
         {editing.kind === "none" ? null : (
           <CategoryForm
             key={editing.kind === "existing" ? editing.category.id : "new"}
@@ -75,12 +96,12 @@ export const CategoriesPage = () => {
             onCancel={() => setEditing({ kind: "none" })}
             onSave={async (input) => {
               if (editing.kind === "existing") {
-                await update.mutateAsync({ id: editing.category.id, input });
+                await update.mutateAsync({ id: editing.category.id, input })
               } else {
-                await create.mutateAsync(input);
+                await create.mutateAsync(input)
               }
-              setEditing({ kind: "none" });
-              Toast.show(`${input.name} is saved.`);
+              setEditing({ kind: "none" })
+              Toast.show(`${input.name} is saved.`)
             }}
           />
         )}
@@ -93,21 +114,21 @@ export const CategoriesPage = () => {
         isBusy={remove.isPending}
         onCancel={() => setDeleting(undefined)}
         onConfirm={() => {
-          if (deleting === undefined) return;
+          if (deleting === undefined) return
           remove.mutate(deleting.id, {
             onSuccess: () => {
-              Toast.show(`${deleting.name} is deleted.`);
-              setDeleting(undefined);
+              Toast.show(`${deleting.name} is deleted.`)
+              setDeleting(undefined)
             },
             onError: (reason) => {
-              setFailure(Failure.message(reason));
-              setDeleting(undefined);
+              setFailure(Failure.message(reason))
+              setDeleting(undefined)
             },
-          });
+          })
         }}
       >
         Its page leaves the shop. No product is filed under it.
       </ConfirmDialog>
     </AdminPage>
-  );
-};
+  )
+}

@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { Link } from "react-router";
-import { Dialog } from "../../../shared/ui/index.ts";
-import { StepUpForm } from "./StepUpForm.tsx";
+import { useState } from "react"
+import { Link } from "react-router"
+import { Dialog } from "../../../shared/ui/index.ts"
+import { StepUpForm } from "./StepUpForm.tsx"
 
 /** What happens once the code is accepted. */
-export type StepUpDialogProps = Readonly<{ onDone: () => void }>;
+export type StepUpDialogProps = Readonly<{ onDone: () => void }>
 
 /**
  * Asks for a fresh code over the admin page that is open, so the page and
@@ -12,7 +12,7 @@ export type StepUpDialogProps = Readonly<{ onDone: () => void }>;
  * the way out is back to the shop.
  */
 export const StepUpDialog = ({ onDone }: StepUpDialogProps) => {
-  const [openings, setOpenings] = useState(0);
+  const [openings, setOpenings] = useState(0)
 
   return (
     <Dialog key={openings} isOpen title="Confirm it is you" onClose={() => setOpenings((count) => count + 1)}>
@@ -26,5 +26,5 @@ export const StepUpDialog = ({ onDone }: StepUpDialogProps) => {
         </Link>
       </p>
     </Dialog>
-  );
-};
+  )
+}

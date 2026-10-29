@@ -1,8 +1,8 @@
 /** Email bodies as pure functions: input in, message out, nothing sent. */
 
-import { StaffRole, type Email } from "@prism/shared";
-import { Html } from "../../http/html.ts";
-import type { OutboundEmail } from "../../platform/mailer.ts";
+import { StaffRole, type Email } from "@prism/shared"
+import { Html } from "../../http/html.ts"
+import type { OutboundEmail } from "../../platform/mailer.ts"
 
 export const PasswordResetEmail = {
   /** The URL is the only interpolation, and the caller percent-encodes it. */
@@ -38,7 +38,7 @@ export const PasswordResetEmail = {
   </body>
 </html>`,
   }),
-} as const;
+} as const
 
 export const RolesChangedEmail = {
   /** What the person can do now, in a sentence. */
@@ -49,11 +49,11 @@ export const RolesChangedEmail = {
 
   /** Tells an account that an admin changed its staff roles. Nothing personal is interpolated. */
   compose: (input: { to: Email; roles: readonly StaffRole[]; adminUrl: string }): OutboundEmail => {
-    const sentence = RolesChangedEmail.sentenceOf(input.roles);
+    const sentence = RolesChangedEmail.sentenceOf(input.roles)
     const next =
       input.roles.length === 0
         ? "If you did not expect this, reply to this email."
-        : "The admin asks for a code from your authenticator app, so turn on two-factor authentication on your account page first if it is off.";
+        : "The admin asks for a code from your authenticator app, so turn on two-factor authentication on your account page first if it is off."
 
     return {
       to: input.to,
@@ -78,6 +78,6 @@ export const RolesChangedEmail = {
     </div>
   </body>
 </html>`,
-    };
+    }
   },
-} as const;
+} as const

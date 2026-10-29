@@ -1,10 +1,10 @@
-import type { ProductImage } from "@prism/shared";
-import { useState } from "react";
-import { Dialog } from "../../../shared/ui/index.ts";
-import { Picture } from "./Picture.tsx";
+import type { ProductImage } from "@prism/shared"
+import { useState } from "react"
+import { Dialog } from "../../../shared/ui/index.ts"
+import { Picture } from "./Picture.tsx"
 
 /** The product's pictures, and its name for the placeholder and the full-size view. */
-export type GalleryProps = Readonly<{ images: readonly ProductImage[]; name: string }>;
+export type GalleryProps = Readonly<{ images: readonly ProductImage[]; name: string }>
 
 /**
  * The product's pictures: the chosen one large, the others as buttons that
@@ -12,11 +12,11 @@ export type GalleryProps = Readonly<{ images: readonly ProductImage[]; name: str
  * picture loads first, in the size that fits the screen.
  */
 export const Gallery = ({ images, name }: GalleryProps) => {
-  const [chosen, setChosen] = useState(0);
+  const [chosen, setChosen] = useState(0)
 
-  const [isEnlarged, setEnlarged] = useState(false);
+  const [isEnlarged, setEnlarged] = useState(false)
 
-  const image = images[chosen] ?? images[0];
+  const image = images[chosen] ?? images[0]
 
   return (
     <div className="space-y-3">
@@ -72,5 +72,5 @@ export const Gallery = ({ images, name }: GalleryProps) => {
         </Dialog>
       )}
     </div>
-  );
-};
+  )
+}

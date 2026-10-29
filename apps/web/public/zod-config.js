@@ -5,4 +5,4 @@
 // catches it, so zod is told not to try. zod keeps its settings on
 // globalThis.__zod_globalConfig and adopts what it finds there when it loads,
 // which a classic script reaches before any module runs.
-globalThis.__zod_globalConfig = Object.assign(globalThis.__zod_globalConfig ?? {}, { jitless: true });
+globalThis.__zod_globalConfig = Object.assign(globalThis.__zod_globalConfig ?? {}, { jitless: true })

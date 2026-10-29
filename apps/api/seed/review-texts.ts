@@ -2,14 +2,14 @@
 
 /** One star rating's parts: the titles, and the openings, details and closings a body is joined from. */
 export type ReviewParts = Readonly<{
-  titles: readonly string[];
-  openings: readonly string[];
-  details: readonly string[];
-  closings: readonly string[];
-}>;
+  titles: readonly string[]
+  openings: readonly string[]
+  details: readonly string[]
+  closings: readonly string[]
+}>
 
 /** One review text: a title and the body under it. */
-export type ReviewText = Readonly<{ title: string; body: string }>;
+export type ReviewText = Readonly<{ title: string; body: string }>
 
 export const ReviewTexts = {
   byRating: {
@@ -155,4 +155,4 @@ export const ReviewTexts = {
     title: pick(parts.titles),
     body: [pick(parts.openings), pick(parts.details), pick(parts.closings)].join(" "),
   }),
-} as const;
+} as const

@@ -1,20 +1,20 @@
-import { Price, type ProductDetail } from "@prism/shared";
-import { useQuery } from "@tanstack/react-query";
-import { Fragment, useEffect, useRef } from "react";
-import { Link, useLocation, useNavigationType, useParams } from "react-router";
-import { HashTarget } from "../../../shared/layout/hash-target.ts";
-import { match, P } from "ts-pattern";
-import { Api, ApiError } from "../../../shared/api/client.ts";
-import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
-import { Alert, Card, Skeleton, Stars } from "../../../shared/ui/index.ts";
-import { AddToCart } from "../../cart/components/index.ts";
-import { NotFoundPage } from "../../pages/pages/NotFoundPage.tsx";
-import { ReviewsSection } from "../../reviews/components/index.ts";
-import { useReviewPage } from "../../reviews/reviews.ts";
-import { ProductKeys, useRelatedProducts } from "../catalog.ts";
-import { CatalogSeo } from "../catalog-seo.ts";
-import { Gallery, Measurements, ProductJsonLd, RecentlyViewedRow, RelatedProducts, SpecRow, Stock } from "../components/index.ts";
-import { RecentlyViewed } from "../recently-viewed.ts";
+import { Price, type ProductDetail } from "@prism/shared"
+import { useQuery } from "@tanstack/react-query"
+import { Fragment, useEffect, useRef } from "react"
+import { Link, useLocation, useNavigationType, useParams } from "react-router"
+import { HashTarget } from "../../../shared/layout/hash-target.ts"
+import { match, P } from "ts-pattern"
+import { Api, ApiError } from "../../../shared/api/client.ts"
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx"
+import { Alert, Card, Skeleton, Stars } from "../../../shared/ui/index.ts"
+import { AddToCart } from "../../cart/components/index.ts"
+import { NotFoundPage } from "../../pages/pages/NotFoundPage.tsx"
+import { ReviewsSection } from "../../reviews/components/index.ts"
+import { useReviewPage } from "../../reviews/reviews.ts"
+import { ProductKeys, useRelatedProducts } from "../catalog.ts"
+import { CatalogSeo } from "../catalog-seo.ts"
+import { Gallery, Measurements, ProductJsonLd, RecentlyViewedRow, RelatedProducts, SpecRow, Stock } from "../components/index.ts"
+import { RecentlyViewed } from "../recently-viewed.ts"
 
 /**
  * One product's page: the breadcrumb trail, the pictures, the price and
@@ -23,48 +23,48 @@ import { RecentlyViewed } from "../recently-viewed.ts";
  * A slug no product carries gets the "not found" page.
  */
 export const ProductPage = () => {
-  const { slug = "" } = useParams();
+  const { slug = "" } = useParams()
 
   const product = useQuery({
     queryKey: ProductKeys.one(slug),
     queryFn: ({ signal }) => Api.getPublic<ProductDetail>(`/products/${slug}`, signal),
     retry: false,
-  });
+  })
 
   // Asked for beside the product, not after it: the sections below find
   // their first page of reviews and the related products in the cache.
-  useReviewPage(slug, "helpful", 1);
+  useReviewPage(slug, "helpful", 1)
 
-  useRelatedProducts(slug);
+  useRelatedProducts(slug)
 
-  const shown = product.data?.slug;
+  const shown = product.data?.slug
 
-  const location = useLocation();
+  const location = useLocation()
 
-  const navigationType = useNavigationType();
+  const navigationType = useNavigationType()
 
   /** The navigation whose hash was brought into view, so each one is, once. */
-  const revealedFor = useRef<string | undefined>(undefined);
+  const revealedFor = useRef<string | undefined>(undefined)
 
   // A followed link to a part of the page, such as a mail's link to the
   // reviews, brings that part into view once the product has rendered it.
   useEffect(() => {
-    if (shown === undefined || revealedFor.current === location.key || !HashTarget.isFollowed(navigationType, location.key)) return;
+    if (shown === undefined || revealedFor.current === location.key || !HashTarget.isFollowed(navigationType, location.key)) return
 
-    const target = HashTarget.find(location.hash);
-    if (target === null) return;
+    const target = HashTarget.find(location.hash)
+    if (target === null) return
 
-    revealedFor.current = location.key;
-    target.scrollIntoView({ block: "start" });
-  }, [shown, location.hash, location.key, navigationType]);
+    revealedFor.current = location.key
+    target.scrollIntoView({ block: "start" })
+  }, [shown, location.hash, location.key, navigationType])
 
   useEffect(() => {
     if (shown !== undefined) {
-      RecentlyViewed.remember(shown);
+      RecentlyViewed.remember(shown)
     }
-  }, [shown]);
+  }, [shown])
 
-  if (product.error instanceof ApiError && product.error.status === 404) return <NotFoundPage heading="Product not found" />;
+  if (product.error instanceof ApiError && product.error.status === 404) return <NotFoundPage heading="Product not found" />
 
   return (
     <div className="mx-auto max-w-6xl space-y-14 px-4 py-8 sm:px-6">
@@ -171,5 +171,5 @@ export const ProductPage = () => {
           </Fragment>
         ))}
     </div>
-  );
-};
+  )
+}

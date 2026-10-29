@@ -1,5 +1,5 @@
-import { useIsMutating } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useIsMutating } from "@tanstack/react-query"
+import { useEffect, useState } from "react"
 
 /**
  * A page's message about its last failed action, and how to set it. It
@@ -7,15 +7,15 @@ import { useEffect, useState } from "react";
  * under an old failure.
  */
 export const useActionFailure = () => {
-  const [failure, setFailure] = useState<string | undefined>(undefined);
+  const [failure, setFailure] = useState<string | undefined>(undefined)
 
-  const isActing = useIsMutating() > 0;
+  const isActing = useIsMutating() > 0
 
   useEffect(() => {
     if (isActing) {
-      setFailure(undefined);
+      setFailure(undefined)
     }
-  }, [isActing]);
+  }, [isActing])
 
-  return [failure, setFailure] as const;
-};
+  return [failure, setFailure] as const
+}

@@ -1,36 +1,36 @@
-import { Password, RegisterForm, type AccessGrant } from "@prism/shared";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useState, type ReactNode } from "react";
-import { useForm } from "react-hook-form";
-import { Link, useNavigate, useSearchParams } from "react-router";
-import { match, P } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
-import { useTheme } from "../../../shared/theme/use-theme.ts";
-import { Alert, Button, Field } from "../../../shared/ui/index.ts";
-import { AuthShell, Captcha, ProviderButtons } from "../components/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { NextPath } from "../next-path.ts";
-import { TokenStore } from "../../../shared/api/token-store.ts";
+import { Password, RegisterForm, type AccessGrant } from "@prism/shared"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useState, type ReactNode } from "react"
+import { useForm } from "react-hook-form"
+import { Link, useNavigate, useSearchParams } from "react-router"
+import { match, P } from "ts-pattern"
+import { Api } from "../../../shared/api/client.ts"
+import { useTheme } from "../../../shared/theme/use-theme.ts"
+import { Alert, Button, Field } from "../../../shared/ui/index.ts"
+import { AuthShell, Captcha, ProviderButtons } from "../components/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { NextPath } from "../next-path.ts"
+import { TokenStore } from "../../../shared/api/token-store.ts"
 
 /** Opening an account, which signs in on success. */
 export const RegisterPage = () => {
-  const navigate = useNavigate();
-  const [params] = useSearchParams();
-  const next = NextPath.of(params.get("next"));
-  const { theme } = useTheme();
-  const [failure, setFailure] = useState<ReactNode | undefined>(undefined);
+  const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const next = NextPath.of(params.get("next"))
+  const { theme } = useTheme()
+  const [failure, setFailure] = useState<ReactNode | undefined>(undefined)
   // Google accepts a token once, and a refused submit may have spent it, so each refusal draws a fresh challenge.
-  const [captchaRound, setCaptchaRound] = useState(0);
+  const [captchaRound, setCaptchaRound] = useState(0)
 
   const form = useForm({
     resolver: zodResolver(RegisterForm.schema),
     defaultValues: { email: "", password: "", confirmPassword: "", captchaToken: "" },
-  });
+  })
 
   const submit = form.handleSubmit(async (values) => {
-    setFailure(undefined);
+    setFailure(undefined)
 
     // `confirmPassword` is a browser-side guard against a typo; the server
     // has no use for it.
@@ -40,15 +40,15 @@ export const RegisterPage = () => {
       captchaToken: values.captchaToken,
     })
       .then((grant) => {
-        TokenStore.set(grant.accessToken, grant.user);
-        void navigate(next, { replace: true });
+        TokenStore.set(grant.accessToken, grant.user)
+        void navigate(next, { replace: true })
       })
       .catch((reason: unknown) => {
-        setFailure(Failure.describe(reason));
-        form.setValue("captchaToken", "");
-        setCaptchaRound((round) => round + 1);
-      });
-  });
+        setFailure(Failure.describe(reason))
+        form.setValue("captchaToken", "")
+        setCaptchaRound((round) => round + 1)
+      })
+  })
 
   return (
     <AuthShell
@@ -69,7 +69,9 @@ export const RegisterPage = () => {
       <form onSubmit={(event) => void submit(event)} className="space-y-4" noValidate>
         {match(failure)
           .with(P.nullish, () => null)
-          .otherwise((message) => <Alert>{message}</Alert>)}
+          .otherwise((message) => (
+            <Alert>{message}</Alert>
+          ))}
 
         <Field
           label="Email address"
@@ -115,5 +117,5 @@ export const RegisterPage = () => {
         </Button>
       </form>
     </AuthShell>
-  );
-};
+  )
+}

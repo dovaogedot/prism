@@ -1,19 +1,19 @@
-import type { ComponentProps } from "react";
+import type { ComponentProps } from "react"
 
 /** Everything a `<textarea>` takes, plus its label, hint and error. */
 export type TextAreaFieldProps = ComponentProps<"textarea"> &
   Readonly<{
-    label: string;
-    hint?: string | undefined;
-    error?: string | undefined;
-  }>;
+    label: string
+    hint?: string | undefined
+    error?: string | undefined
+  }>
 
 /** A labeled text area, with its hint and error tied to it for a screen reader. */
 export const TextAreaField = ({ label, hint, error, id, className = "", ...rest }: TextAreaFieldProps) => {
-  const fieldId = id ?? rest.name ?? label.toLowerCase().replace(/\s+/g, "-");
+  const fieldId = id ?? rest.name ?? label.toLowerCase().replace(/\s+/g, "-")
   const describedBy = [hint === undefined ? undefined : `${fieldId}-hint`, error === undefined ? undefined : `${fieldId}-error`].filter(
     (value): value is string => value !== undefined,
-  );
+  )
 
   return (
     <div className="space-y-1.5">
@@ -43,5 +43,5 @@ export const TextAreaField = ({ label, hint, error, id, className = "", ...rest 
         </p>
       )}
     </div>
-  );
-};
+  )
+}

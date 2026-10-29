@@ -1,39 +1,37 @@
-import { describe, expect, it } from "vitest";
-import { DomainError } from "../../src/domain/errors.ts";
+import { describe, expect, it } from "vitest"
+import { DomainError } from "../../src/domain/errors.ts"
 
 describe("the error tables", () => {
   it("covers every tag in both tables", () => {
-    expect(Object.keys(DomainError.message).sort()).toEqual(
-      Object.keys(DomainError.status).sort(),
-    );
-  });
+    expect(Object.keys(DomainError.message).sort()).toEqual(Object.keys(DomainError.status).sort())
+  })
 
   it("maps every tag to a client or server error status", () => {
     for (const [tag, status] of Object.entries(DomainError.status)) {
-      expect(status, tag).toBeGreaterThanOrEqual(400);
-      expect(status, tag).toBeLessThan(600);
+      expect(status, tag).toBeGreaterThanOrEqual(400)
+      expect(status, tag).toBeLessThan(600)
     }
-  });
+  })
 
   it("gives every tag a sentence-shaped message", () => {
     for (const [tag, message] of Object.entries(DomainError.message)) {
-      expect(message, tag).toMatch(/[.!?]$/);
+      expect(message, tag).toMatch(/[.!?]$/)
     }
-  });
-});
+  })
+})
 
 describe("credential safety", () => {
   it("never reveals which half of a credential pair was wrong", () => {
-    const message = DomainError.message.InvalidCredentials.toLowerCase();
-    expect(message).toContain("or");
-    expect(message).not.toMatch(/no account|not registered|unknown user|wrong password/);
-  });
+    const message = DomainError.message.InvalidCredentials.toLowerCase()
+    expect(message).toContain("or")
+    expect(message).not.toMatch(/no account|not registered|unknown user|wrong password/)
+  })
 
   it("uses one status for both halves so timing is the only side channel left", () => {
-    expect(DomainError.status.InvalidCredentials).toBe(401);
-    expect(DomainError.status.Unauthenticated).toBe(401);
-  });
-});
+    expect(DomainError.status.InvalidCredentials).toBe(401)
+    expect(DomainError.status.Unauthenticated).toBe(401)
+  })
+})
 
 describe("DomainError.toResponse", () => {
   it("puts the tag on the wire as a stable machine-readable code", () => {
@@ -43,25 +41,25 @@ describe("DomainError.toResponse", () => {
         message: DomainError.message.ProductNotFound,
         issues: [],
       },
-    });
-  });
+    })
+  })
 
   it("carries field issues through for validation failures", () => {
-    const issues = [{ path: "email", message: "Enter a valid email address." }];
-    const error: DomainError = { _tag: "ValidationFailed", issues };
+    const issues = [{ path: "email", message: "Enter a valid email address." }]
+    const error: DomainError = { _tag: "ValidationFailed", issues }
 
-    expect(DomainError.toResponse(error).error.issues).toEqual(issues);
-    expect(DomainError.httpStatus(error)).toBe(422);
-  });
+    expect(DomainError.toResponse(error).error.issues).toEqual(issues)
+    expect(DomainError.httpStatus(error)).toBe(422)
+  })
 
   it("carries the per-product issues of a stock failure", () => {
-    const issues = [{ path: "7f0c2a52-3b8e-4f43-9a6e-1c2d3e4f5a6b", message: "Only 2 left." }];
-    const error: DomainError = { _tag: "OutOfStock", issues };
+    const issues = [{ path: "7f0c2a52-3b8e-4f43-9a6e-1c2d3e4f5a6b", message: "Only 2 left." }]
+    const error: DomainError = { _tag: "OutOfStock", issues }
 
-    expect(DomainError.toResponse(error).error.issues).toEqual(issues);
-    expect(DomainError.httpStatus(error)).toBe(409);
-  });
-});
+    expect(DomainError.toResponse(error).error.issues).toEqual(issues)
+    expect(DomainError.httpStatus(error)).toBe(409)
+  })
+})
 
 describe("RateLimited", () => {
   it("says how long to wait, and carries the seconds for the browser", () => {
@@ -72,14 +70,14 @@ describe("RateLimited", () => {
         issues: [],
         retryAfterSeconds: 30,
       },
-    });
-    expect(DomainError.httpStatus({ _tag: "RateLimited", retryAfterSeconds: 30 })).toBe(429);
-  });
+    })
+    expect(DomainError.httpStatus({ _tag: "RateLimited", retryAfterSeconds: 30 })).toBe(429)
+  })
 
   it("words short and long waits for a person", () => {
-    expect(DomainError.durationOf(1)).toBe("a second");
-    expect(DomainError.durationOf(89)).toBe("89 seconds");
-    expect(DomainError.durationOf(90)).toBe("2 minutes");
-    expect(DomainError.durationOf(300)).toBe("5 minutes");
-  });
-});
+    expect(DomainError.durationOf(1)).toBe("a second")
+    expect(DomainError.durationOf(89)).toBe("89 seconds")
+    expect(DomainError.durationOf(90)).toBe("2 minutes")
+    expect(DomainError.durationOf(300)).toBe("5 minutes")
+  })
+})

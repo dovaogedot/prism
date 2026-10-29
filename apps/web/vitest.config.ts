@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vitest/config"
 
 /** The web app's pure functions, which need nothing but Node. */
 export default defineConfig({
@@ -6,4 +6,4 @@ export default defineConfig({
     include: ["tests/**/*.test.ts"],
     environment: "node",
   },
-});
+})

@@ -1,26 +1,23 @@
-import { Link, useSearchParams } from "react-router";
-import { match, P } from "ts-pattern";
-import { Alert, Button, Card, Skeleton } from "../../../shared/ui/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { OrderFilters, OrderRow } from "../components/index.ts";
-import { OrderParams, useOrders } from "../orders.ts";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { AccountPage } from "../../account/components/index.ts";
-import { UrlParams } from "../../../shared/url/url-params.ts";
+import { Link, useSearchParams } from "react-router"
+import { match, P } from "ts-pattern"
+import { Alert, Button, Card, Skeleton } from "../../../shared/ui/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { OrderFilters, OrderRow } from "../components/index.ts"
+import { OrderParams, useOrders } from "../orders.ts"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { AccountPage } from "../../account/components/index.ts"
+import { UrlParams } from "../../../shared/url/url-params.ts"
 
 /** The signed-in customer's orders, filtered by status and date and sorted as the URL says. */
 export const OrdersPage = () => {
+  const [params, setParams] = useSearchParams()
 
-  const [params, setParams] = useSearchParams();
+  const query = params.toString()
 
-  const query = params.toString();
-
-  const orders = useOrders(query);
-
+  const orders = useOrders(query)
 
   return (
     <AccountPage text={PageText.orders} heading="Your orders">
-
       <OrderFilters />
 
       {match(orders)
@@ -76,5 +73,5 @@ export const OrdersPage = () => {
           </div>
         ))}
     </AccountPage>
-  );
-};
+  )
+}

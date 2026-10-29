@@ -1,2 +1,2 @@
-export { CategoryTile } from "./CategoryTile.tsx";
-export type { CategoryTileProps } from "./CategoryTile.tsx";
+export { CategoryTile } from "./CategoryTile.tsx"
+export type { CategoryTileProps } from "./CategoryTile.tsx"

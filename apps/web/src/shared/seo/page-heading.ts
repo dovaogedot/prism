@@ -8,9 +8,9 @@ export const PageHeading = {
    * dialog keeps the page inert.
    */
   focus: (heading: HTMLElement): boolean => {
-    heading.tabIndex = -1;
-    heading.focus({ preventScroll: true });
+    heading.tabIndex = -1
+    heading.focus({ preventScroll: true })
 
-    return document.activeElement === heading;
+    return document.activeElement === heading
   },
-} as const;
+} as const

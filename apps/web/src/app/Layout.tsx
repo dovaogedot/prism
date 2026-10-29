@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Outlet, ScrollRestoration, useLocation } from "react-router";
-import { PageHeading } from "../shared/seo/page-heading.ts";
-import { RouteAnnouncer } from "../shared/seo/RouteAnnouncer.tsx";
-import { Toaster } from "../shared/ui/index.ts";
-import { Drawer, type Drawer as DrawerHandle } from "../shared/layout/drawer.ts";
-import { DrawerMenu } from "./DrawerMenu.tsx";
-import { Footer } from "./Footer.tsx";
-import { Header } from "./Header.tsx";
-import { LookClass } from "../shared/layout/look.ts";
-import { useWide } from "../shared/layout/use-wide.ts";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Outlet, ScrollRestoration, useLocation } from "react-router"
+import { PageHeading } from "../shared/seo/page-heading.ts"
+import { RouteAnnouncer } from "../shared/seo/RouteAnnouncer.tsx"
+import { Toaster } from "../shared/ui/index.ts"
+import { Drawer, type Drawer as DrawerHandle } from "../shared/layout/drawer.ts"
+import { DrawerMenu } from "./DrawerMenu.tsx"
+import { Footer } from "./Footer.tsx"
+import { Header } from "./Header.tsx"
+import { LookClass } from "../shared/layout/look.ts"
+import { useWide } from "../shared/layout/use-wide.ts"
 
 /**
  * The header and footer every page sits between, and the drawer a narrow
@@ -21,65 +21,65 @@ import { useWide } from "../shared/layout/use-wide.ts";
  * changes only its filters or sort keeps the scroll.
  */
 export const Layout = () => {
-  const { pathname } = useLocation();
+  const { pathname } = useLocation()
 
-  const wide = useWide();
+  const wide = useWide()
 
-  const dialog = useRef<HTMLDialogElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null)
 
-  const [slot, setSlot] = useState<HTMLElement | undefined>(undefined);
+  const [slot, setSlot] = useState<HTMLElement | undefined>(undefined)
 
   // One identity for the whole life of the layout, so React calls it when the
   // slot mounts and unmounts rather than on every render.
   const holdSlot = useCallback((node: HTMLDivElement | null) => {
-    setSlot(node === null ? undefined : node);
-  }, []);
+    setSlot(node === null ? undefined : node)
+  }, [])
 
   const open = useCallback(() => {
-    const drawer = dialog.current;
-    if (drawer === null) return;
+    const drawer = dialog.current
+    if (drawer === null) return
 
     // Opened again on its way out, it turns back from where it has got to.
-    drawer.removeAttribute("data-closing");
+    drawer.removeAttribute("data-closing")
     if (!drawer.open) {
-      drawer.showModal();
+      drawer.showModal()
     }
-  }, []);
+  }, [])
 
   const close = useCallback(() => {
-    const drawer = dialog.current;
-    if (drawer === null || !drawer.open || drawer.hasAttribute("data-closing")) return;
+    const drawer = dialog.current
+    if (drawer === null || !drawer.open || drawer.hasAttribute("data-closing")) return
 
     // Slid out while still open, and closed once it is out. Reading the
     // animations settles the style, so the slide the attribute starts is
     // among them; with no slide to wait for, the drawer closes at once.
-    drawer.setAttribute("data-closing", "");
+    drawer.setAttribute("data-closing", "")
     void Promise.allSettled(drawer.getAnimations().map((slide) => slide.finished)).then(() => {
-      if (!drawer.hasAttribute("data-closing")) return;
+      if (!drawer.hasAttribute("data-closing")) return
 
-      drawer.removeAttribute("data-closing");
-      drawer.close();
-    });
-  }, []);
+      drawer.removeAttribute("data-closing")
+      drawer.close()
+    })
+  }, [])
 
   // The menu comes first in the drawer, so a page's own part is scrolled to and its first control focused.
   const openAtSlot = useCallback(() => {
-    open();
-    slot?.scrollIntoView({ block: "start" });
-    slot?.querySelector<HTMLElement>("input, select, button, a[href]")?.focus({ preventScroll: true });
-  }, [open, slot]);
+    open()
+    slot?.scrollIntoView({ block: "start" })
+    slot?.querySelector<HTMLElement>("input, select, button, a[href]")?.focus({ preventScroll: true })
+  }, [open, slot])
 
   // Whether the open drawer is closing because a link in it opened another page.
-  const isClosingForPage = useRef(false);
+  const isClosingForPage = useRef(false)
 
   useEffect(() => {
-    isClosingForPage.current = dialog.current?.open === true;
-    close();
-  }, [pathname, close]);
+    isClosingForPage.current = dialog.current?.open === true
+    close()
+  }, [pathname, close])
 
-  useEffect(close, [wide, close]);
+  useEffect(close, [wide, close])
 
-  const drawer: DrawerHandle = useMemo(() => ({ slot, open, openAtSlot }), [slot, open, openAtSlot]);
+  const drawer: DrawerHandle = useMemo(() => ({ slot, open, openAtSlot }), [slot, open, openAtSlot])
 
   return (
     <Drawer.Context value={drawer}>
@@ -100,30 +100,38 @@ export const Layout = () => {
           // The content fills the dialog, so a click on the dialog itself is a click on the backdrop.
           onClick={(event) => {
             if (event.target === event.currentTarget) {
-              close();
+              close()
             }
           }}
           // Escape slides it out too, rather than taking it off the screen.
           onCancel={(event) => {
-            event.preventDefault();
-            close();
+            event.preventDefault()
+            close()
           }}
           // Closing hands focus back to the menu button; after a link in the
           // drawer, the new page's heading takes it instead, as on any other
           // page change.
           onClose={() => {
-            const heading = PageHeading.find();
+            const heading = PageHeading.find()
             if (isClosingForPage.current && heading !== null) {
-              PageHeading.focus(heading);
+              PageHeading.focus(heading)
             }
-            isClosingForPage.current = false;
+            isClosingForPage.current = false
           }}
         >
           <div className="flex h-full flex-col">
             <div className="flex items-center justify-between p-4">
               <span className="text-sm font-semibold text-ink">Menu</span>
               <button className={LookClass.icon} type="button" onClick={close} aria-label="Close menu">
-                <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                <svg
+                  className="size-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                >
                   <path d="M6 6l12 12M18 6 6 18" />
                 </svg>
               </button>
@@ -146,5 +154,5 @@ export const Layout = () => {
         <ScrollRestoration />
       </div>
     </Drawer.Context>
-  );
-};
+  )
+}

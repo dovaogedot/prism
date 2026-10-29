@@ -1,21 +1,21 @@
-import type { ReactNode } from "react";
-import { Button, type ButtonTone } from "./Button.tsx";
-import { Dialog } from "./Dialog.tsx";
+import type { ReactNode } from "react"
+import { Button, type ButtonTone } from "./Button.tsx"
+import { Dialog } from "./Dialog.tsx"
 
 /** The question, its consequences, and what each answer does. */
 export type ConfirmDialogProps = Readonly<{
-  isOpen: boolean;
-  title: string;
-  children: ReactNode;
+  isOpen: boolean
+  title: string
+  children: ReactNode
   /** What the confirming button says, such as "Delete product". */
-  confirmLabel: string;
+  confirmLabel: string
   /** What the dismissing button says; "Cancel" unless that is what the confirming one does, as in "Keep the order". */
-  cancelLabel?: string;
-  tone?: ButtonTone;
-  isBusy?: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
-}>;
+  cancelLabel?: string
+  tone?: ButtonTone
+  isBusy?: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}>
 
 /** Asks before something that cannot be undone. Cancel is the default, and the first button focus reaches. */
 export const ConfirmDialog = ({
@@ -40,4 +40,4 @@ export const ConfirmDialog = ({
       </Button>
     </div>
   </Dialog>
-);
+)

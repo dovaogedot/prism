@@ -3,11 +3,11 @@
  * list, so the two never drift apart.
  */
 
-import type { StaffRole } from "@prism/shared";
-import { NextPath } from "../features/auth/next-path.ts";
+import type { StaffRole } from "@prism/shared"
+import { NextPath } from "../features/auth/next-path.ts"
 
 /** One page of the account. */
-export type AccountLink = Readonly<{ to: string; label: string }>;
+export type AccountLink = Readonly<{ to: string; label: string }>
 
 export const AccountLinks = {
   /** The pages a signed-in account opens, in menu order; the admin only for staff. */
@@ -20,4 +20,4 @@ export const AccountLinks = {
 
   /** Where "Sign in" goes from the page at `path`: the sign-in page, which comes back to it. */
   signInFrom: (path: string): string => `/login${NextPath.query(path)}`,
-} as const;
+} as const

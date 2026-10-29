@@ -1,7 +1,7 @@
-import type { ProductImage } from "@prism/shared";
+import type { ProductImage } from "@prism/shared"
 
 /** A picture as the list edits it: the picture and the text that describes it. */
-export type PictureDraft = Readonly<{ image: ProductImage; alt: string }>;
+export type PictureDraft = Readonly<{ image: ProductImage; alt: string }>
 
 /** The unsaved order and texts of a product's pictures. */
 export const PictureDrafts = {
@@ -14,17 +14,17 @@ export const PictureDrafts = {
    * the others and any text typed for it, and a new picture goes last.
    */
   merge: (drafts: readonly PictureDraft[], before: readonly ProductImage[], after: readonly ProductImage[]): readonly PictureDraft[] => {
-    const current = new Map(after.map((image) => [image.id, image]));
-    const saved = new Map(before.map((image) => [image.id, image.alt]));
+    const current = new Map(after.map((image) => [image.id, image]))
+    const saved = new Map(before.map((image) => [image.id, image.alt]))
     const kept = drafts.flatMap((draft) => {
-      const image = current.get(draft.image.id);
-      if (image === undefined) return [];
+      const image = current.get(draft.image.id)
+      if (image === undefined) return []
 
       // A text nobody edited follows the server's.
-      return [{ image, alt: draft.alt === saved.get(image.id) ? image.alt : draft.alt }];
-    });
-    const known = new Set(drafts.map((draft) => draft.image.id));
+      return [{ image, alt: draft.alt === saved.get(image.id) ? image.alt : draft.alt }]
+    })
+    const known = new Set(drafts.map((draft) => draft.image.id))
 
-    return [...kept, ...after.filter((image) => !known.has(image.id)).map((image) => ({ image, alt: image.alt }))];
+    return [...kept, ...after.filter((image) => !known.has(image.id)).map((image) => ({ image, alt: image.alt }))]
   },
-} as const;
+} as const

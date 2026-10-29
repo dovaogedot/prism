@@ -4,79 +4,79 @@
  * reviews come in.
  */
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { Shop } from "../support/commerce.ts";
-import { jsonOf, registerUser, seedCatalog, startHarness, userIdOf, type Harness } from "../support/harness.ts";
-import { Staff, type TestAccount } from "../support/staff.ts";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
+import { Shop } from "../support/commerce.ts"
+import { jsonOf, registerUser, seedCatalog, startHarness, userIdOf, type Harness } from "../support/harness.ts"
+import { Staff, type TestAccount } from "../support/staff.ts"
 
-let harness: Harness;
-let moderator: TestAccount;
+let harness: Harness
+let moderator: TestAccount
 
 beforeAll(async () => {
-  harness = await startHarness();
-}, 180_000);
+  harness = await startHarness()
+}, 180_000)
 
 afterAll(async () => {
-  await harness.stop();
-});
+  await harness.stop()
+})
 
 beforeEach(async () => {
-  await harness.reset();
-  await seedCatalog(harness, [{ slug: "desk-lamp", name: "Desk Lamp", priceCents: 2500, stock: 50 }]);
-  moderator = await Staff.account(harness, "moderator@example.com", ["moderator"]);
-});
+  await harness.reset()
+  await seedCatalog(harness, [{ slug: "desk-lamp", name: "Desk Lamp", priceCents: 2500, stock: 50 }])
+  moderator = await Staff.account(harness, "moderator@example.com", ["moderator"])
+})
 
 type Page = {
-  items: { id: string; rating: number; authorName: string; title?: string; body?: string; helpfulCount: number }[];
-  average: number;
-  count: number;
-  distribution: Record<string, number>;
-};
+  items: { id: string; rating: number; authorName: string; title?: string; body?: string; helpfulCount: number }[]
+  average: number
+  count: number
+  distribution: Record<string, number>
+}
 
 type Viewer = {
-  canReview: boolean;
-  reason?: string;
-  own?: { id: string; status: string; rejectionReason?: string };
-  votedReviewIds: string[];
-};
+  canReview: boolean
+  reason?: string
+  own?: { id: string; status: string; rejectionReason?: string }
+  votedReviewIds: string[]
+}
 
-const review = { rating: 4, authorName: "Mari", title: "Bright and steady", body: "Lights the whole desk." };
+const review = { rating: 4, authorName: "Mari", title: "Bright and steady", body: "Lights the whole desk." }
 
 /** A customer with an order of the desk lamp that ended in `status`. */
 const customer = async (email: string, status?: "pending_payment" | "delivered" | "refunded") => {
-  const { accessToken } = await registerUser(harness, email);
+  const { accessToken } = await registerUser(harness, email)
   if (status !== undefined) {
-    const placed = await Shop.placed(harness, await Shop.fill(harness, [["desk-lamp", 1]], { token: accessToken }));
+    const placed = await Shop.placed(harness, await Shop.fill(harness, [["desk-lamp", 1]], { token: accessToken }))
     if (status !== "pending_payment") {
-      await Shop.succeed(harness, placed.charge);
-      await harness.settle();
+      await Shop.succeed(harness, placed.charge)
+      await harness.settle()
       await harness.database.sql`
-        UPDATE customer_order SET status = ${status}, tracking_number = 'PR000000001EE' WHERE id = ${placed.orderId}`;
+        UPDATE customer_order SET status = ${status}, tracking_number = 'PR000000001EE' WHERE id = ${placed.orderId}`
     }
   }
-  return accessToken;
-};
+  return accessToken
+}
 
 const call = (token: string | undefined, method: "GET" | "PUT" | "POST" | "DELETE", url: string, payload?: object) =>
-  Shop.call(harness, method, url, token === undefined ? {} : { token }, payload);
+  Shop.call(harness, method, url, token === undefined ? {} : { token }, payload)
 
 const publicPage = async (query = ""): Promise<Page> =>
-  jsonOf(await call(undefined, "GET", `/products/desk-lamp/reviews${query}`)) as unknown as Page;
+  jsonOf(await call(undefined, "GET", `/products/desk-lamp/reviews${query}`)) as unknown as Page
 
 const viewerOf = async (token: string): Promise<Viewer> =>
-  jsonOf(await call(token, "GET", "/products/desk-lamp/reviews/viewer")) as unknown as Viewer;
+  jsonOf(await call(token, "GET", "/products/desk-lamp/reviews/viewer")) as unknown as Viewer
 
-const write = (token: string, body: object = review) => call(token, "PUT", "/products/desk-lamp/reviews/mine", body);
+const write = (token: string, body: object = review) => call(token, "PUT", "/products/desk-lamp/reviews/mine", body)
 
-const approve = (reviewId: string) => Staff.call(harness, moderator, "POST", `/admin/reviews/${reviewId}/approve`);
+const approve = (reviewId: string) => Staff.call(harness, moderator, "POST", `/admin/reviews/${reviewId}/approve`)
 
 /** A delivered customer's review, approved by the moderator. Resolves to its id and the author's token. */
 const approvedReview = async (email: string, body: object = review) => {
-  const token = await customer(email, "delivered");
-  const id = String(jsonOf(await write(token, body))["id"]);
-  await approve(id);
-  return { id, token };
-};
+  const token = await customer(email, "delivered")
+  const id = String(jsonOf(await write(token, body))["id"])
+  await approve(id)
+  return { id, token }
+}
 
 describe("who may review", () => {
   it.each([
@@ -85,245 +85,245 @@ describe("who may review", () => {
     ["a customer whose order was delivered", "delivered", true],
     ["nobody whose order was refunded", "refunded", false],
   ] as const)("allows %s", async (_label, status, allowed) => {
-    const token = await customer("buyer@example.com", status);
+    const token = await customer("buyer@example.com", status)
 
-    expect((await viewerOf(token)).canReview).toBe(allowed);
-    const response = await write(token);
-    expect(response.statusCode).toBe(allowed ? 200 : 403);
-    if (!allowed) expect(jsonOf(response)["error"]).toMatchObject({ code: "ReviewNotAllowed" });
-  });
+    expect((await viewerOf(token)).canReview).toBe(allowed)
+    const response = await write(token)
+    expect(response.statusCode).toBe(allowed ? 200 : 403)
+    if (!allowed) expect(jsonOf(response)["error"]).toMatchObject({ code: "ReviewNotAllowed" })
+  })
 
   it("lets a customer who already reviewed edit the review rather than write a second", async () => {
-    const token = await customer("buyer@example.com", "delivered");
-    const first = jsonOf(await write(token));
-    const second = jsonOf(await write(token, { ...review, rating: 2 }));
+    const token = await customer("buyer@example.com", "delivered")
+    const first = jsonOf(await write(token))
+    const second = jsonOf(await write(token, { ...review, rating: 2 }))
 
-    expect(second).toMatchObject({ rating: 2, status: "pending" });
-    expect(second["id"]).not.toBe(first["id"]);
-    expect(await harness.database.sql`SELECT count(*)::int AS n FROM product_review`).toEqual([{ n: 1 }]);
-  });
-});
+    expect(second).toMatchObject({ rating: 2, status: "pending" })
+    expect(second["id"]).not.toBe(first["id"])
+    expect(await harness.database.sql`SELECT count(*)::int AS n FROM product_review`).toEqual([{ n: 1 }])
+  })
+})
 
 describe("moderation", () => {
   it("keeps a new review from the public, and shows it to its author as waiting", async () => {
-    const token = await customer("buyer@example.com", "delivered");
-    await write(token);
+    const token = await customer("buyer@example.com", "delivered")
+    await write(token)
 
-    expect((await publicPage()).count).toBe(0);
-    expect((await viewerOf(token)).own).toMatchObject({ status: "pending" });
-  });
+    expect((await publicPage()).count).toBe(0)
+    expect((await viewerOf(token)).own).toMatchObject({ status: "pending" })
+  })
 
   it("publishes an approved review and counts it in the average", async () => {
-    const { id } = await approvedReview("buyer@example.com", { ...review, rating: 2 });
-    await approvedReview("other@example.com", { ...review, rating: 5 });
+    const { id } = await approvedReview("buyer@example.com", { ...review, rating: 2 })
+    await approvedReview("other@example.com", { ...review, rating: 5 })
 
-    const page = await publicPage();
-    expect(page.items.map((item) => item.id)).toContain(id);
-    expect(page).toMatchObject({ count: 2, average: 3.5 });
+    const page = await publicPage()
+    expect(page.items.map((item) => item.id)).toContain(id)
+    expect(page).toMatchObject({ count: 2, average: 3.5 })
 
-    const product = jsonOf(await call(undefined, "GET", "/products/desk-lamp"));
-    expect(product["rating"]).toEqual({ average: 3.5, count: 2 });
-  });
+    const product = jsonOf(await call(undefined, "GET", "/products/desk-lamp"))
+    expect(product["rating"]).toEqual({ average: 3.5, count: 2 })
+  })
 
   it("publishes no text the moderator did not read: a decision on the text before an edit finds nothing", async () => {
-    const token = await customer("buyer@example.com", "delivered");
-    const read = String(jsonOf(await write(token))["id"]);
-    const edited = String(jsonOf(await write(token, { ...review, body: "Text nobody has read yet." }))["id"]);
+    const token = await customer("buyer@example.com", "delivered")
+    const read = String(jsonOf(await write(token))["id"])
+    const edited = String(jsonOf(await write(token, { ...review, body: "Text nobody has read yet." }))["id"])
 
-    const stale = await approve(read);
-    const rejected = await Staff.call(harness, moderator, "POST", `/admin/reviews/${read}/reject`, { reason: "Too short." });
+    const stale = await approve(read)
+    const rejected = await Staff.call(harness, moderator, "POST", `/admin/reviews/${read}/reject`, { reason: "Too short." })
 
-    expect([stale.statusCode, rejected.statusCode]).toEqual([404, 404]);
-    expect((await viewerOf(token)).own).toMatchObject({ id: edited, status: "pending" });
-    expect((await publicPage()).count).toBe(0);
-  });
+    expect([stale.statusCode, rejected.statusCode]).toEqual([404, 404])
+    expect((await viewerOf(token)).own).toMatchObject({ id: edited, status: "pending" })
+    expect((await publicPage()).count).toBe(0)
+  })
 
   it("keeps an edited review's helpful votes", async () => {
-    const { id, token } = await approvedReview("buyer@example.com");
-    const voter = await customer("voter@example.com");
-    await call(voter, "PUT", `/reviews/${id}/vote`);
+    const { id, token } = await approvedReview("buyer@example.com")
+    const voter = await customer("voter@example.com")
+    await call(voter, "PUT", `/reviews/${id}/vote`)
 
-    const edited = String(jsonOf(await write(token, { ...review, rating: 3 }))["id"]);
-    await approve(edited);
+    const edited = String(jsonOf(await write(token, { ...review, rating: 3 }))["id"])
+    await approve(edited)
 
-    expect((await publicPage()).items).toEqual([expect.objectContaining({ id: edited, helpfulCount: 1 })]);
-  });
+    expect((await publicPage()).items).toEqual([expect.objectContaining({ id: edited, helpfulCount: 1 })])
+  })
 
   it("locks the product before the review, in the order a product delete takes", async () => {
-    const token = await customer("buyer@example.com", "delivered");
-    const id = String(jsonOf(await write(token))["id"]);
+    const token = await customer("buyer@example.com", "delivered")
+    const id = String(jsonOf(await write(token))["id"])
     // Another session holds the product, as a product delete would before it reaches the reviews.
-    const holder = await harness.database.sql.reserve();
-    await holder`BEGIN`;
-    await holder`SELECT id FROM product WHERE slug = 'desk-lamp' FOR UPDATE`;
+    const holder = await harness.database.sql.reserve()
+    await holder`BEGIN`
+    await holder`SELECT id FROM product WHERE slug = 'desk-lamp' FOR UPDATE`
 
-    const moderation = approve(id);
+    const moderation = approve(id)
     try {
-      let waiting = 0;
+      let waiting = 0
       while (waiting === 0) {
-        const [row] = await harness.database.sql`SELECT count(*)::int AS n FROM pg_locks WHERE NOT granted`;
-        waiting = Number(row?.["n"]);
+        const [row] = await harness.database.sql`SELECT count(*)::int AS n FROM pg_locks WHERE NOT granted`
+        waiting = Number(row?.["n"])
       }
       // The waiting moderation has not touched the review row yet, so it can be locked at once.
-      const probe = await harness.database.sql.begin((tx) => tx`SELECT id FROM product_review WHERE id = ${id} FOR UPDATE NOWAIT`);
+      const probe = await harness.database.sql.begin((tx) => tx`SELECT id FROM product_review WHERE id = ${id} FOR UPDATE NOWAIT`)
 
-      expect(probe).toHaveLength(1);
+      expect(probe).toHaveLength(1)
     } finally {
-      await holder`ROLLBACK`;
-      holder.release();
+      await holder`ROLLBACK`
+      holder.release()
     }
-    expect((await moderation).statusCode).toBe(204);
-  });
+    expect((await moderation).statusCode).toBe(204)
+  })
 
   it("shows the author why a review was rejected", async () => {
-    const token = await customer("buyer@example.com", "delivered");
-    const id = String(jsonOf(await write(token))["id"]);
+    const token = await customer("buyer@example.com", "delivered")
+    const id = String(jsonOf(await write(token))["id"])
 
-    const rejected = await Staff.call(harness, moderator, "POST", `/admin/reviews/${id}/reject`, { reason: "Please leave out the link." });
+    const rejected = await Staff.call(harness, moderator, "POST", `/admin/reviews/${id}/reject`, { reason: "Please leave out the link." })
 
-    expect(rejected.statusCode).toBe(204);
-    expect((await viewerOf(token)).own).toMatchObject({ status: "rejected", rejectionReason: "Please leave out the link." });
-    expect((await publicPage()).count).toBe(0);
-  });
+    expect(rejected.statusCode).toBe(204)
+    expect((await viewerOf(token)).own).toMatchObject({ status: "rejected", rejectionReason: "Please leave out the link." })
+    expect((await publicPage()).count).toBe(0)
+  })
 
   it("takes an edited review out of the average until it is approved again", async () => {
-    const { token } = await approvedReview("buyer@example.com");
-    expect((await publicPage()).count).toBe(1);
+    const { token } = await approvedReview("buyer@example.com")
+    expect((await publicPage()).count).toBe(1)
 
-    const edited = String(jsonOf(await write(token, { ...review, rating: 1 }))["id"]);
+    const edited = String(jsonOf(await write(token, { ...review, rating: 1 }))["id"])
 
-    expect((await publicPage()).count).toBe(0);
-    await approve(edited);
-    expect(await publicPage()).toMatchObject({ count: 1, average: 1 });
-  });
+    expect((await publicPage()).count).toBe(0)
+    await approve(edited)
+    expect(await publicPage()).toMatchObject({ count: 1, average: 1 })
+  })
 
   it("lets the author delete their review", async () => {
-    const { token } = await approvedReview("buyer@example.com");
+    const { token } = await approvedReview("buyer@example.com")
 
-    expect((await call(token, "DELETE", "/products/desk-lamp/reviews/mine")).statusCode).toBe(204);
-    expect((await publicPage()).count).toBe(0);
-    expect((await call(token, "DELETE", "/products/desk-lamp/reviews/mine")).statusCode).toBe(404);
-  });
+    expect((await call(token, "DELETE", "/products/desk-lamp/reviews/mine")).statusCode).toBe(204)
+    expect((await publicPage()).count).toBe(0)
+    expect((await call(token, "DELETE", "/products/desk-lamp/reviews/mine")).statusCode).toBe(404)
+  })
 
   it("lists the queue for moderators, oldest first, and records each decision", async () => {
-    const first = await customer("first@example.com", "delivered");
-    await write(first);
-    harness.clock.advanceSeconds(60);
-    const second = await customer("second@example.com", "delivered");
-    await write(second, { ...review, authorName: "Jaan" });
+    const first = await customer("first@example.com", "delivered")
+    await write(first)
+    harness.clock.advanceSeconds(60)
+    const second = await customer("second@example.com", "delivered")
+    await write(second, { ...review, authorName: "Jaan" })
 
-    const queue = jsonOf(await Staff.call(harness, moderator, "GET", "/admin/reviews"));
-    const items = queue["items"] as { id: string; authorName: string; product: { slug: string } }[];
+    const queue = jsonOf(await Staff.call(harness, moderator, "GET", "/admin/reviews"))
+    const items = queue["items"] as { id: string; authorName: string; product: { slug: string } }[]
     expect(items.map((item) => [item.authorName, item.product.slug])).toEqual([
       ["Mari", "desk-lamp"],
       ["Jaan", "desk-lamp"],
-    ]);
+    ])
 
-    await approve(items[0]?.id ?? "");
-    await Staff.call(harness, moderator, "DELETE", `/admin/reviews/${items[1]?.id ?? ""}`);
+    await approve(items[0]?.id ?? "")
+    await Staff.call(harness, moderator, "DELETE", `/admin/reviews/${items[1]?.id ?? ""}`)
     expect(await harness.database.sql`SELECT action FROM audit_event WHERE target_type = 'review' ORDER BY id`).toEqual([
       { action: "review.approve" },
       { action: "review.delete" },
-    ]);
-  });
-});
+    ])
+  })
+})
 
 describe("the product's rating columns", () => {
   /** The desk lamp's stored average and count of approved reviews. */
   const stored = async () => {
-    const [row] = await harness.database.sql`SELECT rating_average, rating_count FROM product WHERE slug = 'desk-lamp'`;
-    return row;
-  };
+    const [row] = await harness.database.sql`SELECT rating_average, rating_count FROM product WHERE slug = 'desk-lamp'`
+    return row
+  }
 
   it("follow the approved reviews through approval, an edit, a rejection and a deletion", async () => {
-    const first = await approvedReview("first@example.com");
-    const second = await approvedReview("second@example.com", { ...review, rating: 2 });
-    expect(await stored()).toEqual({ rating_average: 3, rating_count: 2 });
+    const first = await approvedReview("first@example.com")
+    const second = await approvedReview("second@example.com", { ...review, rating: 2 })
+    expect(await stored()).toEqual({ rating_average: 3, rating_count: 2 })
 
     // An edit sends the review back to the queue, and out of the totals.
-    await write(second.token, { ...review, rating: 5 });
-    expect(await stored()).toEqual({ rating_average: 4, rating_count: 1 });
+    await write(second.token, { ...review, rating: 5 })
+    expect(await stored()).toEqual({ rating_average: 4, rating_count: 1 })
 
-    await Staff.call(harness, moderator, "POST", `/admin/reviews/${second.id}/reject`, { reason: "Please leave out the link." });
-    expect(await stored()).toEqual({ rating_average: 4, rating_count: 1 });
+    await Staff.call(harness, moderator, "POST", `/admin/reviews/${second.id}/reject`, { reason: "Please leave out the link." })
+    expect(await stored()).toEqual({ rating_average: 4, rating_count: 1 })
 
-    await call(first.token, "DELETE", "/products/desk-lamp/reviews/mine");
-    expect(await stored()).toEqual({ rating_average: 0, rating_count: 0 });
-  });
+    await call(first.token, "DELETE", "/products/desk-lamp/reviews/mine")
+    expect(await stored()).toEqual({ rating_average: 0, rating_count: 0 })
+  })
 
   it("count both of two reviews approved at the same moment", async () => {
-    const ids: string[] = [];
+    const ids: string[] = []
     for (const email of ["one@example.com", "two@example.com"]) {
-      ids.push(String(jsonOf(await write(await customer(email, "delivered")))["id"]));
+      ids.push(String(jsonOf(await write(await customer(email, "delivered")))["id"]))
     }
 
-    await Promise.all(ids.map((id) => approve(id)));
+    await Promise.all(ids.map((id) => approve(id)))
 
-    expect(await stored()).toEqual({ rating_average: 4, rating_count: 2 });
-  });
-});
+    expect(await stored()).toEqual({ rating_average: 4, rating_count: 2 })
+  })
+})
 
 describe("helpful votes", () => {
   it("count once per person, and can be taken back", async () => {
-    const { id } = await approvedReview("author@example.com");
-    const voter = await customer("voter@example.com");
+    const { id } = await approvedReview("author@example.com")
+    const voter = await customer("voter@example.com")
 
-    await call(voter, "PUT", `/reviews/${id}/vote`);
-    await call(voter, "PUT", `/reviews/${id}/vote`);
-    expect((await publicPage()).items[0]?.helpfulCount).toBe(1);
-    expect((await viewerOf(voter)).votedReviewIds).toEqual([id]);
+    await call(voter, "PUT", `/reviews/${id}/vote`)
+    await call(voter, "PUT", `/reviews/${id}/vote`)
+    expect((await publicPage()).items[0]?.helpfulCount).toBe(1)
+    expect((await viewerOf(voter)).votedReviewIds).toEqual([id])
 
-    await call(voter, "DELETE", `/reviews/${id}/vote`);
-    expect((await publicPage()).items[0]?.helpfulCount).toBe(0);
-  });
+    await call(voter, "DELETE", `/reviews/${id}/vote`)
+    expect((await publicPage()).items[0]?.helpfulCount).toBe(0)
+  })
 
   it("refuses a vote on one's own review", async () => {
-    const { id, token } = await approvedReview("author@example.com");
+    const { id, token } = await approvedReview("author@example.com")
 
-    const response = await call(token, "PUT", `/reviews/${id}/vote`);
+    const response = await call(token, "PUT", `/reviews/${id}/vote`)
 
-    expect(response.statusCode).toBe(403);
-    expect((await publicPage()).items[0]?.helpfulCount).toBe(0);
-  });
+    expect(response.statusCode).toBe(403)
+    expect((await publicPage()).items[0]?.helpfulCount).toBe(0)
+  })
 
   it("leaves a count that matches the votes when ten people vote at once", async () => {
-    const { id } = await approvedReview("author@example.com");
-    const voters = await Promise.all(Array.from({ length: 10 }, (_, index) => customer(`voter-${index}@example.com`)));
+    const { id } = await approvedReview("author@example.com")
+    const voters = await Promise.all(Array.from({ length: 10 }, (_, index) => customer(`voter-${index}@example.com`)))
 
-    const responses = await Promise.all(voters.map((voter) => call(voter, "PUT", `/reviews/${id}/vote`)));
+    const responses = await Promise.all(voters.map((voter) => call(voter, "PUT", `/reviews/${id}/vote`)))
 
-    expect(responses.every((response) => response.statusCode === 204)).toBe(true);
-    expect((await publicPage()).items[0]?.helpfulCount).toBe(10);
-    expect(await harness.database.sql`SELECT count(*)::int AS n FROM review_vote`).toEqual([{ n: 10 }]);
-  });
-});
+    expect(responses.every((response) => response.statusCode === 204)).toBe(true)
+    expect((await publicPage()).items[0]?.helpfulCount).toBe(10)
+    expect(await harness.database.sql`SELECT count(*)::int AS n FROM review_vote`).toEqual([{ n: 10 }])
+  })
+})
 
 describe("the order of reviews", () => {
   it("sorts by helpfulness, newest first among ties, and by date and rating on request", async () => {
-    const low = await approvedReview("low@example.com", { ...review, rating: 2, authorName: "Low" });
-    harness.clock.advanceSeconds(60);
-    await approvedReview("high@example.com", { ...review, rating: 5, authorName: "High" });
-    harness.clock.advanceSeconds(60);
-    await approvedReview("mid@example.com", { ...review, rating: 4, authorName: "Mid" });
-    await call(await customer("voter@example.com"), "PUT", `/reviews/${low.id}/vote`);
+    const low = await approvedReview("low@example.com", { ...review, rating: 2, authorName: "Low" })
+    harness.clock.advanceSeconds(60)
+    await approvedReview("high@example.com", { ...review, rating: 5, authorName: "High" })
+    harness.clock.advanceSeconds(60)
+    await approvedReview("mid@example.com", { ...review, rating: 4, authorName: "Mid" })
+    await call(await customer("voter@example.com"), "PUT", `/reviews/${low.id}/vote`)
 
-    const names = async (sort: string) => (await publicPage(`?sort=${sort}`)).items.map((item) => item.authorName);
+    const names = async (sort: string) => (await publicPage(`?sort=${sort}`)).items.map((item) => item.authorName)
 
-    expect(await names("helpful")).toEqual(["Low", "Mid", "High"]);
-    expect(await names("newest")).toEqual(["Mid", "High", "Low"]);
-    expect(await names("highest")).toEqual(["High", "Mid", "Low"]);
-    expect(await names("lowest")).toEqual(["Low", "Mid", "High"]);
-  });
+    expect(await names("helpful")).toEqual(["Low", "Mid", "High"])
+    expect(await names("newest")).toEqual(["Mid", "High", "Low"])
+    expect(await names("highest")).toEqual(["High", "Mid", "Low"])
+    expect(await names("lowest")).toEqual(["Low", "Mid", "High"])
+  })
 
   it("adds the distribution up to the count", async () => {
-    await seedCatalog(harness, [{ slug: "lamp-2", name: "Lamp Two", priceCents: 1000, ratings: [5, 5, 4, 2, 1, 5] }]);
+    await seedCatalog(harness, [{ slug: "lamp-2", name: "Lamp Two", priceCents: 1000, ratings: [5, 5, 4, 2, 1, 5] }])
 
-    const page = jsonOf(await call(undefined, "GET", "/products/lamp-2/reviews")) as unknown as Page;
+    const page = jsonOf(await call(undefined, "GET", "/products/lamp-2/reviews")) as unknown as Page
 
-    expect(page.distribution).toEqual({ "1": 1, "2": 1, "3": 0, "4": 1, "5": 3 });
-    expect(Object.values(page.distribution).reduce((sum, count) => sum + count, 0)).toBe(page.count);
-  });
-});
+    expect(page.distribution).toEqual({ "1": 1, "2": 1, "3": 0, "4": 1, "5": 3 })
+    expect(Object.values(page.distribution).reduce((sum, count) => sum + count, 0)).toBe(page.count)
+  })
+})
 
 describe("validation", () => {
   it.each([
@@ -333,34 +333,34 @@ describe("validation", () => {
     ["a 121-character title", { ...review, title: "t".repeat(121) }, "title"],
     ["an empty byline", { ...review, authorName: "" }, "authorName"],
   ])("refuses %s", async (_label, body, path) => {
-    const token = await customer("buyer@example.com", "delivered");
+    const token = await customer("buyer@example.com", "delivered")
 
-    const response = await write(token, body);
+    const response = await write(token, body)
 
-    expect(response.statusCode).toBe(422);
-    expect(jsonOf(response)["error"]).toMatchObject({ issues: [{ path }] });
-  });
+    expect(response.statusCode).toBe(422)
+    expect(jsonOf(response)["error"]).toMatchObject({ issues: [{ path }] })
+  })
 
   it("treats an empty title and body as none", async () => {
-    const token = await customer("buyer@example.com", "delivered");
+    const token = await customer("buyer@example.com", "delivered")
 
-    const saved = jsonOf(await write(token, { rating: 5, authorName: "Mari", title: "  ", body: "" }));
+    const saved = jsonOf(await write(token, { rating: 5, authorName: "Mari", title: "  ", body: "" }))
 
-    expect(saved).not.toHaveProperty("title");
-    expect(saved).not.toHaveProperty("body");
-  });
-});
+    expect(saved).not.toHaveProperty("title")
+    expect(saved).not.toHaveProperty("body")
+  })
+})
 
 describe("who changes a review", () => {
   it("is its author alone: another customer's routes touch only their own", async () => {
-    const { id } = await approvedReview("author@example.com");
-    const intruder = await customer("intruder@example.com", "delivered");
-    const author = await userIdOf(harness, "author@example.com");
+    const { id } = await approvedReview("author@example.com")
+    const intruder = await customer("intruder@example.com", "delivered")
+    const author = await userIdOf(harness, "author@example.com")
 
-    expect((await call(intruder, "DELETE", "/products/desk-lamp/reviews/mine")).statusCode).toBe(404);
-    await write(intruder, { ...review, body: "Overwritten?" });
+    expect((await call(intruder, "DELETE", "/products/desk-lamp/reviews/mine")).statusCode).toBe(404)
+    await write(intruder, { ...review, body: "Overwritten?" })
 
-    const [stored] = await harness.database.sql`SELECT body, user_id FROM product_review WHERE id = ${id}`;
-    expect(stored).toEqual({ body: review.body, user_id: author });
-  });
-});
+    const [stored] = await harness.database.sql`SELECT body, user_id FROM product_review WHERE id = ${id}`
+    expect(stored).toEqual({ body: review.body, user_id: author })
+  })
+})

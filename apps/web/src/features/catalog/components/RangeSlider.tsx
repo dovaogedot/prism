@@ -6,67 +6,67 @@
  * thumb at once and report once they pause, so a held arrow reports once.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { match } from "ts-pattern";
+import { useCallback, useEffect, useRef, useState } from "react"
+import { match } from "ts-pattern"
 
 /** A span on a numeric axis, `min` never above `max`. */
-export type Range = Readonly<{ min: number; max: number }>;
+export type Range = Readonly<{ min: number; max: number }>
 
 export const Range = {
   clamp: (value: number, low: number, high: number): number => Math.min(high, Math.max(low, value)),
-} as const;
+} as const
 
 /** The axis, the span selected on it, and where to report a new one. */
 export type RangeSliderProps = Readonly<{
-  label: string;
-  min: number;
-  max: number;
-  step?: number;
-  value: Range;
-  onChange: (next: Range) => void;
-  format: (value: number) => string;
-}>;
+  label: string
+  min: number
+  max: number
+  step?: number
+  value: Range
+  onChange: (next: Range) => void
+  format: (value: number) => string
+}>
 
-type Thumb = "min" | "max";
+type Thumb = "min" | "max"
 
 /** Two thumbs on one track. They may meet but never cross. */
 export const RangeSlider = ({ label, min, max, step = 1, value, onChange, format }: RangeSliderProps) => {
-  const trackRef = useRef<HTMLDivElement>(null);
-  const [draft, setDraft] = useState<Range>(value);
-  const [dragging, setDragging] = useState<Thumb | "none">("none");
+  const trackRef = useRef<HTMLDivElement>(null)
+  const [draft, setDraft] = useState<Range>(value)
+  const [dragging, setDragging] = useState<Thumb | "none">("none")
 
   /**
    * Whether a drag is live, as a ref: keyed on `value` alone, the sync below
    * fires once when the new value arrives rather than snapping the thumb back
    * for a frame on release while the URL has not round-tripped yet.
    */
-  const draggingRef = useRef(false);
+  const draggingRef = useRef(false)
 
   /** The report a key press scheduled, waiting for the keys to pause. */
-  const keyReport = useRef<number | undefined>(undefined);
+  const keyReport = useRef<number | undefined>(undefined)
 
-  useEffect(() => () => window.clearTimeout(keyReport.current), []);
+  useEffect(() => () => window.clearTimeout(keyReport.current), [])
 
   // Follow the value when it changes from somewhere else: a Clear button, the
   // back button, or the parent normalizing what was just sent.
   useEffect(() => {
-    if (draggingRef.current) return;
-    setDraft(value);
-  }, [value.min, value.max]);
+    if (draggingRef.current) return
+    setDraft(value)
+  }, [value.min, value.max])
 
   const valueAt = useCallback(
     (clientX: number): number => {
-      const track = trackRef.current;
-      if (track === null) return min;
+      const track = trackRef.current
+      if (track === null) return min
 
-      const bounds = track.getBoundingClientRect();
-      const ratio = Range.clamp((clientX - bounds.left) / bounds.width, 0, 1);
+      const bounds = track.getBoundingClientRect()
+      const ratio = Range.clamp((clientX - bounds.left) / bounds.width, 0, 1)
 
       // Steps count from `min`, so either end of the track is reachable whatever the step.
-      return Range.clamp(min + Math.round((ratio * (max - min)) / step) * step, min, max);
+      return Range.clamp(min + Math.round((ratio * (max - min)) / step) * step, min, max)
     },
     [min, max, step],
-  );
+  )
 
   const moveThumb = useCallback(
     (thumb: Thumb, next: number): Range =>
@@ -74,32 +74,32 @@ export const RangeSlider = ({ label, min, max, step = 1, value, onChange, format
         ? { min: Range.clamp(next, min, draft.max), max: draft.max }
         : { min: draft.min, max: Range.clamp(next, draft.min, max) },
     [draft.min, draft.max, min, max],
-  );
+  )
 
   const startDrag = (thumb: Thumb) => (event: React.PointerEvent) => {
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    draggingRef.current = true;
-    setDragging(thumb);
-  };
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    draggingRef.current = true
+    setDragging(thumb)
+  }
 
   const onPointerMove = (thumb: Thumb) => (event: React.PointerEvent) => {
-    if (dragging !== thumb) return;
-    setDraft(moveThumb(thumb, valueAt(event.clientX)));
-  };
+    if (dragging !== thumb) return
+    setDraft(moveThumb(thumb, valueAt(event.clientX)))
+  }
 
   const endDrag = (event: React.PointerEvent) => {
-    if (dragging === "none") return;
+    if (dragging === "none") return
 
-    event.currentTarget.releasePointerCapture(event.pointerId);
-    draggingRef.current = false;
-    setDragging("none");
-    onChange(draft);
-  };
+    event.currentTarget.releasePointerCapture(event.pointerId)
+    draggingRef.current = false
+    setDragging("none")
+    onChange(draft)
+  }
 
   const onKeyDown = (thumb: Thumb) => (event: React.KeyboardEvent) => {
-    const current = thumb === "min" ? draft.min : draft.max;
-    const big = Math.max(step, Math.round((max - min) / 10));
+    const current = thumb === "min" ? draft.min : draft.max
+    const big = Math.max(step, Math.round((max - min) / 10))
 
     const next = match(event.key)
       .with("ArrowLeft", "ArrowDown", () => current - step)
@@ -108,24 +108,24 @@ export const RangeSlider = ({ label, min, max, step = 1, value, onChange, format
       .with("PageUp", () => current + big)
       .with("Home", () => min)
       .with("End", () => max)
-      .otherwise(() => current);
+      .otherwise(() => current)
 
-    if (next === current) return;
+    if (next === current) return
 
-    event.preventDefault();
-    const updated = moveThumb(thumb, Range.clamp(next, min, max));
-    setDraft(updated);
-    window.clearTimeout(keyReport.current);
-    keyReport.current = window.setTimeout(() => onChange(updated), 500);
-  };
+    event.preventDefault()
+    const updated = moveThumb(thumb, Range.clamp(next, min, max))
+    setDraft(updated)
+    window.clearTimeout(keyReport.current)
+    keyReport.current = window.setTimeout(() => onChange(updated), 500)
+  }
 
-  const ratio = (at: number): string => `${max === min ? 0 : ((at - min) / (max - min)) * 100}%`;
+  const ratio = (at: number): string => `${max === min ? 0 : ((at - min) / (max - min)) * 100}%`
 
   // Thumbs that meet at the right end leave only the minimum free to move, so it is drawn on top there.
-  const top: Thumb = draft.min === draft.max && draft.max === max ? "min" : "max";
+  const top: Thumb = draft.min === draft.max && draft.max === max ? "min" : "max"
 
   const thumbProps = (thumb: Thumb) => {
-    const current = thumb === "min" ? draft.min : draft.max;
+    const current = thumb === "min" ? draft.min : draft.max
 
     return {
       role: "slider" as const,
@@ -143,8 +143,8 @@ export const RangeSlider = ({ label, min, max, step = 1, value, onChange, format
       style: { left: ratio(current), zIndex: thumb === top ? 2 : 1 },
       className:
         "absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-full border-2 border-surface bg-ink shadow-md transition-transform hover:scale-110 active:cursor-grabbing active:scale-110",
-    };
-  };
+    }
+  }
 
   return (
     <div className="space-y-2">
@@ -168,5 +168,5 @@ export const RangeSlider = ({ label, min, max, step = 1, value, onChange, format
         </div>
       </div>
     </div>
-  );
-};
+  )
+}

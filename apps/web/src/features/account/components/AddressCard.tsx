@@ -1,14 +1,14 @@
-import { Country, type SavedAddress } from "@prism/shared";
-import { Button } from "../../../shared/ui/index.ts";
+import { Country, type SavedAddress } from "@prism/shared"
+import { Button } from "../../../shared/ui/index.ts"
 
 /** The address, and what its buttons do. */
 export type AddressCardProps = Readonly<{
-  address: SavedAddress;
-  onEdit: () => void;
-  onMakeDefault: () => void;
-  onDelete: () => void;
-  isBusy: boolean;
-}>;
+  address: SavedAddress
+  onEdit: () => void
+  onMakeDefault: () => void
+  onDelete: () => void
+  isBusy: boolean
+}>
 
 /** One saved address as the list shows it, with its name, who receives it, where, and its actions. */
 export const AddressCard = ({ address, onEdit, onMakeDefault, onDelete, isBusy }: AddressCardProps) => (
@@ -41,4 +41,4 @@ export const AddressCard = ({ address, onEdit, onMakeDefault, onDelete, isBusy }
       </Button>
     </div>
   </article>
-);
+)

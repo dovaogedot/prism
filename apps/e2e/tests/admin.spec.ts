@@ -8,11 +8,11 @@
  * the refresh cookie rotates with every use, so the pages share one session.
  */
 
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
-import { Checks } from "../support/checks.ts";
-import { Stack, Totp } from "../support/stack.ts";
+import { expect, test, type BrowserContext, type Page } from "@playwright/test"
+import { Checks } from "../support/checks.ts"
+import { Stack, Totp } from "../support/stack.ts"
 
-test.describe.configure({ mode: "serial" });
+test.describe.configure({ mode: "serial" })
 
 const pages = [
   { name: "dashboard", path: "/admin", heading: "Dashboard" },
@@ -26,163 +26,184 @@ const pages = [
   { name: "delivery options", path: "/admin/shipping", heading: "Delivery options" },
   { name: "accounts", path: "/admin/users?staff=true", heading: "Accounts" },
   { name: "audit log", path: "/admin/audit", heading: "Audit log" },
-];
+]
 
-let admin: BrowserContext;
-let adminPage: Page;
-let adminToken: string;
+let admin: BrowserContext
+let adminPage: Page
+let adminToken: string
 
 test.beforeAll(async ({ browser }, info) => {
-  const { baseURL } = info.project.use;
-  admin = await browser.newContext({ ...(baseURL === undefined ? {} : { baseURL }), ignoreHTTPSErrors: true, viewport: { width: 1280, height: 900 } });
-  await Checks.watchCsp(admin);
-  adminToken = await Stack.signInAdmin(admin.request);
-  adminPage = await admin.newPage();
-});
+  const { baseURL } = info.project.use
+  admin = await browser.newContext({
+    ...(baseURL === undefined ? {} : { baseURL }),
+    ignoreHTTPSErrors: true,
+    viewport: { width: 1280, height: 900 },
+  })
+  await Checks.watchCsp(admin)
+  adminToken = await Stack.signInAdmin(admin.request)
+  adminPage = await admin.newPage()
+})
 
 test.afterAll(async () => {
-  await admin.close();
-});
+  await admin.close()
+})
 
 /** Sets up a second factor on the account page `page` shows, as a person does. Resolves to the secret. */
 const turnOnTwoFactor = async (page: Page): Promise<string> => {
-  await page.getByRole("button", { name: "Set up two-factor authentication" }).click();
-  const uri = await page.getByRole("link", { name: "Open it in an authenticator app on this device" }).getAttribute("href");
-  const secret = new URL(String(uri)).searchParams.get("secret") ?? "";
-  await page.getByLabel("Current password").fill(Stack.PASSWORD);
-  await page.getByLabel("Code from the app").fill(Totp.code(secret, 0));
-  await page.getByRole("button", { name: "Turn it on" }).click();
-  await expect(page.getByText("Two-factor authentication is now on.")).toBeVisible();
+  await page.getByRole("button", { name: "Set up two-factor authentication" }).click()
+  const uri = await page.getByRole("link", { name: "Open it in an authenticator app on this device" }).getAttribute("href")
+  const secret = new URL(String(uri)).searchParams.get("secret") ?? ""
+  await page.getByLabel("Current password").fill(Stack.PASSWORD)
+  await page.getByLabel("Code from the app").fill(Totp.code(secret, 0))
+  await page.getByRole("button", { name: "Turn it on" }).click()
+  await expect(page.getByText("Two-factor authentication is now on.")).toBeVisible()
 
-  return secret;
-};
+  return secret
+}
 
 test("a customer is told the admin is for staff", async ({ context, page }) => {
-  await Stack.registerCustomer(context.request, "customer");
+  await Stack.registerCustomer(context.request, "customer")
 
-  await Checks.open(page, "/admin");
+  await Checks.open(page, "/admin")
 
-  await expect(page.getByRole("heading", { level: 1, name: "Staff only" })).toBeVisible();
-});
+  await expect(page.getByRole("heading", { level: 1, name: "Staff only" })).toBeVisible()
+})
 
 test("a guest is sent to sign in, and comes back to the admin afterwards", async ({ page }) => {
-  await Checks.open(page, "/admin/orders");
+  await Checks.open(page, "/admin/orders")
 
-  await expect(page).toHaveURL(/\/login\?next=%2Fadmin%2Forders$/);
-});
+  await expect(page).toHaveURL(/\/login\?next=%2Fadmin%2Forders$/)
+})
 
-test("new staff are sent to their account to set up a second factor, then the admin opens with only their sections", async ({ context, page }) => {
-  const email = await Stack.registerCustomer(context.request, "moderator");
-  await Stack.grantRoles(admin.request, adminToken, email, ["moderator"]);
+test("new staff are sent to their account to set up a second factor, then the admin opens with only their sections", async ({
+  context,
+  page,
+}) => {
+  const email = await Stack.registerCustomer(context.request, "moderator")
+  await Stack.grantRoles(admin.request, adminToken, email, ["moderator"])
 
-  await Checks.open(page, "/admin");
-  await expect(page.getByRole("heading", { level: 1, name: "Set up two-factor authentication" })).toBeVisible();
-  expect(await Checks.axe(page)).toEqual([]);
+  await Checks.open(page, "/admin")
+  await expect(page.getByRole("heading", { level: 1, name: "Set up two-factor authentication" })).toBeVisible()
+  expect(await Checks.axe(page)).toEqual([])
 
-  await page.getByRole("link", { name: "Go to account" }).click();
-  await expect(page).toHaveURL(/\/account$/);
-  await turnOnTwoFactor(page);
+  await page.getByRole("link", { name: "Go to account" }).click()
+  await expect(page).toHaveURL(/\/account$/)
+  await turnOnTwoFactor(page)
 
-  await Checks.open(page, "/admin");
-  await expect(page.getByRole("heading", { level: 1, name: "Dashboard" })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Admin" }).getByRole("link")).toHaveText(["Dashboard", "Reviews"]);
-});
+  await Checks.open(page, "/admin")
+  await expect(page.getByRole("heading", { level: 1, name: "Dashboard" })).toBeVisible()
+  await expect(page.getByRole("navigation", { name: "Admin" }).getByRole("link")).toHaveText(["Dashboard", "Reviews"])
+})
 
-test("staff who turn their second factor off are told which roles they lose and asked first, then the admin closes to them", async ({ context, page }) => {
-  const email = await Stack.registerCustomer(context.request, "staff");
-  await Stack.grantRoles(admin.request, adminToken, email, ["moderator", "support"]);
-  await Checks.open(page, "/account");
-  const secret = await turnOnTwoFactor(page);
-  const turnOff = page.getByRole("button", { name: "Turn off two-factor" });
+test("staff who turn their second factor off are told which roles they lose and asked first, then the admin closes to them", async ({
+  context,
+  page,
+}) => {
+  const email = await Stack.registerCustomer(context.request, "staff")
+  await Stack.grantRoles(admin.request, adminToken, email, ["moderator", "support"])
+  await Checks.open(page, "/account")
+  const secret = await turnOnTwoFactor(page)
+  const turnOff = page.getByRole("button", { name: "Turn off two-factor" })
 
   // The code for the next time step: the current one turned 2FA on, and a code works once.
-  await page.getByLabel("Code from the app").fill(Totp.code(secret, 1));
-  await turnOff.click();
-  const confirm = page.getByRole("dialog", { name: "Turn off two-factor?" });
-  await expect(confirm).toContainText("your Moderator and Support statuses will be revoked");
-  await expect(confirm.getByRole("button", { name: "Cancel" })).toBeFocused();
-  expect(await Checks.axe(page)).toEqual([]);
-  await confirm.getByRole("button", { name: "Cancel" }).click();
-  await expect(confirm).toBeHidden();
-  await expect(turnOff).toBeVisible();
+  await page.getByLabel("Code from the app").fill(Totp.code(secret, 1))
+  await turnOff.click()
+  const confirm = page.getByRole("dialog", { name: "Turn off two-factor?" })
+  await expect(confirm).toContainText("your Moderator and Support statuses will be revoked")
+  await expect(confirm.getByRole("button", { name: "Cancel" })).toBeFocused()
+  expect(await Checks.axe(page)).toEqual([])
+  await confirm.getByRole("button", { name: "Cancel" }).click()
+  await expect(confirm).toBeHidden()
+  await expect(turnOff).toBeVisible()
 
-  await turnOff.click();
-  await confirm.getByRole("button", { name: "Turn off two-factor" }).click();
-  await expect(page.getByText("Two-factor authentication is now off, and your Moderator and Support statuses are revoked.")).toBeVisible();
+  await turnOff.click()
+  await confirm.getByRole("button", { name: "Turn off two-factor" }).click()
+  await expect(page.getByText("Two-factor authentication is now off, and your Moderator and Support statuses are revoked.")).toBeVisible()
 
-  await Checks.open(page, "/admin");
-  await expect(page.getByRole("heading", { level: 1, name: "Staff only" })).toBeVisible();
-});
+  await Checks.open(page, "/admin")
+  await expect(page.getByRole("heading", { level: 1, name: "Staff only" })).toBeVisible()
+})
 
 for (const theme of Checks.THEMES) {
   for (const entry of pages) {
     test(`${entry.name} in the ${theme} theme`, async () => {
       // The theme is stored the way the switch stores it, then the page is opened afresh.
-      await Checks.open(adminPage, "/admin");
-      await adminPage.evaluate((chosen) => localStorage.setItem("prism-theme", chosen), theme);
-      const errors: string[] = [];
-      adminPage.removeAllListeners("pageerror");
-      adminPage.on("pageerror", (error) => errors.push(error.message));
+      await Checks.open(adminPage, "/admin")
+      await adminPage.evaluate((chosen) => localStorage.setItem("prism-theme", chosen), theme)
+      const errors: string[] = []
+      adminPage.removeAllListeners("pageerror")
+      adminPage.on("pageerror", (error) => errors.push(error.message))
 
-      await adminPage.setViewportSize({ width: 1280, height: 900 });
-      await Checks.open(adminPage, entry.path);
-      const facts = await Checks.facts(adminPage);
+      await adminPage.setViewportSize({ width: 1280, height: 900 })
+      await Checks.open(adminPage, entry.path)
+      const facts = await Checks.facts(adminPage)
 
-      await expect(adminPage.getByRole("heading", { level: 1, name: entry.heading })).toBeVisible();
-      expect(facts.headings).toBe(1);
-      expect(facts.title.length, facts.title).toBeLessThanOrEqual(60);
-      expect(facts.descriptions[0]?.length ?? 0).toBeGreaterThanOrEqual(155);
-      expect(facts.descriptions[0]?.length ?? 0).toBeLessThanOrEqual(160);
-      expect(facts.robots).toBe("noindex");
-      expect(await Checks.axe(adminPage)).toEqual([]);
-      expect(await Checks.overflowAt(adminPage, Checks.WIDTHS)).toEqual(Object.fromEntries(Checks.WIDTHS.map((width) => [width, 0])));
-      expect(await Checks.cspViolations(adminPage)).toEqual([]);
-      expect(errors).toEqual([]);
-    });
+      await expect(adminPage.getByRole("heading", { level: 1, name: entry.heading })).toBeVisible()
+      expect(facts.headings).toBe(1)
+      expect(facts.title.length, facts.title).toBeLessThanOrEqual(60)
+      expect(facts.descriptions[0]?.length ?? 0).toBeGreaterThanOrEqual(155)
+      expect(facts.descriptions[0]?.length ?? 0).toBeLessThanOrEqual(160)
+      expect(facts.robots).toBe("noindex")
+      expect(await Checks.axe(adminPage)).toEqual([])
+      expect(await Checks.overflowAt(adminPage, Checks.WIDTHS)).toEqual(Object.fromEntries(Checks.WIDTHS.map((width) => [width, 0])))
+      expect(await Checks.cspViolations(adminPage)).toEqual([])
+      expect(errors).toEqual([])
+    })
   }
 }
 
 test("the accounts search's Find button sits in the email field's row, after the field", async () => {
-  await Checks.open(adminPage, "/admin/users");
-  const field = await Checks.boxOf(adminPage.getByLabel("Exact email"));
-  const find = await Checks.boxOf(adminPage.getByRole("button", { name: "Find" }));
+  await Checks.open(adminPage, "/admin/users")
+  const field = await Checks.boxOf(adminPage.getByLabel("Exact email"))
+  const find = await Checks.boxOf(adminPage.getByRole("button", { name: "Find" }))
 
-  expect(find.x).toBeGreaterThanOrEqual(field.x + field.width);
-  expect(Checks.middleGap(field, find)).toBeLessThanOrEqual(Checks.TOLERANCE);
-});
+  expect(find.x).toBeGreaterThanOrEqual(field.x + field.width)
+  expect(Checks.middleGap(field, find)).toBeLessThanOrEqual(Checks.TOLERANCE)
+})
 
 test("every admin table centers each cell in its row, so text sits level with the pictures and buttons", async () => {
-  for (const path of ["/admin/products", "/admin/orders", "/admin/shipping", "/admin/categories", "/admin/brands", "/admin/users?staff=true", "/admin/audit"]) {
-    await Checks.open(adminPage, path);
-    const row = adminPage.locator("tbody tr").first();
-    const whole = await Checks.boxOf(row);
-    const gaps = (await Checks.contentBoxesOf(row.getByRole("cell"))).map((cell) => Checks.middleGap(cell, whole));
+  for (const path of [
+    "/admin/products",
+    "/admin/orders",
+    "/admin/shipping",
+    "/admin/categories",
+    "/admin/brands",
+    "/admin/users?staff=true",
+    "/admin/audit",
+  ]) {
+    await Checks.open(adminPage, path)
+    const row = adminPage.locator("tbody tr").first()
+    const whole = await Checks.boxOf(row)
+    const gaps = (await Checks.contentBoxesOf(row.getByRole("cell"))).map((cell) => Checks.middleGap(cell, whole))
 
-    expect(Math.max(...gaps), path).toBeLessThanOrEqual(Checks.TOLERANCE);
+    expect(Math.max(...gaps), path).toBeLessThanOrEqual(Checks.TOLERANCE)
   }
-});
+})
 
 test("deleting asks first, and canceling deletes nothing", async () => {
   // A name of its own, so a run against a stack an earlier run used finds no brand of that name.
-  const name = `Asked First ${Date.now()}`;
-  const deleteButton = adminPage.getByRole("button", { name: `Delete ${name}` });
+  const name = `Asked First ${Date.now()}`
+  const deleteButton = adminPage.getByRole("button", { name: `Delete ${name}` })
 
-  await Checks.open(adminPage, "/admin/brands");
-  await adminPage.getByRole("button", { name: "New brand" }).click();
-  await adminPage.getByRole("dialog").getByLabel("Name").fill(name);
-  await adminPage.getByRole("dialog").getByRole("button", { name: "Create brand" }).click();
-  await expect(adminPage.getByRole("dialog", { name: "New brand" })).toBeHidden();
-  await expect(deleteButton).toBeVisible();
+  await Checks.open(adminPage, "/admin/brands")
+  await adminPage.getByRole("button", { name: "New brand" }).click()
+  await adminPage.getByRole("dialog").getByLabel("Name").fill(name)
+  await adminPage.getByRole("dialog").getByRole("button", { name: "Create brand" }).click()
+  await expect(adminPage.getByRole("dialog", { name: "New brand" })).toBeHidden()
+  await expect(deleteButton).toBeVisible()
 
-  await deleteButton.click();
-  const confirm = adminPage.getByRole("dialog", { name: `Delete ${name}?` });
-  await expect(confirm).toBeVisible();
-  await expect(confirm.getByRole("button", { name: "Cancel" })).toBeFocused();
-  await adminPage.keyboard.press("Escape");
-  await expect(confirm).toBeHidden();
-  await expect(deleteButton).toBeFocused();
+  await deleteButton.click()
+  const confirm = adminPage.getByRole("dialog", { name: `Delete ${name}?` })
+  await expect(confirm).toBeVisible()
+  await expect(confirm.getByRole("button", { name: "Cancel" })).toBeFocused()
+  await adminPage.keyboard.press("Escape")
+  await expect(confirm).toBeHidden()
+  await expect(deleteButton).toBeFocused()
 
-  await deleteButton.click();
-  await adminPage.getByRole("dialog", { name: `Delete ${name}?` }).getByRole("button", { name: "Delete brand" }).click();
-  await expect(deleteButton).toBeHidden();
-});
+  await deleteButton.click()
+  await adminPage
+    .getByRole("dialog", { name: `Delete ${name}?` })
+    .getByRole("button", { name: "Delete brand" })
+    .click()
+  await expect(deleteButton).toBeHidden()
+})

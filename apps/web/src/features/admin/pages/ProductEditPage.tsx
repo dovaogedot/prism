@@ -1,15 +1,15 @@
-import type { AdminBrand, AdminCategory, AdminProductDetail, ProductInput, ProductUpdate } from "@prism/shared";
-import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
-import { match, P } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { Alert, Button, ConfirmDialog, Skeleton, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { useAdminRead, useAdminWrite } from "../admin.ts";
-import { AdminPage, ProductForm, ProductImages } from "../components/index.ts";
-import { Cents } from "../forms.ts";
-import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
+import type { AdminBrand, AdminCategory, AdminProductDetail, ProductInput, ProductUpdate } from "@prism/shared"
+import { useState } from "react"
+import { Link, useNavigate, useParams } from "react-router"
+import { match, P } from "ts-pattern"
+import { Api } from "../../../shared/api/client.ts"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { Alert, Button, ConfirmDialog, Skeleton, Toast } from "../../../shared/ui/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { useAdminRead, useAdminWrite } from "../admin.ts"
+import { AdminPage, ProductForm, ProductImages } from "../components/index.ts"
+import { Cents } from "../forms.ts"
+import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts"
 
 /**
  * A product's admin page: a new one at `/admin/products/new`, which goes on
@@ -17,35 +17,38 @@ import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
  * with its pictures and the way to delete it.
  */
 export const ProductEditPage = () => {
-  const { id = "new" } = useParams();
+  const { id = "new" } = useParams()
 
-  const navigate = useNavigate();
+  const navigate = useNavigate()
 
-  const isNew = id === "new";
+  const isNew = id === "new"
 
-  const product = useAdminRead<AdminProductDetail>(`/products/${id}`, !isNew);
+  const product = useAdminRead<AdminProductDetail>(`/products/${id}`, !isNew)
 
-  const categories = useAdminRead<{ items: readonly AdminCategory[] }>("/categories");
+  const categories = useAdminRead<{ items: readonly AdminCategory[] }>("/categories")
 
-  const brands = useAdminRead<{ items: readonly AdminBrand[] }>("/brands");
+  const brands = useAdminRead<{ items: readonly AdminBrand[] }>("/brands")
 
-  const [isDeleting, setDeleting] = useState(false);
+  const [isDeleting, setDeleting] = useState(false)
 
-  const [failure, setFailure] = useActionFailure();
+  const [failure, setFailure] = useActionFailure()
 
-  const create = useAdminWrite((input: ProductInput) => Api.post<AdminProductDetail>("/admin/products", input));
+  const create = useAdminWrite((input: ProductInput) => Api.post<AdminProductDetail>("/admin/products", input))
 
-  const update = useAdminWrite((input: ProductUpdate) => Api.put<AdminProductDetail>(`/admin/products/${id}`, input));
+  const update = useAdminWrite((input: ProductUpdate) => Api.put<AdminProductDetail>(`/admin/products/${id}`, input))
 
-  const remove = useAdminWrite(() => Api.requestEmpty(`/admin/products/${id}`, { method: "DELETE" }));
+  const remove = useAdminWrite(() => Api.requestEmpty(`/admin/products/${id}`, { method: "DELETE" }))
 
   const back = (
     <Link className="text-sm font-medium text-accent underline-offset-2 hover:underline" to="/admin/products">
       All products
     </Link>
-  );
+  )
 
-  const lists = categories.data !== undefined && brands.data !== undefined ? { categories: categories.data.items, brands: brands.data.items } : undefined;
+  const lists =
+    categories.data !== undefined && brands.data !== undefined
+      ? { categories: categories.data.items, brands: brands.data.items }
+      : undefined
 
   if (isNew) {
     return (
@@ -58,14 +61,14 @@ export const ProductEditPage = () => {
             brands={lists.brands}
             submitLabel="Create product"
             onSave={async (input) => {
-              const created = await create.mutateAsync(input);
-              Toast.show(`${created.name} is created. Add its pictures next.`);
-              void navigate(`/admin/products/${created.id}`, { replace: true });
+              const created = await create.mutateAsync(input)
+              Toast.show(`${created.name} is created. Add its pictures next.`)
+              void navigate(`/admin/products/${created.id}`, { replace: true })
             }}
           />
         )}
       </AdminPage>
-    );
+    )
   }
 
   return match({ product, lists })
@@ -80,7 +83,7 @@ export const ProductEditPage = () => {
       </AdminPage>
     ))
     .otherwise(({ product: { data } }) => {
-      if (data === undefined || lists === undefined) return null;
+      if (data === undefined || lists === undefined) return null
 
       return (
         <AdminPage text={{ ...PageText.adminProductEdit, title: `${data.name} - Admin` }} heading={data.name} actions={back}>
@@ -112,8 +115,8 @@ export const ProductEditPage = () => {
             brands={lists.brands}
             submitLabel="Save product"
             onSave={async (input) => {
-              await update.mutateAsync({ ...input, stockBefore: data.stock });
-              Toast.show(`${input.name} is saved.`);
+              await update.mutateAsync({ ...input, stockBefore: data.stock })
+              Toast.show(`${input.name} is saved.`)
             }}
           />
 
@@ -134,12 +137,12 @@ export const ProductEditPage = () => {
             onConfirm={() =>
               remove.mutate(undefined, {
                 onSuccess: () => {
-                  Toast.show(`${data.name} is deleted.`);
-                  void navigate("/admin/products", { replace: true });
+                  Toast.show(`${data.name} is deleted.`)
+                  void navigate("/admin/products", { replace: true })
                 },
                 onError: (reason) => {
-                  setDeleting(false);
-                  setFailure(Failure.message(reason));
+                  setDeleting(false)
+                  setFailure(Failure.message(reason))
                 },
               })
             }
@@ -147,6 +150,6 @@ export const ProductEditPage = () => {
             It leaves the shop with its pictures and reviews. Orders that bought it keep their lines, with its name and price.
           </ConfirmDialog>
         </AdminPage>
-      );
-    });
-};
+      )
+    })
+}

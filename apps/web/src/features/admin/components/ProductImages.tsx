@@ -1,13 +1,13 @@
-import { ImageAlt, type ProductId, type ProductImage } from "@prism/shared";
-import { useState, type ReactNode } from "react";
-import { Api } from "../../../shared/api/client.ts";
-import { Alert, Button, Card, ConfirmDialog, Field, ImageSet, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { useAdminWrite } from "../admin.ts";
-import { PictureDrafts, type PictureDraft } from "../picture-drafts.ts";
+import { ImageAlt, type ProductId, type ProductImage } from "@prism/shared"
+import { useState, type ReactNode } from "react"
+import { Api } from "../../../shared/api/client.ts"
+import { Alert, Button, Card, ConfirmDialog, Field, ImageSet, Toast } from "../../../shared/ui/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { useAdminWrite } from "../admin.ts"
+import { PictureDrafts, type PictureDraft } from "../picture-drafts.ts"
 
 /** The product the pictures belong to, and its pictures in their order. */
-export type ProductImagesProps = Readonly<{ productId: ProductId; images: readonly ProductImage[] }>;
+export type ProductImagesProps = Readonly<{ productId: ProductId; images: readonly ProductImage[] }>
 
 /**
  * A product's pictures: their order, which the first leads, and the text
@@ -16,56 +16,62 @@ export type ProductImagesProps = Readonly<{ productId: ProductId; images: readon
  * camera wrote into it, and makes its smaller copies.
  */
 export const ProductImages = ({ productId, images }: ProductImagesProps) => {
-  const [drafts, setDrafts] = useState<readonly PictureDraft[]>(() => PictureDrafts.of(images));
+  const [drafts, setDrafts] = useState<readonly PictureDraft[]>(() => PictureDrafts.of(images))
 
-  const [file, setFile] = useState<File | undefined>(undefined);
+  const [file, setFile] = useState<File | undefined>(undefined)
 
-  const [alt, setAlt] = useState("");
+  const [alt, setAlt] = useState("")
 
-  const [isPixelArt, setPixelArt] = useState(false);
+  const [isPixelArt, setPixelArt] = useState(false)
 
-  const [deleting, setDeleting] = useState<ProductImage | undefined>(undefined);
+  const [deleting, setDeleting] = useState<ProductImage | undefined>(undefined)
 
-  const [failure, setFailure] = useState<ReactNode | undefined>(undefined);
+  const [failure, setFailure] = useState<ReactNode | undefined>(undefined)
 
-  const [shown, setShown] = useState(images);
+  const [shown, setShown] = useState(images)
 
   // A new server list, after an upload or a delete, keeps the unsaved order and texts.
   if (shown !== images) {
-    setShown(images);
-    setDrafts(PictureDrafts.merge(drafts, shown, images));
+    setShown(images)
+    setDrafts(PictureDrafts.merge(drafts, shown, images))
   }
 
   const save = useAdminWrite(() =>
     Api.put<{ images: readonly ProductImage[] }>(`/admin/products/${productId}/images`, {
       images: drafts.map((draft) => ({ id: draft.image.id, alt: draft.alt })),
     }),
-  );
+  )
 
-  const upload = useAdminWrite((form: FormData) => Api.post<{ images: readonly ProductImage[] }>(`/admin/products/${productId}/images`, form));
+  const upload = useAdminWrite((form: FormData) =>
+    Api.post<{ images: readonly ProductImage[] }>(`/admin/products/${productId}/images`, form),
+  )
 
-  const remove = useAdminWrite((imageId: string) => Api.request<{ images: readonly ProductImage[] }>(`/admin/products/${productId}/images/${imageId}`, { method: "DELETE" }));
+  const remove = useAdminWrite((imageId: string) =>
+    Api.request<{ images: readonly ProductImage[] }>(`/admin/products/${productId}/images/${imageId}`, { method: "DELETE" }),
+  )
 
   const move = (index: number, offset: number): void => {
-    const target = index + offset;
-    if (target < 0 || target >= drafts.length) return;
+    const target = index + offset
+    if (target < 0 || target >= drafts.length) return
 
-    const next = [...drafts];
-    const [moved] = next.splice(index, 1);
+    const next = [...drafts]
+    const [moved] = next.splice(index, 1)
     if (moved !== undefined) {
-      next.splice(target, 0, moved);
+      next.splice(target, 0, moved)
     }
-    setDrafts(next);
-  };
+    setDrafts(next)
+  }
 
-  const isChanged = drafts.some((draft, index) => draft.image.id !== images[index]?.id || draft.alt !== images[index].alt);
+  const isChanged = drafts.some((draft, index) => draft.image.id !== images[index]?.id || draft.alt !== images[index].alt)
 
   return (
     <Card className="space-y-5 p-5">
       <h2 className="font-semibold text-ink">Pictures</h2>
       {failure === undefined ? null : <Alert>{failure}</Alert>}
 
-      {drafts.length === 0 ? <p className="text-sm text-ink-soft">No pictures yet. The shop shows the first letter of the name instead.</p> : null}
+      {drafts.length === 0 ? (
+        <p className="text-sm text-ink-soft">No pictures yet. The shop shows the first letter of the name instead.</p>
+      ) : null}
 
       <ol className="space-y-3">
         {drafts.map((draft, index) => (
@@ -76,14 +82,28 @@ export const ProductImages = ({ productId, images }: ProductImagesProps) => {
                 label={index === 0 ? "Describe the main picture" : `Describe picture ${index + 1}`}
                 id={`alt-${draft.image.id}`}
                 value={draft.alt}
-                onChange={(event) => setDrafts(drafts.map((candidate) => (candidate === draft ? { ...candidate, alt: event.target.value } : candidate)))}
+                onChange={(event) =>
+                  setDrafts(drafts.map((candidate) => (candidate === draft ? { ...candidate, alt: event.target.value } : candidate)))
+                }
               />
             </div>
             <div className="flex gap-1">
-              <Button tone="quiet" type="button" disabled={index === 0} onClick={() => move(index, -1)} aria-label={`Move picture ${index + 1} up`}>
+              <Button
+                tone="quiet"
+                type="button"
+                disabled={index === 0}
+                onClick={() => move(index, -1)}
+                aria-label={`Move picture ${index + 1} up`}
+              >
                 ↑
               </Button>
-              <Button tone="quiet" type="button" disabled={index === drafts.length - 1} onClick={() => move(index, 1)} aria-label={`Move picture ${index + 1} down`}>
+              <Button
+                tone="quiet"
+                type="button"
+                disabled={index === drafts.length - 1}
+                onClick={() => move(index, 1)}
+                aria-label={`Move picture ${index + 1} down`}
+              >
                 ↓
               </Button>
               <Button tone="ghost" type="button" onClick={() => setDeleting(draft.image)}>
@@ -100,13 +120,16 @@ export const ProductImages = ({ productId, images }: ProductImagesProps) => {
           disabled={!isChanged}
           busy={save.isPending}
           onClick={() => {
-            const missing = drafts.findIndex((draft) => !ImageAlt.schema.safeParse(draft.alt).success);
+            const missing = drafts.findIndex((draft) => !ImageAlt.schema.safeParse(draft.alt).success)
             if (missing >= 0) {
-              setFailure(`Describe picture ${missing + 1}: every picture needs a text for people who cannot see it.`);
-              return;
+              setFailure(`Describe picture ${missing + 1}: every picture needs a text for people who cannot see it.`)
+              return
             }
-            setFailure(undefined);
-            save.mutate(undefined, { onSuccess: () => Toast.show("The pictures are saved."), onError: (reason) => setFailure(Failure.describe(reason)) });
+            setFailure(undefined)
+            save.mutate(undefined, {
+              onSuccess: () => Toast.show("The pictures are saved."),
+              onError: (reason) => setFailure(Failure.describe(reason)),
+            })
           }}
         >
           Save order and texts
@@ -116,26 +139,26 @@ export const ProductImages = ({ productId, images }: ProductImagesProps) => {
       <form
         className="space-y-3 border-t border-line pt-5"
         onSubmit={(event) => {
-          event.preventDefault();
-          const formElement = event.currentTarget;
+          event.preventDefault()
+          const formElement = event.currentTarget
           if (file === undefined) {
-            setFailure("Choose a picture to upload.");
-            return;
+            setFailure("Choose a picture to upload.")
+            return
           }
-          const form = new FormData();
-          form.append("alt", alt);
-          form.append("isPixelArt", String(isPixelArt));
-          form.append("file", file);
-          setFailure(undefined);
+          const form = new FormData()
+          form.append("alt", alt)
+          form.append("isPixelArt", String(isPixelArt))
+          form.append("file", file)
+          setFailure(undefined)
           upload.mutate(form, {
             onSuccess: () => {
-              setFile(undefined);
-              setAlt("");
-              formElement.reset();
-              Toast.show("The picture is added.");
+              setFile(undefined)
+              setAlt("")
+              formElement.reset()
+              Toast.show("The picture is added.")
             },
             onError: (reason) => setFailure(Failure.describe(reason)),
-          });
+          })
         }}
       >
         <h3 className="text-sm font-semibold text-ink">Add a picture</h3>
@@ -157,7 +180,12 @@ export const ProductImages = ({ productId, images }: ProductImagesProps) => {
         </div>
         <Field label="Describe the picture" id="image-alt" value={alt} onChange={(event) => setAlt(event.target.value)} />
         <label className="flex items-center gap-2.5 text-sm text-ink">
-          <input className="size-4 accent-[var(--color-accent)]" type="checkbox" checked={isPixelArt} onChange={(event) => setPixelArt(event.target.checked)} />
+          <input
+            className="size-4 accent-[var(--color-accent)]"
+            type="checkbox"
+            checked={isPixelArt}
+            onChange={(event) => setPixelArt(event.target.checked)}
+          />
           Pixel art: keep its pixels sharp when it is scaled
         </label>
         <Button tone="quiet" type="submit" busy={upload.isPending}>
@@ -172,21 +200,21 @@ export const ProductImages = ({ productId, images }: ProductImagesProps) => {
         isBusy={remove.isPending}
         onCancel={() => setDeleting(undefined)}
         onConfirm={() => {
-          if (deleting === undefined) return;
+          if (deleting === undefined) return
           remove.mutate(deleting.id, {
             onSuccess: () => {
-              setDeleting(undefined);
-              Toast.show("The picture is deleted.");
+              setDeleting(undefined)
+              Toast.show("The picture is deleted.")
             },
             onError: (reason) => {
-              setDeleting(undefined);
-              setFailure(Failure.describe(reason));
+              setDeleting(undefined)
+              setFailure(Failure.describe(reason))
             },
-          });
+          })
         }}
       >
         It is removed from the product and from the shop's storage, with its smaller copies.
       </ConfirmDialog>
     </Card>
-  );
-};
+  )
+}

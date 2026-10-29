@@ -1,15 +1,15 @@
-import { match } from "ts-pattern";
-import { useTheme } from "../theme/use-theme.ts";
-import { LookClass, type Look } from "./look.ts";
+import { match } from "ts-pattern"
+import { useTheme } from "../theme/use-theme.ts"
+import { LookClass, type Look } from "./look.ts"
 
 /** Whether the switch sits in the header bar or in the drawer. */
-export type ThemeToggleProps = Readonly<{ look: Look }>;
+export type ThemeToggleProps = Readonly<{ look: Look }>
 
 /** Switches between the light and the dark theme. A row prints what it does; an icon carries it for a screen reader. */
 export const ThemeToggle = ({ look }: ThemeToggleProps) => {
-  const { theme, toggle } = useTheme();
+  const { theme, toggle } = useTheme()
 
-  const label = `Switch to ${theme === "dark" ? "light" : "dark"} mode`;
+  const label = `Switch to ${theme === "dark" ? "light" : "dark"} mode`
 
   return (
     <button className={LookClass[look]} type="button" onClick={toggle} aria-label={look === "icon" ? label : undefined}>
@@ -33,5 +33,5 @@ export const ThemeToggle = ({ look }: ThemeToggleProps) => {
         .exhaustive()}
       {look === "row" ? <span>{label}</span> : null}
     </button>
-  );
-};
+  )
+}

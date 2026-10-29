@@ -1,16 +1,16 @@
-import type { ProductImage } from "@prism/shared";
+import type { ProductImage } from "@prism/shared"
 
 /** The picture, how wide it shows at each viewport, and whether the page is about it. */
 export type ImageSetProps = Readonly<{
-  className?: string;
-  image: ProductImage;
+  className?: string
+  image: ProductImage
   /** The `sizes` attribute: how wide the picture is drawn, so the browser fetches the copy that fits. */
-  sizes: string;
+  sizes: string
   /** The picture a page is about: it loads first instead of when scrolled near. */
-  isPriority?: boolean;
+  isPriority?: boolean
   /** A picture beside the name it shows, which a screen reader would only repeat. */
-  isDecorative?: boolean;
-}>;
+  isDecorative?: boolean
+}>
 
 /**
  * A product picture with every smaller copy in `srcset`, so the browser
@@ -19,8 +19,8 @@ export type ImageSetProps = Readonly<{
  * repeated, never blurred.
  */
 export const ImageSet = ({ className, image, sizes, isPriority = false, isDecorative = false }: ImageSetProps) => {
-  const candidates = image.sources.map((source) => `${source.url} ${source.width}w`);
-  const full = image.width === undefined ? [] : [`${image.url} ${image.width}w`];
+  const candidates = image.sources.map((source) => `${source.url} ${source.width}w`)
+  const full = image.width === undefined ? [] : [`${image.url} ${image.width}w`]
 
   return (
     <img
@@ -35,5 +35,5 @@ export const ImageSet = ({ className, image, sizes, isPriority = false, isDecora
       fetchPriority={isPriority ? "high" : "auto"}
       decoding="async"
     />
-  );
-};
+  )
+}

@@ -1,19 +1,19 @@
-import { useWatch } from "react-hook-form";
-import { PostalAddressFields } from "../../../shared/ui/index.ts";
-import type { CheckoutFormApi } from "../checkout.ts";
+import { useWatch } from "react-hook-form"
+import { PostalAddressFields } from "../../../shared/ui/index.ts"
+import type { CheckoutFormApi } from "../checkout.ts"
 
 /** The form the fields belong to. */
-export type BillingFieldsProps = Readonly<{ form: CheckoutFormApi }>;
+export type BillingFieldsProps = Readonly<{ form: CheckoutFormApi }>
 
 /**
  * Where the bill goes. It goes to the shipping address unless the customer
  * unticks the box, which brings up an address of its own.
  */
 export const BillingFields = ({ form }: BillingFieldsProps) => {
-  const billing = useWatch({ control: form.control, name: "billingAddress" });
+  const billing = useWatch({ control: form.control, name: "billingAddress" })
 
-  const errors = form.formState.errors.billingAddress;
-  const isSameAsShipping = billing === undefined;
+  const errors = form.formState.errors.billingAddress
+  const isSameAsShipping = billing === undefined
 
   return (
     <fieldset className="space-y-4">
@@ -26,10 +26,10 @@ export const BillingFields = ({ form }: BillingFieldsProps) => {
           checked={isSameAsShipping}
           onChange={(event) => {
             if (event.target.checked) {
-              form.unregister("billingAddress");
-              return;
+              form.unregister("billingAddress")
+              return
             }
-            form.setValue("billingAddress", { line1: "", line2: "", city: "", postalCode: "", country: form.getValues("address.country") });
+            form.setValue("billingAddress", { line1: "", line2: "", city: "", postalCode: "", country: form.getValues("address.country") })
           }}
         />
         Same as the shipping address
@@ -52,5 +52,5 @@ export const BillingFields = ({ form }: BillingFieldsProps) => {
         </div>
       )}
     </fieldset>
-  );
-};
+  )
+}

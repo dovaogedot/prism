@@ -3,41 +3,41 @@
  * row for every change, and bulk import that writes a whole file or nothing.
  */
 
-import { randomBytes } from "node:crypto";
-import { AdminProductSort } from "@prism/shared";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { App } from "../../src/app.ts";
-import { Database } from "../../src/db/client.ts";
-import { Topology } from "../../src/messaging/topology.ts";
-import { MessageQueue } from "../../src/platform/queue.ts";
-import { Shop } from "../support/commerce.ts";
-import { jsonOf, seedCatalog, startHarness, type Harness } from "../support/harness.ts";
-import { Staff, type TestAccount } from "../support/staff.ts";
+import { randomBytes } from "node:crypto"
+import { AdminProductSort } from "@prism/shared"
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
+import { App } from "../../src/app.ts"
+import { Database } from "../../src/db/client.ts"
+import { Topology } from "../../src/messaging/topology.ts"
+import { MessageQueue } from "../../src/platform/queue.ts"
+import { Shop } from "../support/commerce.ts"
+import { jsonOf, seedCatalog, startHarness, type Harness } from "../support/harness.ts"
+import { Staff, type TestAccount } from "../support/staff.ts"
 
-let harness: Harness;
-let content: TestAccount;
-let lamps: string;
-let acme: string;
+let harness: Harness
+let content: TestAccount
+let lamps: string
+let acme: string
 
 beforeAll(async () => {
-  harness = await startHarness();
-}, 180_000);
+  harness = await startHarness()
+}, 180_000)
 
 afterAll(async () => {
-  await harness.stop();
-});
+  await harness.stop()
+})
 
 beforeEach(async () => {
-  await harness.reset();
+  await harness.reset()
   await seedCatalog(harness, [
     { slug: "desk-lamp", name: "Desk Lamp", priceCents: 2500, category: "Lamps", brand: "Acme", properties: { Color: "Brass" } },
-  ]);
-  content = await Staff.account(harness, "content@example.com", ["content_manager"]);
-  const [category] = await harness.database.sql`SELECT id FROM category WHERE slug = 'lamps'`;
-  const [brand] = await harness.database.sql`SELECT id FROM brand WHERE slug = 'acme'`;
-  lamps = String(category?.["id"]);
-  acme = String(brand?.["id"]);
-});
+  ])
+  content = await Staff.account(harness, "content@example.com", ["content_manager"])
+  const [category] = await harness.database.sql`SELECT id FROM category WHERE slug = 'lamps'`
+  const [brand] = await harness.database.sql`SELECT id FROM brand WHERE slug = 'acme'`
+  lamps = String(category?.["id"])
+  acme = String(brand?.["id"])
+})
 
 const productInput = (overrides: Readonly<Record<string, unknown>> = {}) => ({
   name: "Floor Lamp",
@@ -54,117 +54,130 @@ const productInput = (overrides: Readonly<Record<string, unknown>> = {}) => ({
   properties: [{ name: "Color", value: "Black" }],
   isFeatured: false,
   ...overrides,
-});
+})
 
 const auditOf = async (targetType: string) =>
-  harness.database.sql`SELECT action, changes FROM audit_event WHERE target_type = ${targetType} ORDER BY id`;
+  harness.database.sql`SELECT action, changes FROM audit_event WHERE target_type = ${targetType} ORDER BY id`
 
 /** Sends an import file as multipart. */
 const importFile = (text: string | Buffer, filename: string, dryRun: boolean) => {
-  const boundary = `prism${randomBytes(8).toString("hex")}`;
+  const boundary = `prism${randomBytes(8).toString("hex")}`
   const body = Buffer.concat([
     Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: text/csv\r\n\r\n`),
     Buffer.isBuffer(text) ? text : Buffer.from(text),
     Buffer.from(`\r\n--${boundary}--\r\n`),
-  ]);
+  ])
 
   return harness.app.inject({
     method: "POST",
     url: `/api/v1/admin/products/import?dryRun=${dryRun}`,
     headers: { authorization: `Bearer ${content.accessToken}`, "content-type": `multipart/form-data; boundary=${boundary}` },
     payload: body,
-  });
-};
+  })
+}
 
-const HEADER = "slug,name,description,price,stock,category,brand,weight_g,width_mm,height_mm,depth_mm,featured,property:Color";
+const HEADER = "slug,name,description,price,stock,category,brand,weight_g,width_mm,height_mm,depth_mm,featured,property:Color"
 const csvRow = (slug: string, name: string, price = "19.90", color = "Red") =>
-  `${slug},${name},A good one.,${price},5,lamps,acme,500,100,200,100,false,${color}`;
+  `${slug},${name},A good one.,${price},5,lamps,acme,500,100,200,100,false,${color}`
 
 describe("products", () => {
   it("creates, edits and deletes a product, recording each change with what changed", async () => {
-    const created = await Staff.call(harness, content, "POST", "/admin/products", productInput());
-    expect(created.statusCode).toBe(201);
-    const id = String(jsonOf(created)["id"]);
+    const created = await Staff.call(harness, content, "POST", "/admin/products", productInput())
+    expect(created.statusCode).toBe(201)
+    const id = String(jsonOf(created)["id"])
 
-    const edited = await Staff.call(harness, content, "PUT", `/admin/products/${id}`, productInput({ priceCents: 7900, stock: 9, stockBefore: 4 }));
-    expect(jsonOf(edited)).toMatchObject({ priceCents: 7900, stock: 9, properties: [{ name: "Color", value: "Black" }] });
+    const edited = await Staff.call(
+      harness,
+      content,
+      "PUT",
+      `/admin/products/${id}`,
+      productInput({ priceCents: 7900, stock: 9, stockBefore: 4 }),
+    )
+    expect(jsonOf(edited)).toMatchObject({ priceCents: 7900, stock: 9, properties: [{ name: "Color", value: "Black" }] })
 
-    expect((await Staff.call(harness, content, "DELETE", `/admin/products/${id}`)).statusCode).toBe(204);
-    expect((await Staff.call(harness, content, "GET", `/admin/products/${id}`)).statusCode).toBe(404);
+    expect((await Staff.call(harness, content, "DELETE", `/admin/products/${id}`)).statusCode).toBe(204)
+    expect((await Staff.call(harness, content, "GET", `/admin/products/${id}`)).statusCode).toBe(404)
 
     expect(await auditOf("product")).toEqual([
       { action: "product.create", changes: null },
       { action: "product.update", changes: { priceCents: [8900, 7900], stock: [4, 9] } },
       { action: "product.delete", changes: null },
-    ]);
-  });
+    ])
+  })
 
   it("keeps the lines of orders that bought a deleted product", async () => {
-    const placed = await Shop.placed(harness, await Shop.fill(harness, [["desk-lamp", 2]]));
-    const id = await Shop.productId(harness, "desk-lamp");
+    const placed = await Shop.placed(harness, await Shop.fill(harness, [["desk-lamp", 2]]))
+    const id = await Shop.productId(harness, "desk-lamp")
 
-    await Staff.call(harness, content, "DELETE", `/admin/products/${id}`);
+    await Staff.call(harness, content, "DELETE", `/admin/products/${id}`)
 
     expect(
-      await harness.database.sql`SELECT product_id, product_name, product_slug, quantity FROM order_line WHERE order_id = ${placed.orderId}`,
-    ).toEqual([{ product_id: null, product_name: "Desk Lamp", product_slug: "desk-lamp", quantity: 2 }]);
-  });
+      await harness.database
+        .sql`SELECT product_id, product_name, product_slug, quantity FROM order_line WHERE order_id = ${placed.orderId}`,
+    ).toEqual([{ product_id: null, product_name: "Desk Lamp", product_slug: "desk-lamp", quantity: 2 }])
+  })
 
   it("features a product on the home page and keeps when it began", async () => {
-    const id = await Shop.productId(harness, "desk-lamp");
-    const featured = productInput({ name: "Desk Lamp", slug: "desk-lamp", isFeatured: true, stock: 10, stockBefore: 10 });
+    const id = await Shop.productId(harness, "desk-lamp")
+    const featured = productInput({ name: "Desk Lamp", slug: "desk-lamp", isFeatured: true, stock: 10, stockBefore: 10 })
 
-    await Staff.call(harness, content, "PUT", `/admin/products/${id}`, featured);
-    const [first] = await harness.database.sql`SELECT featured_at FROM product WHERE id = ${id}`;
-    harness.clock.advanceSeconds(60);
-    await Staff.call(harness, content, "PUT", `/admin/products/${id}`, { ...featured, stock: 1 });
-    const [second] = await harness.database.sql`SELECT featured_at FROM product WHERE id = ${id}`;
+    await Staff.call(harness, content, "PUT", `/admin/products/${id}`, featured)
+    const [first] = await harness.database.sql`SELECT featured_at FROM product WHERE id = ${id}`
+    harness.clock.advanceSeconds(60)
+    await Staff.call(harness, content, "PUT", `/admin/products/${id}`, { ...featured, stock: 1 })
+    const [second] = await harness.database.sql`SELECT featured_at FROM product WHERE id = ${id}`
 
-    expect(first?.["featured_at"]).not.toBeNull();
-    expect(second?.["featured_at"]).toEqual(first?.["featured_at"]);
-  });
+    expect(first?.["featured_at"]).not.toBeNull()
+    expect(second?.["featured_at"]).toEqual(first?.["featured_at"])
+  })
 
   it("moves the stock by the change made in the form, so sales since it loaded stay counted", async () => {
-    const id = await Shop.productId(harness, "desk-lamp");
-    await Shop.placed(harness, await Shop.fill(harness, [["desk-lamp", 3]]));
-    const edit = { name: "Desk Lamp", slug: "desk-lamp" };
+    const id = await Shop.productId(harness, "desk-lamp")
+    await Shop.placed(harness, await Shop.fill(harness, [["desk-lamp", 3]]))
+    const edit = { name: "Desk Lamp", slug: "desk-lamp" }
 
     // The form loaded 10 before the sale of 3: an untouched stock stays at 7, and +2 makes 9.
-    await Staff.call(harness, content, "PUT", `/admin/products/${id}`, productInput({ ...edit, stock: 10, stockBefore: 10 }));
-    const [kept] = await harness.database.sql`SELECT stock FROM product WHERE id = ${id}`;
-    await Staff.call(harness, content, "PUT", `/admin/products/${id}`, productInput({ ...edit, stock: 12, stockBefore: 10 }));
-    const [raised] = await harness.database.sql`SELECT stock FROM product WHERE id = ${id}`;
-    await Staff.call(harness, content, "PUT", `/admin/products/${id}`, productInput({ ...edit, stock: 0, stockBefore: 20 }));
-    const [emptied] = await harness.database.sql`SELECT stock FROM product WHERE id = ${id}`;
+    await Staff.call(harness, content, "PUT", `/admin/products/${id}`, productInput({ ...edit, stock: 10, stockBefore: 10 }))
+    const [kept] = await harness.database.sql`SELECT stock FROM product WHERE id = ${id}`
+    await Staff.call(harness, content, "PUT", `/admin/products/${id}`, productInput({ ...edit, stock: 12, stockBefore: 10 }))
+    const [raised] = await harness.database.sql`SELECT stock FROM product WHERE id = ${id}`
+    await Staff.call(harness, content, "PUT", `/admin/products/${id}`, productInput({ ...edit, stock: 0, stockBefore: 20 }))
+    const [emptied] = await harness.database.sql`SELECT stock FROM product WHERE id = ${id}`
 
-    expect([kept?.["stock"], raised?.["stock"], emptied?.["stock"]]).toEqual([7, 9, 0]);
-  });
+    expect([kept?.["stock"], raised?.["stock"], emptied?.["stock"]]).toEqual([7, 9, 0])
+  })
 
   it("saves a product while it holds the product's row lock, on a pool of one connection", { timeout: 15_000 }, async () => {
-    const database = Database.open(harness.config.database.url, 1);
+    const database = Database.open(harness.config.database.url, 1)
     const single = await App.build({
       config: harness.config,
       database,
       overrides: { clock: harness.clock, mailer: harness.mailer, queue: MessageQueue.memory(Topology.declarations()) },
-    });
-    const id = await Shop.productId(harness, "desk-lamp");
+    })
+    const id = await Shop.productId(harness, "desk-lamp")
 
     try {
-      const saved = await Staff.call({ ...harness, app: single.app }, content, "PUT", `/admin/products/${id}`, productInput({ slug: "desk-lamp", stock: 10, stockBefore: 10 }));
+      const saved = await Staff.call(
+        { ...harness, app: single.app },
+        content,
+        "PUT",
+        `/admin/products/${id}`,
+        productInput({ slug: "desk-lamp", stock: 10, stockBefore: 10 }),
+      )
 
-      expect(saved.statusCode).toBe(200);
+      expect(saved.statusCode).toBe(200)
     } finally {
-      await single.app.close();
-      await database.close();
+      await single.app.close()
+      await database.close()
     }
-  });
+  })
 
   it("refuses a slug another product uses, on the slug field", async () => {
-    const response = await Staff.call(harness, content, "POST", "/admin/products", productInput({ slug: "desk-lamp" }));
+    const response = await Staff.call(harness, content, "POST", "/admin/products", productInput({ slug: "desk-lamp" }))
 
-    expect(response.statusCode).toBe(422);
-    expect(jsonOf(response)["error"]).toMatchObject({ issues: [{ path: "slug", message: "Another product uses this slug." }] });
-  });
+    expect(response.statusCode).toBe(422)
+    expect(jsonOf(response)["error"]).toMatchObject({ issues: [{ path: "slug", message: "Another product uses this slug." }] })
+  })
 
   it("refuses property names that differ only in case", async () => {
     const response = await Staff.call(
@@ -172,30 +185,40 @@ describe("products", () => {
       content,
       "POST",
       "/admin/products",
-      productInput({ properties: [{ name: "Color", value: "Black" }, { name: "color", value: "White" }] }),
-    );
+      productInput({
+        properties: [
+          { name: "Color", value: "Black" },
+          { name: "color", value: "White" },
+        ],
+      }),
+    )
 
-    expect(response.statusCode).toBe(422);
-  });
+    expect(response.statusCode).toBe(422)
+  })
 
   it("lists products with a filter on low stock", async () => {
-    await Staff.call(harness, content, "POST", "/admin/products", productInput());
+    await Staff.call(harness, content, "POST", "/admin/products", productInput())
 
-    const list = jsonOf(await Staff.call(harness, content, "GET", "/admin/products?lowStock=true"));
+    const list = jsonOf(await Staff.call(harness, content, "GET", "/admin/products?lowStock=true"))
 
-    expect((list["items"] as { slug: string }[]).map((item) => item.slug)).toEqual(["floor-lamp"]);
-  });
+    expect((list["items"] as { slug: string }[]).map((item) => item.slug)).toEqual(["floor-lamp"])
+  })
 
   it("sorts products both ways by name, age, stock and price", async () => {
     await seedCatalog(harness, [
       { slug: "arc-lamp", name: "Arc Lamp", priceCents: 9900, stock: 3, category: "Lamps", brand: "Acme" },
       { slug: "wall-lamp", name: "Wall Lamp", priceCents: 4500, stock: 7, category: "Lamps", brand: "Acme" },
-    ]);
+    ])
     // The desk lamp, with 10 in stock at 25.00, is the oldest, and the wall lamp the newest.
     await harness.database.sql`
-      UPDATE product SET created_at = now() - make_interval(days => CASE slug WHEN 'desk-lamp' THEN 3 WHEN 'arc-lamp' THEN 2 ELSE 1 END)`;
+      UPDATE product SET created_at = now() - make_interval(days => CASE slug WHEN 'desk-lamp' THEN 3 WHEN 'arc-lamp' THEN 2 ELSE 1 END)`
     const slugsBy = async (sort: AdminProductSort) =>
-      [sort, (jsonOf(await Staff.call(harness, content, "GET", `/admin/products?sort=${sort}`))["items"] as { slug: string }[]).map((item) => item.slug)] as const;
+      [
+        sort,
+        (jsonOf(await Staff.call(harness, content, "GET", `/admin/products?sort=${sort}`))["items"] as { slug: string }[]).map(
+          (item) => item.slug,
+        ),
+      ] as const
 
     expect(Object.fromEntries(await Promise.all(AdminProductSort.NAMES.map(slugsBy)))).toEqual({
       name_asc: ["arc-lamp", "desk-lamp", "wall-lamp"],
@@ -206,41 +229,54 @@ describe("products", () => {
       stock_desc: ["desk-lamp", "wall-lamp", "arc-lamp"],
       price_asc: ["desk-lamp", "wall-lamp", "arc-lamp"],
       price_desc: ["arc-lamp", "wall-lamp", "desk-lamp"],
-    });
-  });
-});
+    })
+  })
+})
 
 describe("categories and brands", () => {
   it("refuses to delete a category or a brand that products use", async () => {
-    const category = await Staff.call(harness, content, "DELETE", `/admin/categories/${lamps}`);
-    const brand = await Staff.call(harness, content, "DELETE", `/admin/brands/${acme}`);
+    const category = await Staff.call(harness, content, "DELETE", `/admin/categories/${lamps}`)
+    const brand = await Staff.call(harness, content, "DELETE", `/admin/brands/${acme}`)
 
-    expect(jsonOf(category)["error"]).toMatchObject({ code: "CategoryInUse" });
-    expect(jsonOf(brand)["error"]).toMatchObject({ code: "BrandInUse" });
-  });
+    expect(jsonOf(category)["error"]).toMatchObject({ code: "CategoryInUse" })
+    expect(jsonOf(brand)["error"]).toMatchObject({ code: "BrandInUse" })
+  })
 
   it("creates, renames and deletes an unused category, with a description", async () => {
-    const created = await Staff.call(harness, content, "POST", "/admin/categories", { slug: "rugs", name: "Rugs", description: "Soft underfoot." });
-    const id = String(jsonOf(created)["id"]);
+    const created = await Staff.call(harness, content, "POST", "/admin/categories", {
+      slug: "rugs",
+      name: "Rugs",
+      description: "Soft underfoot.",
+    })
+    const id = String(jsonOf(created)["id"])
 
-    const renamed = await Staff.call(harness, content, "PUT", `/admin/categories/${id}`, { slug: "rugs", name: "Rugs and mats", description: "" });
-    expect(jsonOf(renamed)).toEqual({ id, slug: "rugs", name: "Rugs and mats", productCount: 0 });
+    const renamed = await Staff.call(harness, content, "PUT", `/admin/categories/${id}`, {
+      slug: "rugs",
+      name: "Rugs and mats",
+      description: "",
+    })
+    expect(jsonOf(renamed)).toEqual({ id, slug: "rugs", name: "Rugs and mats", productCount: 0 })
 
-    expect((await Staff.call(harness, content, "DELETE", `/admin/categories/${id}`)).statusCode).toBe(204);
-    expect((await auditOf("category")).map((row) => row["action"])).toEqual(["category.create", "category.update", "category.delete"]);
-  });
-});
+    expect((await Staff.call(harness, content, "DELETE", `/admin/categories/${id}`)).statusCode).toBe(204)
+    expect((await auditOf("category")).map((row) => row["action"])).toEqual(["category.create", "category.update", "category.delete"])
+  })
+})
 
 describe("bulk import", () => {
-  const file = [HEADER, csvRow("table-lamp", "Table Lamp"), csvRow("wall-lamp", "Wall Lamp"), csvRow("desk-lamp", "Desk Lamp", "29.90", "Green")].join("\n");
+  const file = [
+    HEADER,
+    csvRow("table-lamp", "Table Lamp"),
+    csvRow("wall-lamp", "Wall Lamp"),
+    csvRow("desk-lamp", "Desk Lamp", "29.90", "Green"),
+  ].join("\n")
 
   it("reports a dry run without writing, then writes the file as given", async () => {
-    const dry = await importFile(file, "lamps.csv", true);
-    expect(jsonOf(dry)).toEqual({ dryRun: true, created: 2, updated: 1, issues: [] });
-    expect(await harness.database.sql`SELECT count(*)::int AS n FROM product`).toEqual([{ n: 1 }]);
+    const dry = await importFile(file, "lamps.csv", true)
+    expect(jsonOf(dry)).toEqual({ dryRun: true, created: 2, updated: 1, issues: [] })
+    expect(await harness.database.sql`SELECT count(*)::int AS n FROM product`).toEqual([{ n: 1 }])
 
-    const real = await importFile(file, "lamps.csv", false);
-    expect(jsonOf(real)).toEqual({ dryRun: false, created: 2, updated: 1, issues: [] });
+    const real = await importFile(file, "lamps.csv", false)
+    expect(jsonOf(real)).toEqual({ dryRun: false, created: 2, updated: 1, issues: [] })
 
     expect(
       await harness.database.sql`
@@ -250,79 +286,99 @@ describe("bulk import", () => {
       { slug: "desk-lamp", price_cents: 2990, color: "Green" },
       { slug: "table-lamp", price_cents: 1990, color: "Red" },
       { slug: "wall-lamp", price_cents: 1990, color: "Red" },
-    ]);
-    expect((await auditOf("product")).map((row) => row["action"])).toEqual(["product.import"]);
-  });
+    ])
+    expect((await auditOf("product")).map((row) => row["action"])).toEqual(["product.import"])
+  })
 
   it("writes a file of several chunks, each row with its properties and featuring", async () => {
     const rows = Array.from({ length: 1201 }, (_, index) => {
-      const row = csvRow(`lamp-${index}`, `Lamp ${index}`);
-      if (index % 3 === 0) return row.replace(",false,", ",true,");
-      return index % 3 === 1 ? row : row.replace(",false,", ",,");
-    });
+      const row = csvRow(`lamp-${index}`, `Lamp ${index}`)
+      if (index % 3 === 0) return row.replace(",false,", ",true,")
+      return index % 3 === 1 ? row : row.replace(",false,", ",,")
+    })
 
-    const response = await importFile([HEADER, ...rows].join("\n"), "many.csv", false);
+    const response = await importFile([HEADER, ...rows].join("\n"), "many.csv", false)
     const [counts] = await harness.database.sql`
       SELECT count(*)::int AS products, count(featured_at)::int AS featured,
         (SELECT count(*)::int FROM product_property WHERE name = 'Color' AND value = 'Red') AS red
-      FROM product WHERE slug LIKE 'lamp-%'`;
+      FROM product WHERE slug LIKE 'lamp-%'`
 
-    expect(jsonOf(response)).toMatchObject({ created: 1201, updated: 0 });
-    expect(counts).toEqual({ products: 1201, featured: 401, red: 1201 });
-  });
+    expect(jsonOf(response)).toMatchObject({ created: 1201, updated: 0 })
+    expect(counts).toEqual({ products: 1201, featured: 401, red: 1201 })
+  })
 
   it("leaves a product's featuring alone when the file has no featured column or an empty cell", async () => {
-    const id = await Shop.productId(harness, "desk-lamp");
-    await Staff.call(harness, content, "PUT", `/admin/products/${id}`, productInput({ name: "Desk Lamp", slug: "desk-lamp", isFeatured: true, stock: 10, stockBefore: 10 }));
-    const [before] = await harness.database.sql`SELECT featured_at FROM product WHERE id = ${id}`;
-    const withoutColumn = HEADER.replace(",featured", "");
+    const id = await Shop.productId(harness, "desk-lamp")
+    await Staff.call(
+      harness,
+      content,
+      "PUT",
+      `/admin/products/${id}`,
+      productInput({ name: "Desk Lamp", slug: "desk-lamp", isFeatured: true, stock: 10, stockBefore: 10 }),
+    )
+    const [before] = await harness.database.sql`SELECT featured_at FROM product WHERE id = ${id}`
+    const withoutColumn = HEADER.replace(",featured", "")
     const cells = (featured: string | undefined) =>
-      ["desk-lamp", "Desk Lamp", "A good one.", "19.90", "5", "lamps", "acme", "500", "100", "200", "100", ...(featured === undefined ? [] : [featured]), "Red"].join(",");
+      [
+        "desk-lamp",
+        "Desk Lamp",
+        "A good one.",
+        "19.90",
+        "5",
+        "lamps",
+        "acme",
+        "500",
+        "100",
+        "200",
+        "100",
+        ...(featured === undefined ? [] : [featured]),
+        "Red",
+      ].join(",")
 
-    await importFile([withoutColumn, cells(undefined)].join("\n"), "lamps.csv", false);
-    const [afterMissing] = await harness.database.sql`SELECT featured_at FROM product WHERE id = ${id}`;
-    await importFile([HEADER, cells("")].join("\n"), "lamps.csv", false);
-    const [afterEmpty] = await harness.database.sql`SELECT featured_at FROM product WHERE id = ${id}`;
-    await importFile([HEADER, cells("false")].join("\n"), "lamps.csv", false);
-    const [afterFalse] = await harness.database.sql`SELECT featured_at FROM product WHERE id = ${id}`;
+    await importFile([withoutColumn, cells(undefined)].join("\n"), "lamps.csv", false)
+    const [afterMissing] = await harness.database.sql`SELECT featured_at FROM product WHERE id = ${id}`
+    await importFile([HEADER, cells("")].join("\n"), "lamps.csv", false)
+    const [afterEmpty] = await harness.database.sql`SELECT featured_at FROM product WHERE id = ${id}`
+    await importFile([HEADER, cells("false")].join("\n"), "lamps.csv", false)
+    const [afterFalse] = await harness.database.sql`SELECT featured_at FROM product WHERE id = ${id}`
 
-    expect(before?.["featured_at"]).not.toBeNull();
-    expect(afterMissing?.["featured_at"]).toEqual(before?.["featured_at"]);
-    expect(afterEmpty?.["featured_at"]).toEqual(before?.["featured_at"]);
-    expect(afterFalse?.["featured_at"]).toBeNull();
-  });
+    expect(before?.["featured_at"]).not.toBeNull()
+    expect(afterMissing?.["featured_at"]).toEqual(before?.["featured_at"])
+    expect(afterEmpty?.["featured_at"]).toEqual(before?.["featured_at"])
+    expect(afterFalse?.["featured_at"]).toBeNull()
+  })
 
   it("writes nothing when one row is bad, and names its row and column", async () => {
-    const bad = [HEADER, csvRow("table-lamp", "Table Lamp"), csvRow("wall-lamp", "Wall Lamp", "12.901")].join("\n");
+    const bad = [HEADER, csvRow("table-lamp", "Table Lamp"), csvRow("wall-lamp", "Wall Lamp", "12.901")].join("\n")
 
-    const response = await importFile(bad, "lamps.csv", false);
+    const response = await importFile(bad, "lamps.csv", false)
 
-    expect(response.statusCode).toBe(422);
-    expect(jsonOf(response)["error"]).toMatchObject({ code: "ImportInvalid", issues: [{ path: "3:price" }] });
-    expect(await harness.database.sql`SELECT count(*)::int AS n FROM product`).toEqual([{ n: 1 }]);
-  });
+    expect(response.statusCode).toBe(422)
+    expect(jsonOf(response)["error"]).toMatchObject({ code: "ImportInvalid", issues: [{ path: "3:price" }] })
+    expect(await harness.database.sql`SELECT count(*)::int AS n FROM product`).toEqual([{ n: 1 }])
+  })
 
   it("names a category the shop does not have", async () => {
-    const unknown = [HEADER, csvRow("table-lamp", "Table Lamp").replace(",lamps,", ",chairs,")].join("\n");
+    const unknown = [HEADER, csvRow("table-lamp", "Table Lamp").replace(",lamps,", ",chairs,")].join("\n")
 
-    const dry = jsonOf(await importFile(unknown, "lamps.csv", true));
+    const dry = jsonOf(await importFile(unknown, "lamps.csv", true))
 
-    expect(dry["issues"]).toEqual([{ row: 2, column: "category", message: "No category has this slug." }]);
+    expect(dry["issues"]).toEqual([{ row: 2, column: "category", message: "No category has this slug." }])
 
-    const real = await importFile(unknown, "lamps.csv", false);
+    const real = await importFile(unknown, "lamps.csv", false)
 
-    expect(jsonOf(real)["error"]).toMatchObject({ code: "ImportInvalid", issues: [{ path: "2:category" }] });
-    expect(await harness.database.sql`SELECT count(*)::int AS n FROM product`).toEqual([{ n: 1 }]);
-  });
+    expect(jsonOf(real)["error"]).toMatchObject({ code: "ImportInvalid", issues: [{ path: "2:category" }] })
+    expect(await harness.database.sql`SELECT count(*)::int AS n FROM product`).toEqual([{ n: 1 }])
+  })
 
   it("refuses 5,001 rows and a 3 MB file", async () => {
-    const many = [HEADER, ...Array.from({ length: 5001 }, (_, index) => csvRow(`lamp-${index}`, `Lamp ${index}`))].join("\n");
+    const many = [HEADER, ...Array.from({ length: 5001 }, (_, index) => csvRow(`lamp-${index}`, `Lamp ${index}`))].join("\n")
 
-    const tooMany = await importFile(many, "many.csv", false);
-    const tooBig = await importFile(randomBytes(3 * 1024 * 1024), "big.csv", false);
+    const tooMany = await importFile(many, "many.csv", false)
+    const tooBig = await importFile(randomBytes(3 * 1024 * 1024), "big.csv", false)
 
-    expect(tooMany.statusCode).toBe(422);
-    expect(jsonOf(tooMany)["error"]).toMatchObject({ issues: [{ path: "" }] });
-    expect(tooBig.statusCode).toBe(413);
-  });
-});
+    expect(tooMany.statusCode).toBe(422)
+    expect(jsonOf(tooMany)["error"]).toMatchObject({ issues: [{ path: "" }] })
+    expect(tooBig.statusCode).toBe(413)
+  })
+})

@@ -1,9 +1,9 @@
-import { NavLink } from "react-router";
+import { NavLink } from "react-router"
 
 /** The account's own pages, the one in view marked for the eye and for a screen reader. */
 export const AccountNav = () => {
   const linkClass = ({ isActive }: Readonly<{ isActive: boolean }>) =>
-    `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${isActive ? "bg-accent-wash text-ink" : "text-ink-soft hover:bg-sunken hover:text-ink"}`;
+    `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${isActive ? "bg-accent-wash text-ink" : "text-ink-soft hover:bg-sunken hover:text-ink"}`
 
   return (
     <nav aria-label="Account">
@@ -25,5 +25,5 @@ export const AccountNav = () => {
         </li>
       </ul>
     </nav>
-  );
-};
+  )
+}

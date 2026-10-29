@@ -6,7 +6,7 @@
  * management UI shows.
  */
 
-import type { Topology as QueueTopology } from "../platform/queue.ts";
+import type { Topology as QueueTopology } from "../platform/queue.ts"
 
 export const Topology = {
   PAYMENTS_EXCHANGE: "payments",
@@ -60,4 +60,4 @@ export const Topology = {
       { name: Topology.DEAD_LETTER_QUEUE, exchange: Topology.DEAD_LETTER_EXCHANGE, routingKey: "#" },
     ],
   }),
-} as const;
+} as const

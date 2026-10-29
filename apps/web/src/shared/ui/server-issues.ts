@@ -1,5 +1,5 @@
-import type { ValidationIssue } from "@prism/shared";
-import type { FieldValues, Path, UseFormSetError } from "react-hook-form";
+import type { ValidationIssue } from "@prism/shared"
+import type { FieldValues, Path, UseFormSetError } from "react-hook-form"
 
 export const ServerIssues = {
   /**
@@ -13,19 +13,19 @@ export const ServerIssues = {
     setError: UseFormSetError<Values>,
     renamed: Readonly<Record<string, string>> = {},
   ): readonly ValidationIssue[] => {
-    const unplaced: ValidationIssue[] = [];
+    const unplaced: ValidationIssue[] = []
 
     for (const issue of issues) {
-      const path = renamed[issue.path] ?? issue.path;
-      const isField = fields.includes(path) || fields.some((field) => path.startsWith(`${field}.`));
+      const path = renamed[issue.path] ?? issue.path
+      const isField = fields.includes(path) || fields.some((field) => path.startsWith(`${field}.`))
 
       if (isField) {
-        setError(path as Path<Values>, { message: issue.message });
+        setError(path as Path<Values>, { message: issue.message })
       } else {
-        unplaced.push(issue);
+        unplaced.push(issue)
       }
     }
 
-    return unplaced;
+    return unplaced
   },
-} as const;
+} as const

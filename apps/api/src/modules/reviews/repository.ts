@@ -19,56 +19,56 @@ import {
   type ReviewView,
   type Slug,
   type UserId,
-} from "@prism/shared";
-import { and, asc, count, desc, eq, sql, type SQL } from "drizzle-orm";
-import type { Database, Transaction } from "../../db/client.ts";
-import { orderLines, orders, productReviews, products, reviewVotes } from "../../db/schema.ts";
-import type { AuditLog, StaffActor } from "../staff/audit.ts";
+} from "@prism/shared"
+import { and, asc, count, desc, eq, sql, type SQL } from "drizzle-orm"
+import type { Database, Transaction } from "../../db/client.ts"
+import { orderLines, orders, productReviews, products, reviewVotes } from "../../db/schema.ts"
+import type { AuditLog, StaffActor } from "../staff/audit.ts"
 
 /** What giving or taking back a helpful vote found. */
 export type VoteOutcome =
   | Readonly<{ _tag: "Changed" }>
   | Readonly<{ _tag: "Unchanged" }>
   | Readonly<{ _tag: "NotFound" }>
-  | Readonly<{ _tag: "OwnReview" }>;
+  | Readonly<{ _tag: "OwnReview" }>
 
 /** What a moderator's decision found. */
-export type ModerationOutcome = Readonly<{ _tag: "Done" }> | Readonly<{ _tag: "NotFound" }>;
+export type ModerationOutcome = Readonly<{ _tag: "Done" }> | Readonly<{ _tag: "NotFound" }>
 
 /** A moderator's decision on one review. */
-export type Decision = Readonly<{ _tag: "approve" }> | Readonly<{ _tag: "reject"; reason: string }>;
+export type Decision = Readonly<{ _tag: "approve" }> | Readonly<{ _tag: "reject"; reason: string }>
 
 /** Every read and write the reviews module makes. */
 export type ReviewRepository = Readonly<{
   /** How many reviews wait for a moderator. */
-  countPending: () => Promise<number>;
-  productIdOf: (slug: Slug) => Promise<ProductId | undefined>;
+  countPending: () => Promise<number>
+  productIdOf: (slug: Slug) => Promise<ProductId | undefined>
   /** One page of a product's approved reviews, with the rating of all of them. */
-  published: (productId: ProductId, sort: ReviewSort, page: number, perPage: number) => Promise<ReviewPage>;
+  published: (productId: ProductId, sort: ReviewSort, page: number, perPage: number) => Promise<ReviewPage>
   /** Whether an order of the product reached the customer and stayed theirs. */
-  isDeliveredTo: (productId: ProductId, userId: UserId) => Promise<boolean>;
-  findOwn: (productId: ProductId, userId: UserId) => Promise<OwnReview | undefined>;
+  isDeliveredTo: (productId: ProductId, userId: UserId) => Promise<boolean>
+  findOwn: (productId: ProductId, userId: UserId) => Promise<OwnReview | undefined>
   /** The reviews of the product the user found helpful. */
-  votesOf: (productId: ProductId, userId: UserId) => Promise<readonly ReviewId[]>;
+  votesOf: (productId: ProductId, userId: UserId) => Promise<readonly ReviewId[]>
   /**
    * Writes or replaces the user's review, which then waits for a moderator
    * again under a new id, so a decision made on the text a moderator read
    * never lands on newer text. Its helpful votes stay with it.
    */
-  saveOwn: (input: Readonly<{ productId: ProductId; userId: UserId; review: ReviewInput; now: Date }>) => Promise<void>;
+  saveOwn: (input: Readonly<{ productId: ProductId; userId: UserId; review: ReviewInput; now: Date }>) => Promise<void>
   /** Resolves to whether there was a review to delete. */
-  deleteOwn: (productId: ProductId, userId: UserId) => Promise<boolean>;
+  deleteOwn: (productId: ProductId, userId: UserId) => Promise<boolean>
   /** Counts the user as finding an approved review helpful, once. */
-  vote: (reviewId: ReviewId, userId: UserId, now: Date) => Promise<VoteOutcome>;
+  vote: (reviewId: ReviewId, userId: UserId, now: Date) => Promise<VoteOutcome>
   /** Takes the user's vote back, if there was one. */
-  unvote: (reviewId: ReviewId, userId: UserId) => Promise<VoteOutcome>;
-  listQueue: (query: AdminReviewQuery) => Promise<Page<AdminReviewView>>;
-  moderate: (input: Readonly<{ reviewId: ReviewId; decision: Decision; actor: StaffActor; now: Date }>) => Promise<ModerationOutcome>;
-  remove: (input: Readonly<{ reviewId: ReviewId; actor: StaffActor }>) => Promise<ModerationOutcome>;
-}>;
+  unvote: (reviewId: ReviewId, userId: UserId) => Promise<VoteOutcome>
+  listQueue: (query: AdminReviewQuery) => Promise<Page<AdminReviewView>>
+  moderate: (input: Readonly<{ reviewId: ReviewId; decision: Decision; actor: StaffActor; now: Date }>) => Promise<ModerationOutcome>
+  remove: (input: Readonly<{ reviewId: ReviewId; actor: StaffActor }>) => Promise<ModerationOutcome>
+}>
 
 /** A review row as the reads return it. */
-type ReviewRow = typeof productReviews.$inferSelect;
+type ReviewRow = typeof productReviews.$inferSelect
 
 export const ReviewRepository = {
   /**
@@ -77,16 +77,16 @@ export const ReviewRepository = {
    * cycle with one.
    */
   lockProduct: async (tx: Transaction, productId: ProductId): Promise<void> => {
-    await tx.select({ id: products.id }).from(products).where(eq(products.id, productId)).for("update");
+    await tx.select({ id: products.id }).from(products).where(eq(products.id, productId)).for("update")
   },
 
   /** Locks the product of a review, as `lockProduct` does; resolves to whether the review exists. */
   lockProductOf: async (tx: Transaction, reviewId: ReviewId): Promise<boolean> => {
-    const [review] = await tx.select({ productId: productReviews.productId }).from(productReviews).where(eq(productReviews.id, reviewId));
-    if (review === undefined) return false;
+    const [review] = await tx.select({ productId: productReviews.productId }).from(productReviews).where(eq(productReviews.id, reviewId))
+    if (review === undefined) return false
 
-    await ReviewRepository.lockProduct(tx, review.productId);
-    return true;
+    await ReviewRepository.lockProduct(tx, review.productId)
+    return true
   },
 
   /** Every sort ends in the id, so paging is stable when the keys tie. */
@@ -116,17 +116,17 @@ export const ReviewRepository = {
 
   create: (db: Database, audit: AuditLog): ReviewRepository => ({
     countPending: async () => {
-      const [row] = await db.select({ total: count() }).from(productReviews).where(eq(productReviews.status, "pending"));
-      return row?.total ?? 0;
+      const [row] = await db.select({ total: count() }).from(productReviews).where(eq(productReviews.status, "pending"))
+      return row?.total ?? 0
     },
 
     productIdOf: async (slug) => {
-      const [row] = await db.select({ id: products.id }).from(products).where(eq(products.slug, slug));
-      return row?.id;
+      const [row] = await db.select({ id: products.id }).from(products).where(eq(products.slug, slug))
+      return row?.id
     },
 
     published: async (productId, sort, page, perPage) => {
-      const approved = and(eq(productReviews.productId, productId), eq(productReviews.status, "approved"));
+      const approved = and(eq(productReviews.productId, productId), eq(productReviews.status, "approved"))
       const [rows, stars, ratings] = await Promise.all([
         db
           .select()
@@ -135,21 +135,17 @@ export const ReviewRepository = {
           .orderBy(...ReviewRepository.ordering[sort])
           .limit(perPage)
           .offset((page - 1) * perPage),
-        db
-          .select({ rating: productReviews.rating, total: count() })
-          .from(productReviews)
-          .where(approved)
-          .groupBy(productReviews.rating),
+        db.select({ rating: productReviews.rating, total: count() }).from(productReviews).where(approved).groupBy(productReviews.rating),
         // The product's own rating, which its trigger keeps, so the page and the product agree.
         db.select({ average: products.ratingAverage, count: products.ratingCount }).from(products).where(eq(products.id, productId)),
-      ]);
+      ])
 
-      const distribution: Record<"1" | "2" | "3" | "4" | "5", number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+      const distribution: Record<"1" | "2" | "3" | "4" | "5", number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 }
       for (const row of stars) {
-        const key = String(row.rating);
-        if (key === "1" || key === "2" || key === "3" || key === "4" || key === "5") distribution[key] = row.total;
+        const key = String(row.rating)
+        if (key === "1" || key === "2" || key === "3" || key === "4" || key === "5") distribution[key] = row.total
       }
-      const total = ratings[0]?.count ?? 0;
+      const total = ratings[0]?.count ?? 0
 
       return {
         items: rows.map(ReviewRepository.viewOf),
@@ -159,7 +155,7 @@ export const ReviewRepository = {
         page,
         perPage,
         totalPages: Page.count(total, perPage),
-      };
+      }
     },
 
     isDeliveredTo: async (productId, userId) => {
@@ -168,18 +164,18 @@ export const ReviewRepository = {
         .from(orders)
         .innerJoin(orderLines, eq(orderLines.orderId, orders.id))
         .where(and(eq(orders.userId, userId), eq(orders.status, "delivered"), eq(orderLines.productId, productId)))
-        .limit(1);
+        .limit(1)
 
-      return row !== undefined;
+      return row !== undefined
     },
 
     findOwn: async (productId, userId) => {
       const [row] = await db
         .select()
         .from(productReviews)
-        .where(and(eq(productReviews.productId, productId), eq(productReviews.userId, userId)));
+        .where(and(eq(productReviews.productId, productId), eq(productReviews.userId, userId)))
 
-      return row === undefined ? undefined : ReviewRepository.ownOf(row);
+      return row === undefined ? undefined : ReviewRepository.ownOf(row)
     },
 
     votesOf: async (productId, userId) =>
@@ -202,29 +198,29 @@ export const ReviewRepository = {
         moderatedBy: null,
         moderatedAt: null,
         updatedAt: now,
-      };
+      }
 
       return db.transaction(async (tx) => {
-        await ReviewRepository.lockProduct(tx, productId);
+        await ReviewRepository.lockProduct(tx, productId)
         await tx
           .insert(productReviews)
           .values({ productId, userId, ...written, createdAt: now })
           .onConflictDoUpdate({
             target: [productReviews.productId, productReviews.userId],
             set: { ...written, id: sql`gen_random_uuid()` },
-          });
-      });
+          })
+      })
     },
 
     deleteOwn: (productId, userId) =>
       db.transaction(async (tx) => {
-        await ReviewRepository.lockProduct(tx, productId);
+        await ReviewRepository.lockProduct(tx, productId)
         const deleted = await tx
           .delete(productReviews)
           .where(and(eq(productReviews.productId, productId), eq(productReviews.userId, userId)))
-          .returning({ id: productReviews.id });
+          .returning({ id: productReviews.id })
 
-        return deleted.length > 0;
+        return deleted.length > 0
       }),
 
     vote: (reviewId, userId, now) =>
@@ -232,23 +228,23 @@ export const ReviewRepository = {
         const [review] = await tx
           .select({ userId: productReviews.userId, status: productReviews.status })
           .from(productReviews)
-          .where(eq(productReviews.id, reviewId));
-        if (review === undefined || review.status !== "approved") return { _tag: "NotFound" };
-        if (review.userId === userId) return { _tag: "OwnReview" };
+          .where(eq(productReviews.id, reviewId))
+        if (review === undefined || review.status !== "approved") return { _tag: "NotFound" }
+        if (review.userId === userId) return { _tag: "OwnReview" }
 
         const added = await tx
           .insert(reviewVotes)
           .values({ reviewId, userId, createdAt: now })
           .onConflictDoNothing()
-          .returning({ id: reviewVotes.reviewId });
-        if (added.length === 0) return { _tag: "Unchanged" };
+          .returning({ id: reviewVotes.reviewId })
+        if (added.length === 0) return { _tag: "Unchanged" }
 
         await tx
           .update(productReviews)
           .set({ helpfulCount: sql`${productReviews.helpfulCount} + 1` })
-          .where(eq(productReviews.id, reviewId));
+          .where(eq(productReviews.id, reviewId))
 
-        return { _tag: "Changed" };
+        return { _tag: "Changed" }
       }),
 
     unvote: (reviewId, userId) =>
@@ -256,19 +252,19 @@ export const ReviewRepository = {
         const removed = await tx
           .delete(reviewVotes)
           .where(and(eq(reviewVotes.reviewId, reviewId), eq(reviewVotes.userId, userId)))
-          .returning({ id: reviewVotes.reviewId });
-        if (removed.length === 0) return { _tag: "Unchanged" };
+          .returning({ id: reviewVotes.reviewId })
+        if (removed.length === 0) return { _tag: "Unchanged" }
 
         await tx
           .update(productReviews)
           .set({ helpfulCount: sql`${productReviews.helpfulCount} - 1` })
-          .where(eq(productReviews.id, reviewId));
+          .where(eq(productReviews.id, reviewId))
 
-        return { _tag: "Changed" };
+        return { _tag: "Changed" }
       }),
 
     listQueue: async (query) => {
-      const matching = eq(productReviews.status, query.status);
+      const matching = eq(productReviews.status, query.status)
       const [rows, totals] = await Promise.all([
         db
           .select({ review: productReviews, productSlug: products.slug, productName: products.name })
@@ -280,8 +276,8 @@ export const ReviewRepository = {
           .limit(query.perPage)
           .offset((query.page - 1) * query.perPage),
         db.select({ total: count() }).from(productReviews).where(matching),
-      ]);
-      const total = totals[0]?.total ?? 0;
+      ])
+      const total = totals[0]?.total ?? 0
 
       return {
         items: rows.map((row) => ({
@@ -294,12 +290,12 @@ export const ReviewRepository = {
         page: query.page,
         perPage: query.perPage,
         totalPages: Page.count(total, query.perPage),
-      };
+      }
     },
 
     moderate: ({ reviewId, decision, actor, now }) =>
       db.transaction(async (tx): Promise<ModerationOutcome> => {
-        if (!(await ReviewRepository.lockProductOf(tx, reviewId))) return { _tag: "NotFound" };
+        if (!(await ReviewRepository.lockProductOf(tx, reviewId))) return { _tag: "NotFound" }
 
         const [changed] = await tx
           .update(productReviews)
@@ -310,32 +306,29 @@ export const ReviewRepository = {
             moderatedAt: now,
           })
           .where(eq(productReviews.id, reviewId))
-          .returning({ productId: productReviews.productId });
-        if (changed === undefined) return { _tag: "NotFound" };
+          .returning({ productId: productReviews.productId })
+        if (changed === undefined) return { _tag: "NotFound" }
 
         await audit.record(tx, {
           actor,
           action: decision._tag === "approve" ? "review.approve" : "review.reject",
           target: { type: "review", id: reviewId },
           summary: decision._tag === "approve" ? "Published a review" : "Rejected a review",
-        });
+        })
 
-        return { _tag: "Done" };
+        return { _tag: "Done" }
       }),
 
     remove: ({ reviewId, actor }) =>
       db.transaction(async (tx): Promise<ModerationOutcome> => {
-        if (!(await ReviewRepository.lockProductOf(tx, reviewId))) return { _tag: "NotFound" };
+        if (!(await ReviewRepository.lockProductOf(tx, reviewId))) return { _tag: "NotFound" }
 
-        const [removed] = await tx
-          .delete(productReviews)
-          .where(eq(productReviews.id, reviewId))
-          .returning({ id: productReviews.id });
-        if (removed === undefined) return { _tag: "NotFound" };
+        const [removed] = await tx.delete(productReviews).where(eq(productReviews.id, reviewId)).returning({ id: productReviews.id })
+        if (removed === undefined) return { _tag: "NotFound" }
 
-        await audit.record(tx, { actor, action: "review.delete", target: { type: "review", id: reviewId }, summary: "Deleted a review" });
+        await audit.record(tx, { actor, action: "review.delete", target: { type: "review", id: reviewId }, summary: "Deleted a review" })
 
-        return { _tag: "Done" };
+        return { _tag: "Done" }
       }),
   }),
-} as const;
+} as const

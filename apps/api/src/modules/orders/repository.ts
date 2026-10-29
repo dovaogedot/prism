@@ -26,100 +26,100 @@ import {
   type Totals,
   type UserId,
   type ValidationIssue,
-} from "@prism/shared";
-import { and, asc, count, desc, eq, gte, inArray, isNull, lte, sql, TransactionRollbackError, type SQL } from "drizzle-orm";
-import type { Database, Transaction } from "../../db/client.ts";
-import { DayRange } from "../../db/day-range.ts";
-import type { CartId } from "../../db/ids.ts";
-import { cartItems, orderEvents, orderLines, orders, products } from "../../db/schema.ts";
-import { Outbox, type OutboxEntry } from "../../messaging/outbox.ts";
-import type { FieldCipher } from "../../platform/cipher.ts";
-import type { AuditEntry, AuditLog } from "../staff/audit.ts";
-import { ImageRows, type ImageRow } from "../catalog/images.ts";
+} from "@prism/shared"
+import { and, asc, count, desc, eq, gte, inArray, isNull, lte, sql, TransactionRollbackError, type SQL } from "drizzle-orm"
+import type { Database, Transaction } from "../../db/client.ts"
+import { DayRange } from "../../db/day-range.ts"
+import type { CartId } from "../../db/ids.ts"
+import { cartItems, orderEvents, orderLines, orders, products } from "../../db/schema.ts"
+import { Outbox, type OutboxEntry } from "../../messaging/outbox.ts"
+import type { FieldCipher } from "../../platform/cipher.ts"
+import type { AuditEntry, AuditLog } from "../staff/audit.ts"
+import { ImageRows, type ImageRow } from "../catalog/images.ts"
 
 /** An order, opened. */
 export type OrderRecord = Readonly<{
-  id: OrderId;
-  number: OrderNumber;
+  id: OrderId
+  number: OrderNumber
   /** Absent for a guest's order. */
-  userId?: UserId;
-  cartId?: CartId;
-  status: OrderStatus;
-  shippingMethod: ShippingMethodCode;
+  userId?: UserId
+  cartId?: CartId
+  status: OrderStatus
+  shippingMethod: ShippingMethodCode
   /** The method's name when the order was placed. */
-  shippingMethodName: string;
+  shippingMethodName: string
   /** The first and last day the parcel is expected, as `YYYY-MM-DD`. */
-  estimatedDelivery: Readonly<{ from: string; to: string }>;
-  subtotalCents: number;
-  shippingCents: number;
-  totalCents: number;
-  contact: Contact;
-  address: ShippingAddress;
+  estimatedDelivery: Readonly<{ from: string; to: string }>
+  subtotalCents: number
+  shippingCents: number
+  totalCents: number
+  contact: Contact
+  address: ShippingAddress
   /** Present when the bill went elsewhere than the parcel. */
-  billingAddress?: ShippingAddress;
+  billingAddress?: ShippingAddress
   /** Present for a guest's order. */
-  key?: OrderKey;
-  trackingNumber?: string;
-  refundedAt?: Date;
-  paymentDueAt: Date;
-  createdAt: Date;
+  key?: OrderKey
+  trackingNumber?: string
+  refundedAt?: Date
+  paymentDueAt: Date
+  createdAt: Date
   /** Ordered by product name. */
-  lines: readonly OrderLine[];
-}>;
+  lines: readonly OrderLine[]
+}>
 
 /** One line to reserve, at the price the customer saw. */
-export type ReservedLine = Readonly<{ productId: ProductId; quantity: number; unitPriceCents: number }>;
+export type ReservedLine = Readonly<{ productId: ProductId; quantity: number; unitPriceCents: number }>
 
 /** Everything a new order is made of. */
 export type PlaceRequest = Readonly<{
-  cartId: CartId;
-  userId?: UserId;
-  contact: Contact;
-  address: ShippingAddress;
+  cartId: CartId
+  userId?: UserId
+  contact: Contact
+  address: ShippingAddress
   /** Absent when the bill goes to the shipping address. */
-  billingAddress?: ShippingAddress;
+  billingAddress?: ShippingAddress
   /** The delivery option as the order keeps it: its code, its name now, and the dates it promises. */
-  shipping: Readonly<{ code: ShippingMethodCode; name: string; estimate: DeliveryEstimate }>;
-  lines: readonly ReservedLine[];
-  totals: Totals;
-  key?: OrderKey;
-  now: Date;
-  paymentDueAt: Date;
-}>;
+  shipping: Readonly<{ code: ShippingMethodCode; name: string; estimate: DeliveryEstimate }>
+  lines: readonly ReservedLine[]
+  totals: Totals
+  key?: OrderKey
+  now: Date
+  paymentDueAt: Date
+}>
 
 /** What placing found. Nothing is written unless the order was placed. */
 export type PlaceOutcome =
   | Readonly<{ _tag: "Placed"; orderId: OrderId; number: OrderNumber }>
   | Readonly<{ _tag: "Short"; issues: readonly ValidationIssue[] }>
-  | Readonly<{ _tag: "PriceChanged" }>;
+  | Readonly<{ _tag: "PriceChanged" }>
 
 /** One conditional move of an order, with everything that has to commit with it. */
 export type OrderTransition = Readonly<{
-  orderId: OrderId;
-  from: readonly OrderStatus[];
-  to: OrderStatus;
+  orderId: OrderId
+  from: readonly OrderStatus[]
+  to: OrderStatus
   /** Shown in the timeline beside the status. */
-  note?: string;
-  now: Date;
+  note?: string
+  now: Date
   /** Gives every line's quantity back to its product. */
-  releaseStock?: boolean;
+  releaseStock?: boolean
   /** Takes the ordered products out of the cart the order came from. */
-  clearFromCart?: boolean;
-  trackingNumber?: string;
-  message?: OutboxEntry;
+  clearFromCart?: boolean
+  trackingNumber?: string
+  message?: OutboxEntry
   /** Written in the same transaction, when staff made the move. */
-  audit?: AuditEntry;
-}>;
+  audit?: AuditEntry
+}>
 
 /** The filters of a list, already parsed. Both days are whole UTC days and count. */
 export type OrderFilter = Readonly<{
-  statuses: readonly OrderStatus[];
-  from?: string;
-  to?: string;
-  sort: OrderSort;
-  page: number;
-  perPage: number;
-}>;
+  statuses: readonly OrderStatus[]
+  from?: string
+  to?: string
+  sort: OrderSort
+  page: number
+  perPage: number
+}>
 
 /** Every read and write the order service makes. */
 export type OrderRepository = Readonly<{
@@ -128,51 +128,53 @@ export type OrderRepository = Readonly<{
    * as one transaction. Lines are reserved in product id order, so two
    * placements never wait on each other in a cycle.
    */
-  place: (request: PlaceRequest) => Promise<PlaceOutcome>;
-  find: (orderId: OrderId) => Promise<OrderRecord | undefined>;
+  place: (request: PlaceRequest) => Promise<PlaceOutcome>
+  find: (orderId: OrderId) => Promise<OrderRecord | undefined>
   /** The user's most recent order. */
-  latestOf: (userId: UserId) => Promise<OrderRecord | undefined>;
-  events: (orderId: OrderId) => Promise<readonly OrderEvent[]>;
-  list: (userId: UserId, filter: OrderFilter) => Promise<OrderList>;
+  latestOf: (userId: UserId) => Promise<OrderRecord | undefined>
+  events: (orderId: OrderId) => Promise<readonly OrderEvent[]>
+  list: (userId: UserId, filter: OrderFilter) => Promise<OrderList>
   /** Resolves to whether the order moved. */
-  transition: (transition: OrderTransition) => Promise<boolean>;
+  transition: (transition: OrderTransition) => Promise<boolean>
   /**
    * Notes a refund request on an order in one of `from`, with its message and
    * audit entry, and leaves the status as it is. Resolves to whether the order
    * was in one of them.
    */
-  requestRefund: (request: Readonly<{
-    orderId: OrderId;
-    from: readonly OrderStatus[];
-    note: string;
-    now: Date;
-    message: OutboxEntry;
-    audit: AuditEntry;
-  }>) => Promise<boolean>;
+  requestRefund: (
+    request: Readonly<{
+      orderId: OrderId
+      from: readonly OrderStatus[]
+      note: string
+      now: Date
+      message: OutboxEntry
+      audit: AuditEntry
+    }>,
+  ) => Promise<boolean>
   /**
    * Records the refund once, and moves a shipped or delivered order to
    * `refunded`; resolves to whether this call recorded it.
    */
-  markRefunded: (orderId: OrderId, now: Date) => Promise<boolean>;
+  markRefunded: (orderId: OrderId, now: Date) => Promise<boolean>
   /** Writes one message to the outbox on its own. */
-  announce: (entry: OutboxEntry) => Promise<void>;
+  announce: (entry: OutboxEntry) => Promise<void>
   /** Unpaid orders whose payment window closed at or before `now`. */
-  overdue: (now: Date) => Promise<readonly OrderId[]>;
+  overdue: (now: Date) => Promise<readonly OrderId[]>
   /** Orders that have had `status` since `before` or longer. */
-  stale: (status: OrderStatus, before: Date) => Promise<readonly OrderId[]>;
+  stale: (status: OrderStatus, before: Date) => Promise<readonly OrderId[]>
   /** How many orders have one of `statuses`. */
-  countInStatus: (statuses: readonly OrderStatus[]) => Promise<number>;
+  countInStatus: (statuses: readonly OrderStatus[]) => Promise<number>
   /** How many orders placed on `day` (`YYYY-MM-DD` in the shop's time zone) were paid for. */
-  countPaidOn: (day: string) => Promise<number>;
+  countPaidOn: (day: string) => Promise<number>
   /** Every order, filtered and sorted for staff, a page at a time. */
-  adminList: (query: AdminOrderQuery) => Promise<Page<AdminOrderSummary>>;
-}>;
+  adminList: (query: AdminOrderQuery) => Promise<Page<AdminOrderSummary>>
+}>
 
 export const OrderRepository = {
   REFUND_NOTE: "Refund issued",
 
   create: (db: Database, cipher: FieldCipher, audit: AuditLog): OrderRepository => {
-    type Row = typeof orders.$inferSelect;
+    type Row = typeof orders.$inferSelect
 
     // The outer row is named as the table plus a literal column: drizzle
     // renders a column bare in a single-table select, where the subquery
@@ -181,13 +183,13 @@ export const OrderRepository = {
       SELECT ${ImageRows.json("i")}
       FROM product_image i WHERE i.product_id = ${orderLines}."product_id"
       ORDER BY i.position LIMIT 1
-    )`;
+    )`
 
     // The product's slug as it stands, so a link still opens it after staff rename it; the copy once it is deleted.
     const lineSlug = sql<typeof orderLines.$inferSelect.productSlug>`COALESCE(
       (SELECT p.slug FROM product p WHERE p.id = ${orderLines}."product_id"),
       ${orderLines}."product_slug"
-    )`;
+    )`
 
     const linesOf = async (orderId: OrderId): Promise<readonly OrderLine[]> => {
       const rows = await db
@@ -202,7 +204,7 @@ export const OrderRepository = {
         })
         .from(orderLines)
         .where(eq(orderLines.orderId, orderId))
-        .orderBy(asc(orderLines.productName));
+        .orderBy(asc(orderLines.productName))
 
       return rows.map((row) => ({
         ...(row.productId === null ? {} : { productId: row.productId }),
@@ -212,8 +214,8 @@ export const OrderRepository = {
         unitPriceCents: row.unitPriceCents,
         quantity: row.quantity,
         lineTotalCents: row.lineTotalCents,
-      }));
-    };
+      }))
+    }
 
     const open = async (row: Row): Promise<OrderRecord> => ({
       id: row.id,
@@ -236,7 +238,7 @@ export const OrderRepository = {
       paymentDueAt: row.paymentDueAt,
       createdAt: row.createdAt,
       lines: await linesOf(row.id),
-    });
+    })
 
     /** Gives every line back to its product, in product id order like the reservation. */
     const release = async (tx: Transaction, orderId: OrderId): Promise<void> => {
@@ -244,34 +246,34 @@ export const OrderRepository = {
         .select({ productId: orderLines.productId, quantity: orderLines.quantity })
         .from(orderLines)
         .where(eq(orderLines.orderId, orderId))
-        .orderBy(asc(orderLines.productId));
+        .orderBy(asc(orderLines.productId))
 
       for (const line of lines) {
-        if (line.productId === null) continue;
+        if (line.productId === null) continue
 
         await tx
           .update(products)
           .set({ stock: sql`${products.stock} + ${line.quantity}` })
-          .where(eq(products.id, line.productId));
+          .where(eq(products.id, line.productId))
       }
-    };
+    }
 
     /** The status and date filters of a list. Both days are whole UTC days and count. */
     const periodOf = (statuses: readonly OrderStatus[], from: string | undefined, to: string | undefined) => [
       statuses.length === 0 ? undefined : inArray(orders.status, [...statuses]),
       ...DayRange.conditionsOf(orders.createdAt, from, to),
-    ];
+    ]
 
     const lifecycle = sql`array_position(ARRAY[${sql.join(
       OrderStatus.NAMES.map((name) => sql`${name}`),
       sql`, `,
-    )}]::text[], ${orders.status})`;
+    )}]::text[], ${orders.status})`
 
     const ordering = {
       newest: [desc(orders.createdAt), desc(orders.number)],
       oldest: [asc(orders.createdAt), asc(orders.number)],
       status: [asc(lifecycle), desc(orders.createdAt), desc(orders.number)],
-    } as const;
+    } as const
 
     /** One page of orders matching `conditions`, with the sealed contact each list opens as it needs. */
     const summaries = async (conditions: SQL | undefined, sort: OrderSort, page: number, perPage: number) => {
@@ -297,9 +299,9 @@ export const OrderRepository = {
         .where(conditions)
         .orderBy(...ordering[sort])
         .limit(perPage)
-        .offset((page - 1) * perPage);
+        .offset((page - 1) * perPage)
 
-      const total = rows[0]?.total ?? (await db.select({ total: count() }).from(orders).where(conditions))[0]?.total ?? 0;
+      const total = rows[0]?.total ?? (await db.select({ total: count() }).from(orders).where(conditions))[0]?.total ?? 0
 
       return {
         items: rows.map((row) => ({
@@ -317,19 +319,19 @@ export const OrderRepository = {
         page,
         perPage,
         totalPages: Page.count(total, perPage),
-      };
-    };
+      }
+    }
 
     return {
       place: async (request) => {
         // Set just before the rollback, so the catch below knows why it happened.
-        let refusal: PlaceOutcome | undefined;
+        let refusal: PlaceOutcome | undefined
 
         try {
           return await db.transaction(async (tx): Promise<PlaceOutcome> => {
-            const lines = [...request.lines].sort((a, b) => a.productId.localeCompare(b.productId));
-            const issues: ValidationIssue[] = [];
-            let priceChanged = false;
+            const lines = [...request.lines].sort((a, b) => a.productId.localeCompare(b.productId))
+            const issues: ValidationIssue[] = []
+            let priceChanged = false
 
             for (const line of lines) {
               // Taking the stock and checking it are one statement: of two
@@ -339,27 +341,24 @@ export const OrderRepository = {
                 .update(products)
                 .set({ stock: sql`${products.stock} - ${line.quantity}` })
                 .where(and(eq(products.id, line.productId), gte(products.stock, line.quantity)))
-                .returning({ priceCents: products.priceCents });
+                .returning({ priceCents: products.priceCents })
 
               if (reserved === undefined) {
-                const [current] = await tx
-                  .select({ stock: products.stock })
-                  .from(products)
-                  .where(eq(products.id, line.productId));
-                issues.push({ path: line.productId, message: Cart.shortage(current?.stock ?? 0) });
+                const [current] = await tx.select({ stock: products.stock }).from(products).where(eq(products.id, line.productId))
+                issues.push({ path: line.productId, message: Cart.shortage(current?.stock ?? 0) })
               } else if (reserved.priceCents !== line.unitPriceCents) {
-                priceChanged = true;
+                priceChanged = true
               }
             }
 
             if (issues.length > 0) {
-              refusal = { _tag: "Short", issues };
-              tx.rollback();
+              refusal = { _tag: "Short", issues }
+              tx.rollback()
             }
 
             if (priceChanged) {
-              refusal = { _tag: "PriceChanged" };
-              tx.rollback();
+              refusal = { _tag: "PriceChanged" }
+              tx.rollback()
             }
 
             const [order] = await tx
@@ -384,8 +383,8 @@ export const OrderRepository = {
                 createdAt: request.now,
                 statusChangedAt: request.now,
               })
-              .returning({ id: orders.id, number: orders.number });
-            if (order === undefined) throw new Error("order insert returned no row");
+              .returning({ id: orders.id, number: orders.number })
+            if (order === undefined) throw new Error("order insert returned no row")
 
             const names = await tx
               .select({ id: products.id, name: products.name, slug: products.slug })
@@ -395,13 +394,13 @@ export const OrderRepository = {
                   products.id,
                   lines.map((line) => line.productId),
                 ),
-              );
-            const byId = new Map(names.map((product) => [product.id, product]));
+              )
+            const byId = new Map(names.map((product) => [product.id, product]))
 
             await tx.insert(orderLines).values(
               lines.map((line) => {
-                const product = byId.get(line.productId);
-                if (product === undefined) throw new Error("a reserved product vanished");
+                const product = byId.get(line.productId)
+                if (product === undefined) throw new Error("a reserved product vanished")
 
                 return {
                   orderId: order.id,
@@ -411,33 +410,28 @@ export const OrderRepository = {
                   unitPriceCents: line.unitPriceCents,
                   quantity: line.quantity,
                   lineTotalCents: line.unitPriceCents * line.quantity,
-                };
+                }
               }),
-            );
+            )
 
-            await tx.insert(orderEvents).values({ orderId: order.id, status: "pending_payment", createdAt: request.now });
+            await tx.insert(orderEvents).values({ orderId: order.id, status: "pending_payment", createdAt: request.now })
 
-            return { _tag: "Placed", orderId: order.id, number: order.number };
-          });
+            return { _tag: "Placed", orderId: order.id, number: order.number }
+          })
         } catch (reason) {
-          if (reason instanceof TransactionRollbackError && refusal !== undefined) return refusal;
-          throw reason;
+          if (reason instanceof TransactionRollbackError && refusal !== undefined) return refusal
+          throw reason
         }
       },
 
       find: async (orderId) => {
-        const [row] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
-        return row === undefined ? undefined : open(row);
+        const [row] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1)
+        return row === undefined ? undefined : open(row)
       },
 
       latestOf: async (userId) => {
-        const [row] = await db
-          .select()
-          .from(orders)
-          .where(eq(orders.userId, userId))
-          .orderBy(desc(orders.createdAt))
-          .limit(1);
-        return row === undefined ? undefined : open(row);
+        const [row] = await db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.createdAt)).limit(1)
+        return row === undefined ? undefined : open(row)
       },
 
       events: async (orderId) => {
@@ -445,13 +439,13 @@ export const OrderRepository = {
           .select({ status: orderEvents.status, note: orderEvents.note, at: orderEvents.createdAt })
           .from(orderEvents)
           .where(eq(orderEvents.orderId, orderId))
-          .orderBy(asc(orderEvents.createdAt), asc(orderEvents.id));
+          .orderBy(asc(orderEvents.createdAt), asc(orderEvents.id))
 
         return rows.map((row) => ({
           status: row.status,
           ...(row.note === null ? {} : { note: row.note }),
           at: row.at.toISOString(),
-        }));
+        }))
       },
 
       list: async (userId, filter) => {
@@ -460,9 +454,9 @@ export const OrderRepository = {
           filter.sort,
           filter.page,
           filter.perPage,
-        );
+        )
 
-        return { ...page, items: page.items.map(({ contact: _contact, isGuest: _isGuest, ...summary }) => summary) };
+        return { ...page, items: page.items.map(({ contact: _contact, isGuest: _isGuest, ...summary }) => summary) }
       },
 
       adminList: async (query) => {
@@ -475,15 +469,15 @@ export const OrderRepository = {
           query.sort,
           query.page,
           query.perPage,
-        );
+        )
 
         return {
           ...page,
           items: page.items.map(({ contact, isGuest, ...summary }) => {
-            const opened = cipher.open(contact, Contact.schema);
-            return { ...summary, customerName: opened.fullName, customerEmail: opened.email, isGuest };
+            const opened = cipher.open(contact, Contact.schema)
+            return { ...summary, customerName: opened.fullName, customerEmail: opened.email, isGuest }
           }),
-        };
+        }
       },
 
       transition: (transition) =>
@@ -496,40 +490,38 @@ export const OrderRepository = {
               ...(transition.trackingNumber === undefined ? {} : { trackingNumber: transition.trackingNumber }),
             })
             .where(and(eq(orders.id, transition.orderId), inArray(orders.status, [...transition.from])))
-            .returning({ id: orders.id, cartId: orders.cartId });
+            .returning({ id: orders.id, cartId: orders.cartId })
 
-          if (moved === undefined) return false;
+          if (moved === undefined) return false
 
           await tx.insert(orderEvents).values({
             orderId: transition.orderId,
             status: transition.to,
             ...(transition.note === undefined ? {} : { note: transition.note }),
             createdAt: transition.now,
-          });
+          })
 
-          if (transition.releaseStock === true) await release(tx, transition.orderId);
+          if (transition.releaseStock === true) await release(tx, transition.orderId)
 
           if (transition.clearFromCart === true && moved.cartId !== null) {
-            await tx
-              .delete(cartItems)
-              .where(
-                and(
-                  eq(cartItems.cartId, moved.cartId),
-                  inArray(
-                    cartItems.productId,
-                    tx
-                      .select({ productId: sql<ProductId>`${orderLines.productId}` })
-                      .from(orderLines)
-                      .where(eq(orderLines.orderId, transition.orderId)),
-                  ),
+            await tx.delete(cartItems).where(
+              and(
+                eq(cartItems.cartId, moved.cartId),
+                inArray(
+                  cartItems.productId,
+                  tx
+                    .select({ productId: sql<ProductId>`${orderLines.productId}` })
+                    .from(orderLines)
+                    .where(eq(orderLines.orderId, transition.orderId)),
                 ),
-              );
+              ),
+            )
           }
 
-          if (transition.message !== undefined) await Outbox.enqueue(tx, transition.message);
-          if (transition.audit !== undefined) await audit.record(tx, transition.audit);
+          if (transition.message !== undefined) await Outbox.enqueue(tx, transition.message)
+          if (transition.audit !== undefined) await audit.record(tx, transition.audit)
 
-          return true;
+          return true
         }),
 
       requestRefund: (request) =>
@@ -538,20 +530,22 @@ export const OrderRepository = {
             .select({ status: orders.status })
             .from(orders)
             .where(and(eq(orders.id, request.orderId), inArray(orders.status, [...request.from])))
-            .for("update");
+            .for("update")
 
-          if (order === undefined) return false;
+          if (order === undefined) return false
 
-          await tx.insert(orderEvents).values({ orderId: request.orderId, status: order.status, note: request.note, createdAt: request.now });
-          await Outbox.enqueue(tx, request.message);
-          await audit.record(tx, request.audit);
+          await tx
+            .insert(orderEvents)
+            .values({ orderId: request.orderId, status: order.status, note: request.note, createdAt: request.now })
+          await Outbox.enqueue(tx, request.message)
+          await audit.record(tx, request.audit)
 
-          return true;
+          return true
         }),
 
       markRefunded: (orderId, now) =>
         db.transaction(async (tx) => {
-          const shipped = inArray(orders.status, [...OrderStatus.REFUNDABLE]);
+          const shipped = inArray(orders.status, [...OrderStatus.REFUNDABLE])
           const [marked] = await tx
             .update(orders)
             .set({
@@ -561,15 +555,13 @@ export const OrderRepository = {
               statusChangedAt: sql`CASE WHEN ${shipped} THEN ${now.toISOString()}::timestamptz ELSE ${orders.statusChangedAt} END`,
             })
             .where(and(eq(orders.id, orderId), isNull(orders.refundedAt)))
-            .returning({ status: orders.status });
+            .returning({ status: orders.status })
 
-          if (marked === undefined) return false;
+          if (marked === undefined) return false
 
-          await tx
-            .insert(orderEvents)
-            .values({ orderId, status: marked.status, note: OrderRepository.REFUND_NOTE, createdAt: now });
+          await tx.insert(orderEvents).values({ orderId, status: marked.status, note: OrderRepository.REFUND_NOTE, createdAt: now })
 
-          return true;
+          return true
         }),
 
       announce: (entry) => db.transaction((tx) => Outbox.enqueue(tx, entry)),
@@ -578,35 +570,33 @@ export const OrderRepository = {
         const rows = await db
           .select({ id: orders.id })
           .from(orders)
-          .where(and(eq(orders.status, "pending_payment"), lte(orders.paymentDueAt, now)));
-        return rows.map((row) => row.id);
+          .where(and(eq(orders.status, "pending_payment"), lte(orders.paymentDueAt, now)))
+        return rows.map((row) => row.id)
       },
 
       stale: async (status, before) => {
         const rows = await db
           .select({ id: orders.id })
           .from(orders)
-          .where(and(eq(orders.status, status), lte(orders.statusChangedAt, before)));
-        return rows.map((row) => row.id);
+          .where(and(eq(orders.status, status), lte(orders.statusChangedAt, before)))
+        return rows.map((row) => row.id)
       },
 
       countInStatus: async (statuses) => {
-        const [row] = await db.select({ total: count() }).from(orders).where(inArray(orders.status, [...statuses]));
-        return row?.total ?? 0;
+        const [row] = await db
+          .select({ total: count() })
+          .from(orders)
+          .where(inArray(orders.status, [...statuses]))
+        return row?.total ?? 0
       },
 
       countPaidOn: async (day) => {
         const [row] = await db
           .select({ total: count() })
           .from(orders)
-          .where(
-            and(
-              inArray(orders.status, [...OrderStatus.PAID]),
-              ...DayRange.conditionsOf(orders.createdAt, day, day),
-            ),
-          );
-        return row?.total ?? 0;
+          .where(and(inArray(orders.status, [...OrderStatus.PAID]), ...DayRange.conditionsOf(orders.createdAt, day, day)))
+        return row?.total ?? 0
       },
-    };
+    }
   },
-} as const;
+} as const

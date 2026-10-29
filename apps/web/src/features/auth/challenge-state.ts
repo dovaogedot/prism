@@ -4,10 +4,10 @@
  * and referrers.
  */
 
-import { ChallengeToken } from "@prism/shared";
-import { z } from "zod";
+import { ChallengeToken } from "@prism/shared"
+import { z } from "zod"
 
-const carried = z.object({ challengeToken: ChallengeToken.schema });
+const carried = z.object({ challengeToken: ChallengeToken.schema })
 
 export const ChallengeState = {
   /**
@@ -16,8 +16,8 @@ export const ChallengeState = {
    * which leaves the challenge in an httpOnly cookie instead.
    */
   read: (state: unknown): ChallengeToken | undefined => {
-    const parsed = carried.safeParse(state);
+    const parsed = carried.safeParse(state)
 
-    return parsed.success ? parsed.data.challengeToken : undefined;
+    return parsed.success ? parsed.data.challengeToken : undefined
   },
-} as const;
+} as const

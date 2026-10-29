@@ -9,44 +9,44 @@
  * same reason.
  */
 
-import type { AccessGrant, ErrorResponse } from "@prism/shared";
-import { TokenStore } from "./token-store.ts";
+import type { AccessGrant, ErrorResponse } from "@prism/shared"
+import { TokenStore } from "./token-store.ts"
 
 /** A request the API refused, as something `throw` accepts. */
 export class ApiError extends Error {
-  readonly status: number;
-  readonly failure: ErrorResponse["error"];
+  readonly status: number
+  readonly failure: ErrorResponse["error"]
 
   constructor(status: number, failure: ErrorResponse["error"]) {
-    super(failure.message);
-    this.name = "ApiError";
-    this.status = status;
-    this.failure = failure;
+    super(failure.message)
+    this.name = "ApiError"
+    this.status = status
+    this.failure = failure
   }
 }
 
 /** A request that got no answer at all: the browser is offline, or the connection was refused or cut. */
 export class NetworkError extends Error {
   constructor(cause: unknown) {
-    super("The request got no answer.", { cause });
-    this.name = "NetworkError";
+    super("The request got no answer.", { cause })
+    this.name = "NetworkError"
   }
 }
 
 /** What a request may carry beyond its path. */
 export type RequestOptions = Readonly<{
-  method?: string;
+  method?: string
   /** Sent as JSON, except form data, which goes as `multipart/form-data`. */
-  body?: unknown;
+  body?: unknown
   /** False for endpoints where a 401 is the answer, like sign-in. */
-  retryOnUnauthorized?: boolean;
+  retryOnUnauthorized?: boolean
   /** True for a read that is the same for everyone, sent without the token so a browser or a CDN may keep it. */
-  isPublic?: boolean;
-  signal?: AbortSignal;
-}>;
+  isPublic?: boolean
+  signal?: AbortSignal
+}>
 
 /** The one refresh in flight, shared by every 401 that arrives while it runs. */
-const Refresh: { inFlight: Promise<boolean> | undefined } = { inFlight: undefined };
+const Refresh: { inFlight: Promise<boolean> | undefined } = { inFlight: undefined }
 
 /** The response body of a refusal, when the server produced one. */
 const isErrorResponse = (payload: unknown): payload is ErrorResponse =>
@@ -60,7 +60,7 @@ const isErrorResponse = (payload: unknown): payload is ErrorResponse =>
   "message" in payload.error &&
   typeof payload.error.message === "string" &&
   "issues" in payload.error &&
-  Array.isArray(payload.error.issues);
+  Array.isArray(payload.error.issues)
 
 export const Api = {
   BASE: "/api/v1",
@@ -83,20 +83,20 @@ export const Api = {
 
   /** The request body as fetch takes it: form data as it is, anything else as JSON, nothing as null. */
   bodyOf: (body: unknown): BodyInit | null => {
-    if (body === undefined) return null;
-    return body instanceof FormData ? body : JSON.stringify(body);
+    if (body === undefined) return null
+    return body instanceof FormData ? body : JSON.stringify(body)
   },
 
   /** Sends one request with the bearer token, if any. */
   send: async (path: string, options: RequestOptions): Promise<Response> => {
-    const token = TokenStore.get();
-    const headers: Record<string, string> = {};
+    const token = TokenStore.get()
+    const headers: Record<string, string> = {}
 
-    const isForm = options.body instanceof FormData;
+    const isForm = options.body instanceof FormData
 
     // A form's content type carries its boundary, which the browser writes.
-    if (options.body !== undefined && !isForm) headers["content-type"] = "application/json";
-    if (token !== undefined && options.isPublic !== true) headers["authorization"] = `Bearer ${token}`;
+    if (options.body !== undefined && !isForm) headers["content-type"] = "application/json"
+    if (token !== undefined && options.isPublic !== true) headers["authorization"] = `Bearer ${token}`
 
     return fetch(`${Api.BASE}${path}`, {
       method: options.method ?? "GET",
@@ -107,10 +107,10 @@ export const Api = {
       ...(options.signal === undefined ? {} : { signal: options.signal }),
     }).catch((reason: unknown) => {
       // A canceled request stays what it is, so the query that canceled it can tell.
-      if (reason instanceof DOMException && reason.name === "AbortError") throw reason;
+      if (reason instanceof DOMException && reason.name === "AbortError") throw reason
 
-      throw new NetworkError(reason);
-    });
+      throw new NetworkError(reason)
+    })
   },
 
   /**
@@ -118,72 +118,77 @@ export const Api = {
    * share one attempt, and the tabs of one browser take turns.
    */
   refresh: (): Promise<boolean> => {
-    if (Refresh.inFlight !== undefined) return Refresh.inFlight;
+    if (Refresh.inFlight !== undefined) return Refresh.inFlight
 
-    const trade = (): Promise<Response> => fetch(`${Api.BASE}/auth/refresh`, { method: "POST", credentials: "same-origin" });
+    const trade = (): Promise<Response> => fetch(`${Api.BASE}/auth/refresh`, { method: "POST", credentials: "same-origin" })
 
     // Under a lock every tab shares, a second tab sends the cookie the first
     // one was just given, never the one it spent, which would read as a replay.
-    const traded = typeof navigator.locks === "undefined" ? trade() : navigator.locks.request("prism-refresh", trade);
+    const traded = typeof navigator.locks === "undefined" ? trade() : navigator.locks.request("prism-refresh", trade)
 
     const attempt = traded
       .then(async (response) => {
         if (!response.ok) {
-          await Api.discard(response);
+          await Api.discard(response)
           // Only a refused cookie ends the session; a 429, or a 502 while the
           // API restarts, leaves it and its cookie as they were.
           if (response.status === 401 || response.status === 403) {
-            TokenStore.clear();
+            TokenStore.clear()
           }
-          return false;
+          return false
         }
 
-        const grant: AccessGrant = await response.json();
-        TokenStore.set(grant.accessToken, grant.user);
-        return true;
+        const grant: AccessGrant = await response.json()
+        TokenStore.set(grant.accessToken, grant.user)
+        return true
       })
       .finally(() => {
-        Refresh.inFlight = undefined;
-      });
+        Refresh.inFlight = undefined
+      })
 
-    Refresh.inFlight = attempt;
-    return attempt;
+    Refresh.inFlight = attempt
+    return attempt
   },
 
   /** Sends, retries once on a 401 a refresh can cure, and throws an `ApiError` on any refusal. */
   exchange: async (path: string, options: RequestOptions): Promise<Response> => {
-    let response = await Api.send(path, options);
+    let response = await Api.send(path, options)
 
     const isRetried =
       response.status === 401 &&
       options.retryOnUnauthorized !== false &&
-      Api.isCuredByRefresh(await response.clone().json().catch(() => null));
+      Api.isCuredByRefresh(
+        await response
+          .clone()
+          .json()
+          .catch(() => null),
+      )
 
     if (isRetried) {
-      const refreshed = await Api.refresh();
+      const refreshed = await Api.refresh()
       if (refreshed) {
-        await Api.discard(response);
-        response = await Api.send(path, options);
+        await Api.discard(response)
+        response = await Api.send(path, options)
       }
     }
 
     if (!response.ok) {
-      const payload: unknown = await response.json().catch(() => null);
-      throw new ApiError(response.status, isErrorResponse(payload) ? payload.error : Api.UNREADABLE);
+      const payload: unknown = await response.json().catch(() => null)
+      throw new ApiError(response.status, isErrorResponse(payload) ? payload.error : Api.UNREADABLE)
     }
 
-    return response;
+    return response
   },
 
   /** A request whose body is decoded as JSON. */
   request: async <A>(path: string, options: RequestOptions = {}): Promise<A> => {
-    const response = await Api.exchange(path, options);
-    return response.json();
+    const response = await Api.exchange(path, options)
+    return response.json()
   },
 
   /** A request whose answer carries nothing the caller reads. */
   requestEmpty: async (path: string, options: RequestOptions = {}): Promise<void> => {
-    await Api.discard(await Api.exchange(path, options));
+    await Api.discard(await Api.exchange(path, options))
   },
 
   /**
@@ -191,14 +196,13 @@ export const Api = {
    * request open in the browser until it is collected.
    */
   discard: async (response: Response): Promise<void> => {
-    await response.body?.cancel();
+    await response.body?.cancel()
   },
 
   /** `path` with `query` as its query string; the bare path when `query` is empty. */
   withQuery: (path: string, query: string): string => (query.length === 0 ? path : `${path}?${query}`),
 
-  get: <A>(path: string, signal?: AbortSignal): Promise<A> =>
-    Api.request<A>(path, signal === undefined ? {} : { signal }),
+  get: <A>(path: string, signal?: AbortSignal): Promise<A> => Api.request<A>(path, signal === undefined ? {} : { signal }),
 
   /** A read that is the same for everyone, such as the catalog, which the browser may keep for a minute whoever is signed in. */
   getPublic: <A>(path: string, signal?: AbortSignal): Promise<A> =>
@@ -210,8 +214,7 @@ export const Api = {
 
   delete: <A>(path: string): Promise<A> => Api.request<A>(path, { method: "DELETE" }),
 
-  postEmpty: (path: string, body?: unknown): Promise<void> =>
-    Api.requestEmpty(path, { method: "POST", body }),
+  postEmpty: (path: string, body?: unknown): Promise<void> => Api.requestEmpty(path, { method: "POST", body }),
 
   /** For sign-in and registration, where a 401 is the answer, not a hint to retry. */
   postWithoutRetry: <A>(path: string, body?: unknown): Promise<A> =>
@@ -221,6 +224,5 @@ export const Api = {
     Api.requestEmpty(path, { method: "POST", body, retryOnUnauthorized: false }),
 
   /** The failure inside a caught value, or `undefined` if it did not come from the API. */
-  failureOf: (reason: unknown): ErrorResponse["error"] | undefined =>
-    reason instanceof ApiError ? reason.failure : undefined,
-} as const;
+  failureOf: (reason: unknown): ErrorResponse["error"] | undefined => (reason instanceof ApiError ? reason.failure : undefined),
+} as const

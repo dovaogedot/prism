@@ -17,12 +17,12 @@ export const PgError = {
   /** A text field of the error, or of the error it wraps. */
   fieldOf: (reason: unknown, field: "code" | "constraint_name"): string | undefined => {
     const own = (value: unknown): string | undefined => {
-      if (typeof value !== "object" || value === null) return undefined;
+      if (typeof value !== "object" || value === null) return undefined
 
-      const found: unknown = Reflect.get(value, field);
-      return typeof found === "string" ? found : undefined;
-    };
+      const found: unknown = Reflect.get(value, field)
+      return typeof found === "string" ? found : undefined
+    }
 
-    return own(reason) ?? (typeof reason === "object" && reason !== null && "cause" in reason ? own(reason.cause) : undefined);
+    return own(reason) ?? (typeof reason === "object" && reason !== null && "cause" in reason ? own(reason.cause) : undefined)
   },
-} as const;
+} as const

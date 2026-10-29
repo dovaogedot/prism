@@ -1,8 +1,8 @@
-import { Link } from "react-router";
+import { Link } from "react-router"
 
 /** The foot of every page: what the shop is, its fixed pages, and where else to find it. */
 export const Footer = () => {
-  const linkClass = "text-sm text-ink-soft hover:text-ink hover:underline";
+  const linkClass = "text-sm text-ink-soft hover:text-ink hover:underline"
 
   return (
     <footer className="border-t border-line">
@@ -72,5 +72,5 @@ export const Footer = () => {
 
       <p className="mx-auto max-w-7xl border-t border-line px-4 py-5 text-sm text-ink-faint sm:px-6">© {new Date().getFullYear()} Prism</p>
     </footer>
-  );
-};
+  )
+}

@@ -6,17 +6,17 @@
  * `slot` through a portal.
  */
 
-import { createContext, useContext } from "react";
+import { createContext, useContext } from "react"
 
 /** What a page can put in the drawer, and how it opens it. */
 export type Drawer = Readonly<{
   /** Where a page's own part of the drawer is rendered, once the drawer is on the page. */
-  slot: HTMLElement | undefined;
+  slot: HTMLElement | undefined
   /** Opens the drawer. Opening a drawer that is already open leaves it open. */
-  open: () => void;
+  open: () => void
   /** Opens the drawer at the page's own part, scrolled to its top, with its first control focused. */
-  openAtSlot: () => void;
-}>;
+  openAtSlot: () => void
+}>
 
 export const Drawer = {
   /** The drawer outside any layout, which has nowhere to render and nothing to open. */
@@ -24,7 +24,7 @@ export const Drawer = {
 
   /** The layout's drawer, for every page under it. */
   Context: createContext<Drawer>({ slot: undefined, open: () => undefined, openAtSlot: () => undefined }),
-} as const;
+} as const
 
 /** The drawer of the layout the caller is rendered in. */
-export const useDrawer = (): Drawer => useContext(Drawer.Context);
+export const useDrawer = (): Drawer => useContext(Drawer.Context)

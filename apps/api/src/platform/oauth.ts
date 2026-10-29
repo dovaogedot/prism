@@ -7,69 +7,69 @@
  * no internet. Only the party asserting "this is who they are" is local.
  */
 
-import { createHmac, timingSafeEqual } from "node:crypto";
-import { Email, type DomainError, type OAuthProvider } from "@prism/shared";
-import { err, errAsync, ok, okAsync, type Result, ResultAsync } from "neverthrow";
-import { z } from "zod";
+import { createHmac, timingSafeEqual } from "node:crypto"
+import { Email, type DomainError, type OAuthProvider } from "@prism/shared"
+import { err, errAsync, ok, okAsync, type Result, ResultAsync } from "neverthrow"
+import { z } from "zod"
 
 /** A provider's own stable identifier for a person, never their email. */
-export type ProviderSubject = z.infer<typeof ProviderSubject.schema>;
+export type ProviderSubject = z.infer<typeof ProviderSubject.schema>
 export const ProviderSubject = {
   schema: z.string().min(1).brand<"ProviderSubject">(),
-} as const;
+} as const
 
 /** What ties a provider's callback to the browser that started the sign-in. */
-export type OAuthState = z.infer<typeof OAuthState.schema>;
+export type OAuthState = z.infer<typeof OAuthState.schema>
 export const OAuthState = {
   schema: z.string().min(1).max(512).brand<"OAuthState">(),
-} as const;
+} as const
 
 /** The one-time code a provider sends back, to be exchanged for a profile. */
-export type AuthorizationCode = z.infer<typeof AuthorizationCode.schema>;
+export type AuthorizationCode = z.infer<typeof AuthorizationCode.schema>
 export const AuthorizationCode = {
   schema: z.string().min(1).max(2048).brand<"AuthorizationCode">(),
-} as const;
+} as const
 
 /** Where a provider sends the browser back to: this API's own callback route. */
-export type RedirectUri = z.infer<typeof RedirectUri.schema>;
+export type RedirectUri = z.infer<typeof RedirectUri.schema>
 export const RedirectUri = {
   schema: z.url().max(2048).brand<"RedirectUri">(),
-} as const;
+} as const
 
 /** Who a provider says the person completing a sign-in is. */
 export type OAuthProfile = Readonly<{
-  provider: OAuthProvider;
-  subject: ProviderSubject;
-  email: Email;
-}>;
+  provider: OAuthProvider
+  subject: ProviderSubject
+  email: Email
+}>
 
 /** One identity provider: where to send a browser, and what to do with the code. */
 export type IdentityProvider = Readonly<{
-  name: OAuthProvider;
-  authorizationUrl: (state: OAuthState, redirectUri: RedirectUri) => string;
-  exchange: (code: AuthorizationCode, redirectUri: RedirectUri) => ResultAsync<OAuthProfile, DomainError>;
-}>;
+  name: OAuthProvider
+  authorizationUrl: (state: OAuthState, redirectUri: RedirectUri) => string
+  exchange: (code: AuthorizationCode, redirectUri: RedirectUri) => ResultAsync<OAuthProfile, DomainError>
+}>
 
 /** The providers this instance can complete a sign-in with. */
 export type IdentityProviders = Readonly<{
-  names: readonly OAuthProvider[];
+  names: readonly OAuthProvider[]
   /** `undefined` for a provider this instance has no credentials for. */
-  find: (name: OAuthProvider) => IdentityProvider | undefined;
+  find: (name: OAuthProvider) => IdentityProvider | undefined
   /** True when the built-in stand-in answers instead of a real provider. */
-  isMock: boolean;
-}>;
+  isMock: boolean
+}>
 
 export const IdentityProviders = {
   of: (providers: readonly IdentityProvider[], isMock: boolean): IdentityProviders => {
-    const byName = new Map<OAuthProvider, IdentityProvider>(providers.map((provider) => [provider.name, provider]));
+    const byName = new Map<OAuthProvider, IdentityProvider>(providers.map((provider) => [provider.name, provider]))
 
     return {
       names: providers.map((provider) => provider.name),
       find: (name) => byName.get(name),
       isMock,
-    };
+    }
   },
-} as const;
+} as const
 
 /**
  * The mock's authorization code: the email, and an HMAC over provider and
@@ -80,36 +80,30 @@ export const MockAuthorizationCode = {
   payload: (provider: OAuthProvider, email: Email): string => `${provider}:${email}`,
 
   issue: (provider: OAuthProvider, email: Email, secret: Uint8Array): AuthorizationCode => {
-    const signature = createHmac("sha256", secret)
-      .update(MockAuthorizationCode.payload(provider, email))
-      .digest("base64url");
+    const signature = createHmac("sha256", secret).update(MockAuthorizationCode.payload(provider, email)).digest("base64url")
 
-    return AuthorizationCode.schema.parse(`${Buffer.from(email, "utf8").toString("base64url")}.${signature}`);
+    return AuthorizationCode.schema.parse(`${Buffer.from(email, "utf8").toString("base64url")}.${signature}`)
   },
 
   /** The email a code carries, or `undefined` when the code does not verify. */
   verify: (provider: OAuthProvider, code: AuthorizationCode, secret: Uint8Array): Email | undefined => {
-    const parts = code.split(".");
-    const encodedEmail = parts[0];
-    const signature = parts[1];
+    const parts = code.split(".")
+    const encodedEmail = parts[0]
+    const signature = parts[1]
     if (parts.length !== 2 || encodedEmail === undefined || signature === undefined) {
-      return undefined;
+      return undefined
     }
 
-    const email = Email.schema.safeParse(Buffer.from(encodedEmail, "base64url").toString("utf8"));
-    if (!email.success) return undefined;
+    const email = Email.schema.safeParse(Buffer.from(encodedEmail, "base64url").toString("utf8"))
+    if (!email.success) return undefined
 
-    const expected = createHmac("sha256", secret)
-      .update(MockAuthorizationCode.payload(provider, email.data))
-      .digest("base64url");
-    const provided = Buffer.from(signature, "utf8");
-    const computed = Buffer.from(expected, "utf8");
+    const expected = createHmac("sha256", secret).update(MockAuthorizationCode.payload(provider, email.data)).digest("base64url")
+    const provided = Buffer.from(signature, "utf8")
+    const computed = Buffer.from(expected, "utf8")
 
-    return provided.length === computed.length && timingSafeEqual(provided, computed)
-      ? email.data
-      : undefined;
+    return provided.length === computed.length && timingSafeEqual(provided, computed) ? email.data : undefined
   },
-} as const;
+} as const
 
 /** The list GitHub's emails endpoint answers with, reduced to one address. */
 export const GitHubEmails = {
@@ -129,15 +123,15 @@ export const GitHubEmails = {
    * themselves to that account here.
    */
   select: (payload: unknown): Email | undefined => {
-    if (!Array.isArray(payload)) return undefined;
+    if (!Array.isArray(payload)) return undefined
 
-    const verified = payload.filter(GitHubEmails.isEntry).filter((entry) => entry.verified);
-    const chosen = verified.find((entry) => entry.primary) ?? verified[0];
-    const email = Email.schema.safeParse(chosen?.email);
+    const verified = payload.filter(GitHubEmails.isEntry).filter((entry) => entry.verified)
+    const chosen = verified.find((entry) => entry.primary) ?? verified[0]
+    const email = Email.schema.safeParse(chosen?.email)
 
-    return email.success ? email.data : undefined;
+    return email.success ? email.data : undefined
   },
-} as const;
+} as const
 
 /** Google's userinfo answer, reduced to the stable id and a verified address. */
 export const GoogleUserInfo = {
@@ -148,37 +142,32 @@ export const GoogleUserInfo = {
    */
   read: (payload: unknown): Result<OAuthProfile, DomainError> => {
     if (typeof payload !== "object" || payload === null) {
-      return err<OAuthProfile, DomainError>({ _tag: "OAuthExchangeFailed" });
+      return err<OAuthProfile, DomainError>({ _tag: "OAuthExchangeFailed" })
     }
 
-    const subject = ProviderSubject.schema.safeParse("sub" in payload ? payload.sub : undefined);
-    if (!subject.success) return err<OAuthProfile, DomainError>({ _tag: "OAuthExchangeFailed" });
+    const subject = ProviderSubject.schema.safeParse("sub" in payload ? payload.sub : undefined)
+    if (!subject.success) return err<OAuthProfile, DomainError>({ _tag: "OAuthExchangeFailed" })
 
-    const verified = "email_verified" in payload && payload.email_verified === true;
-    const email = Email.schema.safeParse("email" in payload ? payload.email : undefined);
+    const verified = "email_verified" in payload && payload.email_verified === true
+    const email = Email.schema.safeParse("email" in payload ? payload.email : undefined)
 
     // An unverified address would let anyone who registers a victim's address
     // at Google link themselves to that account here.
     return verified && email.success
       ? ok<OAuthProfile, DomainError>({ provider: "google", subject: subject.data, email: email.data })
-      : err<OAuthProfile, DomainError>({ _tag: "OAuthEmailUnavailable" });
+      : err<OAuthProfile, DomainError>({ _tag: "OAuthEmailUnavailable" })
   },
-} as const;
+} as const
 
 export const IdentityProvider = {
   exchangeFailed: { _tag: "OAuthExchangeFailed" } as DomainError,
 
   /** `response.json()` is typed `any`; pinning it keeps the guards below meaningful. */
   fetchJson: (url: string, init: RequestInit): Promise<unknown> =>
-    fetch(url, { ...init, signal: AbortSignal.timeout(10_000) }).then(
-      (response): Promise<unknown> => response.json(),
-    ),
+    fetch(url, { ...init, signal: AbortSignal.timeout(10_000) }).then((response): Promise<unknown> => response.json()),
 
   accessTokenOf: (payload: unknown): ResultAsync<string, DomainError> =>
-    typeof payload === "object" &&
-    payload !== null &&
-    "access_token" in payload &&
-    typeof payload.access_token === "string"
+    typeof payload === "object" && payload !== null && "access_token" in payload && typeof payload.access_token === "string"
       ? okAsync(payload.access_token)
       : errAsync(IdentityProvider.exchangeFailed),
 
@@ -190,7 +179,7 @@ export const IdentityProvider = {
       `/api/v1/auth/oauth/${name}/consent?${new URLSearchParams({ state, redirect_uri: redirectUri })}`,
 
     exchange: (code) => {
-      const email = MockAuthorizationCode.verify(name, code, secret);
+      const email = MockAuthorizationCode.verify(name, code, secret)
 
       return email === undefined
         ? errAsync(IdentityProvider.exchangeFailed)
@@ -204,7 +193,7 @@ export const IdentityProvider = {
                 .slice(0, 32)}`,
             ),
             email,
-          });
+          })
     },
   }),
 
@@ -291,7 +280,7 @@ export const IdentityProvider = {
             authorization: `Bearer ${accessToken}`,
             accept: "application/vnd.github+json",
             "user-agent": "prism",
-          };
+          }
 
           return ResultAsync.fromPromise(
             Promise.all([
@@ -299,21 +288,16 @@ export const IdentityProvider = {
               IdentityProvider.fetchJson("https://api.github.com/user/emails", { headers }),
             ]),
             () => IdentityProvider.exchangeFailed,
-          );
+          )
         })
         .andThen(([user, emails]) => {
-          const email = GitHubEmails.select(emails);
+          const email = GitHubEmails.select(emails)
 
-          if (
-            typeof user !== "object" ||
-            user === null ||
-            !("id" in user) ||
-            typeof user.id !== "number"
-          ) {
-            return errAsync<OAuthProfile, DomainError>(IdentityProvider.exchangeFailed);
+          if (typeof user !== "object" || user === null || !("id" in user) || typeof user.id !== "number") {
+            return errAsync<OAuthProfile, DomainError>(IdentityProvider.exchangeFailed)
           }
           if (email === undefined) {
-            return errAsync<OAuthProfile, DomainError>({ _tag: "OAuthEmailUnavailable" });
+            return errAsync<OAuthProfile, DomainError>({ _tag: "OAuthEmailUnavailable" })
           }
 
           // The numeric id, not the login: a username can be re-registered by
@@ -322,7 +306,7 @@ export const IdentityProvider = {
             provider: "github",
             subject: ProviderSubject.schema.parse(String(user.id)),
             email,
-          });
+          })
         }),
   }),
-} as const;
+} as const

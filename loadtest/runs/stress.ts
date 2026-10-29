@@ -6,10 +6,10 @@
  * under 5 seconds.
  */
 
-import { Mix } from "../lib/mix.ts";
-import { Shop } from "../lib/shop.ts";
-import { StressSteps } from "../lib/steps.ts";
-import { Summary } from "../lib/summary.ts";
+import { Mix } from "../lib/mix.ts"
+import { Shop } from "../lib/shop.ts"
+import { StressSteps } from "../lib/steps.ts"
+import { Summary } from "../lib/summary.ts"
 
 const Stress = {
   /** The ramp to `target` users, then the time held there. */
@@ -17,7 +17,7 @@ const Stress = {
     { duration: `${StressSteps.RAMP_SECONDS}s`, target },
     { duration: `${StressSteps.HOLD_SECONDS}s`, target },
   ],
-} as const;
+} as const
 
 export const options = {
   insecureSkipTLSVerify: true,
@@ -35,8 +35,8 @@ export const options = {
       exec: "mixed",
     },
   },
-};
+}
 
-export const setup = Shop.load;
-export const mixed = Mix.run;
-export const handleSummary = (data: Parameters<typeof Summary.write>[1]) => Summary.write("stress", data);
+export const setup = Shop.load
+export const mixed = Mix.run
+export const handleSummary = (data: Parameters<typeof Summary.write>[1]) => Summary.write("stress", data)

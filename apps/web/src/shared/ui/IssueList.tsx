@@ -1,8 +1,8 @@
-import type { ValidationIssue } from "@prism/shared";
-import { match } from "ts-pattern";
+import type { ValidationIssue } from "@prism/shared"
+import { match } from "ts-pattern"
 
 /** The issues to list. */
-export type IssueListProps = Readonly<{ issues: readonly ValidationIssue[] }>;
+export type IssueListProps = Readonly<{ issues: readonly ValidationIssue[] }>
 
 /** Field-level messages the server produced, for anything the client missed. */
 export const IssueList = ({ issues }: IssueListProps) =>
@@ -17,4 +17,4 @@ export const IssueList = ({ issues }: IssueListProps) =>
           </li>
         ))}
       </ul>
-    ));
+    ))

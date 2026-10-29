@@ -6,10 +6,10 @@
  * it rather than bouncing off it again.
  */
 
-import { useState } from "react";
-import { Navigate, Outlet } from "react-router";
-import { match } from "ts-pattern";
-import { TokenStore } from "../../../shared/api/token-store.ts";
+import { useState } from "react"
+import { Navigate, Outlet } from "react-router"
+import { match } from "ts-pattern"
+import { TokenStore } from "../../../shared/api/token-store.ts"
 
 /**
  * The question is whether the visitor was already signed in on arrival, not
@@ -18,10 +18,10 @@ import { TokenStore } from "../../../shared/api/token-store.ts";
  * that page succeeding, and the page decides where to go next.
  */
 export const GuestOnly = () => {
-  const [signedInOnArrival] = useState(() => TokenStore.snapshot() !== undefined);
+  const [signedInOnArrival] = useState(() => TokenStore.snapshot() !== undefined)
 
   return match(signedInOnArrival)
     .with(false, () => <Outlet />)
     .with(true, () => <Navigate to="/account" replace />)
-    .exhaustive();
-};
+    .exhaustive()
+}

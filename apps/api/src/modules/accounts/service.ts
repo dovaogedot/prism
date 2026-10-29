@@ -11,44 +11,45 @@ import {
   type ProfileInput,
   type SavedAddressInput,
   type UserId,
-} from "@prism/shared";
-import { errAsync, okAsync, ResultAsync } from "neverthrow";
-import type { Clock } from "../../platform/clock.ts";
-import type { AuthRepository } from "../auth/repository.ts";
-import type { AccountRepository } from "./repository.ts";
+} from "@prism/shared"
+import { errAsync, okAsync, ResultAsync } from "neverthrow"
+import type { Clock } from "../../platform/clock.ts"
+import type { AuthRepository } from "../auth/repository.ts"
+import type { AccountRepository } from "./repository.ts"
 
 /** What the accounts service works through. */
-export type AccountDependencies = Readonly<{ repository: AccountRepository; users: AuthRepository; clock: Clock }>;
+export type AccountDependencies = Readonly<{ repository: AccountRepository; users: AuthRepository; clock: Clock }>
 
 /** Everything the account pages do. */
 export type AccountService = Readonly<{
-  profile: (userId: UserId) => ResultAsync<Profile, DomainError>;
-  updateProfile: (userId: UserId, input: ProfileInput) => ResultAsync<Profile, DomainError>;
-  addresses: (userId: UserId) => Promise<readonly SavedAddress[]>;
-  addAddress: (userId: UserId, input: SavedAddressInput) => ResultAsync<SavedAddress, DomainError>;
-  updateAddress: (userId: UserId, id: AddressId, input: SavedAddressInput) => ResultAsync<SavedAddress, DomainError>;
-  removeAddress: (userId: UserId, id: AddressId) => ResultAsync<void, DomainError>;
+  profile: (userId: UserId) => ResultAsync<Profile, DomainError>
+  updateProfile: (userId: UserId, input: ProfileInput) => ResultAsync<Profile, DomainError>
+  addresses: (userId: UserId) => Promise<readonly SavedAddress[]>
+  addAddress: (userId: UserId, input: SavedAddressInput) => ResultAsync<SavedAddress, DomainError>
+  updateAddress: (userId: UserId, id: AddressId, input: SavedAddressInput) => ResultAsync<SavedAddress, DomainError>
+  removeAddress: (userId: UserId, id: AddressId) => ResultAsync<void, DomainError>
   /** The address checkout starts with; `undefined` when none is the default. */
-  defaultAddressOf: (userId: UserId) => Promise<SavedAddress | undefined>;
-}>;
+  defaultAddressOf: (userId: UserId) => Promise<SavedAddress | undefined>
+}>
 
 export const AccountService = {
   create: (deps: AccountDependencies): AccountService => {
-    const { repository, clock } = deps;
+    const { repository, clock } = deps
 
     const profile = (userId: UserId): ResultAsync<Profile, DomainError> =>
-      ResultAsync.fromSafePromise(Promise.all([deps.users.findUserById(userId), repository.profileOf(userId)])).andThen(
-        ([user, record]) =>
-          user === undefined || record === undefined
-            ? errAsync<Profile, DomainError>({ _tag: "Unauthenticated" })
-            : okAsync<Profile, DomainError>({ email: user.email, ...record }),
-      );
+      ResultAsync.fromSafePromise(Promise.all([deps.users.findUserById(userId), repository.profileOf(userId)])).andThen(([user, record]) =>
+        user === undefined || record === undefined
+          ? errAsync<Profile, DomainError>({ _tag: "Unauthenticated" })
+          : okAsync<Profile, DomainError>({ email: user.email, ...record }),
+      )
 
     const addressWith = (userId: UserId, id: AddressId): ResultAsync<SavedAddress, DomainError> =>
       ResultAsync.fromSafePromise(repository.addresses(userId)).andThen((all) => {
-        const found = all.find((address) => address.id === id);
-        return found === undefined ? errAsync<SavedAddress, DomainError>({ _tag: "AddressNotFound" }) : okAsync<SavedAddress, DomainError>(found);
-      });
+        const found = all.find((address) => address.id === id)
+        return found === undefined
+          ? errAsync<SavedAddress, DomainError>({ _tag: "AddressNotFound" })
+          : okAsync<SavedAddress, DomainError>(found)
+      })
 
     return {
       profile,
@@ -81,6 +82,6 @@ export const AccountService = {
         ),
 
       defaultAddressOf: async (userId) => (await repository.addresses(userId)).find((address) => address.isDefault),
-    };
+    }
   },
-} as const;
+} as const

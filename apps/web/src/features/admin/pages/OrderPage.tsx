@@ -1,22 +1,22 @@
-import { Country, OrderStatus, Permission, Price, TrackingNumber, type AdminOrderDetail, type OrderStatusChange } from "@prism/shared";
-import { useState } from "react";
-import { Link, useParams } from "react-router";
-import { match, P } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
-import { DeliveryDates } from "../../../shared/format/delivery-dates.ts";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { Alert, Button, Card, ConfirmDialog, Field, Skeleton, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { useSession } from "../../auth/session.ts";
-import { OrderTimeline, StatusBadge } from "../../orders/components/index.ts";
-import { PaymentWords } from "../../orders/orders.ts";
-import { useAdminRead, useAdminWrite } from "../admin.ts";
-import { AdminPage } from "../components/index.ts";
-import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
-import { DateTime } from "../../../shared/format/date-time.ts";
+import { Country, OrderStatus, Permission, Price, TrackingNumber, type AdminOrderDetail, type OrderStatusChange } from "@prism/shared"
+import { useState } from "react"
+import { Link, useParams } from "react-router"
+import { match, P } from "ts-pattern"
+import { Api } from "../../../shared/api/client.ts"
+import { DeliveryDates } from "../../../shared/format/delivery-dates.ts"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { Alert, Button, Card, ConfirmDialog, Field, Skeleton, Toast } from "../../../shared/ui/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { useSession } from "../../auth/session.ts"
+import { OrderTimeline, StatusBadge } from "../../orders/components/index.ts"
+import { PaymentWords } from "../../orders/orders.ts"
+import { useAdminRead, useAdminWrite } from "../admin.ts"
+import { AdminPage } from "../components/index.ts"
+import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts"
+import { DateTime } from "../../../shared/format/date-time.ts"
 
 /** Which confirmation is open. */
-type Confirming = "none" | "cancel" | "refund";
+type Confirming = "none" | "cancel" | "refund"
 
 /**
  * One order for staff: its next step of fulfillment, canceling it before it
@@ -24,38 +24,38 @@ type Confirming = "none" | "cancel" | "refund";
  * everything about it, from the lines to the payment and its history.
  */
 export const OrderPage = () => {
-  const { id = "" } = useParams();
+  const { id = "" } = useParams()
 
-  const session = useSession();
+  const session = useSession()
 
-  const order = useAdminRead<AdminOrderDetail>(`/orders/${id}`);
+  const order = useAdminRead<AdminOrderDetail>(`/orders/${id}`)
 
-  const [tracking, setTracking] = useState("");
+  const [tracking, setTracking] = useState("")
 
-  const [trackingError, setTrackingError] = useState<string | undefined>(undefined);
+  const [trackingError, setTrackingError] = useState<string | undefined>(undefined)
 
-  const [confirming, setConfirming] = useState<Confirming>("none");
+  const [confirming, setConfirming] = useState<Confirming>("none")
 
-  const [failure, setFailure] = useActionFailure();
+  const [failure, setFailure] = useActionFailure()
 
-  const advance = useAdminWrite((change: OrderStatusChange) => Api.post<AdminOrderDetail>(`/admin/orders/${id}/status`, change));
+  const advance = useAdminWrite((change: OrderStatusChange) => Api.post<AdminOrderDetail>(`/admin/orders/${id}/status`, change))
 
-  const cancel = useAdminWrite(() => Api.post<AdminOrderDetail>(`/admin/orders/${id}/cancel`));
+  const cancel = useAdminWrite(() => Api.post<AdminOrderDetail>(`/admin/orders/${id}/cancel`))
 
-  const refund = useAdminWrite(() => Api.post<AdminOrderDetail>(`/admin/orders/${id}/refund`));
+  const refund = useAdminWrite(() => Api.post<AdminOrderDetail>(`/admin/orders/${id}/refund`))
 
-  const roles = session?.roles ?? [];
-  const canFulfill = Permission.can(roles, "orders.fulfill");
-  const canRefund = Permission.can(roles, "orders.refund");
+  const roles = session?.roles ?? []
+  const canFulfill = Permission.can(roles, "orders.fulfill")
+  const canRefund = Permission.can(roles, "orders.refund")
 
   const done = (message: string) => () => {
-    setConfirming("none");
-    Toast.show(message);
-  };
+    setConfirming("none")
+    Toast.show(message)
+  }
   const refused = (reason: unknown): void => {
-    setConfirming("none");
-    setFailure(Failure.message(reason));
-  };
+    setConfirming("none")
+    setFailure(Failure.message(reason))
+  }
 
   return match(order)
     .with({ status: "error" }, ({ error }) => (
@@ -69,16 +69,29 @@ export const OrderPage = () => {
       </AdminPage>
     ))
     .otherwise(({ data }) => (
-      <AdminPage text={{ ...PageText.adminOrder, title: `Order #${data.number} - Admin` }} heading={`Order #${data.number}`} actions={<StatusBadge status={data.status} />}>
+      <AdminPage
+        text={{ ...PageText.adminOrder, title: `Order #${data.number} - Admin` }}
+        heading={`Order #${data.number}`}
+        actions={<StatusBadge status={data.status} />}
+      >
         {failure === undefined ? null : <Alert>{failure}</Alert>}
 
         <Card className="space-y-4 p-5">
           <h2 className="font-semibold text-ink">Next step</h2>
           {match({ next: data.nextStatus, canFulfill })
-            .with({ canFulfill: false }, () => <p className="text-sm text-ink-soft">Moving orders along needs the delivery manager role.</p>)
-            .with({ next: P.nullish }, () => <p className="text-sm text-ink-soft">No step follows from here. Status: {OrderStatus.label[data.status]}.</p>)
+            .with({ canFulfill: false }, () => (
+              <p className="text-sm text-ink-soft">Moving orders along needs the delivery manager role.</p>
+            ))
+            .with({ next: P.nullish }, () => (
+              <p className="text-sm text-ink-soft">No step follows from here. Status: {OrderStatus.label[data.status]}.</p>
+            ))
             .with({ next: "processing" }, () => (
-              <Button busy={advance.isPending} onClick={() => advance.mutate({ status: "processing" }, { onSuccess: done("The order is being processed."), onError: refused })}>
+              <Button
+                busy={advance.isPending}
+                onClick={() =>
+                  advance.mutate({ status: "processing" }, { onSuccess: done("The order is being processed."), onError: refused })
+                }
+              >
                 Start processing
               </Button>
             ))
@@ -86,25 +99,37 @@ export const OrderPage = () => {
               <form
                 className="flex flex-wrap items-end gap-3"
                 onSubmit={(event) => {
-                  event.preventDefault();
-                  const parsed = TrackingNumber.schema.safeParse(tracking);
+                  event.preventDefault()
+                  const parsed = TrackingNumber.schema.safeParse(tracking)
                   if (!parsed.success) {
-                    setTrackingError(parsed.error.issues[0]?.message);
-                    return;
+                    setTrackingError(parsed.error.issues[0]?.message)
+                    return
                   }
-                  setTrackingError(undefined);
-                  advance.mutate({ status: "shipped", trackingNumber: parsed.data }, { onSuccess: done("The order is shipped, and the customer is told."), onError: refused });
+                  setTrackingError(undefined)
+                  advance.mutate(
+                    { status: "shipped", trackingNumber: parsed.data },
+                    { onSuccess: done("The order is shipped, and the customer is told."), onError: refused },
+                  )
                 }}
                 noValidate
               >
-                <Field label="Tracking number" id="tracking" value={tracking} error={trackingError} onChange={(event) => setTracking(event.target.value)} />
+                <Field
+                  label="Tracking number"
+                  id="tracking"
+                  value={tracking}
+                  error={trackingError}
+                  onChange={(event) => setTracking(event.target.value)}
+                />
                 <Button type="submit" busy={advance.isPending}>
                   Mark shipped
                 </Button>
               </form>
             ))
             .with({ next: "delivered" }, () => (
-              <Button busy={advance.isPending} onClick={() => advance.mutate({ status: "delivered" }, { onSuccess: done("The order is delivered."), onError: refused })}>
+              <Button
+                busy={advance.isPending}
+                onClick={() => advance.mutate({ status: "delivered" }, { onSuccess: done("The order is delivered."), onError: refused })}
+              >
                 Mark delivered
               </Button>
             ))
@@ -217,7 +242,9 @@ export const OrderPage = () => {
                         {payment.card.brand.toUpperCase()} •••• {payment.card.last4}
                       </p>
                     )}
-                    {payment.reference === undefined ? null : <p className="break-all font-mono text-xs text-ink-soft">{payment.reference}</p>}
+                    {payment.reference === undefined ? null : (
+                      <p className="break-all font-mono text-xs text-ink-soft">{payment.reference}</p>
+                    )}
                     {payment.refund === undefined ? null : <p className="text-ink-soft">{PaymentWords.refund[payment.refund]}</p>}
                   </>
                 ))}
@@ -234,7 +261,9 @@ export const OrderPage = () => {
           onCancel={() => setConfirming("none")}
           onConfirm={() =>
             cancel.mutate(undefined, {
-              onSuccess: done(data.payment?.status === "succeeded" ? "The order is canceled, and its payment refunded." : "The order is canceled."),
+              onSuccess: done(
+                data.payment?.status === "succeeded" ? "The order is canceled, and its payment refunded." : "The order is canceled.",
+              ),
               onError: refused,
             })
           }
@@ -252,5 +281,5 @@ export const OrderPage = () => {
           {Price.format(data.totalCents)} goes back to the card it was paid with. The stock stays as it is.
         </ConfirmDialog>
       </AdminPage>
-    ));
-};
+    ))
+}

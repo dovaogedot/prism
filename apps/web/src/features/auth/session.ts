@@ -6,23 +6,22 @@
  * anywhere is immediately visible everywhere.
  */
 
-import type { SessionUser } from "@prism/shared";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { Api } from "../../shared/api/client.ts";
-import { TokenStore } from "../../shared/api/token-store.ts";
+import type { SessionUser } from "@prism/shared"
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react"
+import { Api } from "../../shared/api/client.ts"
+import { TokenStore } from "../../shared/api/token-store.ts"
 
 /** Who is signed in, or `undefined`. Re-renders on every sign-in and sign-out. */
-export const useSession = (): SessionUser | undefined =>
-  useSyncExternalStore(TokenStore.subscribe, TokenStore.snapshot)?.user;
+export const useSession = (): SessionUser | undefined => useSyncExternalStore(TokenStore.subscribe, TokenStore.snapshot)?.user
 
 /** The signed-in user, on a page under `SignedInOnly`, which never renders without one. */
 export const useSignedInSession = (): SessionUser => {
-  const session = useSession();
+  const session = useSession()
 
-  if (session === undefined) throw new Error("A page under SignedInOnly rendered without a session.");
+  if (session === undefined) throw new Error("A page under SignedInOnly rendered without a session.")
 
-  return session;
-};
+  return session
+}
 
 /**
  * On first mount, trades the httpOnly refresh cookie for an access token.
@@ -30,28 +29,28 @@ export const useSignedInSession = (): SessionUser => {
  * which is why the header renders nothing rather than flashing "Sign in".
  */
 export const useSessionBootstrap = (): boolean => {
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    let canceled = false;
+    let canceled = false
 
     void Api.refresh().finally(() => {
-      if (!canceled) setReady(true);
-    });
+      if (!canceled) setReady(true)
+    })
 
     return () => {
-      canceled = true;
-    };
-  }, []);
+      canceled = true
+    }
+  }, [])
 
-  return ready;
-};
+  return ready
+}
 
 /** Signs out. The in-memory token is dropped whether or not the server answers. */
 export const useSignOut = (): (() => Promise<void>) =>
   useCallback(async () => {
     // The cookie is cleared by the server, but a failed request must still
     // drop the in-memory token or the UI would look signed in.
-    await Api.postEmpty("/auth/logout").catch(() => undefined);
-    TokenStore.clear();
-  }, []);
+    await Api.postEmpty("/auth/logout").catch(() => undefined)
+    TokenStore.clear()
+  }, [])

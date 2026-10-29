@@ -1,32 +1,22 @@
-import type { ButtonHTMLAttributes } from "react";
-import { match } from "ts-pattern";
-import { Spinner } from "./Spinner.tsx";
+import type { ButtonHTMLAttributes } from "react"
+import { match } from "ts-pattern"
+import { Spinner } from "./Spinner.tsx"
 
 /** How much attention a button asks for. */
-export type ButtonTone = "accent" | "quiet" | "ghost" | "danger";
+export type ButtonTone = "accent" | "quiet" | "ghost" | "danger"
 
 const TONES: Record<ButtonTone, string> = {
-  accent:
-    "bg-accent text-accent-ink hover:bg-accent-hover active:scale-[.98] shadow-sm",
-  quiet:
-    "bg-sunken text-ink border border-line hover:border-line-strong active:scale-[.98]",
+  accent: "bg-accent text-accent-ink hover:bg-accent-hover active:scale-[.98] shadow-sm",
+  quiet: "bg-sunken text-ink border border-line hover:border-line-strong active:scale-[.98]",
   ghost: "text-ink-soft hover:text-ink hover:bg-sunken",
   danger: "bg-danger text-danger-ink hover:opacity-90 active:scale-[.98]",
-};
+}
 
 /** Everything a `<button>` takes, plus its tone and whether it is working. */
-export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
-  Readonly<{ tone?: ButtonTone; busy?: boolean }>;
+export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & Readonly<{ tone?: ButtonTone; busy?: boolean }>
 
 /** A button that keeps its label while it works, and refuses clicks meanwhile. */
-export const Button = ({
-  tone = "accent",
-  busy = false,
-  className = "",
-  children,
-  disabled,
-  ...rest
-}: ButtonProps) => (
+export const Button = ({ tone = "accent", busy = false, className = "", children, disabled, ...rest }: ButtonProps) => (
   <button
     {...rest}
     disabled={disabled === true || busy}
@@ -47,4 +37,4 @@ export const Button = ({
       .exhaustive()}
     {children}
   </button>
-);
+)

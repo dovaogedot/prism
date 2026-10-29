@@ -1,29 +1,29 @@
-import { Delivery, Price, Pricing, ShippingOption } from "@prism/shared";
-import { useWatch } from "react-hook-form";
-import { DeliveryDates } from "../../../shared/format/delivery-dates.ts";
-import type { CheckoutFormApi } from "../checkout.ts";
+import { Delivery, Price, Pricing, ShippingOption } from "@prism/shared"
+import { useWatch } from "react-hook-form"
+import { DeliveryDates } from "../../../shared/format/delivery-dates.ts"
+import type { CheckoutFormApi } from "../checkout.ts"
 
 /** The form the choice belongs to, the options offered, and the subtotal the prices depend on. */
 export type ShippingOptionsProps = Readonly<{
-  form: CheckoutFormApi;
-  options: readonly ShippingOption[];
-  subtotalCents: number;
-}>;
+  form: CheckoutFormApi
+  options: readonly ShippingOption[]
+  subtotalCents: number
+}>
 
 /** Each delivery option, with what it costs for this cart and the days it should arrive between. */
 export const ShippingOptions = ({ form, options, subtotalCents }: ShippingOptionsProps) => {
-  const chosen = useWatch({ control: form.control, name: "shippingMethod" });
+  const chosen = useWatch({ control: form.control, name: "shippingMethod" })
 
-  const error = form.formState.errors.shippingMethod?.message;
-  const today = new Date();
+  const error = form.formState.errors.shippingMethod?.message
+  const today = new Date()
 
   return (
     <fieldset className="space-y-3">
       <legend className="mb-3 text-base font-semibold text-ink">4. Delivery</legend>
 
       {options.map((option) => {
-        const cost = Pricing.shipping(option, subtotalCents);
-        const window = DeliveryDates.format(Delivery.estimate(today, option));
+        const cost = Pricing.shipping(option, subtotalCents)
+        const window = DeliveryDates.format(Delivery.estimate(today, option))
 
         return (
           <label
@@ -41,7 +41,7 @@ export const ShippingOptions = ({ form, options, subtotalCents }: ShippingOption
             </span>
             <span className="text-sm font-semibold tabular-nums text-ink">{cost === 0 ? "Free" : Price.format(cost)}</span>
           </label>
-        );
+        )
       })}
 
       {error === undefined ? null : (
@@ -50,5 +50,5 @@ export const ShippingOptions = ({ form, options, subtotalCents }: ShippingOption
         </p>
       )}
     </fieldset>
-  );
-};
+  )
+}

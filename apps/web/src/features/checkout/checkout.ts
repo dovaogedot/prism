@@ -14,19 +14,19 @@ import {
   type ShippingMethodCode,
   type ShippingOption,
   type ValidationIssue,
-} from "@prism/shared";
+} from "@prism/shared"
 // The pure entry loads Stripe.js when checkout asks for it, not on every page that imports this module.
-import { loadStripe } from "@stripe/stripe-js/pure";
-import type { Stripe } from "@stripe/stripe-js";
-import { skipToken, useQuery } from "@tanstack/react-query";
-import type { UseFormReturn } from "react-hook-form";
-import { Api } from "../../shared/api/client.ts";
+import { loadStripe } from "@stripe/stripe-js/pure"
+import type { Stripe } from "@stripe/stripe-js"
+import { skipToken, useQuery } from "@tanstack/react-query"
+import type { UseFormReturn } from "react-hook-form"
+import { Api } from "../../shared/api/client.ts"
 
 /** The checkout form as its sections share it: what is typed in, and what validation hands on. */
-export type CheckoutFormApi = UseFormReturn<CheckoutForm, unknown, Omit<PlaceOrderInput, "expectedTotalCents">>;
+export type CheckoutFormApi = UseFormReturn<CheckoutForm, unknown, Omit<PlaceOrderInput, "expectedTotalCents">>
 
 /** The fields of a Stripe.js error the page reads. */
-export type StripeFailure = Readonly<{ type: string; code?: string; decline_code?: string; message?: string }>;
+export type StripeFailure = Readonly<{ type: string; code?: string; decline_code?: string; message?: string }>
 
 export const PaymentErrors = {
   /** The sentence for a payment request that never reached Stripe. */
@@ -38,14 +38,14 @@ export const PaymentErrors = {
    * shop's words, the same ones the failure email uses.
    */
   messageOf: (error: StripeFailure): string => {
-    if (error.type === "validation_error") return error.message ?? "Check the card details.";
-    if (error.type === "api_connection_error") return PaymentErrors.OFFLINE;
+    if (error.type === "validation_error") return error.message ?? "Check the card details."
+    if (error.type === "api_connection_error") return PaymentErrors.OFFLINE
 
     if (error.type === "card_error" || error.code === "payment_intent_authentication_failure") {
-      return PaymentFailure.message[DeclineCodes.failureOf(error.decline_code, error.code)];
+      return PaymentFailure.message[DeclineCodes.failureOf(error.decline_code, error.code)]
     }
 
-    return PaymentFailure.message.gateway_error;
+    return PaymentFailure.message.gateway_error
   },
 
   /**
@@ -55,10 +55,10 @@ export const PaymentErrors = {
    */
   isRefusal: (error: StripeFailure): boolean =>
     error.type === "card_error" || error.type === "validation_error" || error.code === "payment_intent_authentication_failure",
-} as const;
+} as const
 
 /** A form path the checkout renders a field for. */
-export type CheckoutField = (typeof CheckoutField.PATHS)[number];
+export type CheckoutField = (typeof CheckoutField.PATHS)[number]
 export const CheckoutField = {
   /** Every path a server issue can name that has a field on the page. */
   PATHS: [
@@ -77,26 +77,26 @@ export const CheckoutField = {
     "billingAddress.country",
     "shippingMethod",
   ] as const,
-} as const;
+} as const
 
 export const CheckoutIssues = {
   /** Server issues split into those a field shows and those the page shows above the form. */
   split: (
     issues: readonly ValidationIssue[],
   ): Readonly<{ fields: readonly Readonly<{ path: CheckoutField; message: string }>[]; other: readonly ValidationIssue[] }> => {
-    const fields: { path: CheckoutField; message: string }[] = [];
-    const other: ValidationIssue[] = [];
+    const fields: { path: CheckoutField; message: string }[] = []
+    const other: ValidationIssue[] = []
 
     for (const issue of issues) {
-      const field = CheckoutField.PATHS.find((candidate) => candidate === issue.path);
+      const field = CheckoutField.PATHS.find((candidate) => candidate === issue.path)
 
-      if (field === undefined) other.push(issue);
-      else fields.push({ path: field, message: issue.message });
+      if (field === undefined) other.push(issue)
+      else fields.push({ path: field, message: issue.message })
     }
 
-    return { fields, other };
+    return { fields, other }
   },
-} as const;
+} as const
 
 export const CheckoutDefaults = {
   /** The form before anyone typed, shipping to the first country on the list with `method`. */
@@ -112,16 +112,16 @@ export const CheckoutDefaults = {
    * `options` still offers it; otherwise the first option is chosen.
    */
   fromPrefill: (prefill: CheckoutPrefill, options: readonly [ShippingOption, ...ShippingOption[]]): CheckoutForm => {
-    const empty = CheckoutDefaults.empty(options[0].code);
-    const offered = options.find((option) => option.code === prefill.shippingMethod);
+    const empty = CheckoutDefaults.empty(options[0].code)
+    const offered = options.find((option) => option.code === prefill.shippingMethod)
 
     return {
       contact: prefill.contact ?? { ...empty.contact, email: prefill.email },
       address: prefill.address === undefined ? empty.address : { ...prefill.address, line2: prefill.address.line2 ?? "" },
       shippingMethod: offered?.code ?? empty.shippingMethod,
-    };
+    }
   },
-} as const;
+} as const
 
 /** What the payment section shows for each state of the payment provider. */
 export const PaymentMode = {
@@ -131,7 +131,7 @@ export const PaymentMode = {
     loading: "card",
     ready: "card",
   } as const satisfies Record<"unavailable" | "simulated" | "loading" | "ready", "card" | "simulated" | "unavailable">,
-} as const;
+} as const
 
 /**
  * Stripe.js for `publishableKey`, loaded from js.stripe.com and never
@@ -146,14 +146,14 @@ export const useStripeJs = (publishableKey: string | undefined) =>
       publishableKey === undefined
         ? skipToken
         : async (): Promise<Stripe> => {
-            const stripe = await loadStripe(publishableKey);
-            if (stripe === null) throw new Error("Stripe.js did not load.");
+            const stripe = await loadStripe(publishableKey)
+            if (stripe === null) throw new Error("Stripe.js did not load.")
 
-            return stripe;
+            return stripe
           },
     staleTime: Number.POSITIVE_INFINITY,
     gcTime: Number.POSITIVE_INFINITY,
-  });
+  })
 
 export const StripeFields = {
   /** Stripe's fields drawn in the shop's colors and corners, in either theme. */
@@ -165,7 +165,7 @@ export const StripeFields = {
       fontFamily: "Inter var, ui-sans-serif, system-ui, sans-serif",
     },
   }),
-} as const;
+} as const
 
 /** Whether payments are on, and Stripe's publishable key if they are. */
 export const usePaymentsConfig = () =>
@@ -173,4 +173,4 @@ export const usePaymentsConfig = () =>
     queryKey: ["checkout", "config"],
     queryFn: ({ signal }) => Api.get<PaymentsConfig>("/checkout/config", signal),
     staleTime: Number.POSITIVE_INFINITY,
-  });
+  })

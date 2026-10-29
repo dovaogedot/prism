@@ -1,26 +1,26 @@
-import { useEffect } from "react";
-import { useNavigate } from "react-router";
-import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { NextPath } from "../next-path.ts";
+import { useEffect } from "react"
+import { useNavigate } from "react-router"
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { NextPath } from "../next-path.ts"
 
 /** Where a provider's callback lands the browser, on its way back to the page sign-in started from. */
 export const OAuthCompletePage = () => {
-  const navigate = useNavigate();
+  const navigate = useNavigate()
 
   // The callback set a refresh cookie and sent us here with no token in the
   // URL. Trading the cookie for an access token is what `useSessionBootstrap`
   // already does on mount, so this page only has to wait and move on. The
   // path is read when the wait ends, and leaving the page first cancels it.
   useEffect(() => {
-    const timer = window.setTimeout(() => void navigate(NextPath.recall(), { replace: true }), 400);
-    return () => window.clearTimeout(timer);
-  }, [navigate]);
+    const timer = window.setTimeout(() => void navigate(NextPath.recall(), { replace: true }), 400)
+    return () => window.clearTimeout(timer)
+  }, [navigate])
 
   return (
     <div className="grid min-h-[60dvh] place-items-center px-4 text-center">
       <PageMeta title={PageText.oauth.title} description={PageText.oauth.description} isIndexed={false} />
       <h1 className="text-sm font-medium text-ink-soft">Signing you in…</h1>
     </div>
-  );
-};
+  )
+}

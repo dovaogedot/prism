@@ -1,10 +1,10 @@
-import type { ReactNode } from "react";
-import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
-import type { PageText } from "../../../shared/seo/page-text.ts";
-import { AccountNav } from "./AccountNav.tsx";
+import type { ReactNode } from "react"
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx"
+import type { PageText } from "../../../shared/seo/page-text.ts"
+import { AccountNav } from "./AccountNav.tsx"
 
 /** The page's head text, its heading, and the page. */
-export type AccountPageProps = Readonly<{ text: PageText; heading: string; children: ReactNode }>;
+export type AccountPageProps = Readonly<{ text: PageText; heading: string; children: ReactNode }>
 
 /**
  * One of the signed-in customer's own pages: its head tags, which keep it out
@@ -20,4 +20,4 @@ export const AccountPage = ({ text, heading, children }: AccountPageProps) => (
     </header>
     {children}
   </div>
-);
+)

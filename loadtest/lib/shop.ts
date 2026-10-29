@@ -4,15 +4,15 @@
  * the scenarios pick from.
  */
 
-import { check, group, sleep } from "k6";
-import http from "k6/http";
-import { Counter, Rate } from "k6/metrics";
+import { check, group, sleep } from "k6"
+import http from "k6/http"
+import { Counter, Rate } from "k6/metrics"
 
 /** What `setup` reads from the shop once, for every user to pick from. */
 export type ShopData = Readonly<{
-  products: readonly Readonly<{ id: string; slug: string; name: string }>[];
-  categories: readonly string[];
-}>;
+  products: readonly Readonly<{ id: string; slug: string; name: string }>[]
+  categories: readonly string[]
+}>
 
 export const Shop = {
   /** The storefront's address: the web service, from inside the load test's network. */
@@ -26,15 +26,15 @@ export const Shop = {
   /** One user step, as a k6 group: counted, and successful when `act` says every answer was as expected. */
   step: (name: string, act: () => boolean): void => {
     group(name, () => {
-      const isOk = act();
-      Shop.transactions.add(1);
-      Shop.transactionSuccess.add(isOk);
-    });
+      const isOk = act()
+      Shop.transactions.add(1)
+      Shop.transactionSuccess.add(isOk)
+    })
   },
 
   /** The pause a person takes between steps: one to three seconds. */
   think: (): void => {
-    sleep(1 + Math.random() * 2);
+    sleep(1 + Math.random() * 2)
   },
 
   /** Whether `response` answered 2xx, recorded as a check named after the request. */
@@ -60,25 +60,27 @@ export const Shop = {
 
   /** A new guest: this user's cookies, and so its cart and session, are forgotten. */
   forget: (): void => {
-    const jar = http.cookieJar();
+    const jar = http.cookieJar()
 
     // A clear removes only the cookies stored at the path it names: the
     // cart's lives under /api/v1, the session's under /api/v1/auth.
     for (const path of ["/", "/api/v1/", "/api/v1/auth/"]) {
-      jar.clear(`${Shop.BASE}${path}`);
+      jar.clear(`${Shop.BASE}${path}`)
     }
   },
 
   /** Reads the catalog the scenarios pick from: the best rated page of the largest size the API serves. Runs once, before any user starts. */
   load: (): ShopData => {
     const products = JSON.parse(Shop.call("GET", "/products?perPage=60&sort=rating", "setup").body as string) as Readonly<{
-      items: readonly Readonly<{ id: string; slug: string; name: string }>[];
-    }>;
-    const categories = JSON.parse(Shop.call("GET", "/categories", "setup").body as string) as Readonly<{ items: readonly Readonly<{ slug: string }>[] }>;
+      items: readonly Readonly<{ id: string; slug: string; name: string }>[]
+    }>
+    const categories = JSON.parse(Shop.call("GET", "/categories", "setup").body as string) as Readonly<{
+      items: readonly Readonly<{ slug: string }>[]
+    }>
 
     return {
       products: products.items.map((item) => ({ id: item.id, slug: item.slug, name: item.name })),
       categories: categories.items.map((category) => category.slug),
-    };
+    }
   },
-} as const;
+} as const

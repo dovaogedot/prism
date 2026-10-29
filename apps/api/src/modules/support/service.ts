@@ -6,19 +6,19 @@
  * Everything the sender typed is escaped before it reaches HTML.
  */
 
-import { SupportTopic, type DomainError, type Email, type SupportMessageInput } from "@prism/shared";
-import { errAsync, okAsync, ResultAsync } from "neverthrow";
-import { Html } from "../../http/html.ts";
-import type { CaptchaVerifier } from "../../platform/captcha.ts";
-import type { Mailer, OutboundEmail } from "../../platform/mailer.ts";
+import { SupportTopic, type DomainError, type Email, type SupportMessageInput } from "@prism/shared"
+import { errAsync, okAsync, ResultAsync } from "neverthrow"
+import { Html } from "../../http/html.ts"
+import type { CaptchaVerifier } from "../../platform/captcha.ts"
+import type { Mailer, OutboundEmail } from "../../platform/mailer.ts"
 
 /** What the contact form works through. */
-export type SupportDependencies = Readonly<{ mailer: Mailer; captcha: CaptchaVerifier; inbox: Email }>;
+export type SupportDependencies = Readonly<{ mailer: Mailer; captcha: CaptchaVerifier; inbox: Email }>
 
 /** Sending one contact message. */
 export type SupportService = Readonly<{
-  send: (message: SupportMessageInput, ipAddress: string) => ResultAsync<void, DomainError>;
-}>;
+  send: (message: SupportMessageInput, ipAddress: string) => ResultAsync<void, DomainError>
+}>
 
 export const SupportService = {
   /** The message as text lines: who wrote, about what, and what they said. */
@@ -32,7 +32,7 @@ export const SupportService = {
 
   /** The support inbox's email: `intro` above the message, every interpolated value escaped in the HTML body. */
   compose: (to: Email, subject: string, intro: string, message: SupportMessageInput, replyTo?: Email): OutboundEmail => {
-    const lines = SupportService.linesOf(message);
+    const lines = SupportService.linesOf(message)
 
     return {
       to,
@@ -49,12 +49,12 @@ export const SupportService = {
     </div>
   </body>
 </html>`,
-    };
+    }
   },
 
   /** The sender's confirmation, the same for everyone. */
   confirmationTo: (to: Email): OutboundEmail => {
-    const text = "Thank you for writing to Prism. We received your message and answer within two business days.";
+    const text = "Thank you for writing to Prism. We received your message and answer within two business days."
 
     return {
       to,
@@ -69,7 +69,7 @@ export const SupportService = {
     </div>
   </body>
 </html>`,
-    };
+    }
   },
 
   create: (deps: SupportDependencies): SupportService => ({
@@ -90,7 +90,9 @@ export const SupportService = {
             ),
           ),
         )
-        .andThen((isDelivered) => (isDelivered ? okAsync<void, DomainError>(undefined) : errAsync<void, DomainError>({ _tag: "MessageNotSent" })))
+        .andThen((isDelivered) =>
+          isDelivered ? okAsync<void, DomainError>(undefined) : errAsync<void, DomainError>({ _tag: "MessageNotSent" }),
+        )
         .andThen(() => ResultAsync.fromSafePromise(deps.mailer.send(SupportService.confirmationTo(message.email)).then(() => undefined))),
   }),
-} as const;
+} as const

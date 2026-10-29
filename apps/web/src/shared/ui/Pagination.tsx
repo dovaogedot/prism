@@ -1,13 +1,13 @@
-import { Button } from "./Button.tsx";
+import { Button } from "./Button.tsx"
 
 /** Where the reader is, how far it goes, and what turning a page does. */
 export type PaginationProps = Readonly<{
-  page: number;
-  totalPages: number;
+  page: number
+  totalPages: number
   /** Names the navigation, so two on one page differ. */
-  label?: string;
-  onPage: (page: number) => void;
-}>;
+  label?: string
+  onPage: (page: number) => void
+}>
 
 /** Previous and next, around where the reader is. Nothing when everything fits on one page. */
 export const Pagination = ({ page, totalPages, label = "Pages", onPage }: PaginationProps) =>
@@ -23,4 +23,4 @@ export const Pagination = ({ page, totalPages, label = "Pages", onPage }: Pagina
         Next
       </Button>
     </nav>
-  );
+  )

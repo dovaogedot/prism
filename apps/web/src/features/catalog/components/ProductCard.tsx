@@ -1,11 +1,11 @@
-import { Price, type ProductSummary } from "@prism/shared";
-import { Link } from "react-router";
-import { Stars } from "../../../shared/ui/index.ts";
-import { Picture } from "./Picture.tsx";
-import { Stock } from "./Stock.tsx";
+import { Price, type ProductSummary } from "@prism/shared"
+import { Link } from "react-router"
+import { Stars } from "../../../shared/ui/index.ts"
+import { Picture } from "./Picture.tsx"
+import { Stock } from "./Stock.tsx"
 
 /** The product the card shows, and whether its picture is in view on load, which then loads at once. */
-export type ProductCardProps = Readonly<{ product: ProductSummary; isPriority?: boolean }>;
+export type ProductCardProps = Readonly<{ product: ProductSummary; isPriority?: boolean }>
 
 /** A product in a grid: its picture, name, brand, rating and price. The whole card is the link to its page. */
 export const ProductCard = ({ product, isPriority = false }: ProductCardProps) => (
@@ -37,4 +37,4 @@ export const ProductCard = ({ product, isPriority = false }: ProductCardProps) =
       </div>
     </div>
   </article>
-);
+)

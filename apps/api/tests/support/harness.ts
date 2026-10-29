@@ -8,76 +8,68 @@
  * `jobs.housekeeping.run` do their work when a test asks.
  */
 
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { PostgreSqlContainer } from "@testcontainers/postgresql";
-import { eq } from "drizzle-orm";
-import type { FastifyInstance } from "fastify";
-import { Email, Slug, type UserId } from "@prism/shared";
-import { generateSync } from "otplib";
-import { App, type Jobs, type MountedRoute } from "../../src/app.ts";
-import { Config } from "../../src/config.ts";
-import { Database, type DatabaseHandle } from "../../src/db/client.ts";
-import { Migrations } from "../../src/db/migrate.ts";
-import { Topology } from "../../src/messaging/topology.ts";
-import { AddressVerifier, type FakeAddressVerifier } from "../../src/platform/address-verifier.ts";
-import {
-  brands,
-  categories,
-  productImages,
-  productProperties,
-  productReviews,
-  products,
-  users,
-} from "../../src/db/schema.ts";
-import { FieldCipher } from "../../src/platform/cipher.ts";
-import { Clock, type MutableClock } from "../../src/platform/clock.ts";
-import { PasswordHash, type Hasher } from "../../src/platform/hasher.ts";
-import { Mailer, type MemoryMailer } from "../../src/platform/mailer.ts";
-import { PaymentGateway, type FakeGateway } from "../../src/platform/payment-gateway.ts";
-import { MessageQueue, type MemoryQueue } from "../../src/platform/queue.ts";
-import { TotpService } from "../../src/platform/totp.ts";
+import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { PostgreSqlContainer } from "@testcontainers/postgresql"
+import { eq } from "drizzle-orm"
+import type { FastifyInstance } from "fastify"
+import { Email, Slug, type UserId } from "@prism/shared"
+import { generateSync } from "otplib"
+import { App, type Jobs, type MountedRoute } from "../../src/app.ts"
+import { Config } from "../../src/config.ts"
+import { Database, type DatabaseHandle } from "../../src/db/client.ts"
+import { Migrations } from "../../src/db/migrate.ts"
+import { Topology } from "../../src/messaging/topology.ts"
+import { AddressVerifier, type FakeAddressVerifier } from "../../src/platform/address-verifier.ts"
+import { brands, categories, productImages, productProperties, productReviews, products, users } from "../../src/db/schema.ts"
+import { FieldCipher } from "../../src/platform/cipher.ts"
+import { Clock, type MutableClock } from "../../src/platform/clock.ts"
+import { PasswordHash, type Hasher } from "../../src/platform/hasher.ts"
+import { Mailer, type MemoryMailer } from "../../src/platform/mailer.ts"
+import { PaymentGateway, type FakeGateway } from "../../src/platform/payment-gateway.ts"
+import { MessageQueue, type MemoryQueue } from "../../src/platform/queue.ts"
+import { TotpService } from "../../src/platform/totp.ts"
 
 /** Where the harness clock starts, so every expiry is reasoned from one instant. */
-export const TEST_START = new Date("2026-08-07T12:00:00.000Z");
+export const TEST_START = new Date("2026-08-07T12:00:00.000Z")
 
 /** A password that satisfies the policy, for tests that are not about the policy. */
-export const VALID_PASSWORD = "correct horse battery staple";
+export const VALID_PASSWORD = "correct horse battery staple"
 
 /** The Postgres the tests start: the release docker-compose.yml pins, so they run what the shop runs. */
-export const POSTGRES_IMAGE = "postgres:18.6-alpine";
+export const POSTGRES_IMAGE = "postgres:18.6-alpine"
 
 /** Argon2 costs ~50 ms per call; this keeps the shape at no cost. */
 export const fastHasher: Hasher = {
   hash: async (plaintext) => PasswordHash.schema.parse(`fake:${Buffer.from(plaintext).toString("base64")}`),
   verify: async (storedHash, plaintext) => storedHash === `fake:${Buffer.from(plaintext).toString("base64")}`,
   fakeVerify: async () => undefined,
-};
+}
 
 /** The real application over a real Postgres, with the slow and external parts faked. */
 export type Harness = Readonly<{
-  app: FastifyInstance;
-  database: DatabaseHandle;
-  clock: MutableClock;
-  mailer: MemoryMailer;
-  queue: MemoryQueue;
-  gateway: FakeGateway;
-  addressVerifier: FakeAddressVerifier;
-  jobs: Jobs;
+  app: FastifyInstance
+  database: DatabaseHandle
+  clock: MutableClock
+  mailer: MemoryMailer
+  queue: MemoryQueue
+  gateway: FakeGateway
+  addressVerifier: FakeAddressVerifier
+  jobs: Jobs
   /** Every route the app mounted. */
-  routes: readonly MountedRoute[];
+  routes: readonly MountedRoute[]
   /** Publishes the outbox and delivers the queue until neither has anything left. */
-  settle: () => Promise<void>;
-  config: Config;
+  settle: () => Promise<void>
+  config: Config
   /** The application's own cipher, for tests that write or read sealed columns. */
-  cipher: FieldCipher;
+  cipher: FieldCipher
   /** A live TOTP code for the harness clock, which is not the wall clock. */
-  totpCodeFor: (secret: string) => string;
-  mediaDirectory: string;
-  reset: () => Promise<void>;
-  stop: () => Promise<void>;
-}>;
+  totpCodeFor: (secret: string) => string
+  mediaDirectory: string
+  reset: () => Promise<void>
+  stop: () => Promise<void>
+}>
 
 /** An environment the config parser accepts, pointed at a throwaway database. */
 export const testEnvironment = (databaseUrl: string, mediaDirectory: string, rateLimitScale = 1_000_000) =>
@@ -124,13 +116,13 @@ export const testEnvironment = (databaseUrl: string, mediaDirectory: string, rat
     PAYMENT_WINDOW_SECONDS: 1800,
     PAYMENTS_MODE: "stripe" as const,
     STAFF_VERIFICATION_TTL_SECONDS: 8 * 60 * 60,
-  }) as const;
+  }) as const
 
 /** What a suite can choose about its harness. */
 export type HarnessOptions = Readonly<{
   /** Defaults to a fast stand-in; a suite about stored passwords passes the real one. */
-  hasher?: Hasher;
-}>;
+  hasher?: Hasher
+}>
 
 /**
  * Starts a Postgres container, migrates it, and builds the app against it.
@@ -138,29 +130,31 @@ export type HarnessOptions = Readonly<{
  * hour on; `stop` takes the container down.
  */
 export const startHarness = async (options: HarnessOptions = {}): Promise<Harness> => {
-  const container = await new PostgreSqlContainer(POSTGRES_IMAGE).start();
-  const mediaDirectory = await mkdtemp(join(tmpdir(), "prism-media-"));
+  const container = await new PostgreSqlContainer(POSTGRES_IMAGE).start()
+  const mediaDirectory = await mkdtemp(join(tmpdir(), "prism-media-"))
 
-  const config = Config.fromEnvironment(testEnvironment(container.getConnectionUri(), mediaDirectory));
-  const database = Database.open(config.database.url, config.database.poolSize);
-  const cipher = FieldCipher.create(config.encryptionKey);
-  await Migrations.apply(database.db, cipher);
+  const config = Config.fromEnvironment(testEnvironment(container.getConnectionUri(), mediaDirectory))
+  const database = Database.open(config.database.url, config.database.poolSize)
+  const cipher = FieldCipher.create(config.encryptionKey)
+  await Migrations.apply(database.db, cipher)
   // Every table the schema has, so a table added later is emptied too, and the delivery options as the migration planted them.
-  const tables = (await database.sql`SELECT tablename FROM pg_tables WHERE schemaname = 'public'`).map((row) => `"${String(row["tablename"])}"`);
-  const plantedShippingMethods = await database.sql`SELECT * FROM shipping_method`;
+  const tables = (await database.sql`SELECT tablename FROM pg_tables WHERE schemaname = 'public'`).map(
+    (row) => `"${String(row["tablename"])}"`,
+  )
+  const plantedShippingMethods = await database.sql`SELECT * FROM shipping_method`
 
-  const clock = Clock.mutable(TEST_START);
-  const mailer = Mailer.memory();
-  const queue = MessageQueue.memory(Topology.declarations());
-  const gateway = PaymentGateway.fake();
-  const addressVerifier = AddressVerifier.fake();
+  const clock = Clock.mutable(TEST_START)
+  const mailer = Mailer.memory()
+  const queue = MessageQueue.memory(Topology.declarations())
+  const gateway = PaymentGateway.fake()
+  const addressVerifier = AddressVerifier.fake()
   const { app, jobs, routes } = await App.build({
     config,
     database,
     overrides: { clock, mailer, hasher: options.hasher ?? fastHasher, queue, gateway, addressVerifier },
-  });
+  })
 
-  let epoch = TEST_START.getTime();
+  let epoch = TEST_START.getTime()
 
   return {
     app,
@@ -179,12 +173,12 @@ export const startHarness = async (options: HarnessOptions = {}): Promise<Harnes
     settle: async () => {
       // A handler may enqueue the next message, so this runs until a round moves nothing.
       for (let round = 0; round < 20; round += 1) {
-        const published = await jobs.relay.flush();
-        const delivered = await queue.drain();
-        if (published === 0 && delivered === 0) return;
+        const published = await jobs.relay.flush()
+        const delivered = await queue.drain()
+        if (published === 0 && delivered === 0) return
       }
 
-      throw new Error("The outbox and the queue did not settle in 20 rounds.");
+      throw new Error("The outbox and the queue did not settle in 20 rounds.")
     },
 
     totpCodeFor: (secret) =>
@@ -196,28 +190,28 @@ export const startHarness = async (options: HarnessOptions = {}): Promise<Harnes
       }),
 
     reset: async () => {
-      await database.sql.unsafe(`TRUNCATE ${tables.join(", ")} RESTART IDENTITY CASCADE`);
-      await database.sql`INSERT INTO shipping_method ${database.sql(plantedShippingMethods)}`;
-      await rm(mediaDirectory, { recursive: true, force: true });
-      await mkdir(mediaDirectory, { recursive: true });
-      epoch += 60 * 60 * 1000;
-      clock.set(new Date(epoch));
-      mailer.clear();
-      queue.clear();
-      gateway.clear();
-      addressVerifier.clear();
+      await database.sql.unsafe(`TRUNCATE ${tables.join(", ")} RESTART IDENTITY CASCADE`)
+      await database.sql`INSERT INTO shipping_method ${database.sql(plantedShippingMethods)}`
+      await rm(mediaDirectory, { recursive: true, force: true })
+      await mkdir(mediaDirectory, { recursive: true })
+      epoch += 60 * 60 * 1000
+      clock.set(new Date(epoch))
+      mailer.clear()
+      queue.clear()
+      gateway.clear()
+      addressVerifier.clear()
     },
 
     stop: async () => {
-      await app.close();
-      await database.close();
-      await container.stop();
-      await rm(mediaDirectory, { recursive: true, force: true });
+      await app.close()
+      await database.close()
+      await container.stop()
+      await rm(mediaDirectory, { recursive: true, force: true })
     },
-  };
-};
+  }
+}
 
-export const jsonOf = (response: { body: string }): Record<string, unknown> => JSON.parse(response.body);
+export const jsonOf = (response: { body: string }): Record<string, unknown> => JSON.parse(response.body)
 
 /** Reads a Set-Cookie value by name from an inject response; `undefined` when the answer set no such cookie. */
 export const cookieValue = (response: { cookies: readonly unknown[] }, name: string): string | undefined => {
@@ -230,20 +224,20 @@ export const cookieValue = (response: { cookies: readonly unknown[] }, name: str
       "value" in cookie &&
       typeof cookie.value === "string"
     ) {
-      return cookie.value;
+      return cookie.value
     }
   }
 
-  return undefined;
-};
+  return undefined
+}
 
 /** Reads a Set-Cookie value the test needs, and fails at once when the answer set none. */
 export const requiredCookie = (response: { cookies: readonly unknown[]; body: string }, name: string): string => {
-  const value = cookieValue(response, name);
-  if (value === undefined) throw new Error(`The answer set no ${name} cookie: ${response.body}`);
+  const value = cookieValue(response, name)
+  if (value === undefined) throw new Error(`The answer set no ${name} cookie: ${response.body}`)
 
-  return value;
-};
+  return value
+}
 
 /** Opens an account and hands back the response along with the token it granted. */
 export const registerUser = async (harness: Harness, email: string, password: string = VALID_PASSWORD) => {
@@ -251,51 +245,60 @@ export const registerUser = async (harness: Harness, email: string, password: st
     method: "POST",
     url: "/api/v1/auth/register",
     payload: { email, password, captchaToken: "test-token" },
-  });
+  })
 
-  if (response.statusCode !== 201) throw new Error(`Registering ${email} failed: ${response.statusCode} ${response.body}`);
+  if (response.statusCode !== 201) throw new Error(`Registering ${email} failed: ${response.statusCode} ${response.body}`)
 
-  const accessToken = jsonOf(response)["accessToken"];
-  if (typeof accessToken !== "string") throw new Error(`Registering ${email} granted no access token: ${response.body}`);
+  const accessToken = jsonOf(response)["accessToken"]
+  if (typeof accessToken !== "string") throw new Error(`Registering ${email} granted no access token: ${response.body}`)
 
-  return { response, accessToken, refreshToken: requiredCookie(response, "prism_refresh") };
-};
+  return { response, accessToken, refreshToken: requiredCookie(response, "prism_refresh") }
+}
 
 /** One product as a test describes it; everything but the name and price has a default. */
 export type ProductSeed = Readonly<{
-  slug: string;
-  name: string;
-  description?: string;
-  priceCents: number;
-  stock?: number;
-  category?: string;
-  brand?: string;
-  properties?: Readonly<Record<string, string>>;
-  images?: readonly string[];
+  slug: string
+  name: string
+  description?: string
+  priceCents: number
+  stock?: number
+  category?: string
+  brand?: string
+  properties?: Readonly<Record<string, string>>
+  images?: readonly string[]
   /** One review per star value listed, each from its own reviewer. */
-  ratings?: readonly number[];
-}>;
+  ratings?: readonly number[]
+}>
 
 /** A slug for a name a test writes in words. */
-const slugOf = (name: string): Slug => Slug.schema.parse(name.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
+const slugOf = (name: string): Slug => Slug.schema.parse(name.toLowerCase().replace(/[^a-z0-9]+/g, "-"))
 
 /** Plants the given products, creating whatever categories, brands and reviewers they name. */
 export const seedCatalog = async (harness: Harness, seeds: readonly ProductSeed[]): Promise<void> => {
-  const { db } = harness.database;
+  const { db } = harness.database
 
   for (const seed of seeds) {
-    const categoryName = seed.category ?? "Things";
-    const brandName = seed.brand ?? "Acme";
+    const categoryName = seed.category ?? "Things"
+    const brandName = seed.brand ?? "Acme"
 
-    await db.insert(categories).values({ slug: slugOf(categoryName), name: categoryName }).onConflictDoNothing();
-    await db.insert(brands).values({ slug: slugOf(brandName), name: brandName }).onConflictDoNothing();
+    await db
+      .insert(categories)
+      .values({ slug: slugOf(categoryName), name: categoryName })
+      .onConflictDoNothing()
+    await db
+      .insert(brands)
+      .values({ slug: slugOf(brandName), name: brandName })
+      .onConflictDoNothing()
 
     const [category] = await db
       .select({ id: categories.id })
       .from(categories)
-      .where(eq(categories.slug, slugOf(categoryName)));
-    const [brand] = await db.select({ id: brands.id }).from(brands).where(eq(brands.slug, slugOf(brandName)));
-    if (category === undefined || brand === undefined) throw new Error("seed lookup failed");
+      .where(eq(categories.slug, slugOf(categoryName)))
+    const [brand] = await db
+      .select({ id: brands.id })
+      .from(brands)
+      .where(eq(brands.slug, slugOf(brandName)))
+    if (category === undefined || brand === undefined) throw new Error("seed lookup failed")
 
     const [product] = await db
       .insert(products)
@@ -312,51 +315,50 @@ export const seedCatalog = async (harness: Harness, seeds: readonly ProductSeed[
         heightMm: 127,
         depthMm: 25,
       })
-      .returning({ id: products.id });
-    if (product === undefined) throw new Error("product insert returned no row");
+      .returning({ id: products.id })
+    if (product === undefined) throw new Error("product insert returned no row")
 
-    const properties = Object.entries(seed.properties ?? {});
+    const properties = Object.entries(seed.properties ?? {})
     if (properties.length > 0) {
-      await db.insert(productProperties).values(properties.map(([name, value]) => ({ productId: product.id, name, value })));
+      await db.insert(productProperties).values(properties.map(([name, value]) => ({ productId: product.id, name, value })))
     }
 
-    const images = seed.images ?? [];
+    const images = seed.images ?? []
     if (images.length > 0) {
-      await db.insert(productImages).values(images.map((file, position) => ({ productId: product.id, file, alt: seed.name, position })));
+      await db.insert(productImages).values(images.map((file, position) => ({ productId: product.id, file, alt: seed.name, position })))
     }
 
     for (const [index, rating] of (seed.ratings ?? []).entries()) {
-      const reviewer = await insertUser(harness, `reviewer-${seed.slug}-${index}@example.com`);
+      const reviewer = await insertUser(harness, `reviewer-${seed.slug}-${index}@example.com`)
 
       await db
         .insert(productReviews)
-        .values({ productId: product.id, userId: reviewer, rating, authorName: `Reviewer ${index + 1}`, status: "approved" });
+        .values({ productId: product.id, userId: reviewer, rating, authorName: `Reviewer ${index + 1}`, status: "approved" })
     }
   }
-};
+}
 
 /** Writes an account straight to the table, sealed the way the API seals it, and hands back its id. */
 export const insertUser = async (harness: Harness, email: string): Promise<UserId> => {
-  const address = Email.schema.parse(email);
+  const address = Email.schema.parse(email)
   const [row] = await harness.database.db
     .insert(users)
     .values({ email: harness.cipher.seal(address), emailIndex: harness.cipher.index("account-email", address) })
-    .returning({ id: users.id });
-  if (row === undefined) throw new Error("user insert returned no row");
+    .returning({ id: users.id })
+  if (row === undefined) throw new Error("user insert returned no row")
 
-  return row.id;
-};
+  return row.id
+}
 
 /** The blind index sign-in finds the account registered under `email` by. */
-export const emailIndexOf = (harness: Harness, email: string): Buffer =>
-  harness.cipher.index("account-email", Email.schema.parse(email));
+export const emailIndexOf = (harness: Harness, email: string): Buffer => harness.cipher.index("account-email", Email.schema.parse(email))
 
 /** The id of the account registered under `email`, found the way sign-in finds it. */
 export const userIdOf = async (harness: Harness, email: string): Promise<UserId | undefined> => {
   const [row] = await harness.database.db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.emailIndex, harness.cipher.index("account-email", Email.schema.parse(email))));
+    .where(eq(users.emailIndex, harness.cipher.index("account-email", Email.schema.parse(email))))
 
-  return row?.id;
-};
+  return row?.id
+}

@@ -1,21 +1,21 @@
-import { NavLink, Outlet } from "react-router";
-import { useSession } from "../../auth/session.ts";
-import { AdminAccess } from "../admin.ts";
-import { StaffGate } from "./StaffGate.tsx";
+import { NavLink, Outlet } from "react-router"
+import { useSession } from "../../auth/session.ts"
+import { AdminAccess } from "../admin.ts"
+import { StaffGate } from "./StaffGate.tsx"
 
 /**
  * The admin's frame: the sections the staff member's roles open, and the
  * page. Every page under it sits behind the staff gate.
  */
 export const AdminLayout = () => {
-  const session = useSession();
+  const session = useSession()
 
-  const sections = AdminAccess.sectionsFor(session?.roles ?? []);
+  const sections = AdminAccess.sectionsFor(session?.roles ?? [])
 
   const linkClass = ({ isActive }: Readonly<{ isActive: boolean }>) =>
     `block whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
       isActive ? "bg-accent-wash text-ink" : "text-ink-soft hover:bg-sunken hover:text-ink"
-    }`;
+    }`
 
   return (
     <StaffGate>
@@ -37,5 +37,5 @@ export const AdminLayout = () => {
         </div>
       </div>
     </StaffGate>
-  );
-};
+  )
+}

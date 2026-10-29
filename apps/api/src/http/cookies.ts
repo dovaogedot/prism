@@ -7,13 +7,13 @@
  * still surviving the top-level navigation an OAuth redirect makes.
  */
 
-import type { ChallengeToken } from "@prism/shared";
-import type { FastifyReply } from "fastify";
-import type { OAuthState } from "../platform/oauth.ts";
-import type { CartToken, RefreshToken } from "../platform/tokens.ts";
+import type { ChallengeToken } from "@prism/shared"
+import type { FastifyReply } from "fastify"
+import type { OAuthState } from "../platform/oauth.ts"
+import type { CartToken, RefreshToken } from "../platform/tokens.ts"
 
 /** Whether the connection is https, which decides the `Secure` attribute. */
-export type CookieOptions = Readonly<{ secure: boolean }>;
+export type CookieOptions = Readonly<{ secure: boolean }>
 
 export const Cookies = {
   /** The refresh token, the only credential that survives a reload. */
@@ -43,20 +43,20 @@ export const Cookies = {
 
   /** Puts a refresh token in the browser, expiring when the token does. */
   setRefresh: (reply: FastifyReply, token: RefreshToken, expiresAt: Date, options: CookieOptions): void => {
-    reply.setCookie(Cookies.REFRESH, token, { ...Cookies.attributes(options), expires: expiresAt });
+    reply.setCookie(Cookies.REFRESH, token, { ...Cookies.attributes(options), expires: expiresAt })
   },
 
   clearRefresh: (reply: FastifyReply, options: CookieOptions): void => {
-    reply.clearCookie(Cookies.REFRESH, Cookies.attributes(options));
+    reply.clearCookie(Cookies.REFRESH, Cookies.attributes(options))
   },
 
   /** Keeps the state value for the length of one sign-in. */
   setOAuthState: (reply: FastifyReply, state: OAuthState, options: CookieOptions): void => {
-    reply.setCookie(Cookies.OAUTH_STATE, state, { ...Cookies.attributes(options), maxAge: 600 });
+    reply.setCookie(Cookies.OAUTH_STATE, state, { ...Cookies.attributes(options), maxAge: 600 })
   },
 
   clearOAuthState: (reply: FastifyReply, options: CookieOptions): void => {
-    reply.clearCookie(Cookies.OAUTH_STATE, Cookies.attributes(options));
+    reply.clearCookie(Cookies.OAUTH_STATE, Cookies.attributes(options))
   },
 
   /** Short-lived: the challenge itself expires, this only stops it lingering. */
@@ -64,19 +64,19 @@ export const Cookies = {
     reply.setCookie(Cookies.TWO_FACTOR, challengeToken, {
       ...Cookies.attributes(options),
       maxAge: 600,
-    });
+    })
   },
 
   clearTwoFactor: (reply: FastifyReply, options: CookieOptions): void => {
-    reply.clearCookie(Cookies.TWO_FACTOR, Cookies.attributes(options));
+    reply.clearCookie(Cookies.TWO_FACTOR, Cookies.attributes(options))
   },
 
   /** Keeps a guest cart's token for as long as the cart lives. */
   setCart: (reply: FastifyReply, token: CartToken, expiresAt: Date, options: CookieOptions): void => {
-    reply.setCookie(Cookies.CART, token, { ...Cookies.attributes(options, Cookies.CART_PATH), expires: expiresAt });
+    reply.setCookie(Cookies.CART, token, { ...Cookies.attributes(options, Cookies.CART_PATH), expires: expiresAt })
   },
 
   clearCart: (reply: FastifyReply, options: CookieOptions): void => {
-    reply.clearCookie(Cookies.CART, Cookies.attributes(options, Cookies.CART_PATH));
+    reply.clearCookie(Cookies.CART, Cookies.attributes(options, Cookies.CART_PATH))
   },
-} as const;
+} as const

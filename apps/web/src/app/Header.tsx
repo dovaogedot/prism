@@ -1,12 +1,12 @@
-import { Link } from "react-router";
-import { CartPreviewButton } from "../features/cart/components/index.ts";
-import { CategoryMenu, SearchCombobox } from "../features/catalog/components/index.ts";
-import { AccountMenu } from "./AccountMenu.tsx";
-import { LookClass } from "../shared/layout/look.ts";
-import { ThemeToggle } from "../shared/layout/ThemeToggle.tsx";
+import { Link } from "react-router"
+import { CartPreviewButton } from "../features/cart/components/index.ts"
+import { CategoryMenu, SearchCombobox } from "../features/catalog/components/index.ts"
+import { AccountMenu } from "./AccountMenu.tsx"
+import { LookClass } from "../shared/layout/look.ts"
+import { ThemeToggle } from "../shared/layout/ThemeToggle.tsx"
 
 /** What the menu button does: open the drawer. */
-export type HeaderProps = Readonly<{ onOpenMenu: () => void }>;
+export type HeaderProps = Readonly<{ onOpenMenu: () => void }>
 
 /**
  * The bar on top of every page: the menu button on a narrow page, the
@@ -17,7 +17,15 @@ export const Header = ({ onOpenMenu }: HeaderProps) => (
   <header className="sticky top-0 z-20 border-b border-line bg-canvas/85 backdrop-blur-md">
     <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-2 gap-y-2 px-4 py-3 sm:gap-x-3 sm:px-6 md:h-16 md:flex-nowrap md:py-0">
       <button className={`${LookClass.icon} lg:hidden`} type="button" onClick={onOpenMenu} aria-label="Open menu" aria-haspopup="dialog">
-        <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+        <svg
+          className="size-5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          aria-hidden="true"
+        >
           <path d="M4 7h16M4 12h16M4 17h16" />
         </svg>
       </button>
@@ -46,4 +54,4 @@ export const Header = ({ onOpenMenu }: HeaderProps) => (
       <AccountMenu />
     </div>
   </header>
-);
+)

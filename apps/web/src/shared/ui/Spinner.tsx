@@ -1,7 +1,4 @@
 /** A turning ring, hidden from screen readers because the label already says it. */
 export const Spinner = () => (
-  <span
-    aria-hidden="true"
-    className="size-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
-  />
-);
+  <span aria-hidden="true" className="size-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent" />
+)

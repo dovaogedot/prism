@@ -5,7 +5,7 @@
  */
 
 /** A page's own part of the title, and its meta description. */
-export type PageText = Readonly<{ title: string; description: string }>;
+export type PageText = Readonly<{ title: string; description: string }>
 
 export const PageText = {
   home: {
@@ -198,4 +198,4 @@ export const PageText = {
     description:
       "The Prism admin is for the shop's staff: moderators, content and delivery managers, support and admins. Customers find their orders and their account elsewhere.",
   },
-} as const satisfies Record<string, PageText>;
+} as const satisfies Record<string, PageText>

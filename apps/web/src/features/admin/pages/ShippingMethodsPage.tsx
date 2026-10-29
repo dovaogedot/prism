@@ -1,16 +1,16 @@
-import { Price, ShippingOption, type ShippingMethodInput, type ShippingMethodView } from "@prism/shared";
-import { useState } from "react";
-import { match, P } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { Alert, Button, ConfirmDialog, DataTable, Dialog, Skeleton, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { useAdminRead, useAdminWrite } from "../admin.ts";
-import { AdminPage, ShippingMethodForm } from "../components/index.ts";
-import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts";
+import { Price, ShippingOption, type ShippingMethodInput, type ShippingMethodView } from "@prism/shared"
+import { useState } from "react"
+import { match, P } from "ts-pattern"
+import { Api } from "../../../shared/api/client.ts"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { Alert, Button, ConfirmDialog, DataTable, Dialog, Skeleton, Toast } from "../../../shared/ui/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { useAdminRead, useAdminWrite } from "../admin.ts"
+import { AdminPage, ShippingMethodForm } from "../components/index.ts"
+import { useActionFailure } from "../../../shared/hooks/use-action-failure.ts"
 
 /** Which form is open: none, a new option, or the option given. */
-type Editing = Readonly<{ kind: "none" }> | Readonly<{ kind: "new" }> | Readonly<{ kind: "existing"; option: ShippingMethodView }>;
+type Editing = Readonly<{ kind: "none" }> | Readonly<{ kind: "new" }> | Readonly<{ kind: "existing"; option: ShippingMethodView }>
 
 /**
  * The delivery options checkout offers, in their order. An option no order
@@ -18,24 +18,28 @@ type Editing = Readonly<{ kind: "none" }> | Readonly<{ kind: "new" }> | Readonly
  * orders keep what they were charged.
  */
 export const ShippingMethodsPage = () => {
-  const options = useAdminRead<{ items: readonly ShippingMethodView[] }>("/shipping-methods");
+  const options = useAdminRead<{ items: readonly ShippingMethodView[] }>("/shipping-methods")
 
-  const [editing, setEditing] = useState<Editing>({ kind: "none" });
+  const [editing, setEditing] = useState<Editing>({ kind: "none" })
 
-  const [deleting, setDeleting] = useState<ShippingMethodView | undefined>(undefined);
+  const [deleting, setDeleting] = useState<ShippingMethodView | undefined>(undefined)
 
-  const [failure, setFailure] = useActionFailure();
+  const [failure, setFailure] = useActionFailure()
 
-  const create = useAdminWrite((input: ShippingMethodInput) => Api.post<ShippingMethodView>("/admin/shipping-methods", input));
+  const create = useAdminWrite((input: ShippingMethodInput) => Api.post<ShippingMethodView>("/admin/shipping-methods", input))
 
-  const update = useAdminWrite((input: ShippingMethodInput) => Api.put<ShippingMethodView>(`/admin/shipping-methods/${input.code}`, input));
+  const update = useAdminWrite((input: ShippingMethodInput) => Api.put<ShippingMethodView>(`/admin/shipping-methods/${input.code}`, input))
 
-  const remove = useAdminWrite((code: string) => Api.requestEmpty(`/admin/shipping-methods/${code}`, { method: "DELETE" }));
+  const remove = useAdminWrite((code: string) => Api.requestEmpty(`/admin/shipping-methods/${code}`, { method: "DELETE" }))
 
-  const nextPosition = Math.max(0, ...(options.data?.items ?? []).map((option) => option.position + 10));
+  const nextPosition = Math.max(0, ...(options.data?.items ?? []).map((option) => option.position + 10))
 
   return (
-    <AdminPage text={PageText.adminShipping} heading="Delivery options" actions={<Button onClick={() => setEditing({ kind: "new" })}>New option</Button>}>
+    <AdminPage
+      text={PageText.adminShipping}
+      heading="Delivery options"
+      actions={<Button onClick={() => setEditing({ kind: "new" })}>New option</Button>}
+    >
       {failure === undefined ? null : <Alert>{failure}</Alert>}
 
       {match(options)
@@ -58,8 +62,17 @@ export const ShippingMethodsPage = () => {
                 ),
               },
               { key: "price", header: "Price", isNumeric: true, cell: (option) => Price.format(option.priceCents) },
-              { key: "free", header: "Free from", isNumeric: true, cell: (option) => (option.freeFromCents === undefined ? "Never" : Price.format(option.freeFromCents)) },
-              { key: "window", header: "Arrives in", cell: (option) => <span className="whitespace-nowrap">{ShippingOption.windowOf(option)}</span> },
+              {
+                key: "free",
+                header: "Free from",
+                isNumeric: true,
+                cell: (option) => (option.freeFromCents === undefined ? "Never" : Price.format(option.freeFromCents)),
+              },
+              {
+                key: "window",
+                header: "Arrives in",
+                cell: (option) => <span className="whitespace-nowrap">{ShippingOption.windowOf(option)}</span>,
+              },
               { key: "active", header: "Offered", cell: (option) => (option.isActive ? "Yes" : "No") },
               { key: "orders", header: "Orders", isNumeric: true, cell: (option) => option.orderCount },
               {
@@ -67,7 +80,12 @@ export const ShippingMethodsPage = () => {
                 header: "Actions",
                 cell: (option) => (
                   <span className="flex gap-1">
-                    <Button tone="quiet" type="button" onClick={() => setEditing({ kind: "existing", option })} aria-label={`Edit ${option.name}`}>
+                    <Button
+                      tone="quiet"
+                      type="button"
+                      onClick={() => setEditing({ kind: "existing", option })}
+                      aria-label={`Edit ${option.name}`}
+                    >
                       Edit
                     </Button>
                     {option.orderCount === 0 ? (
@@ -82,7 +100,11 @@ export const ShippingMethodsPage = () => {
           />
         ))}
 
-      <Dialog isOpen={editing.kind !== "none"} title={editing.kind === "existing" ? `Edit ${editing.option.name}` : "New delivery option"} onClose={() => setEditing({ kind: "none" })}>
+      <Dialog
+        isOpen={editing.kind !== "none"}
+        title={editing.kind === "existing" ? `Edit ${editing.option.name}` : "New delivery option"}
+        onClose={() => setEditing({ kind: "none" })}
+      >
         {editing.kind === "none" ? null : (
           <ShippingMethodForm
             key={editing.kind === "existing" ? editing.option.code : "new"}
@@ -91,12 +113,12 @@ export const ShippingMethodsPage = () => {
             onCancel={() => setEditing({ kind: "none" })}
             onSave={async (input) => {
               if (editing.kind === "existing") {
-                await update.mutateAsync(input);
+                await update.mutateAsync(input)
               } else {
-                await create.mutateAsync(input);
+                await create.mutateAsync(input)
               }
-              setEditing({ kind: "none" });
-              Toast.show(`${input.name} is saved.`);
+              setEditing({ kind: "none" })
+              Toast.show(`${input.name} is saved.`)
             }}
           />
         )}
@@ -109,21 +131,21 @@ export const ShippingMethodsPage = () => {
         isBusy={remove.isPending}
         onCancel={() => setDeleting(undefined)}
         onConfirm={() => {
-          if (deleting === undefined) return;
+          if (deleting === undefined) return
           remove.mutate(deleting.code, {
             onSuccess: () => {
-              Toast.show(`${deleting.name} is deleted.`);
-              setDeleting(undefined);
+              Toast.show(`${deleting.name} is deleted.`)
+              setDeleting(undefined)
             },
             onError: (reason) => {
-              setFailure(Failure.message(reason));
-              setDeleting(undefined);
+              setFailure(Failure.message(reason))
+              setDeleting(undefined)
             },
-          });
+          })
         }}
       >
         Checkout stops offering it. No order used it, so no order changes.
       </ConfirmDialog>
     </AdminPage>
-  );
-};
+  )
+}

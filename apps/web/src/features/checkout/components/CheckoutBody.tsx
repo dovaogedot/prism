@@ -9,29 +9,29 @@ import {
   type PlaceOrderResult,
   type SavedAddress,
   type ShippingOption,
-} from "@prism/shared";
-import { zodResolver } from "@hookform/resolvers/zod";
-import type { Stripe, StripeElements } from "@stripe/stripe-js";
-import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState, type ReactNode } from "react";
-import { useForm, useWatch } from "react-hook-form";
-import { Link, useNavigate } from "react-router";
-import { match } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
-import { useWide } from "../../../shared/layout/use-wide.ts";
-import { Alert, Button, Card, IssueList } from "../../../shared/ui/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { CartCache } from "../../cart/cart.ts";
-import { CheckoutDefaults, CheckoutIssues, PaymentErrors, PaymentMode } from "../checkout.ts";
-import { NextPath } from "../../auth/next-path.ts";
-import { AddressFields } from "./AddressFields.tsx";
-import { BillingFields } from "./BillingFields.tsx";
-import { ContactFields } from "./ContactFields.tsx";
-import { OrderSummary } from "./OrderSummary.tsx";
-import { PaymentFields } from "./PaymentFields.tsx";
-import { SavedAddressPicker } from "./SavedAddressPicker.tsx";
-import { ShippingOptions } from "./ShippingOptions.tsx";
-import { ShippingOptionKeys } from "../../../shared/api/shipping-options.ts";
+} from "@prism/shared"
+import { zodResolver } from "@hookform/resolvers/zod"
+import type { Stripe, StripeElements } from "@stripe/stripe-js"
+import { useQueryClient } from "@tanstack/react-query"
+import { useEffect, useState, type ReactNode } from "react"
+import { useForm, useWatch } from "react-hook-form"
+import { Link, useNavigate } from "react-router"
+import { match } from "ts-pattern"
+import { Api } from "../../../shared/api/client.ts"
+import { useWide } from "../../../shared/layout/use-wide.ts"
+import { Alert, Button, Card, IssueList } from "../../../shared/ui/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { CartCache } from "../../cart/cart.ts"
+import { CheckoutDefaults, CheckoutIssues, PaymentErrors, PaymentMode } from "../checkout.ts"
+import { NextPath } from "../../auth/next-path.ts"
+import { AddressFields } from "./AddressFields.tsx"
+import { BillingFields } from "./BillingFields.tsx"
+import { ContactFields } from "./ContactFields.tsx"
+import { OrderSummary } from "./OrderSummary.tsx"
+import { PaymentFields } from "./PaymentFields.tsx"
+import { SavedAddressPicker } from "./SavedAddressPicker.tsx"
+import { ShippingOptions } from "./ShippingOptions.tsx"
+import { ShippingOptionKeys } from "../../../shared/api/shipping-options.ts"
 
 /**
  * Whether a card can be taken, and the Stripe objects to take it with. A
@@ -41,17 +41,17 @@ export type CheckoutPayments =
   | Readonly<{ status: "unavailable" }>
   | Readonly<{ status: "simulated" }>
   | Readonly<{ status: "loading" }>
-  | Readonly<{ status: "ready"; stripe: Stripe; elements: StripeElements }>;
+  | Readonly<{ status: "ready"; stripe: Stripe; elements: StripeElements }>
 
 /** The cart being bought, the delivery options, how it is paid for, and what a signed-in customer starts with. */
 export type CheckoutBodyProps = Readonly<{
-  cart: CartView;
-  options: readonly [ShippingOption, ...ShippingOption[]];
-  payments: CheckoutPayments;
-  prefill?: CheckoutPrefill;
+  cart: CartView
+  options: readonly [ShippingOption, ...ShippingOption[]]
+  payments: CheckoutPayments
+  prefill?: CheckoutPrefill
   /** The signed-in customer's saved addresses; absent for a guest. */
-  savedAddresses?: readonly SavedAddress[];
-}>;
+  savedAddresses?: readonly SavedAddress[]
+}>
 
 /**
  * The single-page checkout: contact, address, shipping, payment and the
@@ -60,110 +60,109 @@ export type CheckoutBodyProps = Readonly<{
  * first step that fails and saying why where it happened.
  */
 export const CheckoutBody = ({ cart, options, payments, prefill, savedAddresses }: CheckoutBodyProps) => {
-  const navigate = useNavigate();
+  const navigate = useNavigate()
 
-  const client = useQueryClient();
+  const client = useQueryClient()
 
-  const wide = useWide();
+  const wide = useWide()
 
-  const [problem, setProblem] = useState<ReactNode | undefined>(undefined);
+  const [problem, setProblem] = useState<ReactNode | undefined>(undefined)
 
-  const [cartProblem, setCartProblem] = useState<string | undefined>(undefined);
+  const [cartProblem, setCartProblem] = useState<string | undefined>(undefined)
 
-  const [paymentError, setPaymentError] = useState<string | undefined>(undefined);
+  const [paymentError, setPaymentError] = useState<string | undefined>(undefined)
 
   const form = useForm({
     resolver: zodResolver(CheckoutForm.schema),
-    defaultValues:
-      prefill === undefined ? CheckoutDefaults.empty(options[0].code) : CheckoutDefaults.fromPrefill(prefill, options),
-  });
+    defaultValues: prefill === undefined ? CheckoutDefaults.empty(options[0].code) : CheckoutDefaults.fromPrefill(prefill, options),
+  })
 
-  const method = useWatch({ control: form.control, name: "shippingMethod" });
+  const method = useWatch({ control: form.control, name: "shippingMethod" })
 
-  const option = options.find((candidate) => candidate.code === method) ?? options[0];
-  const totals = Pricing.totals(cart.lines, option);
-  const blocked = Cart.issues(cart.lines).length > 0;
+  const option = options.find((candidate) => candidate.code === method) ?? options[0]
+  const totals = Pricing.totals(cart.lines, option)
+  const blocked = Cart.issues(cart.lines).length > 0
   // Which products the cart holds and how many; a refreshed price or stock leaves it as it is.
-  const contents = cart.lines.map((line) => `${line.productId}:${line.quantity}`).join(",");
+  const contents = cart.lines.map((line) => `${line.productId}:${line.quantity}`).join(",")
 
   // Stripe's fields are told the amount, which has to match the intent the server creates.
   useEffect(() => {
-    if (payments.status === "ready") payments.elements.update({ amount: totals.totalCents });
-  }, [payments, totals.totalCents]);
+    if (payments.status === "ready") payments.elements.update({ amount: totals.totalCents })
+  }, [payments, totals.totalCents])
 
   // A refusal about the cart stands until the customer changes what is in it.
   useEffect(() => {
-    setCartProblem(undefined);
-  }, [contents]);
+    setCartProblem(undefined)
+  }, [contents])
 
   const refused = (reason: unknown): void => {
-    const failure = Api.failureOf(reason);
+    const failure = Api.failureOf(reason)
 
     if (failure === undefined) {
-      setProblem(Failure.unrefused(reason));
-      return;
+      setProblem(Failure.unrefused(reason))
+      return
     }
 
     match(failure.code)
       .with("ValidationFailed", () => {
-        const { fields, other } = CheckoutIssues.split(failure.issues);
+        const { fields, other } = CheckoutIssues.split(failure.issues)
 
         // The first field the server refused takes focus, so the customer lands on it.
-        fields.forEach((field, index) => form.setError(field.path, { message: field.message }, { shouldFocus: index === 0 }));
-        if (other.length > 0) setProblem(<IssueList issues={other} />);
+        fields.forEach((field, index) => form.setError(field.path, { message: field.message }, { shouldFocus: index === 0 }))
+        if (other.length > 0) setProblem(<IssueList issues={other} />)
       })
       .with("OutOfStock", "CartChanged", "CartEmpty", () => {
-        setCartProblem(failure.message);
+        setCartProblem(failure.message)
         // The total the server compared also takes the delivery option's price, which may have changed too.
-        void client.invalidateQueries({ queryKey: CartCache.all });
-        void client.invalidateQueries({ queryKey: ShippingOptionKeys.all });
+        void client.invalidateQueries({ queryKey: CartCache.all })
+        void client.invalidateQueries({ queryKey: ShippingOptionKeys.all })
       })
       .with("PaymentGatewayUnavailable", "PaymentsUnavailable", () => setPaymentError(failure.message))
-      .otherwise(() => setProblem(failure.message));
-  };
+      .otherwise(() => setProblem(failure.message))
+  }
 
   const submit = form.handleSubmit(async (values) => {
-    setProblem(undefined);
-    setCartProblem(undefined);
-    setPaymentError(undefined);
+    setProblem(undefined)
+    setCartProblem(undefined)
+    setPaymentError(undefined)
 
     if (payments.status === "simulated") {
       const placed = await Api.post<PlaceOrderResult>("/orders", { ...values, expectedTotalCents: totals.totalCents }).catch(
         (reason: unknown) => {
-          refused(reason);
-          return undefined;
+          refused(reason)
+          return undefined
         },
-      );
+      )
       if (placed !== undefined) {
-        void navigate(`/orders/${placed.orderId}?placed=1${placed.key === undefined ? "" : `&key=${placed.key}`}`);
+        void navigate(`/orders/${placed.orderId}?placed=1${placed.key === undefined ? "" : `&key=${placed.key}`}`)
       }
-      return;
+      return
     }
 
     if (payments.status !== "ready") {
-      setPaymentError(DomainError.message.PaymentsUnavailable);
-      return;
+      setPaymentError(DomainError.message.PaymentsUnavailable)
+      return
     }
 
     // Stripe checks the number, expiry and CVC before anything is sent anywhere.
-    const checked = await payments.elements.submit();
+    const checked = await payments.elements.submit()
     if (checked.error !== undefined) {
-      setPaymentError(PaymentErrors.messageOf(checked.error));
-      return;
+      setPaymentError(PaymentErrors.messageOf(checked.error))
+      return
     }
 
     const placed = await Api.post<PlaceOrderResult>("/orders", { ...values, expectedTotalCents: totals.totalCents }).catch(
       (reason: unknown) => {
-        refused(reason);
-        return undefined;
+        refused(reason)
+        return undefined
       },
-    );
-    if (placed === undefined) return;
+    )
+    if (placed === undefined) return
 
     // The cart is not refetched here: the order now holds its stock, so the
     // customer's own lines would read as short. The order page refetches it
     // once the payment settles.
-    const target = `/orders/${placed.orderId}?placed=1${placed.key === undefined ? "" : `&key=${placed.key}`}`;
+    const target = `/orders/${placed.orderId}?placed=1${placed.key === undefined ? "" : `&key=${placed.key}`}`
     const confirmed = await payments.stripe
       .confirmPayment({
         elements: payments.elements,
@@ -171,24 +170,24 @@ export const CheckoutBody = ({ cart, options, payments, prefill, savedAddresses 
         redirect: "if_required",
         confirmParams: { return_url: `${window.location.origin}${target}` },
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
 
     if (confirmed?.error !== undefined && PaymentErrors.isRefusal(confirmed.error)) {
       // The order stays unpaid; Stripe tells the server, which releases the stock and emails.
-      setPaymentError(`${PaymentErrors.messageOf(confirmed.error)} Place the order again to retry.`);
-      return;
+      setPaymentError(`${PaymentErrors.messageOf(confirmed.error)} Place the order again to retry.`)
+      return
     }
 
     // Paid, or not known when the confirmation was lost on the way: the order
     // page shows where the payment stands, so nobody pays for a second order.
-    void navigate(target);
-  });
+    void navigate(target)
+  })
 
-  const summary = <OrderSummary cart={cart} totals={totals} />;
+  const summary = <OrderSummary cart={cart} totals={totals} />
 
   // Every refusal shows beside "Place order", where the customer is looking,
   // whatever the width and whether the summary is open.
-  const refusal = problem ?? cartProblem;
+  const refusal = problem ?? cartProblem
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_22rem] lg:items-start">
@@ -216,7 +215,9 @@ export const CheckoutBody = ({ cart, options, payments, prefill, savedAddresses 
         <ContactFields form={form} />
 
         <div className="space-y-4">
-          {savedAddresses === undefined || savedAddresses.length === 0 ? null : <SavedAddressPicker form={form} addresses={savedAddresses} />}
+          {savedAddresses === undefined || savedAddresses.length === 0 ? null : (
+            <SavedAddressPicker form={form} addresses={savedAddresses} />
+          )}
           <AddressFields form={form} />
           {savedAddresses === undefined ? null : (
             <label className="flex items-center gap-2.5 text-sm text-ink">
@@ -228,14 +229,9 @@ export const CheckoutBody = ({ cart, options, payments, prefill, savedAddresses 
 
         <BillingFields form={form} />
         <ShippingOptions form={form} options={options} subtotalCents={totals.subtotalCents} />
-        <PaymentFields
-          mode={PaymentMode.of[payments.status]}
-          {...(paymentError === undefined ? {} : { error: paymentError })}
-        />
+        <PaymentFields mode={PaymentMode.of[payments.status]} {...(paymentError === undefined ? {} : { error: paymentError })} />
 
-        {blocked ? (
-          <Alert>Some items are not available in that quantity. Fix them in the summary to place the order.</Alert>
-        ) : null}
+        {blocked ? <Alert>Some items are not available in that quantity. Fix them in the summary to place the order.</Alert> : null}
 
         {refusal === undefined ? null : <Alert>{refusal}</Alert>}
 
@@ -251,5 +247,5 @@ export const CheckoutBody = ({ cart, options, payments, prefill, savedAddresses 
 
       {wide ? <Card className="sticky top-24 p-5">{summary}</Card> : null}
     </div>
-  );
-};
+  )
+}

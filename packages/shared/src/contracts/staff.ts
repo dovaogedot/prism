@@ -5,10 +5,10 @@
  * what an account cannot use, both through `Permission.can`.
  */
 
-import { z } from "zod";
+import { z } from "zod"
 
 /** One staff job. An account holds any set of them, or none. */
-export type StaffRole = (typeof StaffRole.NAMES)[number];
+export type StaffRole = (typeof StaffRole.NAMES)[number]
 export const StaffRole = {
   NAMES: ["moderator", "content_manager", "delivery_manager", "support", "admin"] as const,
   schema: z.enum(["moderator", "content_manager", "delivery_manager", "support", "admin"]),
@@ -22,14 +22,12 @@ export const StaffRole = {
   /** The job each role does, as the staff pages explain it. */
   description: {
     moderator: "Keeps reviews fair: approves, rejects and deletes them.",
-    content_manager:
-      "Owns the catalog: products, images, categories and brands, bulk import, and the featured products.",
-    delivery_manager:
-      "Gets paid orders to customers: moves them through processing, shipped and delivered, and sets the delivery options.",
+    content_manager: "Owns the catalog: products, images, categories and brands, bulk import, and the featured products.",
+    delivery_manager: "Gets paid orders to customers: moves them through processing, shipped and delivered, and sets the delivery options.",
     support: "Helps customers: finds their accounts and orders, cancels orders that have not shipped, and refunds.",
     admin: "Runs the shop: every permission, plus staff roles, account status, 2FA resets and the audit log.",
   } as const satisfies Record<"moderator" | "content_manager" | "delivery_manager" | "support" | "admin", string>,
-} as const;
+} as const
 
 /**
  * One thing a staff member may do. Spelled out rather than read off `NAMES`,
@@ -45,7 +43,7 @@ export type Permission =
   | "orders.refund"
   | "customers.view"
   | "staff.manage"
-  | "audit.view";
+  | "audit.view"
 
 export const Permission = {
   NAMES: [
@@ -62,8 +60,7 @@ export const Permission = {
   ] as const satisfies readonly Permission[],
   label: {
     "reviews.moderate": "See the review queue; approve, reject and delete reviews",
-    "catalog.manage":
-      "Create, edit and delete products, images, categories and brands; feature products on the home page",
+    "catalog.manage": "Create, edit and delete products, images, categories and brands; feature products on the home page",
     "catalog.import": "Bulk import products from JSON or CSV",
     "orders.view": "See every order, with its lines, contact, addresses and payment",
     "orders.fulfill": "Move orders to processing, shipped and delivered",
@@ -89,11 +86,10 @@ export const Permission = {
 
   /** Whether an account holding `roles` may do `permission`. */
   can: (roles: readonly StaffRole[], permission: Permission): boolean => {
-    const granted: readonly StaffRole[] = Permission.grantedTo[permission];
-    return roles.some((role) => granted.includes(role));
+    const granted: readonly StaffRole[] = Permission.grantedTo[permission]
+    return roles.some((role) => granted.includes(role))
   },
 
   /** Every permission `roles` grant together, in the order of `NAMES`. */
-  of: (roles: readonly StaffRole[]): readonly Permission[] =>
-    Permission.NAMES.filter((permission) => Permission.can(roles, permission)),
-} as const;
+  of: (roles: readonly StaffRole[]): readonly Permission[] => Permission.NAMES.filter((permission) => Permission.can(roles, permission)),
+} as const

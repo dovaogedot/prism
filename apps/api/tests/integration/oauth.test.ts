@@ -4,9 +4,9 @@
  * account link and the identity separation are all the real code paths.
  */
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { Email, OAuthProvider } from "@prism/shared";
-import { MockAuthorizationCode, ProviderSubject } from "../../src/platform/oauth.ts";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
+import { Email, OAuthProvider } from "@prism/shared"
+import { MockAuthorizationCode, ProviderSubject } from "../../src/platform/oauth.ts"
 import {
   cookieValue,
   requiredCookie,
@@ -16,129 +16,124 @@ import {
   startHarness,
   VALID_PASSWORD,
   type Harness,
-} from "../support/harness.ts";
+} from "../support/harness.ts"
 
-let harness: Harness;
+let harness: Harness
 
 beforeAll(async () => {
-  harness = await startHarness();
-}, 180_000);
+  harness = await startHarness()
+}, 180_000)
 
 afterAll(async () => {
-  await harness.stop();
-});
+  await harness.stop()
+})
 
 beforeEach(async () => {
-  await harness.reset();
-});
+  await harness.reset()
+})
 
-const OAUTH_STATE_COOKIE = "prism_oauth_state";
+const OAUTH_STATE_COOKIE = "prism_oauth_state"
 
 /** Walks a provider's flow from the button to a usable refresh cookie. */
 const signInWith = async (provider: string, email: string) => {
   const begin = await harness.app.inject({
     method: "GET",
     url: `/api/v1/auth/oauth/${provider}`,
-  });
+  })
 
-  const state = requiredCookie(begin, OAUTH_STATE_COOKIE);
+  const state = requiredCookie(begin, OAUTH_STATE_COOKIE)
 
   const code = MockAuthorizationCode.issue(
     provider === "github" ? "github" : "google",
     Email.schema.parse(email),
     harness.config.tokens.secret,
-  );
+  )
 
   const callback = await harness.app.inject({
     method: "GET",
     url: `/api/v1/auth/oauth/${provider}/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`,
     cookies: { [OAUTH_STATE_COOKIE]: state },
-  });
+  })
 
-  return { begin, state, callback };
-};
+  return { begin, state, callback }
+}
 
 describe("GET /auth/oauth/providers", () => {
   it("advertises every provider when running on the stand-in", async () => {
     const response = await harness.app.inject({
       method: "GET",
       url: "/api/v1/auth/oauth/providers",
-    });
+    })
 
-    expect(response.statusCode).toBe(200);
-    expect(jsonOf(response)).toEqual({ providers: [...OAuthProvider.NAMES], mock: true });
-  });
-});
+    expect(response.statusCode).toBe(200)
+    expect(jsonOf(response)).toEqual({ providers: [...OAuthProvider.NAMES], mock: true })
+  })
+})
 
 describe.each(OAuthProvider.NAMES)("signing in with %s", (provider) => {
   it("redirects to the provider and remembers the state", async () => {
     const begin = await harness.app.inject({
       method: "GET",
       url: `/api/v1/auth/oauth/${provider}`,
-    });
+    })
 
-    expect(begin.statusCode).toBe(302);
-    expect(begin.headers["location"]).toContain(`/oauth/${provider}/consent`);
-    expect(cookieValue(begin, OAUTH_STATE_COOKIE)).toMatch(/.+/);
-  });
+    expect(begin.statusCode).toBe(302)
+    expect(begin.headers["location"]).toContain(`/oauth/${provider}/consent`)
+    expect(cookieValue(begin, OAUTH_STATE_COOKIE)).toMatch(/.+/)
+  })
 
   it("creates an account with no password on first sign-in", async () => {
-    const { callback } = await signInWith(
-      provider,
-      `${provider}-newcomer@example.com`,
-    );
-    const refreshToken = requiredCookie(callback, "prism_refresh");
+    const { callback } = await signInWith(provider, `${provider}-newcomer@example.com`)
+    const refreshToken = requiredCookie(callback, "prism_refresh")
 
-    expect(callback.statusCode).toBe(302);
-    expect(callback.headers["location"]).toContain("/oauth/complete");
-    expect(refreshToken).not.toBe("");
+    expect(callback.statusCode).toBe(302)
+    expect(callback.headers["location"]).toContain("/oauth/complete")
+    expect(refreshToken).not.toBe("")
 
     const grant = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
       cookies: { prism_refresh: refreshToken },
-    });
+    })
 
     expect(jsonOf(grant)["user"]).toMatchObject({
       email: `${provider}-newcomer@example.com`,
       hasPassword: false,
-    });
-  });
+    })
+  })
 
   it("records the identity against the provider, with the subject sealed", async () => {
-    await signInWith(provider, `${provider}-linked@example.com`);
+    await signInWith(provider, `${provider}-linked@example.com`)
 
-    const rows = await harness.database.sql<
-      { provider: string; subject: Uint8Array }[]
-    >`SELECT provider, subject FROM oauth_identity`;
-    const subject = harness.cipher.open(Buffer.from(rows[0]?.subject ?? []), ProviderSubject.schema);
+    const rows = await harness.database.sql<{ provider: string; subject: Uint8Array }[]>`SELECT provider, subject FROM oauth_identity`
+    const subject = harness.cipher.open(Buffer.from(rows[0]?.subject ?? []), ProviderSubject.schema)
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.provider).toBe(provider);
-    expect(subject).not.toBe(`${provider}-linked@example.com`);
-    expect(Buffer.from(rows[0]?.subject ?? []).toString("latin1")).not.toContain(subject);
-  });
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.provider).toBe(provider)
+    expect(subject).not.toBe(`${provider}-linked@example.com`)
+    expect(Buffer.from(rows[0]?.subject ?? []).toString("latin1")).not.toContain(subject)
+  })
 
   it("reuses the same account on a second sign-in", async () => {
-    await signInWith(provider, `${provider}-repeat@example.com`);
-    await signInWith(provider, `${provider}-repeat@example.com`);
+    await signInWith(provider, `${provider}-repeat@example.com`)
+    await signInWith(provider, `${provider}-repeat@example.com`)
 
     const users = await harness.database
-      .sql`SELECT id FROM app_user WHERE email_index = ${emailIndexOf(harness, `${provider}-repeat@example.com`)}`;
-    const identities = await harness.database.sql`SELECT id FROM oauth_identity`;
+      .sql`SELECT id FROM app_user WHERE email_index = ${emailIndexOf(harness, `${provider}-repeat@example.com`)}`
+    const identities = await harness.database.sql`SELECT id FROM oauth_identity`
 
-    expect(users).toHaveLength(1);
-    expect(identities).toHaveLength(1);
-  });
+    expect(users).toHaveLength(1)
+    expect(identities).toHaveLength(1)
+  })
 
   it("links to an existing password account rather than duplicating the person", async () => {
-    await registerUser(harness, `${provider}-existing@example.com`);
-    await signInWith(provider, `${provider}-existing@example.com`);
+    await registerUser(harness, `${provider}-existing@example.com`)
+    await signInWith(provider, `${provider}-existing@example.com`)
 
     const users = await harness.database
-      .sql`SELECT id FROM app_user WHERE email_index = ${emailIndexOf(harness, `${provider}-existing@example.com`)}`;
+      .sql`SELECT id FROM app_user WHERE email_index = ${emailIndexOf(harness, `${provider}-existing@example.com`)}`
 
-    expect(users).toHaveLength(1);
+    expect(users).toHaveLength(1)
 
     // Linking must not remove the password they already had.
     const grant = await harness.app.inject({
@@ -148,199 +143,181 @@ describe.each(OAuthProvider.NAMES)("signing in with %s", (provider) => {
         email: `${provider}-existing@example.com`,
         password: VALID_PASSWORD,
       },
-    });
+    })
 
-    expect(jsonOf(grant)["status"]).toBe("authenticated");
-  });
+    expect(jsonOf(grant)["status"]).toBe("authenticated")
+  })
 
   it("reports the provider it was actually signed in with", async () => {
     // The account page reads this, so the provider has to travel on the
     // wire rather than be guessed at the far end.
-    const refreshToken = requiredCookie((await signInWith(
-      provider,
-      `${provider}-named@example.com`,
-    )).callback, "prism_refresh");
+    const refreshToken = requiredCookie((await signInWith(provider, `${provider}-named@example.com`)).callback, "prism_refresh")
 
     const grant = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
       cookies: { prism_refresh: refreshToken },
-    });
+    })
 
     expect(jsonOf(grant)["user"]).toMatchObject({
       hasPassword: false,
       providers: [provider],
-    });
-  });
+    })
+  })
 
   it("adds the provider to an account that already had a password", async () => {
-    await registerUser(harness, `${provider}-fresh@example.com`);
-    const refreshToken = requiredCookie((await signInWith(
-      provider,
-      `${provider}-fresh@example.com`,
-    )).callback, "prism_refresh");
+    await registerUser(harness, `${provider}-fresh@example.com`)
+    const refreshToken = requiredCookie((await signInWith(provider, `${provider}-fresh@example.com`)).callback, "prism_refresh")
 
     const grant = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
       cookies: { prism_refresh: refreshToken },
-    });
+    })
 
     expect(jsonOf(grant)["user"]).toMatchObject({
       hasPassword: true,
       providers: [provider],
-    });
-  });
+    })
+  })
 
   it("rejects a callback whose state does not match the cookie", async () => {
     const code = MockAuthorizationCode.issue(
       provider === "github" ? "github" : "google",
       Email.schema.parse("forged@example.com"),
       harness.config.tokens.secret,
-    );
+    )
 
     const response = await harness.app.inject({
       method: "GET",
       url: `/api/v1/auth/oauth/${provider}/callback?code=${encodeURIComponent(code)}&state=attacker-state`,
       cookies: { [OAUTH_STATE_COOKIE]: "the-real-state" },
-    });
+    })
 
-    expect(response.statusCode).toBe(302);
-    expect(response.headers["location"]).toBe(`${harness.config.http.webOrigin}/login?error=OAuthStateInvalid`);
-    expect(await harness.database.sql`SELECT id FROM app_user`).toHaveLength(0);
-  });
+    expect(response.statusCode).toBe(302)
+    expect(response.headers["location"]).toBe(`${harness.config.http.webOrigin}/login?error=OAuthStateInvalid`)
+    expect(await harness.database.sql`SELECT id FROM app_user`).toHaveLength(0)
+  })
 
   it("rejects a callback with no state cookie at all", async () => {
     const response = await harness.app.inject({
       method: "GET",
       url: `/api/v1/auth/oauth/${provider}/callback?code=abc&state=abc`,
-    });
+    })
 
-    expect(response.headers["location"]).toBe(`${harness.config.http.webOrigin}/login?error=OAuthStateInvalid`);
-  });
+    expect(response.headers["location"]).toBe(`${harness.config.http.webOrigin}/login?error=OAuthStateInvalid`)
+  })
 
   it("sends a person who canceled at the provider back to the sign-in page", async () => {
     const response = await harness.app.inject({
       method: "GET",
       url: `/api/v1/auth/oauth/${provider}/callback?error=access_denied&state=the-real-state`,
       cookies: { [OAUTH_STATE_COOKIE]: "the-real-state" },
-    });
+    })
 
-    expect(response.statusCode).toBe(302);
-    expect(response.headers["location"]).toBe(`${harness.config.http.webOrigin}/login?error=OAuthCanceled`);
-  });
-});
+    expect(response.statusCode).toBe(302)
+    expect(response.headers["location"]).toBe(`${harness.config.http.webOrigin}/login?error=OAuthCanceled`)
+  })
+})
 
 describe("an account with more than one provider", () => {
   it("lists every provider linked to it", async () => {
     // Two providers reporting the same verified address are one person, so
     // the second sign-in links rather than duplicating — and the account has
     // to be able to say both.
-    await signInWith("google", "both@example.com");
-    const refreshToken = requiredCookie((await signInWith("github", "both@example.com")).callback, "prism_refresh");
+    await signInWith("google", "both@example.com")
+    const refreshToken = requiredCookie((await signInWith("github", "both@example.com")).callback, "prism_refresh")
 
-    const users = await harness.database
-      .sql`SELECT id FROM app_user WHERE email_index = ${emailIndexOf(harness, "both@example.com")}`;
+    const users = await harness.database.sql`SELECT id FROM app_user WHERE email_index = ${emailIndexOf(harness, "both@example.com")}`
 
     const grant = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
       cookies: { prism_refresh: refreshToken },
-    });
+    })
 
-    expect(users).toHaveLength(1);
+    expect(users).toHaveLength(1)
     expect(jsonOf(grant)["user"]).toMatchObject({
       providers: ["github", "google"],
-    });
-  });
-});
+    })
+  })
+})
 
 describe("adding a password to a provider account", () => {
-  const setPassword = async (
-    accessToken: string,
-    password: string,
-    currentPassword?: string,
-  ) =>
+  const setPassword = async (accessToken: string, password: string, currentPassword?: string) =>
     harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/password",
       headers: { authorization: `Bearer ${accessToken}` },
-      payload:
-        currentPassword === undefined
-          ? { password }
-          : { currentPassword, password },
-    });
+      payload: currentPassword === undefined ? { password } : { currentPassword, password },
+    })
 
   /** Signs in through a provider and returns a usable access token. */
   const tokenFor = async (email: string): Promise<string> => {
-    const refreshToken = requiredCookie((await signInWith("google", email)).callback, "prism_refresh");
+    const refreshToken = requiredCookie((await signInWith("google", email)).callback, "prism_refresh")
     const grant = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
       cookies: { prism_refresh: refreshToken },
-    });
-    return String(jsonOf(grant)["accessToken"]);
-  };
+    })
+    return String(jsonOf(grant)["accessToken"])
+  }
 
   it("lets an account with no password set one", async () => {
-    const token = await tokenFor("adds-password@example.com");
-    const response = await setPassword(token, VALID_PASSWORD);
+    const token = await tokenFor("adds-password@example.com")
+    const response = await setPassword(token, VALID_PASSWORD)
 
-    expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(200)
     expect(jsonOf(response)).toMatchObject({
       hasPassword: true,
       providers: ["google"],
-    });
-  });
+    })
+  })
 
   it("makes email sign-in work afterwards", async () => {
-    const token = await tokenFor("then-logs-in@example.com");
-    await setPassword(token, VALID_PASSWORD);
+    const token = await tokenFor("then-logs-in@example.com")
+    await setPassword(token, VALID_PASSWORD)
 
     const login = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/login",
       payload: { email: "then-logs-in@example.com", password: VALID_PASSWORD },
-    });
+    })
 
-    expect(jsonOf(login)["status"]).toBe("authenticated");
-  });
+    expect(jsonOf(login)["status"]).toBe("authenticated")
+  })
 
   it("keeps the provider working too", async () => {
-    const token = await tokenFor("keeps-provider@example.com");
-    await setPassword(token, VALID_PASSWORD);
+    const token = await tokenFor("keeps-provider@example.com")
+    await setPassword(token, VALID_PASSWORD)
 
-    const { callback } = await signInWith("google", "keeps-provider@example.com");
+    const { callback } = await signInWith("google", "keeps-provider@example.com")
     const users = await harness.database
-      .sql`SELECT id FROM app_user WHERE email_index = ${emailIndexOf(harness, "keeps-provider@example.com")}`;
+      .sql`SELECT id FROM app_user WHERE email_index = ${emailIndexOf(harness, "keeps-provider@example.com")}`
 
-    expect(callback.statusCode).toBe(302);
-    expect(users).toHaveLength(1);
-  });
+    expect(callback.statusCode).toBe(302)
+    expect(users).toHaveLength(1)
+  })
 
   it("needs the current password once one exists", async () => {
     // A stolen session must not be able to change the password on its own.
-    const token = await tokenFor("has-password@example.com");
-    await setPassword(token, VALID_PASSWORD);
+    const token = await tokenFor("has-password@example.com")
+    await setPassword(token, VALID_PASSWORD)
 
-    const blind = await setPassword(token, `${VALID_PASSWORD}-again`);
-    const wrong = await setPassword(token, `${VALID_PASSWORD}-again`, "not-it-at-all");
+    const blind = await setPassword(token, `${VALID_PASSWORD}-again`)
+    const wrong = await setPassword(token, `${VALID_PASSWORD}-again`, "not-it-at-all")
 
-    expect(blind.statusCode).toBe(401);
-    expect(wrong.statusCode).toBe(401);
-  });
+    expect(blind.statusCode).toBe(401)
+    expect(wrong.statusCode).toBe(401)
+  })
 
   it("changes the password when the current one is right", async () => {
-    const token = await tokenFor("changes-password@example.com");
-    await setPassword(token, VALID_PASSWORD);
+    const token = await tokenFor("changes-password@example.com")
+    await setPassword(token, VALID_PASSWORD)
 
-    const changed = await setPassword(
-      token,
-      `${VALID_PASSWORD}-again`,
-      VALID_PASSWORD,
-    );
+    const changed = await setPassword(token, `${VALID_PASSWORD}-again`, VALID_PASSWORD)
 
-    expect(changed.statusCode).toBe(200);
+    expect(changed.statusCode).toBe(200)
 
     const login = await harness.app.inject({
       method: "POST",
@@ -349,41 +326,42 @@ describe("adding a password to a provider account", () => {
         email: "changes-password@example.com",
         password: `${VALID_PASSWORD}-again`,
       },
-    });
+    })
 
-    expect(jsonOf(login)["status"]).toBe("authenticated");
-  });
+    expect(jsonOf(login)["status"]).toBe("authenticated")
+  })
 
   it("ends every other session of the account, and keeps the one that changed it", async () => {
-    const { accessToken: other } = await registerUser(harness, "two-sessions@example.com");
+    const { accessToken: other } = await registerUser(harness, "two-sessions@example.com")
     const login = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/login",
       payload: { email: "two-sessions@example.com", password: VALID_PASSWORD },
-    });
-    const current = String((jsonOf(login)["grant"] as { accessToken: string }).accessToken);
+    })
+    const current = String((jsonOf(login)["grant"] as { accessToken: string }).accessToken)
 
-    expect((await setPassword(current, `${VALID_PASSWORD}-again`, VALID_PASSWORD)).statusCode).toBe(200);
+    expect((await setPassword(current, `${VALID_PASSWORD}-again`, VALID_PASSWORD)).statusCode).toBe(200)
 
-    const me = (token: string) => harness.app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: `Bearer ${token}` } });
-    expect([(await me(other)).statusCode, (await me(current)).statusCode]).toEqual([401, 200]);
-  });
+    const me = (token: string) =>
+      harness.app.inject({ method: "GET", url: "/api/v1/auth/me", headers: { authorization: `Bearer ${token}` } })
+    expect([(await me(other)).statusCode, (await me(current)).statusCode]).toEqual([401, 200])
+  })
 
   it("rejects a weak password", async () => {
-    const token = await tokenFor("weak@example.com");
-    expect((await setPassword(token, "password")).statusCode).toBe(422);
-  });
+    const token = await tokenFor("weak@example.com")
+    expect((await setPassword(token, "password")).statusCode).toBe(422)
+  })
 
   it("refuses an unauthenticated caller", async () => {
     const response = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/password",
       payload: { password: VALID_PASSWORD },
-    });
+    })
 
-    expect(response.statusCode).toBe(401);
-  });
-});
+    expect(response.statusCode).toBe(401)
+  })
+})
 
 describe("a provider sign-in into an account with two-factor", () => {
   /** Enrolls the signed-in account in TOTP and returns nothing but the effect. */
@@ -392,72 +370,71 @@ describe("a provider sign-in into an account with two-factor", () => {
       method: "POST",
       url: "/api/v1/auth/2fa/setup",
       headers: { authorization: `Bearer ${accessToken}` },
-    });
+    })
 
-    const uri = String(jsonOf(setup)["uri"]);
-    const secret = new URL(uri).searchParams.get("secret") ?? "";
+    const uri = String(jsonOf(setup)["uri"])
+    const secret = new URL(uri).searchParams.get("secret") ?? ""
 
     await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/2fa/enable",
       headers: { authorization: `Bearer ${accessToken}` },
       payload: { code: harness.totpCodeFor(secret) },
-    });
-  };
+    })
+  }
 
   const signedInToken = async (email: string): Promise<string> => {
-    const refreshToken = requiredCookie((await signInWith("google", email)).callback, "prism_refresh");
+    const refreshToken = requiredCookie((await signInWith("google", email)).callback, "prism_refresh")
     const grant = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
       cookies: { prism_refresh: refreshToken },
-    });
-    return String(jsonOf(grant)["accessToken"]);
-  };
+    })
+    return String(jsonOf(grant)["accessToken"])
+  }
 
   it("challenges instead of signing straight in", async () => {
     // Otherwise the provider is a way around a factor the owner asked for —
     // and since a matching verified address links itself, that is not a bar
     // the owner controls.
-    await enableTwoFactor(await signedInToken("guarded@example.com"));
+    await enableTwoFactor(await signedInToken("guarded@example.com"))
 
-    const { callback } = await signInWith("google", "guarded@example.com");
+    const { callback } = await signInWith("google", "guarded@example.com")
 
-    expect(callback.statusCode).toBe(302);
-    expect(callback.headers["location"]).toContain("/login/2fa");
-    expect(cookieValue(callback, "prism_refresh")).toBeUndefined();
-    expect(cookieValue(callback, "prism_2fa_challenge")).toMatch(/.+/);
-  });
+    expect(callback.statusCode).toBe(302)
+    expect(callback.headers["location"]).toContain("/login/2fa")
+    expect(cookieValue(callback, "prism_refresh")).toBeUndefined()
+    expect(cookieValue(callback, "prism_2fa_challenge")).toMatch(/.+/)
+  })
 
   it("keeps the challenge out of the redirect URL", async () => {
-    await enableTwoFactor(await signedInToken("no-token-in-url@example.com"));
-    const { callback } = await signInWith("google", "no-token-in-url@example.com");
+    await enableTwoFactor(await signedInToken("no-token-in-url@example.com"))
+    const { callback } = await signInWith("google", "no-token-in-url@example.com")
 
-    expect(String(callback.headers["location"])).not.toContain("challenge");
-    expect(String(callback.headers["location"])).not.toContain("eyJ");
-  });
+    expect(String(callback.headers["location"])).not.toContain("challenge")
+    expect(String(callback.headers["location"])).not.toContain("eyJ")
+  })
 
   it("completes with a code and the cookie alone", async () => {
-    const token = await signedInToken("finishes@example.com");
+    const token = await signedInToken("finishes@example.com")
     const setup = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/2fa/setup",
       headers: { authorization: `Bearer ${token}` },
-    });
-    const secret =
-      new URL(String(jsonOf(setup)["uri"])).searchParams.get("secret") ?? "";
+    })
+    const secret = new URL(String(jsonOf(setup)["uri"])).searchParams.get("secret") ?? ""
     await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/2fa/enable",
       headers: { authorization: `Bearer ${token}` },
       payload: { code: harness.totpCodeFor(secret) },
-    });
+    })
 
-    const { callback } = await signInWith("google", "finishes@example.com");
-    const challenge = requiredCookie(callback, "prism_2fa_challenge");
+    const { callback } = await signInWith("google", "finishes@example.com")
+    const challenge = requiredCookie(callback, "prism_2fa_challenge")
 
     // A code is accepted once, so the sign-in waits for the next one.
-    harness.clock.advanceSeconds(30);
+    harness.clock.advanceSeconds(30)
 
     // No challenge token in the body: the page that collects the code cannot
     // read an httpOnly cookie, so the server finds it.
@@ -466,82 +443,76 @@ describe("a provider sign-in into an account with two-factor", () => {
       url: "/api/v1/auth/login/2fa",
       cookies: { prism_2fa_challenge: challenge },
       payload: { code: harness.totpCodeFor(secret) },
-    });
+    })
 
-    expect(done.statusCode).toBe(200);
-    expect(jsonOf(done)["status"]).toBe("authenticated");
-    expect(cookieValue(done, "prism_refresh")).toMatch(/.+/);
-  });
+    expect(done.statusCode).toBe(200)
+    expect(jsonOf(done)["status"]).toBe("authenticated")
+    expect(cookieValue(done, "prism_refresh")).toMatch(/.+/)
+  })
 
   it("refuses a code with no challenge anywhere", async () => {
     const response = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/login/2fa",
       payload: { code: "123456" },
-    });
+    })
 
-    expect(response.statusCode).toBe(401);
-  });
-});
+    expect(response.statusCode).toBe(401)
+  })
+})
 
 describe("provider isolation", () => {
   it("refuses a code minted for another provider", async () => {
     const begin = await harness.app.inject({
       method: "GET",
       url: "/api/v1/auth/oauth/google",
-    });
-    const state = requiredCookie(begin, OAUTH_STATE_COOKIE);
+    })
+    const state = requiredCookie(begin, OAUTH_STATE_COOKIE)
 
     // Signed for GitHub, presented at Google's callback.
-    const code = MockAuthorizationCode.issue(
-      "github",
-      Email.schema.parse("crossover@example.com"),
-      harness.config.tokens.secret,
-    );
+    const code = MockAuthorizationCode.issue("github", Email.schema.parse("crossover@example.com"), harness.config.tokens.secret)
 
     const callback = await harness.app.inject({
       method: "GET",
       url: `/api/v1/auth/oauth/google/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`,
       cookies: { [OAUTH_STATE_COOKIE]: state },
-    });
+    })
 
     // The failure redirects to the sign-in page rather than 500ing.
-    expect(callback.statusCode).toBe(302);
-    expect(callback.headers["location"]).toContain("error=OAuthExchangeFailed");
-    expect(await harness.database.sql`SELECT id FROM app_user`).toHaveLength(0);
-  });
+    expect(callback.statusCode).toBe(302)
+    expect(callback.headers["location"]).toContain("error=OAuthExchangeFailed")
+    expect(await harness.database.sql`SELECT id FROM app_user`).toHaveLength(0)
+  })
 
   it("treats the same address on two providers as two identities on one account", async () => {
-    await signInWith("google", "both@example.com");
-    await signInWith("github", "both@example.com");
+    await signInWith("google", "both@example.com")
+    await signInWith("github", "both@example.com")
 
-    const users = await harness.database
-      .sql`SELECT id FROM app_user WHERE email_index = ${emailIndexOf(harness, "both@example.com")}`;
-    const identities = await harness.database
-      .sql<{ provider: string }[]>`SELECT provider FROM oauth_identity ORDER BY provider`;
+    const users = await harness.database.sql`SELECT id FROM app_user WHERE email_index = ${emailIndexOf(harness, "both@example.com")}`
+    const identities = await harness.database.sql<{ provider: string }[]>`SELECT provider FROM oauth_identity ORDER BY provider`
 
     // One person, one account, two ways in.
-    expect(users).toHaveLength(1);
-    expect(identities.map((row) => row.provider)).toEqual(["github", "google"]);
-  });
-});
+    expect(users).toHaveLength(1)
+    expect(identities.map((row) => row.provider)).toEqual(["github", "google"])
+  })
+})
 
 describe("unknown providers", () => {
   // A name that is not a provider is rejected either by the schema (422) or,
   // for a path the router normalizes away first, by routing (404). Both mean
   // "not a provider" and neither signs anyone in, which is what matters.
-  const REJECTED = [404, 422];
+  const REJECTED = [404, 422]
 
   it("refuses to treat an unknown name as a provider", async () => {
     for (const name of ["facebook", "GOOGLE", "..", "google%20", "goo.gle"]) {
       const response = await harness.app.inject({
         method: "GET",
         url: `/api/v1/auth/oauth/${name}`,
-      });
+      })
 
-      expect(REJECTED, name).toContain(response.statusCode);
+      expect(REJECTED, name).toContain(response.statusCode)
     }
-  });
+  })
 
   it("resolves a dot-segment path to the provider it normalizes to", async () => {
     // `google/../github` is `github` after the router normalizes it, and is
@@ -551,64 +522,64 @@ describe("unknown providers", () => {
     const response = await harness.app.inject({
       method: "GET",
       url: "/api/v1/auth/oauth/google/../github",
-    });
+    })
 
-    expect(response.statusCode).toBe(302);
-    expect(response.headers["location"]).toContain("/oauth/github/consent");
-  });
+    expect(response.statusCode).toBe(302)
+    expect(response.headers["location"]).toContain("/oauth/github/consent")
+  })
 
   it("refuses an unknown provider's callback", async () => {
     const response = await harness.app.inject({
       method: "GET",
       url: "/api/v1/auth/oauth/facebook/callback?code=abc&state=abc",
-    });
+    })
 
-    expect(REJECTED).toContain(response.statusCode);
-  });
+    expect(REJECTED).toContain(response.statusCode)
+  })
 
   it("never mints a session for one", async () => {
     await harness.app.inject({
       method: "GET",
       url: "/api/v1/auth/oauth/facebook/callback?code=abc&state=abc",
-    });
+    })
 
-    expect(await harness.database.sql`SELECT id FROM session`).toHaveLength(0);
-  });
-});
+    expect(await harness.database.sql`SELECT id FROM session`).toHaveLength(0)
+  })
+})
 
 describe("the mock consent screen", () => {
   it("names the provider it is standing in for", async () => {
     const response = await harness.app.inject({
       method: "GET",
       url: "/api/v1/auth/oauth/github/consent?state=abc&redirect_uri=http://localhost:3000/cb",
-    });
+    })
 
-    expect(response.statusCode).toBe(200);
-    expect(response.headers["content-type"]).toContain("text/html");
-    expect(response.body).toContain("GitHub");
-    expect(response.body).toContain("/api/v1/auth/oauth/github/consent");
-  });
+    expect(response.statusCode).toBe(200)
+    expect(response.headers["content-type"]).toContain("text/html")
+    expect(response.body).toContain("GitHub")
+    expect(response.body).toContain("/api/v1/auth/oauth/github/consent")
+  })
 
   it("escapes the values it echoes back into the form", async () => {
     const response = await harness.app.inject({
       method: "GET",
       url: `/api/v1/auth/oauth/google/consent?state=${encodeURIComponent('"><script>alert(1)</script>')}&redirect_uri=http://localhost:3000/cb`,
-    });
+    })
 
-    expect(response.body).not.toContain("<script>alert(1)</script>");
-    expect(response.body).toContain("&lt;script&gt;");
-  });
+    expect(response.body).not.toContain("<script>alert(1)</script>")
+    expect(response.body).toContain("&lt;script&gt;")
+  })
 
   it("issues a code the matching provider accepts", async () => {
     const consent = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/oauth/github/consent",
       payload: { email: "via-form@example.com", state: "abc" },
-    });
+    })
 
-    expect(consent.statusCode).toBe(302);
-    expect(consent.headers["location"]).toContain("code=");
-  });
+    expect(consent.statusCode).toBe(302)
+    expect(consent.headers["location"]).toContain("code=")
+  })
 
   it("takes the form as the browser posts it, urlencoded", async () => {
     const consent = await harness.app.inject({
@@ -616,18 +587,18 @@ describe("the mock consent screen", () => {
       url: "/api/v1/auth/oauth/github/consent",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       payload: new URLSearchParams({ email: "via-form@example.com", state: "abc" }).toString(),
-    });
+    })
 
-    expect(consent.statusCode).toBe(302);
-  });
+    expect(consent.statusCode).toBe(302)
+  })
 
   it("sends the code only to this shop's own callback, whatever the form names", async () => {
     const consent = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/oauth/github/consent",
       payload: { email: "via-form@example.com", state: "abc", redirect_uri: "https://elsewhere.example/steal" },
-    });
+    })
 
-    expect(String(consent.headers["location"]).startsWith(`${harness.config.http.webOrigin}/api/v1/auth/oauth/github/callback?`)).toBe(true);
-  });
-});
+    expect(String(consent.headers["location"]).startsWith(`${harness.config.http.webOrigin}/api/v1/auth/oauth/github/callback?`)).toBe(true)
+  })
+})

@@ -1,11 +1,11 @@
-import { Price, type ProductSummary } from "@prism/shared";
-import { Link } from "react-router";
-import { Stars } from "../../../shared/ui/index.ts";
-import { Picture } from "./Picture.tsx";
-import { Stock } from "./Stock.tsx";
+import { Price, type ProductSummary } from "@prism/shared"
+import { Link } from "react-router"
+import { Stars } from "../../../shared/ui/index.ts"
+import { Picture } from "./Picture.tsx"
+import { Stock } from "./Stock.tsx"
 
 /** The product the row shows. */
-export type ProductListItemProps = Readonly<{ product: ProductSummary }>;
+export type ProductListItemProps = Readonly<{ product: ProductSummary }>
 
 /** A product as a row of the list view: the picture beside its name, brand, category, rating, price and stock. */
 export const ProductListItem = ({ product }: ProductListItemProps) => (
@@ -31,4 +31,4 @@ export const ProductListItem = ({ product }: ProductListItemProps) => (
       </div>
     </div>
   </article>
-);
+)

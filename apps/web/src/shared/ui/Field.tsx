@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react"
 
 /**
  * `| undefined` is explicit because `exactOptionalPropertyTypes` is on and
@@ -6,20 +6,19 @@ import type { ComponentProps, ReactNode } from "react";
  */
 export type FieldProps = ComponentProps<"input"> &
   Readonly<{
-    label: string;
-    hint?: string | undefined;
-    error?: string | undefined;
+    label: string
+    hint?: string | undefined
+    error?: string | undefined
     /** A control in the input's row, after it, such as the button that submits it. */
-    action?: ReactNode;
-  }>;
+    action?: ReactNode
+  }>
 
 /** A labeled input, with its hint and error tied to it for a screen reader. */
 export const Field = ({ label, hint, error, action, id, className = "", ...rest }: FieldProps) => {
-  const fieldId = id ?? rest.name ?? label.toLowerCase().replace(/\s+/g, "-");
-  const describedBy = [
-    hint === undefined ? null : `${fieldId}-hint`,
-    error === undefined ? null : `${fieldId}-error`,
-  ].filter((value): value is string => value !== null);
+  const fieldId = id ?? rest.name ?? label.toLowerCase().replace(/\s+/g, "-")
+  const describedBy = [hint === undefined ? null : `${fieldId}-hint`, error === undefined ? null : `${fieldId}-error`].filter(
+    (value): value is string => value !== null,
+  )
 
   const input = (
     <input
@@ -34,7 +33,7 @@ export const Field = ({ label, hint, error, action, id, className = "", ...rest 
         className,
       ].join(" ")}
     />
-  );
+  )
 
   return (
     <div className="space-y-1.5">
@@ -62,5 +61,5 @@ export const Field = ({ label, hint, error, action, id, className = "", ...rest 
         </p>
       )}
     </div>
-  );
-};
+  )
+}

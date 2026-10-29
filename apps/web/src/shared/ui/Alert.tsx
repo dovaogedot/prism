@@ -1,12 +1,12 @@
-import type { ReactNode } from "react";
-import { match, P } from "ts-pattern";
+import type { ReactNode } from "react"
+import { match, P } from "ts-pattern"
 
 /** What an alert says, and how loudly. */
 export type AlertProps = Readonly<{
-  tone?: "danger" | "accent";
-  title?: string;
-  children: ReactNode;
-}>;
+  tone?: "danger" | "accent"
+  title?: string
+  children: ReactNode
+}>
 
 /** A message the page announces as soon as it appears. */
 export const Alert = ({ tone = "danger", title, children }: AlertProps) => (
@@ -14,16 +14,12 @@ export const Alert = ({ tone = "danger", title, children }: AlertProps) => (
     role="alert"
     className={[
       "rounded-lg border px-4 py-3 text-sm",
-      tone === "danger"
-        ? "border-danger/30 bg-danger-wash text-ink"
-        : "border-accent/30 bg-accent-wash text-ink",
+      tone === "danger" ? "border-danger/30 bg-danger-wash text-ink" : "border-accent/30 bg-accent-wash text-ink",
     ].join(" ")}
   >
     {match(title)
-      .with(P.string.select(), (heading) => (
-        <p className="mb-0.5 font-semibold">{heading}</p>
-      ))
+      .with(P.string.select(), (heading) => <p className="mb-0.5 font-semibold">{heading}</p>)
       .otherwise(() => null)}
     <div className="text-ink-soft">{children}</div>
   </div>
-);
+)

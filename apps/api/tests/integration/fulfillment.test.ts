@@ -5,82 +5,82 @@
  * memory queue, except where the simulated provider is under test.
  */
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { App } from "../../src/app.ts";
-import { Config, Environment } from "../../src/config.ts";
-import { Topology } from "../../src/messaging/topology.ts";
-import { OutboxRelay } from "../../src/messaging/outbox.ts";
-import { PaymentGateway } from "../../src/platform/payment-gateway.ts";
-import { MessageQueue } from "../../src/platform/queue.ts";
-import { CHECKOUT, Shop, type Caller } from "../support/commerce.ts";
-import { jsonOf, registerUser, seedCatalog, startHarness, testEnvironment, type Harness } from "../support/harness.ts";
-import { Staff, type TestAccount } from "../support/staff.ts";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
+import { App } from "../../src/app.ts"
+import { Config, Environment } from "../../src/config.ts"
+import { Topology } from "../../src/messaging/topology.ts"
+import { OutboxRelay } from "../../src/messaging/outbox.ts"
+import { PaymentGateway } from "../../src/platform/payment-gateway.ts"
+import { MessageQueue } from "../../src/platform/queue.ts"
+import { CHECKOUT, Shop, type Caller } from "../support/commerce.ts"
+import { jsonOf, registerUser, seedCatalog, startHarness, testEnvironment, type Harness } from "../support/harness.ts"
+import { Staff, type TestAccount } from "../support/staff.ts"
 
-let harness: Harness;
-let delivery: TestAccount;
-let support: TestAccount;
+let harness: Harness
+let delivery: TestAccount
+let support: TestAccount
 
 beforeAll(async () => {
-  harness = await startHarness();
-}, 180_000);
+  harness = await startHarness()
+}, 180_000)
 
 afterAll(async () => {
-  await harness.stop();
-});
+  await harness.stop()
+})
 
 beforeEach(async () => {
-  await harness.reset();
+  await harness.reset()
   await seedCatalog(harness, [
     { slug: "desk-lamp", name: "Desk Lamp", priceCents: 2500, stock: 50 },
     { slug: "sticker", name: "Sticker", priceCents: 20, stock: 50 },
-  ]);
-  delivery = await Staff.account(harness, "delivery@example.com", ["delivery_manager"]);
-  support = await Staff.account(harness, "support@example.com", ["support"]);
-});
+  ])
+  delivery = await Staff.account(harness, "delivery@example.com", ["delivery_manager"])
+  support = await Staff.account(harness, "support@example.com", ["support"])
+})
 
 type Detail = {
-  status: string;
-  shippingMethodName: string;
-  shippingCents: number;
-  estimatedDelivery: { from: string; to: string };
-  events: { status: string; note?: string }[];
-  payment?: { status: string; reference?: string; refund?: string };
-  trackingNumber?: string;
-  nextStatus?: string;
-  canCancel: boolean;
-  canRefund: boolean;
-};
+  status: string
+  shippingMethodName: string
+  shippingCents: number
+  estimatedDelivery: { from: string; to: string }
+  events: { status: string; note?: string }[]
+  payment?: { status: string; reference?: string; refund?: string }
+  trackingNumber?: string
+  nextStatus?: string
+  canCancel: boolean
+  canRefund: boolean
+}
 
 const adminDetail = async (orderId: string): Promise<Detail> =>
-  jsonOf(await Staff.call(harness, support, "GET", `/admin/orders/${orderId}`)) as unknown as Detail;
+  jsonOf(await Staff.call(harness, support, "GET", `/admin/orders/${orderId}`)) as unknown as Detail
 
 /** Places an order as `caller` with `method` and has Stripe pay for it. */
 const paidOrder = async (caller: Caller = {}, method = "standard") => {
-  const filled = await Shop.fill(harness, [["desk-lamp", 1]], caller);
+  const filled = await Shop.fill(harness, [["desk-lamp", 1]], caller)
   const response = await Shop.place(harness, filled, {
     shippingMethod: method,
     expectedTotalCents: await Shop.totalOf(harness, filled, method),
-  });
-  if (response.statusCode !== 201) throw new Error(`placing failed: ${response.body}`);
+  })
+  if (response.statusCode !== 201) throw new Error(`placing failed: ${response.body}`)
 
-  const placed = JSON.parse(response.body) as { orderId: string; key?: string };
-  const charge = await Shop.chargeOf(harness, placed.orderId);
-  await Shop.succeed(harness, charge);
-  await harness.settle();
-  return { ...placed, charge };
-};
+  const placed = JSON.parse(response.body) as { orderId: string; key?: string }
+  const charge = await Shop.chargeOf(harness, placed.orderId)
+  await Shop.succeed(harness, charge)
+  await harness.settle()
+  return { ...placed, charge }
+}
 
-const step = (orderId: string, body: object) => Staff.call(harness, delivery, "POST", `/admin/orders/${orderId}/status`, body);
+const step = (orderId: string, body: object) => Staff.call(harness, delivery, "POST", `/admin/orders/${orderId}/status`, body)
 
 /** A paid order taken all the way to delivered. */
 const deliveredOrder = async () => {
-  const placed = await paidOrder();
-  await step(placed.orderId, { status: "processing" });
-  await step(placed.orderId, { status: "shipped", trackingNumber: "PR123456789EE" });
-  await step(placed.orderId, { status: "delivered" });
+  const placed = await paidOrder()
+  await step(placed.orderId, { status: "processing" })
+  await step(placed.orderId, { status: "shipped", trackingNumber: "PR123456789EE" })
+  await step(placed.orderId, { status: "delivered" })
 
-  return placed;
-};
+  return placed
+}
 
 /** A delivery option as the admin form sends it. */
 const methodInput = (overrides: Readonly<Record<string, unknown>> = {}) => ({
@@ -92,20 +92,26 @@ const methodInput = (overrides: Readonly<Record<string, unknown>> = {}) => ({
   isActive: true,
   position: 5,
   ...overrides,
-});
+})
 
 describe("delivery options", () => {
   it("lists the active options in order for checkout", async () => {
-    await Staff.call(harness, delivery, "POST", "/admin/shipping-methods", methodInput({ position: 0, code: "pickup", name: "Pickup", priceCents: 0 }));
-    await Staff.call(harness, delivery, "POST", "/admin/shipping-methods", methodInput({ isActive: false }));
+    await Staff.call(
+      harness,
+      delivery,
+      "POST",
+      "/admin/shipping-methods",
+      methodInput({ position: 0, code: "pickup", name: "Pickup", priceCents: 0 }),
+    )
+    await Staff.call(harness, delivery, "POST", "/admin/shipping-methods", methodInput({ isActive: false }))
 
-    const { items } = jsonOf(await Shop.call(harness, "GET", "/shipping-methods")) as { items: { code: string }[] };
+    const { items } = jsonOf(await Shop.call(harness, "GET", "/shipping-methods")) as { items: { code: string }[] }
 
-    expect(items.map((item) => item.code)).toEqual(["pickup", "standard", "express"]);
-  });
+    expect(items.map((item) => item.code)).toEqual(["pickup", "standard", "express"])
+  })
 
   it("charges an edited price on the next order, and older orders keep theirs", async () => {
-    const before = await paidOrder({}, "express");
+    const before = await paidOrder({}, "express")
 
     const edited = await Staff.call(
       harness,
@@ -113,20 +119,20 @@ describe("delivery options", () => {
       "PUT",
       "/admin/shipping-methods/express",
       methodInput({ code: "express", name: "Express courier", priceCents: 1490, minDays: 1, maxDays: 1, position: 1 }),
-    );
-    expect(edited.statusCode).toBe(200);
+    )
+    expect(edited.statusCode).toBe(200)
 
-    const after = await paidOrder({}, "express");
+    const after = await paidOrder({}, "express")
 
-    expect(await adminDetail(before.orderId)).toMatchObject({ shippingCents: 990, shippingMethodName: "Express" });
-    expect(await adminDetail(after.orderId)).toMatchObject({ shippingCents: 1490, shippingMethodName: "Express courier" });
-  });
+    expect(await adminDetail(before.orderId)).toMatchObject({ shippingCents: 990, shippingMethodName: "Express" })
+    expect(await adminDetail(after.orderId)).toMatchObject({ shippingCents: 1490, shippingMethodName: "Express courier" })
+  })
 
   it("keeps an option that orders use: it can be deactivated, not deleted", async () => {
-    await paidOrder({}, "express");
+    await paidOrder({}, "express")
 
-    const deleted = await Staff.call(harness, delivery, "DELETE", "/admin/shipping-methods/express");
-    expect(jsonOf(deleted)["error"]).toMatchObject({ code: "ShippingMethodInUse" });
+    const deleted = await Staff.call(harness, delivery, "DELETE", "/admin/shipping-methods/express")
+    expect(jsonOf(deleted)["error"]).toMatchObject({ code: "ShippingMethodInUse" })
 
     const deactivated = await Staff.call(
       harness,
@@ -134,19 +140,19 @@ describe("delivery options", () => {
       "PUT",
       "/admin/shipping-methods/express",
       methodInput({ code: "express", name: "Express", priceCents: 990, minDays: 1, maxDays: 2, isActive: false, position: 1 }),
-    );
-    expect(jsonOf(deactivated)).toMatchObject({ isActive: false, orderCount: 1 });
-  });
+    )
+    expect(jsonOf(deactivated)).toMatchObject({ isActive: false, orderCount: 1 })
+  })
 
   it("deletes an option nobody used", async () => {
-    await Staff.call(harness, delivery, "POST", "/admin/shipping-methods", methodInput());
+    await Staff.call(harness, delivery, "POST", "/admin/shipping-methods", methodInput())
 
-    expect((await Staff.call(harness, delivery, "DELETE", "/admin/shipping-methods/pigeon")).statusCode).toBe(204);
+    expect((await Staff.call(harness, delivery, "DELETE", "/admin/shipping-methods/pigeon")).statusCode).toBe(204)
     expect(await harness.database.sql`SELECT action FROM audit_event WHERE target_type = 'shipping_method' ORDER BY id`).toEqual([
       { action: "shipping_method.create" },
       { action: "shipping_method.delete" },
-    ]);
-  });
+    ])
+  })
 
   it("refuses an inactive option at placement, with an issue on the method", async () => {
     await Staff.call(
@@ -155,221 +161,217 @@ describe("delivery options", () => {
       "PUT",
       "/admin/shipping-methods/express",
       methodInput({ code: "express", name: "Express", priceCents: 990, minDays: 1, maxDays: 2, isActive: false, position: 1 }),
-    );
-    const filled = await Shop.fill(harness, [["desk-lamp", 1]]);
+    )
+    const filled = await Shop.fill(harness, [["desk-lamp", 1]])
 
-    const response = await Shop.place(harness, filled, { shippingMethod: "express", expectedTotalCents: 3490 });
+    const response = await Shop.place(harness, filled, { shippingMethod: "express", expectedTotalCents: 3490 })
 
-    expect(response.statusCode).toBe(422);
-    expect(jsonOf(response)["error"]).toMatchObject({ issues: [{ path: "shippingMethod" }] });
-  });
+    expect(response.statusCode).toBe(422)
+    expect(jsonOf(response)["error"]).toMatchObject({ issues: [{ path: "shippingMethod" }] })
+  })
 
   it("refuses a code no option has, with an issue on the method", async () => {
-    const filled = await Shop.fill(harness, [["desk-lamp", 1]]);
+    const filled = await Shop.fill(harness, [["desk-lamp", 1]])
 
-    const response = await Shop.place(harness, filled, { shippingMethod: "drone", expectedTotalCents: 3490 });
+    const response = await Shop.place(harness, filled, { shippingMethod: "drone", expectedTotalCents: 3490 })
 
-    expect(response.statusCode).toBe(422);
-    expect(jsonOf(response)["error"]).toMatchObject({ issues: [{ path: "shippingMethod" }] });
-  });
+    expect(response.statusCode).toBe(422)
+    expect(jsonOf(response)["error"]).toMatchObject({ issues: [{ path: "shippingMethod" }] })
+  })
 
   it("refuses a window whose earliest day comes after its latest", async () => {
-    const response = await Staff.call(harness, delivery, "POST", "/admin/shipping-methods", methodInput({ minDays: 6, maxDays: 2 }));
+    const response = await Staff.call(harness, delivery, "POST", "/admin/shipping-methods", methodInput({ minDays: 6, maxDays: 2 }))
 
-    expect(response.statusCode).toBe(422);
-    expect(jsonOf(response)["error"]).toMatchObject({ issues: [{ path: "maxDays" }] });
-  });
-});
+    expect(response.statusCode).toBe(422)
+    expect(jsonOf(response)["error"]).toMatchObject({ issues: [{ path: "maxDays" }] })
+  })
+})
 
 describe("fulfillment", () => {
   it("moves a paid order through processing, shipped and delivered, emailing each arrival once", async () => {
-    const placed = await paidOrder();
-    harness.mailer.clear();
+    const placed = await paidOrder()
+    harness.mailer.clear()
 
-    expect((await step(placed.orderId, { status: "processing" })).statusCode).toBe(200);
-    expect((await step(placed.orderId, { status: "shipped", trackingNumber: "PR123456789EE" })).statusCode).toBe(200);
-    expect((await step(placed.orderId, { status: "delivered" })).statusCode).toBe(200);
+    expect((await step(placed.orderId, { status: "processing" })).statusCode).toBe(200)
+    expect((await step(placed.orderId, { status: "shipped", trackingNumber: "PR123456789EE" })).statusCode).toBe(200)
+    expect((await step(placed.orderId, { status: "delivered" })).statusCode).toBe(200)
 
-    const detail = await adminDetail(placed.orderId);
-    expect(detail).toMatchObject({ status: "delivered", trackingNumber: "PR123456789EE", canRefund: true, canCancel: false });
-    expect(detail.nextStatus).toBeUndefined();
-    expect(harness.mailer.sent.map((email) => email.subject)).toEqual(["Order #100001 shipped", "Order #100001 delivered"]);
-    expect(harness.mailer.sent[1]?.text).toContain("/products/desk-lamp#reviews-heading");
-  });
+    const detail = await adminDetail(placed.orderId)
+    expect(detail).toMatchObject({ status: "delivered", trackingNumber: "PR123456789EE", canRefund: true, canCancel: false })
+    expect(detail.nextStatus).toBeUndefined()
+    expect(harness.mailer.sent.map((email) => email.subject)).toEqual(["Order #100001 shipped", "Order #100001 delivered"])
+    expect(harness.mailer.sent[1]?.text).toContain("/products/desk-lamp#reviews-heading")
+  })
 
   it("refuses a skipped step and a step backwards", async () => {
-    const placed = await paidOrder();
+    const placed = await paidOrder()
 
-    const skipped = await step(placed.orderId, { status: "delivered" });
-    expect(jsonOf(skipped)["error"]).toMatchObject({ code: "OrderTransitionNotAllowed" });
+    const skipped = await step(placed.orderId, { status: "delivered" })
+    expect(jsonOf(skipped)["error"]).toMatchObject({ code: "OrderTransitionNotAllowed" })
 
-    await step(placed.orderId, { status: "processing" });
-    await step(placed.orderId, { status: "shipped", trackingNumber: "PR123456789EE" });
-    const backwards = await step(placed.orderId, { status: "processing" });
-    expect(jsonOf(backwards)["error"]).toMatchObject({ code: "OrderTransitionNotAllowed" });
+    await step(placed.orderId, { status: "processing" })
+    await step(placed.orderId, { status: "shipped", trackingNumber: "PR123456789EE" })
+    const backwards = await step(placed.orderId, { status: "processing" })
+    expect(jsonOf(backwards)["error"]).toMatchObject({ code: "OrderTransitionNotAllowed" })
 
-    const repeated = await step(placed.orderId, { status: "shipped", trackingNumber: "PR999999999EE" });
-    expect(jsonOf(repeated)["error"]).toMatchObject({ code: "OrderTransitionNotAllowed" });
-    expect((await adminDetail(placed.orderId)).trackingNumber).toBe("PR123456789EE");
-  });
+    const repeated = await step(placed.orderId, { status: "shipped", trackingNumber: "PR999999999EE" })
+    expect(jsonOf(repeated)["error"]).toMatchObject({ code: "OrderTransitionNotAllowed" })
+    expect((await adminDetail(placed.orderId)).trackingNumber).toBe("PR123456789EE")
+  })
 
   it("needs a tracking number to ship", async () => {
-    const placed = await paidOrder();
-    await step(placed.orderId, { status: "processing" });
+    const placed = await paidOrder()
+    await step(placed.orderId, { status: "processing" })
 
-    const response = await step(placed.orderId, { status: "shipped" });
+    const response = await step(placed.orderId, { status: "shipped" })
 
-    expect(response.statusCode).toBe(422);
-    expect((await adminDetail(placed.orderId)).status).toBe("processing");
-  });
+    expect(response.statusCode).toBe(422)
+    expect((await adminDetail(placed.orderId)).status).toBe("processing")
+  })
 
   it("is open to delivery managers and admins only", async () => {
-    const placed = await paidOrder();
+    const placed = await paidOrder()
 
-    const response = await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/status`, { status: "processing" });
+    const response = await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/status`, { status: "processing" })
 
-    expect(response.statusCode).toBe(403);
-  });
-});
+    expect(response.statusCode).toBe(403)
+  })
+})
 
 describe("cancellations and refunds by support", () => {
   it("cancels a processing order: the stock comes back and the payment is refunded", async () => {
-    const placed = await paidOrder();
-    await step(placed.orderId, { status: "processing" });
-    expect(await Shop.stockOf(harness, "desk-lamp")).toBe(49);
+    const placed = await paidOrder()
+    await step(placed.orderId, { status: "processing" })
+    expect(await Shop.stockOf(harness, "desk-lamp")).toBe(49)
 
-    const response = await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/cancel`);
-    await harness.settle();
+    const response = await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/cancel`)
+    await harness.settle()
 
-    expect(response.statusCode).toBe(200);
-    expect(await Shop.stockOf(harness, "desk-lamp")).toBe(50);
+    expect(response.statusCode).toBe(200)
+    expect(await Shop.stockOf(harness, "desk-lamp")).toBe(50)
     expect(await adminDetail(placed.orderId)).toMatchObject({
       status: "canceled",
       payment: { status: "succeeded", refund: "succeeded" },
-    });
-  });
+    })
+  })
 
   it("refunds a delivered order in full and leaves the stock alone", async () => {
-    const placed = await paidOrder();
-    await step(placed.orderId, { status: "processing" });
-    await step(placed.orderId, { status: "shipped", trackingNumber: "PR123456789EE" });
-    await step(placed.orderId, { status: "delivered" });
-    harness.mailer.clear();
+    const placed = await paidOrder()
+    await step(placed.orderId, { status: "processing" })
+    await step(placed.orderId, { status: "shipped", trackingNumber: "PR123456789EE" })
+    await step(placed.orderId, { status: "delivered" })
+    harness.mailer.clear()
 
-    const response = await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`);
-    await harness.settle();
+    const response = await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`)
+    await harness.settle()
 
-    expect(response.statusCode).toBe(200);
-    const detail = await adminDetail(placed.orderId);
-    expect(detail).toMatchObject({ status: "refunded", canRefund: false, payment: { refund: "succeeded" } });
-    expect(detail.events.map((event) => event.note)).toContain("Refund issued");
-    expect(harness.gateway.calls.refund).toEqual([{ refundId: expect.any(String), intent: placed.charge.intent, amountCents: 2990 }]);
-    expect(harness.mailer.sent.map((email) => email.subject)).toEqual(["Refund for order #100001"]);
-    expect(await Shop.stockOf(harness, "desk-lamp")).toBe(49);
+    expect(response.statusCode).toBe(200)
+    const detail = await adminDetail(placed.orderId)
+    expect(detail).toMatchObject({ status: "refunded", canRefund: false, payment: { refund: "succeeded" } })
+    expect(detail.events.map((event) => event.note)).toContain("Refund issued")
+    expect(harness.gateway.calls.refund).toEqual([{ refundId: expect.any(String), intent: placed.charge.intent, amountCents: 2990 }])
+    expect(harness.mailer.sent.map((email) => email.subject)).toEqual(["Refund for order #100001"])
+    expect(await Shop.stockOf(harness, "desk-lamp")).toBe(49)
 
-    const again = await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`);
-    await harness.settle();
-    expect(jsonOf(again)["error"]).toMatchObject({ code: "OrderTransitionNotAllowed" });
-    expect(harness.gateway.calls.refund).toHaveLength(1);
-  });
+    const again = await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`)
+    await harness.settle()
+    expect(jsonOf(again)["error"]).toMatchObject({ code: "OrderTransitionNotAllowed" })
+    expect(harness.gateway.calls.refund).toHaveLength(1)
+  })
 
   it("keeps the order delivered while its refund is pending, and refunds it once the provider confirms", async () => {
-    const placed = await deliveredOrder();
-    harness.gateway.answerNextRefund("pending");
-    harness.mailer.clear();
+    const placed = await deliveredOrder()
+    harness.gateway.answerNextRefund("pending")
+    harness.mailer.clear()
 
-    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`);
-    await harness.settle();
+    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`)
+    await harness.settle()
 
-    expect(await adminDetail(placed.orderId)).toMatchObject({ status: "delivered", canRefund: true, payment: { refund: "pending" } });
-    expect(harness.mailer.sent).toEqual([]);
+    expect(await adminDetail(placed.orderId)).toMatchObject({ status: "delivered", canRefund: true, payment: { refund: "pending" } })
+    expect(harness.mailer.sent).toEqual([])
 
     // Asking again repeats the request under the same idempotency key.
-    harness.gateway.answerNextRefund("pending");
-    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`);
-    await harness.settle();
-    const [first, second] = harness.gateway.calls.refund;
-    expect(second?.refundId).toBe(first?.refundId);
+    harness.gateway.answerNextRefund("pending")
+    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`)
+    await harness.settle()
+    const [first, second] = harness.gateway.calls.refund
+    expect(second?.refundId).toBe(first?.refundId)
 
     await Shop.webhook(harness, "refund.updated", {
       id: "re_fake_settled",
       object: "refund",
       status: "succeeded",
       metadata: { [PaymentGateway.PAYMENT_KEY]: first?.refundId },
-    });
-    await harness.settle();
+    })
+    await harness.settle()
 
-    expect(await adminDetail(placed.orderId)).toMatchObject({ status: "refunded", canRefund: false, payment: { refund: "succeeded" } });
-    expect(harness.mailer.sent.map((email) => email.subject)).toEqual(["Refund for order #100001"]);
-  });
+    expect(await adminDetail(placed.orderId)).toMatchObject({ status: "refunded", canRefund: false, payment: { refund: "succeeded" } })
+    expect(harness.mailer.sent.map((email) => email.subject)).toEqual(["Refund for order #100001"])
+  })
 
   it("leaves a delivered order refundable when its refund fails, and refunds it afresh on the next try", async () => {
-    const placed = await deliveredOrder();
-    harness.gateway.answerNextRefund("failed");
+    const placed = await deliveredOrder()
+    harness.gateway.answerNextRefund("failed")
 
-    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`);
-    await harness.settle();
+    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`)
+    await harness.settle()
 
-    expect(await adminDetail(placed.orderId)).toMatchObject({ status: "delivered", canRefund: true, payment: { refund: "failed" } });
+    expect(await adminDetail(placed.orderId)).toMatchObject({ status: "delivered", canRefund: true, payment: { refund: "failed" } })
 
-    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`);
-    await harness.settle();
+    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`)
+    await harness.settle()
 
-    expect(await adminDetail(placed.orderId)).toMatchObject({ status: "refunded", canRefund: false, payment: { refund: "succeeded" } });
-    const [first, second] = harness.gateway.calls.refund;
-    expect(second?.refundId).not.toBe(first?.refundId);
-  });
+    expect(await adminDetail(placed.orderId)).toMatchObject({ status: "refunded", canRefund: false, payment: { refund: "succeeded" } })
+    const [first, second] = harness.gateway.calls.refund
+    expect(second?.refundId).not.toBe(first?.refundId)
+  })
 
   it("offers to refund a canceled order whose automatic refund failed", async () => {
-    const placed = await paidOrder();
-    harness.gateway.answerNextRefund("failed");
+    const placed = await paidOrder()
+    harness.gateway.answerNextRefund("failed")
 
-    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/cancel`);
-    await harness.settle();
+    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/cancel`)
+    await harness.settle()
 
-    expect(await adminDetail(placed.orderId)).toMatchObject({ status: "canceled", canRefund: true, payment: { refund: "failed" } });
+    expect(await adminDetail(placed.orderId)).toMatchObject({ status: "canceled", canRefund: true, payment: { refund: "failed" } })
 
-    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`);
-    await harness.settle();
+    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`)
+    await harness.settle()
 
-    expect(await adminDetail(placed.orderId)).toMatchObject({ status: "canceled", canRefund: false, payment: { refund: "succeeded" } });
-  });
+    expect(await adminDetail(placed.orderId)).toMatchObject({ status: "canceled", canRefund: false, payment: { refund: "succeeded" } })
+  })
 
   it("refuses to refund an order that has not shipped, where canceling applies", async () => {
-    const placed = await paidOrder();
+    const placed = await paidOrder()
 
-    const response = await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`);
+    const response = await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/refund`)
 
-    expect(jsonOf(response)["error"]).toMatchObject({ code: "OrderTransitionNotAllowed" });
-  });
+    expect(jsonOf(response)["error"]).toMatchObject({ code: "OrderTransitionNotAllowed" })
+  })
 
   it("records each change in the audit log", async () => {
-    const placed = await paidOrder();
-    await step(placed.orderId, { status: "processing" });
-    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/cancel`);
+    const placed = await paidOrder()
+    await step(placed.orderId, { status: "processing" })
+    await Staff.call(harness, support, "POST", `/admin/orders/${placed.orderId}/cancel`)
 
-    expect(
-      await harness.database.sql`SELECT action, actor_id FROM audit_event WHERE target_type = 'order' ORDER BY id`,
-    ).toEqual([
+    expect(await harness.database.sql`SELECT action, actor_id FROM audit_event WHERE target_type = 'order' ORDER BY id`).toEqual([
       { action: "order.status", actor_id: delivery.userId },
       { action: "order.cancel", actor_id: support.userId },
-    ]);
-  });
+    ])
+  })
 
   it("finds orders by the customer's email and by number", async () => {
-    const { accessToken } = await registerUser(harness, "buyer@example.com");
-    const placed = await paidOrder({ token: accessToken });
-    await paidOrder();
+    const { accessToken } = await registerUser(harness, "buyer@example.com")
+    const placed = await paidOrder({ token: accessToken })
+    await paidOrder()
 
-    const byEmail = jsonOf(await Staff.call(harness, support, "GET", "/admin/orders?email=Mari@Example.com"));
-    const byNumber = jsonOf(await Staff.call(harness, support, "GET", "/admin/orders?number=100001"));
+    const byEmail = jsonOf(await Staff.call(harness, support, "GET", "/admin/orders?email=Mari@Example.com"))
+    const byNumber = jsonOf(await Staff.call(harness, support, "GET", "/admin/orders?number=100001"))
 
-    expect(byEmail["total"]).toBe(2);
-    expect(byNumber["items"]).toEqual([
-      expect.objectContaining({ id: placed.orderId, customerEmail: "mari@example.com", isGuest: false }),
-    ]);
-  });
-});
+    expect(byEmail["total"]).toBe(2)
+    expect(byNumber["items"]).toEqual([expect.objectContaining({ id: placed.orderId, customerEmail: "mari@example.com", isGuest: false })])
+  })
+})
 
 describe("placement", () => {
   it("refuses a total under €0.50", async () => {
@@ -379,46 +381,48 @@ describe("placement", () => {
       "POST",
       "/admin/shipping-methods",
       methodInput({ code: "pickup", name: "Pickup", priceCents: 0, position: 0 }),
-    );
-    const filled = await Shop.fill(harness, [["sticker", 1]]);
+    )
+    const filled = await Shop.fill(harness, [["sticker", 1]])
 
-    const response = await Shop.place(harness, filled, { shippingMethod: "pickup", expectedTotalCents: 20 });
+    const response = await Shop.place(harness, filled, { shippingMethod: "pickup", expectedTotalCents: 20 })
 
-    expect(response.statusCode).toBe(422);
-    expect(jsonOf(response)["error"]).toMatchObject({ code: "OrderTotalTooSmall" });
-  });
+    expect(response.statusCode).toBe(422)
+    expect(jsonOf(response)["error"]).toMatchObject({ code: "OrderTotalTooSmall" })
+  })
 
   it("links an order's line to its product by the product's slug as it stands, after staff renamed it", async () => {
-    const placed = await paidOrder();
-    await harness.database.sql`UPDATE product SET slug = 'brass-desk-lamp' WHERE slug = 'desk-lamp'`;
+    const placed = await paidOrder()
+    await harness.database.sql`UPDATE product SET slug = 'brass-desk-lamp' WHERE slug = 'desk-lamp'`
 
-    expect((await adminDetail(placed.orderId)) as unknown as { lines: { slug: string }[] }).toMatchObject({ lines: [{ slug: "brass-desk-lamp" }] });
-  });
+    expect((await adminDetail(placed.orderId)) as unknown as { lines: { slug: string }[] }).toMatchObject({
+      lines: [{ slug: "brass-desk-lamp" }],
+    })
+  })
 
   it("refuses a total over Stripe's largest charge before reserving anything", async () => {
-    await harness.database.sql`UPDATE product SET price_cents = 10000000, stock = 50 WHERE slug = 'desk-lamp'`;
-    const filled = await Shop.fill(harness, [["desk-lamp", 10]]);
+    await harness.database.sql`UPDATE product SET price_cents = 10000000, stock = 50 WHERE slug = 'desk-lamp'`
+    const filled = await Shop.fill(harness, [["desk-lamp", 10]])
 
-    const response = await Shop.place(harness, filled, { expectedTotalCents: await Shop.totalOf(harness, filled) });
+    const response = await Shop.place(harness, filled, { expectedTotalCents: await Shop.totalOf(harness, filled) })
 
-    expect(response.statusCode).toBe(422);
-    expect(jsonOf(response)["error"]).toMatchObject({ code: "OrderTotalTooLarge" });
-    expect(await Shop.stockOf(harness, "desk-lamp")).toBe(50);
-  });
+    expect(response.statusCode).toBe(422)
+    expect(jsonOf(response)["error"]).toMatchObject({ code: "OrderTotalTooLarge" })
+    expect(await Shop.stockOf(harness, "desk-lamp")).toBe(50)
+  })
 
   it("records the method's name and the delivery dates on the order", async () => {
-    const placed = await paidOrder();
+    const placed = await paidOrder()
 
     expect(await adminDetail(placed.orderId)).toMatchObject({
       shippingMethodName: "Standard",
       estimatedDelivery: { from: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), to: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) },
-    });
-  });
-});
+    })
+  })
+})
 
 describe("the simulated payment provider", () => {
   it("takes an order to payment_successful through the outbox and the queue", async () => {
-    const queue = MessageQueue.memory(Topology.declarations());
+    const queue = MessageQueue.memory(Topology.declarations())
     const simulated = await App.build({
       config: Config.fromEnvironment(
         Environment.schema.parse({
@@ -430,40 +434,40 @@ describe("the simulated payment provider", () => {
       ),
       database: harness.database,
       overrides: { clock: harness.clock, mailer: harness.mailer, queue },
-    });
-    const relay = OutboxRelay.create({ db: harness.database.db, queue, onFailure: () => undefined });
+    })
+    const relay = OutboxRelay.create({ db: harness.database.db, queue, onFailure: () => undefined })
 
     try {
-      const config = await simulated.app.inject({ method: "GET", url: "/api/v1/checkout/config" });
-      expect(jsonOf(config)).toEqual({ provider: "simulated" });
+      const config = await simulated.app.inject({ method: "GET", url: "/api/v1/checkout/config" })
+      expect(jsonOf(config)).toEqual({ provider: "simulated" })
 
       const cart = await simulated.app.inject({
         method: "POST",
         url: "/api/v1/cart/items",
         payload: { productId: await Shop.productId(harness, "desk-lamp"), quantity: 1 },
-      });
-      const guest = cart.cookies.find((cookie) => cookie.name === "prism_cart")?.value ?? "";
+      })
+      const guest = cart.cookies.find((cookie) => cookie.name === "prism_cart")?.value ?? ""
       const placed = await simulated.app.inject({
         method: "POST",
         url: "/api/v1/orders",
         cookies: { prism_cart: guest },
         payload: { ...CHECKOUT, shippingMethod: "standard", expectedTotalCents: 2990 },
-      });
-      expect(placed.statusCode).toBe(201);
+      })
+      expect(placed.statusCode).toBe(201)
 
-      await relay.flush();
-      await queue.drain();
+      await relay.flush()
+      await queue.drain()
 
-      const { orderId, key } = jsonOf(placed) as { orderId: string; key: string };
-      const order = await simulated.app.inject({ method: "GET", url: `/api/v1/orders/${orderId}?key=${key}` });
+      const { orderId, key } = jsonOf(placed) as { orderId: string; key: string }
+      const order = await simulated.app.inject({ method: "GET", url: `/api/v1/orders/${orderId}?key=${key}` })
       expect(jsonOf(order)).toMatchObject({
         status: "payment_successful",
         payment: { status: "succeeded", reference: expect.stringMatching(/^pi_simulated_/) },
-      });
+      })
     } finally {
-      await simulated.app.close();
+      await simulated.app.close()
     }
-  });
+  })
 
   it("refuses to start anywhere but localhost", () => {
     const parsed = Environment.schema.safeParse({
@@ -472,8 +476,8 @@ describe("the simulated payment provider", () => {
       SMTP_SECURE: "false",
       PAYMENTS_MODE: "simulated",
       PUBLIC_WEB_URL: "https://shop.example.com",
-    });
+    })
 
-    expect(parsed.success).toBe(false);
-  });
-});
+    expect(parsed.success).toBe(false)
+  })
+})

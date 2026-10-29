@@ -4,16 +4,15 @@
  * the state check, the code exchange, the account link.
  */
 
-import { OAuthProvider } from "@prism/shared";
-import type { OAuthState } from "../../platform/oauth.ts";
+import { OAuthProvider } from "@prism/shared"
+import type { OAuthState } from "../../platform/oauth.ts"
 
 export const MockConsentPage = {
-  escape: (value: string): string =>
-    value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"),
+  escape: (value: string): string => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"),
 
   /** The consent page, with every value it is given escaped into the markup. */
   render: (input: { provider: OAuthProvider; state: OAuthState }): string => {
-    const label = MockConsentPage.escape(OAuthProvider.label[input.provider]);
+    const label = MockConsentPage.escape(OAuthProvider.label[input.provider])
 
     return `<!doctype html>
 <html lang="en">
@@ -45,6 +44,6 @@ export const MockConsentPage = {
     </form>
   </main>
 </body>
-</html>`;
+</html>`
   },
-} as const;
+} as const

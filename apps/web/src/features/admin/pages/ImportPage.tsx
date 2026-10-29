@@ -1,23 +1,23 @@
-import type { ImportReport } from "@prism/shared";
-import { useRef, useState } from "react";
-import { match } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { Alert, Button, Card, ConfirmDialog, DataTable, Toast } from "../../../shared/ui/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { useAdminWrite } from "../admin.ts";
-import { AdminPage } from "../components/index.ts";
+import type { ImportReport } from "@prism/shared"
+import { useRef, useState } from "react"
+import { match } from "ts-pattern"
+import { Api } from "../../../shared/api/client.ts"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { Alert, Button, Card, ConfirmDialog, DataTable, Toast } from "../../../shared/ui/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { useAdminWrite } from "../admin.ts"
+import { AdminPage } from "../components/index.ts"
 
 /** Reading where an issue the server found sits in the file. */
 const Report = {
   /** `"3:price"` as row 3 and column price; an empty path is about the whole file, and names neither. */
   locate: (path: string): Readonly<{ row?: number; column?: string }> => {
-    if (path === "") return {};
+    if (path === "") return {}
 
-    const [row = "", ...column] = path.split(":");
-    return { row: Number(row), column: column.join(":") };
+    const [row = "", ...column] = path.split(":")
+    return { row: Number(row), column: column.join(":") }
   },
-} as const;
+} as const
 
 /**
  * Bulk import from a CSV or JSON file. A check reads the whole file and
@@ -26,66 +26,66 @@ const Report = {
  * checked are written, all at once or none of them.
  */
 export const ImportPage = () => {
-  const input = useRef<HTMLInputElement>(null);
+  const input = useRef<HTMLInputElement>(null)
 
-  const [file, setFile] = useState<File | undefined>(undefined);
+  const [file, setFile] = useState<File | undefined>(undefined)
 
   /** The file chosen now, read by a check that answers after another was chosen. */
-  const chosenNow = useRef<File | undefined>(undefined);
+  const chosenNow = useRef<File | undefined>(undefined)
 
   /** The bytes of the file as its last check read them, which an import sends. */
-  const [checked, setChecked] = useState<File | undefined>(undefined);
+  const [checked, setChecked] = useState<File | undefined>(undefined)
 
-  const [report, setReport] = useState<ImportReport | undefined>(undefined);
+  const [report, setReport] = useState<ImportReport | undefined>(undefined)
 
-  const [failure, setFailure] = useState<string | undefined>(undefined);
+  const [failure, setFailure] = useState<string | undefined>(undefined)
 
-  const [isConfirming, setConfirming] = useState(false);
+  const [isConfirming, setConfirming] = useState(false)
 
   const send = useAdminWrite((change: Readonly<{ file: File; isDryRun: boolean }>) => {
-    const form = new FormData();
-    form.append("file", change.file);
-    return Api.post<ImportReport>(`/admin/products/import?dryRun=${change.isDryRun}`, form);
-  });
+    const form = new FormData()
+    form.append("file", change.file)
+    return Api.post<ImportReport>(`/admin/products/import?dryRun=${change.isDryRun}`, form)
+  })
 
   const check = async (chosen: File): Promise<void> => {
-    setFailure(undefined);
-    setReport(undefined);
-    setChecked(undefined);
+    setFailure(undefined)
+    setReport(undefined)
+    setChecked(undefined)
 
     // Read now, so a file saved again since it was chosen, which a browser may refuse to send, is caught here.
     const snapshot = await chosen.arrayBuffer().then(
       (bytes) => new File([bytes], chosen.name, { type: chosen.type }),
       () => undefined,
-    );
+    )
 
     if (snapshot === undefined) {
-      chosenNow.current = undefined;
-      setFile(undefined);
-      if (input.current !== null) input.current.value = "";
-      setFailure("The file changed after it was chosen. Choose it again.");
-      return;
+      chosenNow.current = undefined
+      setFile(undefined)
+      if (input.current !== null) input.current.value = ""
+      setFailure("The file changed after it was chosen. Choose it again.")
+      return
     }
 
     send.mutate(
       { file: snapshot, isDryRun: true },
       {
         onSuccess: (found) => {
-          if (chosenNow.current !== chosen) return;
+          if (chosenNow.current !== chosen) return
 
-          setReport(found);
-          setChecked(snapshot);
+          setReport(found)
+          setChecked(snapshot)
         },
         onError: (reason) => {
-          if (chosenNow.current !== chosen) return;
+          if (chosenNow.current !== chosen) return
 
-          setFailure(Failure.message(reason));
+          setFailure(Failure.message(reason))
         },
       },
-    );
-  };
+    )
+  }
 
-  const isClean = checked !== undefined && report !== undefined && report.dryRun && report.issues.length === 0;
+  const isClean = checked !== undefined && report !== undefined && report.dryRun && report.issues.length === 0
 
   return (
     <AdminPage text={PageText.adminImport} heading="Import products">
@@ -102,10 +102,10 @@ export const ImportPage = () => {
             accept=".csv,.json,text/csv,application/json"
             aria-describedby="import-file-hint"
             onChange={(event) => {
-              chosenNow.current = event.target.files?.[0];
-              setFile(event.target.files?.[0]);
-              setReport(undefined);
-              setChecked(undefined);
+              chosenNow.current = event.target.files?.[0]
+              setFile(event.target.files?.[0])
+              setReport(undefined)
+              setChecked(undefined)
             }}
           />
           <p className="text-sm text-ink-faint" id="import-file-hint">
@@ -113,7 +113,13 @@ export const ImportPage = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button tone="quiet" type="button" disabled={file === undefined} busy={send.isPending && !isConfirming} onClick={() => file !== undefined && void check(file)}>
+          <Button
+            tone="quiet"
+            type="button"
+            disabled={file === undefined}
+            busy={send.isPending && !isConfirming}
+            onClick={() => file !== undefined && void check(file)}
+          >
             Check the file
           </Button>
           <Button type="button" disabled={!isClean} onClick={() => setConfirming(true)}>
@@ -129,13 +135,16 @@ export const ImportPage = () => {
           (found) => found.issues.length === 0,
           (found) => (
             <Alert tone="accent" title={found.dryRun ? "The file is ready to import" : "The file is imported"}>
-              {found.dryRun ? "It would create" : "It created"} {found.created} and {found.dryRun ? "update" : "updated"} {found.updated} products.
+              {found.dryRun ? "It would create" : "It created"} {found.created} and {found.dryRun ? "update" : "updated"} {found.updated}{" "}
+              products.
             </Alert>
           ),
         )
         .otherwise((found) => (
           <div className="space-y-3">
-            <Alert title={`The file has ${found.issues.length === 1 ? "1 problem" : `${found.issues.length} problems`}`}>Nothing was written. Fix the file, choose it again and check it.</Alert>
+            <Alert title={`The file has ${found.issues.length === 1 ? "1 problem" : `${found.issues.length} problems`}`}>
+              Nothing was written. Fix the file, choose it again and check it.
+            </Alert>
             <DataTable
               label="Problems in the file"
               rows={found.issues}
@@ -152,17 +161,20 @@ export const ImportPage = () => {
       <Card className="space-y-3 p-5 text-sm text-ink-soft">
         <h2 className="text-base font-semibold text-ink">The file's columns</h2>
         <p>
-          A CSV file starts with a row naming its columns: <code className="font-mono text-ink">slug</code>, <code className="font-mono text-ink">name</code>,{" "}
-          <code className="font-mono text-ink">description</code>, <code className="font-mono text-ink">price</code> in euros,{" "}
-          <code className="font-mono text-ink">stock</code>, <code className="font-mono text-ink">category</code> and <code className="font-mono text-ink">brand</code> by
-          their slugs, <code className="font-mono text-ink">weight_g</code>, <code className="font-mono text-ink">width_mm</code>,{" "}
-          <code className="font-mono text-ink">height_mm</code>, <code className="font-mono text-ink">depth_mm</code> and <code className="font-mono text-ink">featured</code>{" "}
-          (true or false). Each column named <code className="font-mono text-ink">property:Color</code> and so on holds one named property.
+          A CSV file starts with a row naming its columns: <code className="font-mono text-ink">slug</code>,{" "}
+          <code className="font-mono text-ink">name</code>, <code className="font-mono text-ink">description</code>,{" "}
+          <code className="font-mono text-ink">price</code> in euros, <code className="font-mono text-ink">stock</code>,{" "}
+          <code className="font-mono text-ink">category</code> and <code className="font-mono text-ink">brand</code> by their slugs,{" "}
+          <code className="font-mono text-ink">weight_g</code>, <code className="font-mono text-ink">width_mm</code>,{" "}
+          <code className="font-mono text-ink">height_mm</code>, <code className="font-mono text-ink">depth_mm</code> and{" "}
+          <code className="font-mono text-ink">featured</code> (true or false). Each column named{" "}
+          <code className="font-mono text-ink">property:Color</code> and so on holds one named property.
         </p>
         <p>
-          A JSON file is an array of products with the same fields, the price as <code className="font-mono text-ink">priceCents</code>, the measurements as{" "}
-          <code className="font-mono text-ink">weightGrams</code>, <code className="font-mono text-ink">widthMm</code>, <code className="font-mono text-ink">heightMm</code> and{" "}
-          <code className="font-mono text-ink">depthMm</code>, and the properties as an object of names and values.
+          A JSON file is an array of products with the same fields, the price as <code className="font-mono text-ink">priceCents</code>, the
+          measurements as <code className="font-mono text-ink">weightGrams</code>, <code className="font-mono text-ink">widthMm</code>,{" "}
+          <code className="font-mono text-ink">heightMm</code> and <code className="font-mono text-ink">depthMm</code>, and the properties
+          as an object of names and values.
         </p>
       </Card>
 
@@ -174,36 +186,41 @@ export const ImportPage = () => {
         isBusy={send.isPending}
         onCancel={() => setConfirming(false)}
         onConfirm={() => {
-          if (checked === undefined) return;
+          if (checked === undefined) return
           send.mutate(
             { file: checked, isDryRun: false },
             {
               onSuccess: (written) => {
-                setConfirming(false);
-                setReport(written);
-                Toast.show(`Imported: ${written.created} created, ${written.updated} updated.`);
+                setConfirming(false)
+                setReport(written)
+                Toast.show(`Imported: ${written.created} created, ${written.updated} updated.`)
               },
               onError: (reason) => {
-                setConfirming(false);
-                setChecked(undefined);
+                setConfirming(false)
+                setChecked(undefined)
 
                 // What changed since the check, such as a category deleted, is listed like the check's own problems.
-                const found = Api.failureOf(reason);
+                const found = Api.failureOf(reason)
                 if (found?.code === "ImportInvalid") {
-                  setReport({ dryRun: false, created: 0, updated: 0, issues: found.issues.map((issue) => ({ ...Report.locate(issue.path), message: issue.message })) });
-                  return;
+                  setReport({
+                    dryRun: false,
+                    created: 0,
+                    updated: 0,
+                    issues: found.issues.map((issue) => ({ ...Report.locate(issue.path), message: issue.message })),
+                  })
+                  return
                 }
 
-                setReport(undefined);
-                setFailure(Failure.message(reason));
+                setReport(undefined)
+                setFailure(Failure.message(reason))
               },
             },
-          );
+          )
         }}
       >
-        {report === undefined ? "" : `It creates ${report.created} products and updates ${report.updated}, all at once.`} The update replaces each product's fields and properties with the
-        file's.
+        {report === undefined ? "" : `It creates ${report.created} products and updates ${report.updated}, all at once.`} The update
+        replaces each product's fields and properties with the file's.
       </ConfirmDialog>
     </AdminPage>
-  );
-};
+  )
+}

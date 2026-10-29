@@ -10,14 +10,14 @@
  *   node loadtest/report.ts baseline|normal|peak|stress
  */
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { StressSteps } from "./lib/steps.ts";
+import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { StressSteps } from "./lib/steps.ts"
 
 /** The part of k6's end-of-run summary the report reads. */
-type Summary = Readonly<{ metrics: Readonly<Record<string, Readonly<{ values: Readonly<Record<string, number>> }>>> }>;
+type Summary = Readonly<{ metrics: Readonly<Record<string, Readonly<{ values: Readonly<Record<string, number>> }>>> }>
 
 /** A container's highest CPU and memory over the run. */
-type Peak = { cpu: number; memory: number; memoryText: string; limitText: string; memoryShare: number };
+type Peak = { cpu: number; memory: number; memoryText: string; limitText: string; memoryShare: number }
 
 const Report = {
   RESULTS: new URL("./results/", import.meta.url),
@@ -25,55 +25,56 @@ const Report = {
   LIMIT_MS: 5000,
 
   read: (file: string): string | undefined => {
-    const url = new URL(file, Report.RESULTS);
-    return existsSync(url) ? readFileSync(url, "utf8") : undefined;
+    const url = new URL(file, Report.RESULTS)
+    return existsSync(url) ? readFileSync(url, "utf8") : undefined
   },
 
   /** The fields of one CSV line, with quoted fields unquoted. */
   fields: (line: string): string[] => {
-    const fields: string[] = [];
-    let field = "";
-    let isQuoted = false;
+    const fields: string[] = []
+    let field = ""
+    let isQuoted = false
 
     for (let index = 0; index < line.length; index += 1) {
-      const char = line[index];
+      const char = line[index]
       if (isQuoted && char === '"' && line[index + 1] === '"') {
-        field += '"';
-        index += 1;
+        field += '"'
+        index += 1
       } else if (char === '"') {
-        isQuoted = !isQuoted;
+        isQuoted = !isQuoted
       } else if (char === "," && !isQuoted) {
-        fields.push(field);
-        field = "";
+        fields.push(field)
+        field = ""
       } else {
-        field += char;
+        field += char
       }
     }
-    fields.push(field);
-    return fields;
+    fields.push(field)
+    return fields
   },
 
   /** A size such as `312.4MiB` or `1.2GiB`, in mebibytes. */
   mebibytes: (text: string): number => {
-    const match = /([\d.]+)\s*([KMG]i?B|B)/.exec(text);
-    if (match === null) return 0;
+    const match = /([\d.]+)\s*([KMG]i?B|B)/.exec(text)
+    if (match === null) return 0
 
-    const units: Readonly<Record<string, number>> = { B: 1 / 1048576, KiB: 1 / 1024, KB: 1 / 1024, MiB: 1, MB: 1, GiB: 1024, GB: 1024 };
-    return Number(match[1]) * (units[match[2] ?? "MiB"] ?? 1);
+    const units: Readonly<Record<string, number>> = { B: 1 / 1048576, KiB: 1 / 1024, KB: 1 / 1024, MiB: 1, MB: 1, GiB: 1024, GB: 1024 }
+    return Number(match[1]) * (units[match[2] ?? "MiB"] ?? 1)
   },
 
   table: (header: readonly string[], rows: readonly (readonly (string | number)[])[]): string =>
     [`| ${header.join(" | ")} |`, `| ${header.map(() => "---").join(" | ")} |`, ...rows.map((row) => `| ${row.join(" | ")} |`)].join("\n"),
 
-  percentile: (sorted: readonly number[], share: number): number => sorted[Math.min(sorted.length - 1, Math.floor(share * sorted.length))] ?? 0,
+  percentile: (sorted: readonly number[], share: number): number =>
+    sorted[Math.min(sorted.length - 1, Math.floor(share * sorted.length))] ?? 0,
 
   summary: (run: string): string => {
-    const text = Report.read(`${run}.json`);
-    if (text === undefined) return `No summary for ${run}: run it first.`;
+    const text = Report.read(`${run}.json`)
+    if (text === undefined) return `No summary for ${run}: run it first.`
 
-    const summary = JSON.parse(text) as Summary;
-    const value = (metric: string, stat: string): number => summary.metrics[metric]?.values[stat] ?? 0;
-    const ms = (stat: string): string => `${Math.round(value("http_req_duration", stat))} ms`;
+    const summary = JSON.parse(text) as Summary
+    const value = (metric: string, stat: string): number => summary.metrics[metric]?.values[stat] ?? 0
+    const ms = (stat: string): string => `${Math.round(value("http_req_duration", stat))} ms`
 
     return Report.table(
       ["Users", "Requests", "Requests/s", "Steps/s", "p50", "p90", "p95", "p99", "Errors", "Steps successful"],
@@ -91,27 +92,27 @@ const Report = {
           `${(value("transaction_success", "rate") * 100).toFixed(2)}%`,
         ],
       ],
-    );
+    )
   },
 
   containers: (run: string): string => {
-    const text = Report.read(`stats-${run}.csv`);
-    if (text === undefined) return `No container samples for ${run}.`;
+    const text = Report.read(`stats-${run}.csv`)
+    if (text === undefined) return `No container samples for ${run}.`
 
-    const peaks = new Map<string, Peak>();
+    const peaks = new Map<string, Peak>()
     for (const line of text.split("\n")) {
-      const [, name, cpu, usage, share] = Report.fields(line.trim());
-      if (name === undefined || cpu === undefined || usage === undefined || share === undefined || !cpu.endsWith("%")) continue;
+      const [, name, cpu, usage, share] = Report.fields(line.trim())
+      if (name === undefined || cpu === undefined || usage === undefined || share === undefined || !cpu.endsWith("%")) continue
 
-      const [used = "", limit = ""] = usage.split("/").map((part) => part.trim());
-      const peak = peaks.get(name) ?? { cpu: 0, memory: 0, memoryText: used, limitText: limit, memoryShare: 0 };
-      peak.cpu = Math.max(peak.cpu, Number.parseFloat(cpu));
+      const [used = "", limit = ""] = usage.split("/").map((part) => part.trim())
+      const peak = peaks.get(name) ?? { cpu: 0, memory: 0, memoryText: used, limitText: limit, memoryShare: 0 }
+      peak.cpu = Math.max(peak.cpu, Number.parseFloat(cpu))
       if (Report.mebibytes(used) >= peak.memory) {
-        peak.memory = Report.mebibytes(used);
-        peak.memoryText = used;
-        peak.memoryShare = Number.parseFloat(share);
+        peak.memory = Report.mebibytes(used)
+        peak.memoryText = used
+        peak.memoryShare = Number.parseFloat(share)
       }
-      peaks.set(name, peak);
+      peaks.set(name, peak)
     }
 
     return Report.table(
@@ -119,15 +120,18 @@ const Report = {
       [...peaks.entries()]
         .toSorted(([a], [b]) => a.localeCompare(b))
         .map(([name, peak]) => [name, `${peak.cpu.toFixed(0)}%`, peak.memoryText, `${peak.memoryShare.toFixed(0)}% of ${peak.limitText}`]),
-    );
+    )
   },
 
   queries: (run: string): string => {
-    const text = Report.read(`queries-${run}.csv`);
-    if (text === undefined) return `No statement costs for ${run}.`;
+    const text = Report.read(`queries-${run}.csv`)
+    if (text === undefined) return `No statement costs for ${run}.`
 
-    const [, ...rows] = text.trim().split("\n").map(Report.fields);
-    return Report.table(["Calls", "Total ms", "Mean ms", "Statement"], rows.map(([calls = "", total = "", mean = "", query = ""]) => [calls, total, mean, `\`${query.replaceAll("|", "\\|")}\``]));
+    const [, ...rows] = text.trim().split("\n").map(Report.fields)
+    return Report.table(
+      ["Calls", "Total ms", "Mean ms", "Statement"],
+      rows.map(([calls = "", total = "", mean = "", query = ""]) => [calls, total, mean, `\`${query.replaceAll("|", "\\|")}\``]),
+    )
   },
 
   /**
@@ -136,61 +140,64 @@ const Report = {
    * never counts: most of its time is spent below its step's users.
    */
   steps: (): string => {
-    const text = Report.read("stress-samples.csv");
-    if (text === undefined) return "No samples: the stress run writes them.";
+    const text = Report.read("stress-samples.csv")
+    if (text === undefined) return "No samples: the stress run writes them."
 
-    const [header = "", ...lines] = text.split("\n");
-    const columns = Report.fields(header);
-    const at = (name: string): number => columns.indexOf(name);
+    const [header = "", ...lines] = text.split("\n")
+    const columns = Report.fields(header)
+    const at = (name: string): number => columns.indexOf(name)
 
     // The scenario begins with its first count of users; the setup's requests come before it.
-    let start = Number.POSITIVE_INFINITY;
+    let start = Number.POSITIVE_INFINITY
     for (const line of lines) {
-      const fields = Report.fields(line);
-      if (fields[at("metric_name")] === "vus") start = Math.min(start, Number(fields[at("timestamp")]));
+      const fields = Report.fields(line)
+      if (fields[at("metric_name")] === "vus") start = Math.min(start, Number(fields[at("timestamp")]))
     }
 
-    const period = StressSteps.RAMP_SECONDS + StressSteps.HOLD_SECONDS;
+    const period = StressSteps.RAMP_SECONDS + StressSteps.HOLD_SECONDS
     // Stage 2n is the ramp to step n, and stage 2n + 1 holds it.
-    const stages = new Map<number, { durations: number[]; failures: number; requests: number }>();
+    const stages = new Map<number, { durations: number[]; failures: number; requests: number }>()
 
     for (const line of lines) {
-      const fields = Report.fields(line);
-      const metric = fields[at("metric_name")];
-      const second = Number(fields[at("timestamp")]);
-      const value = Number(fields[at("metric_value")]);
-      if (metric === undefined || Number.isNaN(second) || second < start) continue;
+      const fields = Report.fields(line)
+      const metric = fields[at("metric_name")]
+      const second = Number(fields[at("timestamp")])
+      const value = Number(fields[at("metric_value")])
+      if (metric === undefined || Number.isNaN(second) || second < start) continue
 
-      const offset = second - start;
-      const step = Math.floor(offset / period);
-      if (step >= StressSteps.TARGETS.length) continue;
+      const offset = second - start
+      const step = Math.floor(offset / period)
+      if (step >= StressSteps.TARGETS.length) continue
 
-      const index = step * 2 + (offset % period < StressSteps.RAMP_SECONDS ? 0 : 1);
-      const stage = stages.get(index) ?? { durations: [], failures: 0, requests: 0 };
-      if (metric === "http_req_duration") stage.durations.push(value);
+      const index = step * 2 + (offset % period < StressSteps.RAMP_SECONDS ? 0 : 1)
+      const stage = stages.get(index) ?? { durations: [], failures: 0, requests: 0 }
+      if (metric === "http_req_duration") stage.durations.push(value)
       if (metric === "http_req_failed") {
-        stage.requests += 1;
-        stage.failures += value;
+        stage.requests += 1
+        stage.failures += value
       }
-      stages.set(index, stage);
+      stages.set(index, stage)
     }
 
     const rows = [...stages.entries()]
       .toSorted(([a], [b]) => a - b)
       .map(([index, stage]) => {
-        const users = StressSteps.TARGETS[Math.floor(index / 2)] ?? 0;
-        const isHeld = index % 2 === 1;
+        const users = StressSteps.TARGETS[Math.floor(index / 2)] ?? 0
+        const isHeld = index % 2 === 1
 
         return {
           label: isHeld ? `Held at ${users}` : `Ramp to ${users}`,
           users,
           isHeld,
-          p95: Report.percentile(stage.durations.toSorted((a, b) => a - b), 0.95),
+          p95: Report.percentile(
+            stage.durations.toSorted((a, b) => a - b),
+            0.95,
+          ),
           errors: stage.requests === 0 ? 0 : stage.failures / stage.requests,
-        };
-      });
-    const served = rows.filter((row) => row.isHeld && row.p95 < Report.LIMIT_MS && row.errors < 0.05);
-    const most = Math.max(0, ...served.map((row) => row.users));
+        }
+      })
+    const served = rows.filter((row) => row.isHeld && row.p95 < Report.LIMIT_MS && row.errors < 0.05)
+    const most = Math.max(0, ...served.map((row) => row.users))
 
     return [
       Report.table(
@@ -199,14 +206,14 @@ const Report = {
       ),
       "",
       `The most users a held minute served with p95 under 5 seconds and errors under 5%: ${most}.`,
-    ].join("\n");
+    ].join("\n")
   },
 
   main: (run: string | undefined): void => {
     if (run === undefined || !["baseline", "normal", "peak", "stress"].includes(run)) {
-      console.error("Usage: node loadtest/report.ts baseline|normal|peak|stress");
-      process.exitCode = 2;
-      return;
+      console.error("Usage: node loadtest/report.ts baseline|normal|peak|stress")
+      process.exitCode = 2
+      return
     }
 
     const report = [
@@ -223,11 +230,11 @@ const Report = {
       Report.queries(run),
       ...(run === "stress" ? ["", "Step by step:", "", Report.steps()] : []),
       "",
-    ].join("\n");
+    ].join("\n")
 
-    writeFileSync(new URL(`${run}.md`, Report.RESULTS), report);
-    console.log(report);
+    writeFileSync(new URL(`${run}.md`, Report.RESULTS), report)
+    console.log(report)
   },
-} as const;
+} as const
 
-Report.main(process.argv[2]);
+Report.main(process.argv[2])

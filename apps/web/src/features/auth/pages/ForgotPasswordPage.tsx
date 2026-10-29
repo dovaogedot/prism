@@ -1,35 +1,35 @@
-import { ForgotPasswordInput } from "@prism/shared";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { Link } from "react-router";
-import { match } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
-import { Alert, Button, Field } from "../../../shared/ui/index.ts";
-import { AuthShell } from "../components/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
-import { PageText } from "../../../shared/seo/page-text.ts";
+import { ForgotPasswordInput } from "@prism/shared"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { Link } from "react-router"
+import { match } from "ts-pattern"
+import { Api } from "../../../shared/api/client.ts"
+import { Alert, Button, Field } from "../../../shared/ui/index.ts"
+import { AuthShell } from "../components/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx"
+import { PageText } from "../../../shared/seo/page-text.ts"
 
 /** Asks for an address to send a reset link to, and says the same thing whether or not it has an account. */
 export const ForgotPasswordPage = () => {
-  const [isSent, setSent] = useState(false);
+  const [isSent, setSent] = useState(false)
 
-  const [failure, setFailure] = useState<string | undefined>(undefined);
+  const [failure, setFailure] = useState<string | undefined>(undefined)
 
   const form = useForm({
     resolver: zodResolver(ForgotPasswordInput.schema),
     defaultValues: { email: "" },
-  });
+  })
 
   const submit = form.handleSubmit(async (values) => {
-    setFailure(undefined);
+    setFailure(undefined)
 
     // The server answers alike for every address, so only a request that failed, such as a rate limit or no connection, shows here.
     await Api.postEmpty("/auth/password/forgot", values)
       .then(() => setSent(true))
-      .catch((reason: unknown) => setFailure(Failure.message(reason)));
-  });
+      .catch((reason: unknown) => setFailure(Failure.message(reason)))
+  })
 
   return (
     <AuthShell
@@ -65,5 +65,5 @@ export const ForgotPasswordPage = () => {
         ))
         .exhaustive()}
     </AuthShell>
-  );
-};
+  )
+}

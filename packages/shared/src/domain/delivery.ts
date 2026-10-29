@@ -5,10 +5,10 @@
  */
 
 /** A delivery window in business days, both ends counted. */
-export type DeliveryWindow = Readonly<{ minDays: number; maxDays: number }>;
+export type DeliveryWindow = Readonly<{ minDays: number; maxDays: number }>
 
 /** The first and last day a parcel is expected, as `YYYY-MM-DD`. */
-export type DeliveryEstimate = Readonly<{ from: string; to: string }>;
+export type DeliveryEstimate = Readonly<{ from: string; to: string }>
 
 export const Delivery = {
   TIME_ZONE: "Europe/Tallinn",
@@ -20,29 +20,29 @@ export const Delivery = {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
-    }).formatToParts(instant);
-    const part = (type: "year" | "month" | "day"): string => parts.find((candidate) => candidate.type === type)?.value ?? "";
+    }).formatToParts(instant)
+    const part = (type: "year" | "month" | "day"): string => parts.find((candidate) => candidate.type === type)?.value ?? ""
 
-    return `${part("year")}-${part("month")}-${part("day")}`;
+    return `${part("year")}-${part("month")}-${part("day")}`
   },
 
   /** The day `count` business days after `day`, both as `YYYY-MM-DD`. */
   addBusinessDays: (day: string, count: number): string => {
-    const date = new Date(`${day}T00:00:00.000Z`);
+    const date = new Date(`${day}T00:00:00.000Z`)
 
-    for (let remaining = count; remaining > 0; ) {
-      date.setUTCDate(date.getUTCDate() + 1);
-      const weekday = date.getUTCDay();
-      if (weekday !== 0 && weekday !== 6) remaining -= 1;
+    for (let remaining = count; remaining > 0;) {
+      date.setUTCDate(date.getUTCDate() + 1)
+      const weekday = date.getUTCDay()
+      if (weekday !== 0 && weekday !== 6) remaining -= 1
     }
 
-    return date.toISOString().slice(0, 10);
+    return date.toISOString().slice(0, 10)
   },
 
   /** The days an order placed at `placedAt` is expected to arrive within. */
   estimate: (placedAt: Date, window: DeliveryWindow): DeliveryEstimate => {
-    const day = Delivery.dayOf(placedAt);
+    const day = Delivery.dayOf(placedAt)
 
-    return { from: Delivery.addBusinessDays(day, window.minDays), to: Delivery.addBusinessDays(day, window.maxDays) };
+    return { from: Delivery.addBusinessDays(day, window.minDays), to: Delivery.addBusinessDays(day, window.maxDays) }
   },
-} as const;
+} as const

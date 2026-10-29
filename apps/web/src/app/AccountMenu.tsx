@@ -1,9 +1,9 @@
-import { useId } from "react";
-import { Link, useLocation, useNavigate } from "react-router";
-import { useSession, useSignOut } from "../features/auth/session.ts";
-import { Popover } from "../shared/ui/index.ts";
-import { AccountLinks } from "./account-links.ts";
-import { LookClass } from "../shared/layout/look.ts";
+import { useId } from "react"
+import { Link, useLocation, useNavigate } from "react-router"
+import { useSession, useSignOut } from "../features/auth/session.ts"
+import { Popover } from "../shared/ui/index.ts"
+import { AccountLinks } from "./account-links.ts"
+import { LookClass } from "../shared/layout/look.ts"
 
 /**
  * The header's account control. A guest gets the way to sign in, which
@@ -12,28 +12,39 @@ import { LookClass } from "../shared/layout/look.ts";
  * for staff, and signing out.
  */
 export const AccountMenu = () => {
-  const session = useSession();
+  const session = useSession()
 
-  const signOut = useSignOut();
+  const signOut = useSignOut()
 
-  const navigate = useNavigate();
+  const navigate = useNavigate()
 
-  const { pathname, search } = useLocation();
+  const { pathname, search } = useLocation()
 
-  const panelId = useId();
+  const panelId = useId()
 
   if (session === undefined) {
-    const signIn = AccountLinks.signInFrom(`${pathname}${search}`);
+    const signIn = AccountLinks.signInFrom(`${pathname}${search}`)
 
     return (
       <div className="flex shrink-0 items-center gap-1">
         <Link className={`${LookClass.icon} lg:hidden`} to={signIn} aria-label="Sign in">
-          <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+          <svg
+            className="size-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
             <circle cx="12" cy="8.5" r="3.8" />
             <path d="M4.5 20.5c1.2-3.6 4.1-5.6 7.5-5.6s6.3 2 7.5 5.6" />
           </svg>
         </Link>
-        <Link className="hidden whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium text-ink-soft hover:bg-sunken hover:text-ink lg:block" to={signIn}>
+        <Link
+          className="hidden whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium text-ink-soft hover:bg-sunken hover:text-ink lg:block"
+          to={signIn}
+        >
           Sign in
         </Link>
         <Link
@@ -43,10 +54,10 @@ export const AccountMenu = () => {
           Create account
         </Link>
       </div>
-    );
+    )
   }
 
-  const itemClass = "block rounded-md px-3 py-2 text-sm text-ink hover:bg-sunken";
+  const itemClass = "block rounded-md px-3 py-2 text-sm text-ink hover:bg-sunken"
 
   return (
     <>
@@ -56,12 +67,29 @@ export const AccountMenu = () => {
         popoverTarget={panelId}
         aria-label={`Account, ${session.email}`}
       >
-        <svg className="size-5 lg:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+        <svg
+          className="size-5 lg:hidden"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          aria-hidden="true"
+        >
           <circle cx="12" cy="8.5" r="3.8" />
           <path d="M4.5 20.5c1.2-3.6 4.1-5.6 7.5-5.6s6.3 2 7.5 5.6" />
         </svg>
         <span className="hidden max-w-[13rem] truncate lg:block">{session.email}</span>
-        <svg className="hidden size-4 lg:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg
+          className="hidden size-4 lg:block"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
           <path d="m6 9 6 6 6-6" />
         </svg>
       </button>
@@ -82,7 +110,7 @@ export const AccountMenu = () => {
             className={`${itemClass} w-full text-left`}
             type="button"
             onClick={() => {
-              void signOut().then(() => navigate("/"));
+              void signOut().then(() => navigate("/"))
             }}
           >
             Sign out
@@ -90,5 +118,5 @@ export const AccountMenu = () => {
         </div>
       </Popover>
     </>
-  );
-};
+  )
+}

@@ -1,13 +1,13 @@
-import { Country, Price, ShippingOption } from "@prism/shared";
-import { Link } from "react-router";
-import { match, P } from "ts-pattern";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { FixedPage } from "../components/index.ts";
-import { useShippingOptions } from "../../../shared/api/shipping-options.ts";
+import { Country, Price, ShippingOption } from "@prism/shared"
+import { Link } from "react-router"
+import { match, P } from "ts-pattern"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { FixedPage } from "../components/index.ts"
+import { useShippingOptions } from "../../../shared/api/shipping-options.ts"
 
 /** Common questions about shipping, payment and returns. The delivery options come from the shop's own settings. */
 export const FaqPage = () => {
-  const shipping = useShippingOptions();
+  const shipping = useShippingOptions()
 
   return (
     <FixedPage text={PageText.faq} lede="Shipping, payment and returns, answered. Anything else, ask us through the contact form.">
@@ -34,16 +34,16 @@ export const FaqPage = () => {
       <details>
         <summary>When will my order arrive?</summary>
         <p>
-          Checkout shows the delivery dates of each option before you pay, counted in business days from the day you order. Your
-          order page keeps those dates, and its status changes as the order moves from processing to shipped and delivered.
+          Checkout shows the delivery dates of each option before you pay, counted in business days from the day you order. Your order page
+          keeps those dates, and its status changes as the order moves from processing to shipped and delivered.
         </p>
       </details>
 
       <details>
         <summary>How do I track my order?</summary>
         <p>
-          Once your order ships, its page shows the carrier's tracking number, and we email you. Signed-in customers find every order
-          under <Link to="/account/orders">Orders</Link>; a guest opens the order from the link in the confirmation email.
+          Once your order ships, its page shows the carrier's tracking number, and we email you. Signed-in customers find every order under{" "}
+          <Link to="/account/orders">Orders</Link>; a guest opens the order from the link in the confirmation email.
         </p>
       </details>
 
@@ -57,21 +57,23 @@ export const FaqPage = () => {
       <details>
         <summary>How can I pay?</summary>
         <p>
-          By card. The card fields come from Stripe, our payment provider, so your card number goes straight to Stripe and never
-          reaches our servers.
+          By card. The card fields come from Stripe, our payment provider, so your card number goes straight to Stripe and never reaches our
+          servers.
         </p>
       </details>
 
       <details>
         <summary>When is my card charged?</summary>
-        <p>When you place the order. If the payment fails, the order closes, your cart keeps its items, and you can place the order again.</p>
+        <p>
+          When you place the order. If the payment fails, the order closes, your cart keeps its items, and you can place the order again.
+        </p>
       </details>
 
       <details>
         <summary>Can I cancel an order?</summary>
         <p>
-          Yes, until we start processing it: open the order and choose Cancel. A paid order that is canceled is refunded in full to
-          the card it was paid with.
+          Yes, until we start processing it: open the order and choose Cancel. A paid order that is canceled is refunded in full to the card
+          it was paid with.
         </p>
       </details>
 
@@ -80,18 +82,18 @@ export const FaqPage = () => {
       <details>
         <summary>Can I return an item?</summary>
         <p>
-          Yes, within 14 days of delivery, for any reason. Write to us through the <Link to="/contact">contact form</Link> with your
-          order number, and we will tell you where to send it.
+          Yes, within 14 days of delivery, for any reason. Write to us through the <Link to="/contact">contact form</Link> with your order
+          number, and we will tell you where to send it.
         </p>
       </details>
 
       <details>
         <summary>How long does a refund take?</summary>
         <p>
-          We refund the whole order to the card it was paid with as soon as the return arrives. Your bank usually shows the money
-          within 5 to 10 business days, and your order page shows it as refunded.
+          We refund the whole order to the card it was paid with as soon as the return arrives. Your bank usually shows the money within 5
+          to 10 business days, and your order page shows it as refunded.
         </p>
       </details>
     </FixedPage>
-  );
-};
+  )
+}

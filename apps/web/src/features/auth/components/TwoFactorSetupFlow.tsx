@@ -5,74 +5,74 @@
  * lock the account out.
  */
 
-import { EnableTwoFactorInput, type SessionUser, type TwoFactorSetup } from "@prism/shared";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { match, P } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
-import { Alert, Button, Field } from "../../../shared/ui/index.ts";
-import { SetupKey } from "../setup-key.ts";
-import { TokenStore } from "../../../shared/api/token-store.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
+import { EnableTwoFactorInput, type SessionUser, type TwoFactorSetup } from "@prism/shared"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { match, P } from "ts-pattern"
+import { Api } from "../../../shared/api/client.ts"
+import { Alert, Button, Field } from "../../../shared/ui/index.ts"
+import { SetupKey } from "../setup-key.ts"
+import { TokenStore } from "../../../shared/api/token-store.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
 
 export type TwoFactorSetupFlowProps = Readonly<{
   /** Whether the account has a password, which turning 2FA on then asks for. */
-  hasPassword: boolean;
+  hasPassword: boolean
   /** What happens once two-factor sign-in is on. */
-  onDone: () => void;
-}>;
+  onDone: () => void
+}>
 
 export const TwoFactorSetupFlow = ({ hasPassword, onDone }: TwoFactorSetupFlowProps) => {
-  const [setup, setSetup] = useState<TwoFactorSetup | undefined>(undefined);
-  const [failure, setFailure] = useState<string | undefined>(undefined);
-  const [starting, setStarting] = useState(false);
+  const [setup, setSetup] = useState<TwoFactorSetup | undefined>(undefined)
+  const [failure, setFailure] = useState<string | undefined>(undefined)
+  const [starting, setStarting] = useState(false)
 
   const form = useForm({
     resolver: zodResolver(hasPassword ? EnableTwoFactorInput.withPassword : EnableTwoFactorInput.schema),
     defaultValues: hasPassword ? { code: "", currentPassword: "" } : { code: "" },
-  });
+  })
 
   const begin = async (): Promise<void> => {
-    setStarting(true);
-    setFailure(undefined);
+    setStarting(true)
+    setFailure(undefined)
 
     await Api.post<TwoFactorSetup>("/auth/2fa/setup")
       .then((result) => setSetup(result))
       .catch((reason: unknown) => setFailure(Failure.message(reason)))
-      .finally(() => setStarting(false));
-  };
+      .finally(() => setStarting(false))
+  }
 
   const confirm = form.handleSubmit(async (values) => {
-    setFailure(undefined);
+    setFailure(undefined)
 
     await Api.post<SessionUser>("/auth/2fa/enable", values)
       .then((user) => {
-        TokenStore.updateUser(user);
-        onDone();
+        TokenStore.updateUser(user)
+        onDone()
       })
-      .catch((reason: unknown) => setFailure(Failure.message(reason)));
-  });
+      .catch((reason: unknown) => setFailure(Failure.message(reason)))
+  })
 
   return (
     <div className="space-y-4">
       {match(failure)
         .with(P.nullish, () => null)
-        .otherwise((message) => <Alert>{message}</Alert>)}
+        .otherwise((message) => (
+          <Alert>{message}</Alert>
+        ))}
 
       {match(setup)
         .with(P.nullish, () => (
           <>
-            <p className="text-sm text-ink-soft">
-              Adds a six-digit code from an authenticator app to every sign-in.
-            </p>
+            <p className="text-sm text-ink-soft">Adds a six-digit code from an authenticator app to every sign-in.</p>
             <Button busy={starting} onClick={() => void begin()}>
               Set up two-factor authentication
             </Button>
           </>
         ))
         .otherwise((value) => {
-          const key = SetupKey.of(value.uri);
+          const key = SetupKey.of(value.uri)
 
           return (
             <div className="space-y-4">
@@ -89,12 +89,8 @@ export const TwoFactorSetupFlow = ({ hasPassword, onDone }: TwoFactorSetupFlowPr
                 />
 
                 <div className="min-w-0 flex-1 space-y-2">
-                  <p className="text-xs font-medium uppercase tracking-wider text-ink-faint">
-                    Or enter this setup key in the app
-                  </p>
-                  <code className="block break-all rounded-lg bg-sunken px-3 py-2 font-mono text-sm text-ink">
-                    {key ?? value.uri}
-                  </code>
+                  <p className="text-xs font-medium uppercase tracking-wider text-ink-faint">Or enter this setup key in the app</p>
+                  <code className="block break-all rounded-lg bg-sunken px-3 py-2 font-mono text-sm text-ink">{key ?? value.uri}</code>
                   <p className="text-sm">
                     <a className="text-accent underline underline-offset-2" href={value.uri}>
                       Open it in an authenticator app on this device
@@ -130,8 +126,8 @@ export const TwoFactorSetupFlow = ({ hasPassword, onDone }: TwoFactorSetupFlowPr
                 />
               </form>
             </div>
-          );
+          )
         })}
     </div>
-  );
-};
+  )
+}

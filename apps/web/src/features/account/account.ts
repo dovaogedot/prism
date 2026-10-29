@@ -3,10 +3,10 @@
  * addresses, and which saved address checkout starts with.
  */
 
-import type { AddressId, Profile, ProfileInput, SavedAddress, SavedAddressInput } from "@prism/shared";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Api } from "../../shared/api/client.ts";
-import { useSession } from "../auth/session.ts";
+import type { AddressId, Profile, ProfileInput, SavedAddress, SavedAddressInput } from "@prism/shared"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Api } from "../../shared/api/client.ts"
+import { useSession } from "../auth/session.ts"
 
 export const SavedAddresses = {
   /** The address checkout starts with: the default one; `undefined` when there is none. */
@@ -14,77 +14,80 @@ export const SavedAddresses = {
 
   /** An address on one line, such as "Narva mnt 7, 10117 Tallinn". */
   oneLine: (address: SavedAddress["address"]): string =>
-    [address.line1, address.line2, `${address.postalCode} ${address.city}`].filter((part) => part !== undefined && part.length > 0).join(", "),
-} as const;
+    [address.line1, address.line2, `${address.postalCode} ${address.city}`]
+      .filter((part) => part !== undefined && part.length > 0)
+      .join(", "),
+} as const
 
 export const AccountKeys = {
   profile: (userId: string | undefined) => ["account", userId ?? "guest", "profile"] as const,
   addresses: (userId: string | undefined) => ["account", userId ?? "guest", "addresses"] as const,
   /** What checkout starts with, which the profile and the default address decide. */
   checkoutPrefill: (userId: string | undefined) => ["account", userId ?? "guest", "checkout-prefill"] as const,
-} as const;
+} as const
 
 /** The signed-in customer's profile; nothing is fetched for a guest. */
 export const useProfile = () => {
-  const session = useSession();
+  const session = useSession()
 
   return useQuery({
     queryKey: AccountKeys.profile(session?.id),
     queryFn: ({ signal }) => Api.get<Profile>("/account/profile", signal),
     enabled: session !== undefined,
-  });
-};
+  })
+}
 
 /** The signed-in customer's saved addresses, the default first; nothing is fetched for a guest. */
 export const useSavedAddresses = () => {
-  const session = useSession();
+  const session = useSession()
 
   return useQuery({
     queryKey: AccountKeys.addresses(session?.id),
     queryFn: async ({ signal }) => (await Api.get<{ items: readonly SavedAddress[] }>("/account/addresses", signal)).items,
     enabled: session !== undefined,
-  });
-};
+  })
+}
 
 /** Changing the profile and the saved addresses; each answer replaces what the page holds. */
 export const useAccountChanges = () => {
-  const client = useQueryClient();
+  const client = useQueryClient()
 
-  const userId = useSession()?.id;
+  const userId = useSession()?.id
 
   // Checkout seeds its form once, so a changed profile or address drops the
   // prefill it would start from, and the next checkout waits for a fresh one.
   const dropPrefill = (): void => {
-    client.removeQueries({ queryKey: AccountKeys.checkoutPrefill(userId) });
-  };
+    client.removeQueries({ queryKey: AccountKeys.checkoutPrefill(userId) })
+  }
 
   const refreshAddresses = (): Promise<void> => {
-    dropPrefill();
-    return client.invalidateQueries({ queryKey: AccountKeys.addresses(userId) });
-  };
+    dropPrefill()
+    return client.invalidateQueries({ queryKey: AccountKeys.addresses(userId) })
+  }
 
   const saveProfile = useMutation({
     mutationFn: (profile: ProfileInput) => Api.put<Profile>("/account/profile", profile),
     onSuccess: (profile) => {
-      dropPrefill();
-      client.setQueryData(AccountKeys.profile(userId), profile);
+      dropPrefill()
+      client.setQueryData(AccountKeys.profile(userId), profile)
     },
-  });
+  })
 
   const addAddress = useMutation({
     mutationFn: (address: SavedAddressInput) => Api.post<SavedAddress>("/account/addresses", address),
     onSuccess: refreshAddresses,
-  });
+  })
 
   const updateAddress = useMutation({
-    mutationFn: (change: Readonly<{ id: AddressId; address: SavedAddressInput }>) => Api.put<SavedAddress>(`/account/addresses/${change.id}`, change.address),
+    mutationFn: (change: Readonly<{ id: AddressId; address: SavedAddressInput }>) =>
+      Api.put<SavedAddress>(`/account/addresses/${change.id}`, change.address),
     onSuccess: refreshAddresses,
-  });
+  })
 
   const removeAddress = useMutation({
     mutationFn: (id: AddressId) => Api.requestEmpty(`/account/addresses/${id}`, { method: "DELETE" }),
     onSuccess: refreshAddresses,
-  });
+  })
 
-  return { saveProfile, addAddress, updateAddress, removeAddress };
-};
+  return { saveProfile, addAddress, updateAddress, removeAddress }
+}

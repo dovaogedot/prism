@@ -40,6 +40,8 @@ jobs: # The work this workflow does.
       - run: npm ci # Installs exactly what package-lock.json lists.
       - run: npm run build # Builds the shared package; both apps import its built output, so the typecheck needs it.
       - run: npm run typecheck # Stops the deploy on a type error.
+      - run: npm run format:check # Stops the deploy on a file oxfmt would lay out differently.
+      - run: npm run lint # Stops the deploy on any oxlint warning.
       - name: Check that the schema has its migration # Stops the deploy when schema.ts changed without the SQL drizzle-kit makes from it.
         run: |
           npm run db:generate --workspace @prism/api

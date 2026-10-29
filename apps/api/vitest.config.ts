@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vitest/config"
 
 /**
  * The projects, split by what they cost to run and what they prove.
@@ -53,4 +53,4 @@ export default defineConfig({
       },
     ],
   },
-});
+})

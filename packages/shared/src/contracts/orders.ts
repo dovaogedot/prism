@@ -3,61 +3,43 @@
  * as whole cents.
  */
 
-import { z } from "zod";
-import { ProductId, type ProductImage, type Slug } from "./catalog.ts";
-import type { Contact, PaymentFailure, ShippingAddress, ShippingMethodCode } from "./checkout.ts";
+import { z } from "zod"
+import { ProductId, type ProductImage, type Slug } from "./catalog.ts"
+import type { Contact, PaymentFailure, ShippingAddress, ShippingMethodCode } from "./checkout.ts"
 
 /** The identity of an order, as the database assigns it. */
-export type OrderId = z.infer<typeof OrderId.schema>;
+export type OrderId = z.infer<typeof OrderId.schema>
 export const OrderId = {
   schema: z.uuid().brand<"OrderId">(),
-} as const;
+} as const
 
 /** The number a customer quotes, as the database assigns it. */
-export type OrderNumber = z.infer<typeof OrderNumber.schema>;
+export type OrderNumber = z.infer<typeof OrderNumber.schema>
 export const OrderNumber = {
   schema: z.number().int().positive().brand<"OrderNumber">(),
-} as const;
+} as const
 
 /** The secret that opens a guest's order, carried in its links as `?key=`. */
-export type OrderKey = z.infer<typeof OrderKey.schema>;
+export type OrderKey = z.infer<typeof OrderKey.schema>
 export const OrderKey = {
   schema: z
     .string()
     .regex(/^[A-Za-z0-9_-]{43}$/)
     .brand<"OrderKey">(),
-} as const;
+} as const
 
 /** What the browser hands Stripe to confirm one payment. */
-export type ClientSecret = z.infer<typeof ClientSecret.schema>;
+export type ClientSecret = z.infer<typeof ClientSecret.schema>
 export const ClientSecret = {
   schema: z.string().min(1).brand<"ClientSecret">(),
-} as const;
+} as const
 
 /** Where an order is in its life. */
-export type OrderStatus = (typeof OrderStatus.NAMES)[number];
+export type OrderStatus = (typeof OrderStatus.NAMES)[number]
 export const OrderStatus = {
   /** In lifecycle order, which is also the order of the `status` sort. */
-  NAMES: [
-    "pending_payment",
-    "payment_successful",
-    "payment_failed",
-    "processing",
-    "shipped",
-    "delivered",
-    "canceled",
-    "refunded",
-  ] as const,
-  schema: z.enum([
-    "pending_payment",
-    "payment_successful",
-    "payment_failed",
-    "processing",
-    "shipped",
-    "delivered",
-    "canceled",
-    "refunded",
-  ]),
+  NAMES: ["pending_payment", "payment_successful", "payment_failed", "processing", "shipped", "delivered", "canceled", "refunded"] as const,
+  schema: z.enum(["pending_payment", "payment_successful", "payment_failed", "processing", "shipped", "delivered", "canceled", "refunded"]),
   label: {
     pending_payment: "Pending payment",
     payment_successful: "Payment successful",
@@ -68,14 +50,7 @@ export const OrderStatus = {
     canceled: "Canceled",
     refunded: "Refunded",
   } as const satisfies Record<
-    | "pending_payment"
-    | "payment_successful"
-    | "payment_failed"
-    | "processing"
-    | "shipped"
-    | "delivered"
-    | "canceled"
-    | "refunded",
+    "pending_payment" | "payment_successful" | "payment_failed" | "processing" | "shipped" | "delivered" | "canceled" | "refunded",
     string
   >,
   /** The statuses a customer may still cancel from: nothing has left the warehouse. */
@@ -94,10 +69,10 @@ export const OrderStatus = {
     "processing" | "shipped" | "delivered",
     "payment_successful" | "processing" | "shipped"
   >,
-} as const;
+} as const
 
 /** The orders a list can come in. */
-export type OrderSort = (typeof OrderSort.NAMES)[number];
+export type OrderSort = (typeof OrderSort.NAMES)[number]
 export const OrderSort = {
   NAMES: ["newest", "oldest", "status"] as const,
   schema: z.enum(["newest", "oldest", "status"]),
@@ -105,16 +80,16 @@ export const OrderSort = {
     "newest" | "oldest" | "status",
     string
   >,
-} as const;
+} as const
 
 /** A calendar day as `YYYY-MM-DD`. */
 export const CalendarDay = {
   // Postgres has no year 0, which the ISO format allows.
   schema: z.iso.date("Enter a date as YYYY-MM-DD.").refine((day) => !day.startsWith("0000"), "Enter a year from 1 on."),
-} as const;
+} as const
 
 /** The query string of `GET /orders`. Both ends of the date range count. */
-export type OrderQueryParams = z.infer<typeof OrderQueryParams.schema>;
+export type OrderQueryParams = z.infer<typeof OrderQueryParams.schema>
 export const OrderQueryParams = {
   schema: z
     .object({
@@ -132,96 +107,96 @@ export const OrderQueryParams = {
       message: "The start date must not be after the end date.",
       path: ["to"],
     }),
-} as const;
+} as const
 
 /** How a payment stands, as the order page shows it. */
 export type PaymentSummary = Readonly<{
-  status: "pending" | "succeeded" | "failed" | "canceled";
+  status: "pending" | "succeeded" | "failed" | "canceled"
   /** The provider's id of the payment, which support and the provider find it by. Present once it answered. */
-  reference?: string;
+  reference?: string
   /** Present once the provider has told which card paid. */
-  card?: Readonly<{ brand: string; last4: string }>;
-  failure?: PaymentFailure;
+  card?: Readonly<{ brand: string; last4: string }>
+  failure?: PaymentFailure
   /** Present once a refund was asked for. */
-  refund?: "pending" | "succeeded" | "failed";
-}>;
+  refund?: "pending" | "succeeded" | "failed"
+}>
 
 /** One step of an order's history. */
 export type OrderEvent = Readonly<{
-  status: OrderStatus;
+  status: OrderStatus
   /** Present when the status alone does not say what happened. */
-  note?: string;
-  at: string;
-}>;
+  note?: string
+  at: string
+}>
 
 /** One product of an order, as it was sold. */
 export type OrderLine = Readonly<{
   /** Absent once the product has left the catalog. */
-  productId?: ProductId;
-  slug: Slug;
-  name: string;
-  image?: ProductImage;
-  unitPriceCents: number;
-  quantity: number;
-  lineTotalCents: number;
-}>;
+  productId?: ProductId
+  slug: Slug
+  name: string
+  image?: ProductImage
+  unitPriceCents: number
+  quantity: number
+  lineTotalCents: number
+}>
 
 /** An order as a list shows it. */
 export type OrderSummary = Readonly<{
-  id: OrderId;
-  number: OrderNumber;
-  status: OrderStatus;
-  createdAt: string;
-  totalCents: number;
-  itemCount: number;
+  id: OrderId
+  number: OrderNumber
+  status: OrderStatus
+  createdAt: string
+  totalCents: number
+  itemCount: number
   /** The first line's picture, when it has one. */
-  image?: ProductImage;
-}>;
+  image?: ProductImage
+}>
 
 /** One page of orders. */
 export type OrderList = Readonly<{
-  items: readonly OrderSummary[];
-  total: number;
-  page: number;
-  perPage: number;
-  totalPages: number;
-}>;
+  items: readonly OrderSummary[]
+  total: number
+  page: number
+  perPage: number
+  totalPages: number
+}>
 
 /** An order as its own page shows it. */
 export type OrderDetail = Readonly<{
-  id: OrderId;
-  number: OrderNumber;
-  status: OrderStatus;
-  createdAt: string;
-  contact: Contact;
-  address: ShippingAddress;
+  id: OrderId
+  number: OrderNumber
+  status: OrderStatus
+  createdAt: string
+  contact: Contact
+  address: ShippingAddress
   /** Where the bill went; absent when it went to the shipping address. */
-  billingAddress?: ShippingAddress;
-  shippingMethod: ShippingMethodCode;
+  billingAddress?: ShippingAddress
+  shippingMethod: ShippingMethodCode
   /** The method's name when the order was placed. */
-  shippingMethodName: string;
+  shippingMethodName: string
   /** The first and last day the parcel is expected, as `YYYY-MM-DD`. */
-  estimatedDelivery: Readonly<{ from: string; to: string }>;
-  lines: readonly OrderLine[];
-  subtotalCents: number;
-  shippingCents: number;
-  totalCents: number;
+  estimatedDelivery: Readonly<{ from: string; to: string }>
+  lines: readonly OrderLine[]
+  subtotalCents: number
+  shippingCents: number
+  totalCents: number
   /** Oldest first. */
-  events: readonly OrderEvent[];
+  events: readonly OrderEvent[]
   /** Absent when no payment was ever started. */
-  payment?: PaymentSummary;
+  payment?: PaymentSummary
   /** Present once the order has shipped. */
-  trackingNumber?: string;
-  cancelable: boolean;
+  trackingNumber?: string
+  cancelable: boolean
   /** When an unpaid order expires; present while the payment is pending. */
-  paymentDueAt?: string;
-}>;
+  paymentDueAt?: string
+}>
 
 /** What `POST /orders` answers: the order, and what the browser needs to pay for it. */
 export type PlaceOrderResult = Readonly<{
-  orderId: OrderId;
-  number: OrderNumber;
+  orderId: OrderId
+  number: OrderNumber
   /** Present for a guest's order: the only way back to it. */
-  key?: OrderKey;
-  clientSecret: ClientSecret;
-}>;
+  key?: OrderKey
+  clientSecret: ClientSecret
+}>

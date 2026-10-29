@@ -1,11 +1,11 @@
-import { Price } from "@prism/shared";
-import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
-import { match } from "ts-pattern";
-import { ImageSet, Popover } from "../../../shared/ui/index.ts";
-import { CartPreview } from "../cart-preview.ts";
-import { FreeShipping, useCart } from "../cart.ts";
-import { useShippingOptions } from "../../../shared/api/shipping-options.ts";
+import { Price } from "@prism/shared"
+import { useEffect, useRef, useState } from "react"
+import { Link } from "react-router"
+import { match } from "ts-pattern"
+import { ImageSet, Popover } from "../../../shared/ui/index.ts"
+import { CartPreview } from "../cart-preview.ts"
+import { FreeShipping, useCart } from "../cart.ts"
+import { useShippingOptions } from "../../../shared/api/shipping-options.ts"
 
 /**
  * The header's cart: a button with how many items the cart holds, which
@@ -14,26 +14,26 @@ import { useShippingOptions } from "../../../shared/api/shipping-options.ts";
  * count is read out to a screen reader.
  */
 export const CartPreviewButton = () => {
-  const cart = useCart();
+  const cart = useCart()
 
-  const shipping = useShippingOptions();
+  const shipping = useShippingOptions()
 
-  const [announcement, setAnnouncement] = useState("");
+  const [announcement, setAnnouncement] = useState("")
 
-  const count = cart.data?.itemCount ?? 0;
-  const items = count === 1 ? "1 item" : `${count} items`;
+  const count = cart.data?.itemCount ?? 0
+  const items = count === 1 ? "1 item" : `${count} items`
 
   // The count last read out; the first one the page loads is not news.
-  const announcedCount = useRef<number | undefined>(undefined);
+  const announcedCount = useRef<number | undefined>(undefined)
 
   useEffect(() => {
-    if (cart.data === undefined) return;
+    if (cart.data === undefined) return
 
     if (announcedCount.current !== undefined && announcedCount.current !== count) {
-      setAnnouncement(count === 0 ? "Your cart is empty." : `Your cart has ${items}.`);
+      setAnnouncement(count === 0 ? "Your cart is empty." : `Your cart has ${items}.`)
     }
-    announcedCount.current = count;
-  }, [cart.data, count, items]);
+    announcedCount.current = count
+  }, [cart.data, count, items])
 
   return (
     <>
@@ -43,7 +43,16 @@ export const CartPreviewButton = () => {
         popoverTarget={CartPreview.PANEL_ID}
         aria-label={count === 0 ? "Cart, empty" : `Cart, ${items}`}
       >
-        <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg
+          className="size-5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
           <path d="M3 4h2.2l2.1 10.2a1.5 1.5 0 0 0 1.5 1.2h8.4a1.5 1.5 0 0 0 1.5-1.1L20.5 8H6.2" />
           <circle cx="9.5" cy="19.5" r="1.3" />
           <circle cx="17" cy="19.5" r="1.3" />
@@ -77,20 +86,23 @@ export const CartPreviewButton = () => {
             ),
           )
           .otherwise((view) => {
-            const freeShipping = FreeShipping.sentenceOf(shipping.data ?? [], view.subtotalCents);
+            const freeShipping = FreeShipping.sentenceOf(shipping.data ?? [], view.subtotalCents)
 
             return (
               <div className="space-y-3 p-4">
-                <p className="text-sm font-semibold text-ink">
-                  {items} in your cart
-                </p>
+                <p className="text-sm font-semibold text-ink">{items} in your cart</p>
                 <ul className="max-h-72 space-y-3 overflow-y-auto">
                   {view.lines.map((line) => (
                     <li className="flex items-center gap-3" key={line.productId}>
                       {line.image === undefined ? (
                         <span className="size-12 shrink-0 rounded bg-sunken" aria-hidden="true" />
                       ) : (
-                        <ImageSet className="size-12 shrink-0 rounded bg-sunken object-contain" image={line.image} sizes="3rem" isDecorative />
+                        <ImageSet
+                          className="size-12 shrink-0 rounded bg-sunken object-contain"
+                          image={line.image}
+                          sizes="3rem"
+                          isDecorative
+                        />
                       )}
                       <div className="min-w-0 flex-1 text-sm">
                         <Link className="line-clamp-2 font-medium text-ink hover:text-accent" to={`/products/${line.slug}`}>
@@ -116,14 +128,17 @@ export const CartPreviewButton = () => {
                   >
                     View cart
                   </Link>
-                  <Link className="rounded-lg bg-accent px-3 py-2 text-center text-sm font-semibold text-accent-ink hover:bg-accent-hover" to="/checkout">
+                  <Link
+                    className="rounded-lg bg-accent px-3 py-2 text-center text-sm font-semibold text-accent-ink hover:bg-accent-hover"
+                    to="/checkout"
+                  >
                     Checkout
                   </Link>
                 </div>
               </div>
-            );
+            )
           })}
       </Popover>
     </>
-  );
-};
+  )
+}

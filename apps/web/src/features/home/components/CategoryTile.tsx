@@ -1,9 +1,9 @@
-import type { CategorySummary } from "@prism/shared";
-import { Link } from "react-router";
-import { Picture } from "../../catalog/components/index.ts";
+import type { CategorySummary } from "@prism/shared"
+import { Link } from "react-router"
+import { Picture } from "../../catalog/components/index.ts"
 
 /** The category the tile leads to. */
-export type CategoryTileProps = Readonly<{ category: CategorySummary }>;
+export type CategoryTileProps = Readonly<{ category: CategorySummary }>
 
 /** A category as a picture card, with how many items it holds. The whole tile is the link. */
 export const CategoryTile = ({ category }: CategoryTileProps) => (
@@ -14,7 +14,9 @@ export const CategoryTile = ({ category }: CategoryTileProps) => (
     <Picture className="size-16 shrink-0 rounded-md" image={category.image} name={category.name} sizes="4rem" isDecorative />
     <span className="min-w-0">
       <span className="block truncate font-semibold text-ink group-hover:text-accent">{category.name}</span>
-      <span className="block text-sm tabular-nums text-ink-soft">{category.productCount === 1 ? "1 item" : `${category.productCount} items`}</span>
+      <span className="block text-sm tabular-nums text-ink-soft">
+        {category.productCount === 1 ? "1 item" : `${category.productCount} items`}
+      </span>
     </span>
   </Link>
-);
+)

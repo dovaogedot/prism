@@ -1,29 +1,29 @@
-import type { ReactNode } from "react";
+import type { ReactNode } from "react"
 
 /** One column: its heading, how a row fills it, and the sort it stands for. */
 export type DataTableColumn<Row> = Readonly<{
-  key: string;
-  header: string;
-  cell: (row: Row) => ReactNode;
+  key: string
+  header: string
+  cell: (row: Row) => ReactNode
   /** The sort the server knows this column by, when the column sorts. */
-  sort?: string;
+  sort?: string
   /** Numbers line up on the end edge. */
-  isNumeric?: boolean;
-}>;
+  isNumeric?: boolean
+}>
 
 /** The sort in force: a column's sort name and its direction. */
-export type DataTableSort = Readonly<{ by: string; direction: "ascending" | "descending" }>;
+export type DataTableSort = Readonly<{ by: string; direction: "ascending" | "descending" }>
 
 /** The rows, their columns, and the table's accessible name. */
 export type DataTableProps<Row> = Readonly<{
   /** Names the table for a screen reader, and the region that scrolls it sideways. */
-  label: string;
-  columns: readonly DataTableColumn<Row>[];
-  rows: readonly Row[];
-  rowKey: (row: Row) => string;
-  sort?: DataTableSort;
-  onSort?: (by: string) => void;
-}>;
+  label: string
+  columns: readonly DataTableColumn<Row>[]
+  rows: readonly Row[]
+  rowKey: (row: Row) => string
+  sort?: DataTableSort
+  onSort?: (by: string) => void
+}>
 
 /**
  * A `<table>` for rows and columns of data. On a narrow screen it scrolls
@@ -48,9 +48,15 @@ export const DataTable = <Row,>({ label, columns, rows, rowKey, sort, onSort }: 
               {column.sort === undefined || onSort === undefined ? (
                 column.header
               ) : (
-                <button className="inline-flex items-center gap-1 uppercase hover:text-ink" type="button" onClick={() => onSort(column.sort ?? "")}>
+                <button
+                  className="inline-flex items-center gap-1 uppercase hover:text-ink"
+                  type="button"
+                  onClick={() => onSort(column.sort ?? "")}
+                >
                   {column.header}
-                  <span aria-hidden="true">{sort?.by === column.sort ? ({ ascending: "↑", descending: "↓" } as const)[sort.direction] : "↕"}</span>
+                  <span aria-hidden="true">
+                    {sort?.by === column.sort ? ({ ascending: "↑", descending: "↓" } as const)[sort.direction] : "↕"}
+                  </span>
                 </button>
               )}
             </th>
@@ -70,4 +76,4 @@ export const DataTable = <Row,>({ label, columns, rows, rowKey, sort, onSort }: 
       </tbody>
     </table>
   </div>
-);
+)

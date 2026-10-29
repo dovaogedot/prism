@@ -1,21 +1,21 @@
-import { Country, OrderStatus, PaymentFailure, Price } from "@prism/shared";
-import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
-import { match, P } from "ts-pattern";
-import { Api } from "../../../shared/api/client.ts";
-import { Alert, Card, Skeleton } from "../../../shared/ui/index.ts";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { SignInFirst } from "../../auth/components/index.ts";
-import { useSession } from "../../auth/session.ts";
-import { CartCache } from "../../cart/cart.ts";
-import { Picture } from "../../catalog/components/index.ts";
-import { DeliveryDates } from "../../../shared/format/delivery-dates.ts";
-import { CancelOrderButton, OrderConfirmation, OrderTimeline, StatusBadge } from "../components/index.ts";
-import { OrderPolling, PaymentWords, useOrder } from "../orders.ts";
-import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { DateTime } from "../../../shared/format/date-time.ts";
+import { Country, OrderStatus, PaymentFailure, Price } from "@prism/shared"
+import { useQueryClient } from "@tanstack/react-query"
+import { useEffect, useState } from "react"
+import { Link, useParams, useSearchParams } from "react-router"
+import { match, P } from "ts-pattern"
+import { Api } from "../../../shared/api/client.ts"
+import { Alert, Card, Skeleton } from "../../../shared/ui/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { SignInFirst } from "../../auth/components/index.ts"
+import { useSession } from "../../auth/session.ts"
+import { CartCache } from "../../cart/cart.ts"
+import { Picture } from "../../catalog/components/index.ts"
+import { DeliveryDates } from "../../../shared/format/delivery-dates.ts"
+import { CancelOrderButton, OrderConfirmation, OrderTimeline, StatusBadge } from "../components/index.ts"
+import { OrderPolling, PaymentWords, useOrder } from "../orders.ts"
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { DateTime } from "../../../shared/format/date-time.ts"
 
 /**
  * One order: its status and history, what is in it, where it goes and how it
@@ -24,39 +24,39 @@ import { DateTime } from "../../../shared/format/date-time.ts";
  * from the confirmation link.
  */
 export const OrderPage = () => {
-  const { id = "" } = useParams();
+  const { id = "" } = useParams()
 
-  const [params] = useSearchParams();
+  const [params] = useSearchParams()
 
-  const [startedAt] = useState(() => Date.now());
+  const [startedAt] = useState(() => Date.now())
 
-  const session = useSession();
+  const session = useSession()
 
-  const key = params.get("key") ?? undefined;
-  const placed = params.get("placed") === "1";
+  const key = params.get("key") ?? undefined
+  const placed = params.get("placed") === "1"
   // A member's order mails carry no key, so a member who is signed out signs in first and comes back.
-  const needsSignIn = session === undefined && key === undefined;
+  const needsSignIn = session === undefined && key === undefined
 
-  const order = useOrder(id, key, startedAt, !needsSignIn);
+  const order = useOrder(id, key, startedAt, !needsSignIn)
 
-  const client = useQueryClient();
+  const client = useQueryClient()
 
-  const status = order.data?.status;
+  const status = order.data?.status
 
   // Polling ends at the limit with nothing new to show, so a timer renders the page once more, past its watch.
-  const [isWatchOver, setWatchOver] = useState(false);
+  const [isWatchOver, setWatchOver] = useState(false)
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setWatchOver(true), OrderPolling.LIMIT_MS - (Date.now() - startedAt));
-    return () => window.clearTimeout(timer);
-  }, [startedAt]);
+    const timer = window.setTimeout(() => setWatchOver(true), OrderPolling.LIMIT_MS - (Date.now() - startedAt))
+    return () => window.clearTimeout(timer)
+  }, [startedAt])
 
   // A settled payment takes the bought items out of the cart on the server.
   useEffect(() => {
-    if (placed && status !== undefined && status !== "pending_payment") void client.invalidateQueries({ queryKey: CartCache.all });
-  }, [placed, status, client]);
+    if (placed && status !== undefined && status !== "pending_payment") void client.invalidateQueries({ queryKey: CartCache.all })
+  }, [placed, status, client])
 
-  if (needsSignIn) return <SignInFirst />;
+  if (needsSignIn) return <SignInFirst />
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
@@ -210,9 +210,7 @@ export const OrderPage = () => {
                             Reference <span className="break-all font-mono text-ink">{payment.reference}</span>
                           </p>
                         )}
-                        {payment.failure === undefined ? null : (
-                          <p className="text-danger">{PaymentFailure.message[payment.failure]}</p>
-                        )}
+                        {payment.failure === undefined ? null : <p className="text-danger">{PaymentFailure.message[payment.failure]}</p>}
                         {match(payment.refund)
                           .with(P.nullish, () => null)
                           .with("pending", () => <p className="text-ink-soft">{PaymentWords.refund.pending}.</p>)
@@ -224,9 +222,7 @@ export const OrderPage = () => {
                 </Card>
 
                 {data.status === "pending_payment" && data.paymentDueAt !== undefined && !placed ? (
-                  <p className="text-sm text-ink-soft">
-                    Unpaid orders are canceled at {DateTime.format(data.paymentDueAt)}.
-                  </p>
+                  <p className="text-sm text-ink-soft">Unpaid orders are canceled at {DateTime.format(data.paymentDueAt)}.</p>
                 ) : null}
 
                 {OrderStatus.isCancelable(data.status) ? (
@@ -237,5 +233,5 @@ export const OrderPage = () => {
           </>
         ))}
     </div>
-  );
-};
+  )
+}

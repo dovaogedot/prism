@@ -5,8 +5,8 @@
  * dropped.
  */
 
-import { Slug } from "@prism/shared";
-import { z } from "zod";
+import { Slug } from "@prism/shared"
+import { z } from "zod"
 
 export const RecentlyViewed = {
   STORAGE_KEY: "prism-recently-viewed",
@@ -14,35 +14,34 @@ export const RecentlyViewed = {
   MAX: 12,
 
   /** `list` with `slug` first, without its earlier place, cut to the most the list keeps. */
-  add: (list: readonly Slug[], slug: Slug): readonly Slug[] =>
-    [slug, ...list.filter((kept) => kept !== slug)].slice(0, RecentlyViewed.MAX),
+  add: (list: readonly Slug[], slug: Slug): readonly Slug[] => [slug, ...list.filter((kept) => kept !== slug)].slice(0, RecentlyViewed.MAX),
 
   /** The list stored as `stored`; empty for anything that is not a list of slugs. */
   parse: (stored: string | null): readonly Slug[] => {
-    if (stored === null) return [];
+    if (stored === null) return []
 
     try {
-      const parsed = z.array(Slug.schema).safeParse(JSON.parse(stored));
-      return parsed.success ? parsed.data.slice(0, RecentlyViewed.MAX) : [];
+      const parsed = z.array(Slug.schema).safeParse(JSON.parse(stored))
+      return parsed.success ? parsed.data.slice(0, RecentlyViewed.MAX) : []
     } catch {
-      return [];
+      return []
     }
   },
 
   read: (): readonly Slug[] => {
     try {
-      return RecentlyViewed.parse(localStorage.getItem(RecentlyViewed.STORAGE_KEY));
+      return RecentlyViewed.parse(localStorage.getItem(RecentlyViewed.STORAGE_KEY))
     } catch {
-      return [];
+      return []
     }
   },
 
   /** Puts `slug` first in the stored list. */
   remember: (slug: Slug): void => {
     try {
-      localStorage.setItem(RecentlyViewed.STORAGE_KEY, JSON.stringify(RecentlyViewed.add(RecentlyViewed.read(), slug)));
+      localStorage.setItem(RecentlyViewed.STORAGE_KEY, JSON.stringify(RecentlyViewed.add(RecentlyViewed.read(), slug)))
     } catch {
       // Storage is blocked or full; the list is a convenience, so nothing is lost.
     }
   },
-} as const;
+} as const

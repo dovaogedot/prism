@@ -1,22 +1,22 @@
-import { Cart, Price } from "@prism/shared";
-import { Link } from "react-router";
-import { match, P } from "ts-pattern";
-import { Failure } from "../../../shared/api/failure.tsx";
-import { Alert, Card, Skeleton } from "../../../shared/ui/index.ts";
-import { FreeShipping, useCart } from "../cart.ts";
-import { CartLineItem, Recommendations } from "../components/index.ts";
-import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
-import { PageText } from "../../../shared/seo/page-text.ts";
-import { useShippingOptions } from "../../../shared/api/shipping-options.ts";
+import { Cart, Price } from "@prism/shared"
+import { Link } from "react-router"
+import { match, P } from "ts-pattern"
+import { Failure } from "../../../shared/api/failure.tsx"
+import { Alert, Card, Skeleton } from "../../../shared/ui/index.ts"
+import { FreeShipping, useCart } from "../cart.ts"
+import { CartLineItem, Recommendations } from "../components/index.ts"
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx"
+import { PageText } from "../../../shared/seo/page-text.ts"
+import { useShippingOptions } from "../../../shared/api/shipping-options.ts"
 
 /**
  * The cart: every line with its picture, price and quantity, the subtotal,
  * the way to checkout, and products to go with it.
  */
 export const CartPage = () => {
-  const cart = useCart();
+  const cart = useCart()
 
-  const options = useShippingOptions();
+  const options = useShippingOptions()
 
   return (
     <div className="mx-auto max-w-6xl space-y-12 px-4 py-8 sm:px-6">
@@ -41,8 +41,8 @@ export const CartPage = () => {
             </Card>
           ))
           .otherwise(({ data }) => {
-            const blocked = Cart.issues(data.lines).length > 0;
-            const freeShipping = FreeShipping.sentenceOf(options.data ?? [], data.subtotalCents);
+            const blocked = Cart.issues(data.lines).length > 0
+            const freeShipping = FreeShipping.sentenceOf(options.data ?? [], data.subtotalCents)
 
             return (
               <div className="grid gap-8 lg:grid-cols-[1fr_20rem] lg:items-start">
@@ -75,23 +75,21 @@ export const CartPage = () => {
                     to="/checkout"
                     aria-disabled={blocked}
                     onClick={(event) => {
-                      if (blocked) event.preventDefault();
+                      if (blocked) event.preventDefault()
                     }}
                     className={`flex w-full items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
-                      blocked
-                        ? "pointer-events-none bg-sunken text-ink-faint"
-                        : "bg-accent text-accent-ink hover:bg-accent-hover"
+                      blocked ? "pointer-events-none bg-sunken text-ink-faint" : "bg-accent text-accent-ink hover:bg-accent-hover"
                     }`}
                   >
                     Go to checkout
                   </Link>
                 </Card>
               </div>
-            );
+            )
           })}
       </div>
 
       <Recommendations />
     </div>
-  );
-};
+  )
+}

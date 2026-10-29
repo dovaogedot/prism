@@ -1,20 +1,20 @@
-import { DomainError } from "@prism/shared";
-import { PaymentElement } from "@stripe/react-stripe-js";
-import { useState } from "react";
-import { Alert } from "../../../shared/ui/index.ts";
+import { DomainError } from "@prism/shared"
+import { PaymentElement } from "@stripe/react-stripe-js"
+import { useState } from "react"
+import { Alert } from "../../../shared/ui/index.ts"
 
 /**
  * How this shop takes payment: Stripe's card fields, the simulated provider
  * of a test stack, or not at all; and what went wrong with the payment last time.
  */
-export type PaymentFieldsProps = Readonly<{ mode: "card" | "simulated" | "unavailable"; error?: string }>;
+export type PaymentFieldsProps = Readonly<{ mode: "card" | "simulated" | "unavailable"; error?: string }>
 
 /**
  * Stripe's own card fields, in an iframe served by Stripe: the card number,
  * expiry and CVC never pass through this page's code or Prism's server.
  */
 export const PaymentFields = ({ mode, error }: PaymentFieldsProps) => {
-  const [loadError, setLoadError] = useState<string | undefined>(undefined);
+  const [loadError, setLoadError] = useState<string | undefined>(undefined)
 
   return (
     <fieldset className="space-y-3">
@@ -49,5 +49,5 @@ export const PaymentFields = ({ mode, error }: PaymentFieldsProps) => {
         </p>
       ) : null}
     </fieldset>
-  );
-};
+  )
+}

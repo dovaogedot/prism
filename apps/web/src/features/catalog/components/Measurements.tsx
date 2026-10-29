@@ -1,31 +1,31 @@
-import type { ProductDetail } from "@prism/shared";
-import { useState } from "react";
-import { match } from "ts-pattern";
-import { SpecRow } from "./SpecRow.tsx";
+import type { ProductDetail } from "@prism/shared"
+import { useState } from "react"
+import { match } from "ts-pattern"
+import { SpecRow } from "./SpecRow.tsx"
 
 /** The product whose weight and box are shown. */
-export type MeasurementsProps = Readonly<{ product: ProductDetail }>;
+export type MeasurementsProps = Readonly<{ product: ProductDetail }>
 
 /** The weight and the box, read in either unit system. */
 export const Measurements = ({ product }: MeasurementsProps) => {
-  const [system, setSystem] = useState<"metric" | "imperial">("metric");
+  const [system, setSystem] = useState<"metric" | "imperial">("metric")
 
   const rows = match(system)
     .with("metric", () => {
-      const { width, height, depth } = product.dimensions.millimeters;
+      const { width, height, depth } = product.dimensions.millimeters
       return [
         { label: "Weight", value: `${product.weight.grams} g` },
         { label: "Size", value: `${width} × ${height} × ${depth} mm` },
-      ];
+      ]
     })
     .with("imperial", () => {
-      const { width, height, depth } = product.dimensions.inches;
+      const { width, height, depth } = product.dimensions.inches
       return [
         { label: "Weight", value: `${product.weight.ounces} oz` },
         { label: "Size", value: `${width} × ${height} × ${depth} in` },
-      ];
+      ]
     })
-    .exhaustive();
+    .exhaustive()
 
   return (
     <div>
@@ -55,5 +55,5 @@ export const Measurements = ({ product }: MeasurementsProps) => {
         ))}
       </dl>
     </div>
-  );
-};
+  )
+}

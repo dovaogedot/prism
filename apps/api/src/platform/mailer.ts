@@ -5,47 +5,47 @@
  * account-enumeration oracle.
  */
 
-import type { Email } from "@prism/shared";
-import { createTransport } from "nodemailer";
+import type { Email } from "@prism/shared"
+import { createTransport } from "nodemailer"
 
 /** One message, carrying both bodies so a client can take either. */
 export type OutboundEmail = Readonly<{
-  to: Email;
+  to: Email
   /** Where a reply goes, when not to the sender. */
-  replyTo?: Email;
-  subject: string;
-  text: string;
-  html: string;
-}>;
+  replyTo?: Email
+  subject: string
+  text: string
+  html: string
+}>
 
 /** Sending a message. Answers whether it went, and never rejects. */
 export type Mailer = Readonly<{
-  send: (email: OutboundEmail) => Promise<boolean>;
-}>;
+  send: (email: OutboundEmail) => Promise<boolean>
+}>
 
 /** What an SMTP server asks for before it relays. */
-export type SmtpCredentials = Readonly<{ user: string; password: string }>;
+export type SmtpCredentials = Readonly<{ user: string; password: string }>
 
 /** Which server to hand messages to, and who they come from. */
 export type MailerOptions = Readonly<{
-  host: string;
-  port: number;
+  host: string
+  port: number
   /** TLS from the first byte, as on port 465. STARTTLS on 587 is negotiated. */
-  secure: boolean;
+  secure: boolean
   /** Left out for a local relay like Mailpit, which accepts anything. */
-  credentials?: SmtpCredentials;
-  from: string;
-  onFailure: (reason: unknown) => void;
-}>;
+  credentials?: SmtpCredentials
+  from: string
+  onFailure: (reason: unknown) => void
+}>
 
 /** A mailer that keeps what it was given, in the order it was given. */
 export type MemoryMailer = Mailer &
   Readonly<{
-    sent: readonly OutboundEmail[];
+    sent: readonly OutboundEmail[]
     /** Makes the next send fail, as an SMTP server that refuses it would. */
-    failNext: () => void;
-    clear: () => void;
-  }>;
+    failNext: () => void
+    clear: () => void
+  }>
 
 export const Mailer = {
   /** Hands messages to an SMTP server. A failure is reported and swallowed. */
@@ -56,10 +56,8 @@ export const Mailer = {
       secure: options.secure,
       // Mailpit speaks plain SMTP with no certificate and no login.
       ignoreTLS: options.credentials === undefined && !options.secure,
-      ...(options.credentials === undefined
-        ? {}
-        : { auth: { user: options.credentials.user, pass: options.credentials.password } }),
-    });
+      ...(options.credentials === undefined ? {} : { auth: { user: options.credentials.user, pass: options.credentials.password } }),
+    })
 
     return {
       send: (email) =>
@@ -74,35 +72,35 @@ export const Mailer = {
           })
           .then(() => true)
           .catch((reason: unknown) => {
-            options.onFailure(reason);
-            return false;
+            options.onFailure(reason)
+            return false
           }),
-    };
+    }
   },
 
   /** Collects messages in memory so tests can assert on what was sent. */
   memory: (): MemoryMailer => {
-    const sent: OutboundEmail[] = [];
-    let shouldFailNext = false;
+    const sent: OutboundEmail[] = []
+    let shouldFailNext = false
 
     return {
       sent,
       send: async (email) => {
         if (shouldFailNext) {
-          shouldFailNext = false;
-          return false;
+          shouldFailNext = false
+          return false
         }
 
-        sent.push(email);
-        return true;
+        sent.push(email)
+        return true
       },
       failNext: () => {
-        shouldFailNext = true;
+        shouldFailNext = true
       },
       clear: () => {
-        sent.length = 0;
-        shouldFailNext = false;
+        sent.length = 0
+        shouldFailNext = false
       },
-    };
+    }
   },
-} as const;
+} as const

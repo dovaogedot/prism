@@ -1,7 +1,7 @@
-import { OrderStatus } from "@prism/shared";
+import { OrderStatus } from "@prism/shared"
 
 /** The status to show. */
-export type StatusBadgeProps = Readonly<{ status: OrderStatus }>;
+export type StatusBadgeProps = Readonly<{ status: OrderStatus }>
 
 const Tones = {
   pending_payment: "border-warn/40 text-warn",
@@ -12,11 +12,11 @@ const Tones = {
   delivered: "border-line-strong text-ink",
   canceled: "border-line text-ink-faint",
   refunded: "border-line text-ink-faint",
-} as const satisfies Record<OrderStatus, string>;
+} as const satisfies Record<OrderStatus, string>
 
 /** An order's status as a small outlined label, colored by how it went. */
 export const StatusBadge = ({ status }: StatusBadgeProps) => (
   <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold ${Tones[status]}`}>
     {OrderStatus.label[status]}
   </span>
-);
+)

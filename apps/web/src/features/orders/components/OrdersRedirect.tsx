@@ -1,8 +1,8 @@
-import { Navigate, useLocation } from "react-router";
+import { Navigate, useLocation } from "react-router"
 
 /** Sends `/orders` to `/account/orders`, keeping its filters. */
 export const OrdersRedirect = () => {
-  const { search } = useLocation();
+  const { search } = useLocation()
 
-  return <Navigate to={`/account/orders${search}`} replace />;
-};
+  return <Navigate to={`/account/orders${search}`} replace />
+}

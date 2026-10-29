@@ -1,7 +1,7 @@
 /** What every run measures against, and what it writes when it ends. */
 
 /** The part of k6's end-of-run summary the runs read. */
-type SummaryData = Readonly<{ metrics: Readonly<Record<string, Readonly<{ values: Readonly<Record<string, number>> }>>> }>;
+type SummaryData = Readonly<{ metrics: Readonly<Record<string, Readonly<{ values: Readonly<Record<string, number>> }>>> }>
 
 export const Summary = {
   /** The percentiles every duration is reported at. */
@@ -21,8 +21,8 @@ export const Summary = {
   }),
 
   text: (run: string, data: SummaryData): string => {
-    const value = (metric: string, stat: string): number => data.metrics[metric]?.values[stat] ?? 0;
-    const milliseconds = (stat: string): string => `${Math.round(value("http_req_duration", stat))} ms`;
+    const value = (metric: string, stat: string): number => data.metrics[metric]?.values[stat] ?? 0
+    const milliseconds = (stat: string): string => `${Math.round(value("http_req_duration", stat))} ms`
 
     return [
       "",
@@ -31,6 +31,6 @@ export const Summary = {
       `  user steps    ${value("transactions", "count")} at ${value("transactions", "rate").toFixed(1)}/s, ${(value("transaction_success", "rate") * 100).toFixed(2)}% successful`,
       `  durations     p50 ${milliseconds("med")}, p90 ${milliseconds("p(90)")}, p95 ${milliseconds("p(95)")}, p99 ${milliseconds("p(99)")}`,
       "",
-    ].join("\n");
+    ].join("\n")
   },
-} as const;
+} as const

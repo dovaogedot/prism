@@ -1,16 +1,16 @@
-import { useId } from "react";
-import { match } from "ts-pattern";
+import { useId } from "react"
+import { match } from "ts-pattern"
 
 /** The average, how many ratings it comes from, and whether that count is shown. */
 export type StarsProps = Readonly<{
   /** `undefined` while nobody has rated it, which draws the stars empty. */
-  rating: number | undefined;
-  count: number;
+  rating: number | undefined
+  count: number
   /** False for one review's own rating, where a count says nothing. */
-  isCountShown?: boolean;
+  isCountShown?: boolean
   /** False where the average and the count are written beside the stars already. */
-  isTextShown?: boolean;
-}>;
+  isTextShown?: boolean
+}>
 
 /**
  * Five stars, filled to the rating. The stars are drawn for the eye; a
@@ -18,14 +18,14 @@ export type StarsProps = Readonly<{
  */
 export const Stars = ({ rating, count, isCountShown = true, isTextShown = true }: StarsProps) => {
   // Each star's gradient needs an id no other element on the page has.
-  const gradientId = useId();
+  const gradientId = useId()
 
-  const filled = rating ?? 0;
+  const filled = rating ?? 0
 
   const spoken = match({ isCountShown, rating })
     .with({ rating: undefined }, () => "No reviews yet")
     .with({ isCountShown: false }, () => `Rated ${filled} out of 5`)
-    .otherwise(() => `Rated ${filled.toFixed(1)} out of 5 from ${count} ${count === 1 ? "review" : "reviews"}`);
+    .otherwise(() => `Rated ${filled.toFixed(1)} out of 5 from ${count} ${count === 1 ? "review" : "reviews"}`)
 
   return (
     <span className="inline-flex items-center gap-1">
@@ -49,5 +49,5 @@ export const Stars = ({ rating, count, isCountShown = true, isTextShown = true }
         </span>
       ) : null}
     </span>
-  );
-};
+  )
+}

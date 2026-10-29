@@ -1,15 +1,15 @@
-import type { ReactNode } from "react";
-import { PageMeta } from "../../../shared/seo/PageMeta.tsx";
-import type { PageText } from "../../../shared/seo/page-text.ts";
+import type { ReactNode } from "react"
+import { PageMeta } from "../../../shared/seo/PageMeta.tsx"
+import type { PageText } from "../../../shared/seo/page-text.ts"
 
 /** The page's head tags and title, the sentence under its heading, and its text. */
 export type FixedPageProps = Readonly<{
-  text: PageText;
+  text: PageText
   /** The h1, when it reads better than the title. */
-  heading?: string;
-  lede: string;
-  children: ReactNode;
-}>;
+  heading?: string
+  lede: string
+  children: ReactNode
+}>
 
 /** A page of running text: the about page, the FAQ, the terms and the privacy policy. */
 export const FixedPage = ({ text, heading, lede, children }: FixedPageProps) => (
@@ -21,4 +21,4 @@ export const FixedPage = ({ text, heading, lede, children }: FixedPageProps) => 
     </header>
     <div className="prose-page">{children}</div>
   </article>
-);
+)

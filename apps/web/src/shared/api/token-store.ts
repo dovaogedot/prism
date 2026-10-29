@@ -8,16 +8,16 @@
  * it for a fresh access token on boot.
  */
 
-import type { AccessToken, SessionUser } from "@prism/shared";
+import type { AccessToken, SessionUser } from "@prism/shared"
 
 /** The token and the person it was granted to. */
-export type Held = Readonly<{ token: AccessToken; user: SessionUser }>;
+export type Held = Readonly<{ token: AccessToken; user: SessionUser }>
 
 /** The one held grant and who wants to know when it changes. */
 const TokenState: { held: Held | undefined; readonly listeners: Set<() => void> } = {
   held: undefined,
   listeners: new Set(),
-};
+}
 
 /**
  * The access token and its user, held for the life of the tab.
@@ -31,30 +31,30 @@ export const TokenStore = {
   user: (): SessionUser | undefined => TokenState.held?.user,
 
   set: (token: AccessToken, user: SessionUser): void => {
-    TokenState.held = { token, user };
-    TokenStore.announce();
+    TokenState.held = { token, user }
+    TokenStore.announce()
   },
 
   /** Replaces the cached user without disturbing a valid token. */
   updateUser: (user: SessionUser): void => {
-    if (TokenState.held !== undefined) TokenState.held = { token: TokenState.held.token, user };
-    TokenStore.announce();
+    if (TokenState.held !== undefined) TokenState.held = { token: TokenState.held.token, user }
+    TokenStore.announce()
   },
 
   clear: (): void => {
-    TokenState.held = undefined;
-    TokenStore.announce();
+    TokenState.held = undefined
+    TokenStore.announce()
   },
 
   subscribe: (listener: () => void): (() => void) => {
-    TokenState.listeners.add(listener);
-    return () => TokenState.listeners.delete(listener);
+    TokenState.listeners.add(listener)
+    return () => TokenState.listeners.delete(listener)
   },
 
   /** `useSyncExternalStore` compares by reference, so the snapshot is the held value itself. */
   snapshot: (): Held | undefined => TokenState.held,
 
   announce: (): void => {
-    for (const listener of TokenState.listeners) listener();
+    for (const listener of TokenState.listeners) listener()
   },
-} as const;
+} as const

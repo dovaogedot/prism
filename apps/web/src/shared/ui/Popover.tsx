@@ -1,19 +1,19 @@
-import { useEffect, useRef, type ReactNode } from "react";
-import { useLocation } from "react-router";
+import { useEffect, useRef, type ReactNode } from "react"
+import { useLocation } from "react-router"
 
 /** The panel's id, which edge it lines up with, and its content. */
 export type PopoverProps = Readonly<{
-  className?: string;
+  className?: string
   /** What a `popoverTarget` button names to open it; unique on the page. */
-  id: string;
+  id: string
   /** The side of the content column the panel lines up with. */
-  side: "start" | "end";
+  side: "start" | "end"
   /** The panel's accessible name. */
-  label: string;
+  label: string
   /** Told whenever the panel opens or closes. */
-  onToggle?: (isOpen: boolean) => void;
-  children: ReactNode;
-}>;
+  onToggle?: (isOpen: boolean) => void
+  children: ReactNode
+}>
 
 /**
  * A panel the header opens with the native `popover` attribute. A button
@@ -22,15 +22,15 @@ export type PopoverProps = Readonly<{
  * page closes it too.
  */
 export const Popover = ({ className = "", id, side, label, onToggle, children }: PopoverProps) => {
-  const panel = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null)
 
-  const { pathname } = useLocation();
+  const { pathname } = useLocation()
 
   useEffect(() => {
     if (panel.current?.matches(":popover-open") === true) {
-      panel.current.hidePopover();
+      panel.current.hidePopover()
     }
-  }, [pathname]);
+  }, [pathname])
 
   return (
     <div
@@ -45,5 +45,5 @@ export const Popover = ({ className = "", id, side, label, onToggle, children }:
     >
       {children}
     </div>
-  );
-};
+  )
+}

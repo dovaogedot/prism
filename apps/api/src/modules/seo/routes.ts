@@ -5,22 +5,34 @@
  * site's root.
  */
 
-import type { Slug } from "@prism/shared";
-import { asc } from "drizzle-orm";
-import type { FastifyInstance } from "fastify";
-import type { Database } from "../../db/client.ts";
-import { categories, products } from "../../db/schema.ts";
-import { Html } from "../../http/html.ts";
+import type { Slug } from "@prism/shared"
+import { asc } from "drizzle-orm"
+import type { FastifyInstance } from "fastify"
+import type { Database } from "../../db/client.ts"
+import { categories, products } from "../../db/schema.ts"
+import { Html } from "../../http/html.ts"
 
 /** What the SEO routes are served from. */
-export type SeoRouteDependencies = Readonly<{ db: Database; webOrigin: string }>;
+export type SeoRouteDependencies = Readonly<{ db: Database; webOrigin: string }>
 
 /** One address of the sitemap, with when it last changed when that is known. */
-export type SitemapEntry = Readonly<{ path: string; lastModified?: Date }>;
+export type SitemapEntry = Readonly<{ path: string; lastModified?: Date }>
 
 export const SeoRoutes = {
   /** Pages nobody should find through a search engine: they are personal, or empty without a session. */
-  PRIVATE: ["/cart", "/checkout", "/orders", "/account", "/admin", "/login", "/register", "/forgot-password", "/reset-password", "/search", "/api/"],
+  PRIVATE: [
+    "/cart",
+    "/checkout",
+    "/orders",
+    "/account",
+    "/admin",
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/reset-password",
+    "/search",
+    "/api/",
+  ],
 
   /** The fixed pages every sitemap lists. */
   FIXED: ["/", "/shop", "/about", "/contact", "/faq", "/terms", "/privacy"],
@@ -47,25 +59,25 @@ export const SeoRoutes = {
     const [shelves, items] = await Promise.all([
       db.select({ slug: categories.slug }).from(categories).orderBy(asc(categories.slug)),
       db.select({ slug: products.slug, updatedAt: products.updatedAt }).from(products).orderBy(asc(products.slug)),
-    ]);
-    const pathOf = (prefix: string, slug: Slug) => `${prefix}/${slug}`;
+    ])
+    const pathOf = (prefix: string, slug: Slug) => `${prefix}/${slug}`
 
     return [
       ...SeoRoutes.FIXED.map((path) => ({ path })),
       ...shelves.map((shelf) => ({ path: pathOf("/categories", shelf.slug) })),
       ...items.map((item) => ({ path: pathOf("/products", item.slug), lastModified: item.updatedAt })),
-    ];
+    ]
   },
 
   register: (app: FastifyInstance, deps: SeoRouteDependencies): void => {
-    const shared = { cache: "public" } as const;
+    const shared = { cache: "public" } as const
 
     app.get("/seo/robots.txt", { config: shared }, async (_request, reply) =>
       reply.type("text/plain; charset=utf-8").send(SeoRoutes.robots(deps.webOrigin)),
-    );
+    )
 
     app.get("/seo/sitemap.xml", { config: shared }, async (_request, reply) =>
       reply.type("application/xml; charset=utf-8").send(SeoRoutes.sitemap(deps.webOrigin, await SeoRoutes.entries(deps.db))),
-    );
+    )
   },
-} as const;
+} as const

@@ -4,8 +4,8 @@
  * pages show their times in.
  */
 
-import { Delivery } from "@prism/shared";
-import { gte, lt, sql, type AnyColumn, type SQL } from "drizzle-orm";
+import { Delivery } from "@prism/shared"
+import { gte, lt, sql, type AnyColumn, type SQL } from "drizzle-orm"
 
 export const DayRange = {
   /**
@@ -17,4 +17,4 @@ export const DayRange = {
     // The end day counts, so the bound is the start of the next one.
     to === undefined ? undefined : lt(column, sql`((${to}::date + 1)::timestamp) AT TIME ZONE ${Delivery.TIME_ZONE}`),
   ],
-} as const;
+} as const
