@@ -9,7 +9,7 @@
     "apps/*"
   ],
   "engines": {
-    "node": ">=25.0.0"
+    "node": ">=26.0.0"
   },
   "scripts": {
     "build": "npm run build --workspace @prism/shared",

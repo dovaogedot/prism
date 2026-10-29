@@ -1,7 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["es2024"],
+    "lib": ["esnext"],
     "types": ["node"],
     "noEmit": true
   },
