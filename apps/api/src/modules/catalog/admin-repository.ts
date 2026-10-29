@@ -24,6 +24,7 @@ import {
   type Slug,
 } from "@prism/shared";
 import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, lte, max, or, sql, type SQL } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import type { Database, Transaction } from "../../db/client.ts";
 import { brands, categories, productImages, productProperties, products } from "../../db/schema.ts";
 import type { StoredImage } from "../../platform/image-store.ts";
@@ -109,6 +110,16 @@ export type CatalogAdminRepository = Readonly<{
 }>;
 
 export const CatalogAdminRepository = {
+  /**
+   * How many import rows go into one statement. A chunk's properties, at most
+   * 30 a row and 3 values each, stay under Postgres's 65,535 bound values.
+   */
+  IMPORT_CHUNK: 500,
+
+  /** An upsert's `SET` that takes each column, under its key, from the row that conflicted. */
+  excludedOf: (columns: Readonly<Record<string, AnyPgColumn>>): Record<string, SQL> =>
+    Object.fromEntries(Object.entries(columns).map(([key, column]) => [key, sql.raw(`excluded."${column.name}"`)])),
+
   /** The fields of a product an audit entry compares. The description is long, so only whether it changed is kept. */
   auditedOf: (input: ProductInput) => ({
     name: input.name,
@@ -501,34 +512,75 @@ export const CatalogAdminRepository = {
           const created = rows.length - updated;
           if (dryRun) return { _tag: "Imported", created, updated };
 
-          for (const { product: candidate } of rows) {
-            const categoryId = categoryIds.get(candidate.category);
-            const brandId = brandIds.get(candidate.brand);
-            if (categoryId === undefined || brandId === undefined) throw new Error("a checked reference vanished");
+          // A few hundred rows a statement: one upsert per featuring rule, then the chunk's properties in two.
+          for (let start = 0; start < rows.length; start += CatalogAdminRepository.IMPORT_CHUNK) {
+            const chunk = rows.slice(start, start + CatalogAdminRepository.IMPORT_CHUNK);
+            const saved: { id: ProductId; slug: Slug }[] = [];
 
-            const values = {
-              slug: candidate.slug,
-              name: candidate.name,
-              description: candidate.description,
-              priceCents: candidate.priceCents,
-              stock: candidate.stock,
-              categoryId,
-              brandId,
-              weightGrams: candidate.weightGrams,
-              widthMm: candidate.widthMm,
-              heightMm: candidate.heightMm,
-              depthMm: candidate.depthMm,
-              updatedAt: now,
-            };
+            for (const featured of [true, false, undefined]) {
+              const group = chunk.filter((entry) => entry.product.featured === featured);
+              if (group.length === 0) continue;
 
-            const [saved] = await tx
-              .insert(products)
-              .values({ ...values, featuredAt: candidate.featured === true ? now : null, createdAt: now })
-              .onConflictDoUpdate({ target: products.slug, set: { ...values, featuredAt: importedFeaturedAt(candidate.featured, now) } })
-              .returning({ id: products.id });
-            if (saved === undefined) throw new Error("product upsert returned no row");
+              const values = group.map(({ product: candidate }) => {
+                const categoryId = categoryIds.get(candidate.category);
+                const brandId = brandIds.get(candidate.brand);
+                if (categoryId === undefined || brandId === undefined) throw new Error("a checked reference vanished");
 
-            await writeProperties(tx, saved.id, candidate.properties);
+                return {
+                  slug: candidate.slug,
+                  name: candidate.name,
+                  description: candidate.description,
+                  priceCents: candidate.priceCents,
+                  stock: candidate.stock,
+                  categoryId,
+                  brandId,
+                  weightGrams: candidate.weightGrams,
+                  widthMm: candidate.widthMm,
+                  heightMm: candidate.heightMm,
+                  depthMm: candidate.depthMm,
+                  featuredAt: candidate.featured === true ? now : null,
+                  createdAt: now,
+                  updatedAt: now,
+                };
+              });
+
+              saved.push(
+                ...(await tx
+                  .insert(products)
+                  .values(values)
+                  .onConflictDoUpdate({
+                    target: products.slug,
+                    set: {
+                      ...CatalogAdminRepository.excludedOf({
+                        name: products.name,
+                        description: products.description,
+                        priceCents: products.priceCents,
+                        stock: products.stock,
+                        categoryId: products.categoryId,
+                        brandId: products.brandId,
+                        weightGrams: products.weightGrams,
+                        widthMm: products.widthMm,
+                        heightMm: products.heightMm,
+                        depthMm: products.depthMm,
+                        updatedAt: products.updatedAt,
+                      }),
+                      featuredAt: importedFeaturedAt(featured, now),
+                    },
+                  })
+                  .returning({ id: products.id, slug: products.slug })),
+              );
+            }
+
+            const idOf = new Map(saved.map((row) => [row.slug, row.id]));
+            const properties = chunk.flatMap(({ product: candidate }) => {
+              const productId = idOf.get(candidate.slug);
+              if (productId === undefined) throw new Error("an imported product was not written");
+
+              return candidate.properties.map((property) => ({ productId, ...property }));
+            });
+
+            await tx.delete(productProperties).where(inArray(productProperties.productId, saved.map((row) => row.id)));
+            if (properties.length > 0) await tx.insert(productProperties).values(properties);
           }
 
           await audit.record(tx, {

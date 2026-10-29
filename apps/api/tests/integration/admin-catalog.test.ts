@@ -254,6 +254,23 @@ describe("bulk import", () => {
     expect((await auditOf("product")).map((row) => row["action"])).toEqual(["product.import"]);
   });
 
+  it("writes a file of several chunks, each row with its properties and featuring", async () => {
+    const rows = Array.from({ length: 1201 }, (_, index) => {
+      const row = csvRow(`lamp-${index}`, `Lamp ${index}`);
+      if (index % 3 === 0) return row.replace(",false,", ",true,");
+      return index % 3 === 1 ? row : row.replace(",false,", ",,");
+    });
+
+    const response = await importFile([HEADER, ...rows].join("\n"), "many.csv", false);
+    const [counts] = await harness.database.sql`
+      SELECT count(*)::int AS products, count(featured_at)::int AS featured,
+        (SELECT count(*)::int FROM product_property WHERE name = 'Color' AND value = 'Red') AS red
+      FROM product WHERE slug LIKE 'lamp-%'`;
+
+    expect(jsonOf(response)).toMatchObject({ created: 1201, updated: 0 });
+    expect(counts).toEqual({ products: 1201, featured: 401, red: 1201 });
+  });
+
   it("leaves a product's featuring alone when the file has no featured column or an empty cell", async () => {
     const id = await Shop.productId(harness, "desk-lamp");
     await Staff.call(harness, content, "PUT", `/admin/products/${id}`, productInput({ name: "Desk Lamp", slug: "desk-lamp", isFeatured: true, stock: 10, stockBefore: 10 }));
