@@ -6,6 +6,7 @@ Placeholder data for the shop. The application never imports from this folder, a
 | --- | --- |
 | `seed.ts` | Fills an empty catalog in one transaction: a demo shopper, reviewers, and the products of `catalog.json`. Only the demo shopper has a password; the reviewers have none and live on the reserved `.example` domain. A database that already holds products keeps its catalog: the seed only makes the smaller copies of any picture that lacks them, and moves reviewers an earlier seed made on real mail domains with a password to their `.example` addresses, with no password and no live session. |
 | `seed-catalog.ts` | The shape of `catalog.json`. |
+| `review-texts.ts` | The titles, openings, details and closings the seeded reviews are built from, by star rating. |
 | `data.zip` | The data: `catalog.json` with the products, and `media/` with one picture each. No image contains it. |
 | `catalog.json`, `media/` | The data unpacked. Git ignores them. |
 | `archive.ts` | Packs the unpacked data into `data.zip`, and unpacks it. |
