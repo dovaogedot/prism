@@ -57,8 +57,6 @@ export const ProductForm = ({ initial, categories, brands, submitLabel, onSave }
 
   return (
     <form className="space-y-6" onSubmit={(event) => void submit(event)} noValidate>
-      {failure === undefined ? null : <Alert>{failure}</Alert>}
-
       <Card className="space-y-4 p-5">
         <h2 className="font-semibold text-ink">The product</h2>
         <Field
@@ -151,6 +149,9 @@ export const ProductForm = ({ initial, categories, brands, submitLabel, onSave }
           ))}
         </ul>
       </Card>
+
+      {/* Beside the button that was pressed, at the bottom of a long form. */}
+      {failure === undefined ? null : <Alert>{failure}</Alert>}
 
       <Button type="submit" busy={form.formState.isSubmitting}>
         {submitLabel}

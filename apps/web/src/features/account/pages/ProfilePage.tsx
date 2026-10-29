@@ -1,7 +1,6 @@
-import { useState, type ReactNode } from "react";
 import { match, P } from "ts-pattern";
 import { PageText } from "../../../shared/seo/page-text.ts";
-import { Alert, Card, Skeleton } from "../../../shared/ui/index.ts";
+import { Alert, Card, Skeleton, Toast } from "../../../shared/ui/index.ts";
 import { PasswordFlow } from "../../auth/components/PasswordFlow.tsx";
 import { SignInFirst } from "../../auth/components/SignInFirst.tsx";
 import { TwoFactorDisableFlow } from "../../auth/components/TwoFactorDisableFlow.tsx";
@@ -21,15 +20,11 @@ export const ProfilePage = () => {
 
   const profile = useProfile();
 
-  const [notice, setNotice] = useState<ReactNode | undefined>(undefined);
-
   if (session === undefined) return <SignInFirst />;
 
   return (
     <AccountPage text={PageText.account} heading="Your account">
-
-      {notice === undefined ? null : <Alert tone="accent">{notice}</Alert>}
-
+      {/* Every change is confirmed with a toast, where it shows whichever card it was made in. */}
       <Card className="p-5">
         <h2 className="mb-3 font-semibold text-ink">Profile</h2>
         {match(profile)
@@ -47,9 +42,9 @@ export const ProfilePage = () => {
         </div>
 
         {session.twoFactorEnabled ? (
-          <TwoFactorDisableFlow onDone={setNotice} />
+          <TwoFactorDisableFlow onDone={(notice) => Toast.show(notice)} />
         ) : (
-          <TwoFactorSetupFlow onDone={() => setNotice("Two-factor authentication is now on.")} />
+          <TwoFactorSetupFlow onDone={() => Toast.show("Two-factor authentication is now on.")} />
         )}
       </Card>
 
@@ -69,7 +64,7 @@ export const ProfilePage = () => {
         <h2 className="mb-3 font-semibold text-ink">Password</h2>
         <PasswordFlow
           hasPassword={session.hasPassword}
-          onDone={() => setNotice(session.hasPassword ? "Password changed." : "Password set. You can now sign in with your email.")}
+          onDone={() => Toast.show(session.hasPassword ? "Password changed." : "Password set. You can now sign in with your email.")}
         />
       </Card>
     </AccountPage>
