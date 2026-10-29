@@ -66,7 +66,7 @@ export const HomePage = () => {
         ))
         .with({ data: P.nonNullable.select() }, (data) => (
           <>
-            {data.featured.length === 0 ? null : <ProductRow id="featured-heading" title="Featured" products={data.featured} />}
+            {data.featured.length === 0 ? null : <ProductRow id="featured-heading" title="Featured" products={data.featured} isFirst />}
 
             {data.categories.length === 0 ? null : (
               <section className="space-y-4" aria-labelledby="categories-heading">

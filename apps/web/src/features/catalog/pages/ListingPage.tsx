@@ -260,9 +260,10 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
                   view === "grid" ? "grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4" : "space-y-3"
                 }`}
               >
-                {data.items.map((product) => (
+                {data.items.map((product, index) => (
                   <li className="grid grid-cols-1" key={product.id}>
-                    {view === "grid" ? <ProductCard product={product} /> : <ProductListItem product={product} />}
+                    {/* The first row, four at the widest, is in view on load. */}
+                    {view === "grid" ? <ProductCard product={product} isPriority={index < 4} /> : <ProductListItem product={product} />}
                   </li>
                 ))}
               </ul>

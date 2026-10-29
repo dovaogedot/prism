@@ -4,17 +4,18 @@ import { Stars } from "../../../shared/ui/index.ts";
 import { Picture } from "./Picture.tsx";
 import { Stock } from "./Stock.tsx";
 
-/** The product the card shows. */
-export type ProductCardProps = Readonly<{ product: ProductSummary }>;
+/** The product the card shows, and whether its picture is in view on load, which then loads at once. */
+export type ProductCardProps = Readonly<{ product: ProductSummary; isPriority?: boolean }>;
 
 /** A product in a grid: its picture, name, brand, rating and price. The whole card is the link to its page. */
-export const ProductCard = ({ product }: ProductCardProps) => (
+export const ProductCard = ({ product, isPriority = false }: ProductCardProps) => (
   <article className="group relative flex flex-col overflow-hidden rounded-lg border border-line bg-surface transition-all hover:border-line-strong hover:shadow-lg">
     <Picture
       className="aspect-square w-full"
       image={product.images[0]}
       name={product.name}
       sizes="(min-width: 1280px) 18rem, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+      isPriority={isPriority}
     />
 
     <div className="flex flex-1 flex-col gap-2 p-3">
