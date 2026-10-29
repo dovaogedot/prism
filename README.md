@@ -289,7 +289,7 @@ Open the image for full size. It is drawn from `docs/erd.mmd`: paste that into <
 
 `outbox_message` stands alone: it holds messages on their way to RabbitMQ.
 
-The schema is `apps/api/src/db/schema.ts`, and the migrations under `apps/api/drizzle/` are applied at start. Deleting a user or a product cascades to the rows that hang off it, with these exceptions. An account with orders, or one that acted in the audit log, cannot be deleted. An order line keeps its snapshot when its product goes, and a review keeps its moderation when the moderator's account goes. A category, brand or delivery option that something uses refuses deletion.
+The schema is `apps/api/src/db/schema.ts`, and the migrations under `apps/api/drizzle/` are applied at start. After a change to the schema, `npm run db:generate --workspace @prism/api` writes its migration; the deploy stops when a schema change comes without one. Deleting a user or a product cascades to the rows that hang off it, with these exceptions. An account with orders, or one that acted in the audit log, cannot be deleted. An order line keeps its snapshot when its product goes, and a review keeps its moderation when the moderator's account goes. A category, brand or delivery option that something uses refuses deletion.
 
 ## Design notes
 

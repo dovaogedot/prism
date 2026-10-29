@@ -40,6 +40,10 @@ jobs: # The work this workflow does.
       - run: npm ci # Installs exactly what package-lock.json lists.
       - run: npm run build # Builds the shared package; both apps import its built output, so the typecheck needs it.
       - run: npm run typecheck # Stops the deploy on a type error.
+      - name: Check that the schema has its migration # Stops the deploy when schema.ts changed without the SQL drizzle-kit makes from it.
+        run: |
+          npm run db:generate --workspace @prism/api
+          test -z "$(git status --porcelain apps/api/drizzle)" || { git status --porcelain apps/api/drizzle; echo "schema.ts changed without its migration: run npm run db:generate --workspace @prism/api and commit the files it writes." >&2; exit 1; }
       - run: npm test # Stops the deploy on a failing test; the integration and security suites start their own Postgres with Testcontainers.
 
   # The VPS is too small to build the images, so this job builds them and the
