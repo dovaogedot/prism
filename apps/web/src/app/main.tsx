@@ -10,25 +10,12 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router";
 import { GuestOnly } from "../features/auth/components/GuestOnly.tsx";
-import { AddressesPage } from "../features/account/pages/AddressesPage.tsx";
-import { ProfilePage } from "../features/account/pages/ProfilePage.tsx";
-import {
-  ForgotPasswordPage,
-  LoginPage,
-  OAuthCompletePage,
-  RegisterPage,
-  ResetPasswordPage,
-  TwoFactorPage,
-} from "../features/auth/pages/index.ts";
 import { CartPage } from "../features/cart/pages/CartPage.tsx";
 import { ItemRedirect } from "../features/catalog/components/ItemRedirect.tsx";
 import { ListingPage } from "../features/catalog/pages/ListingPage.tsx";
 import { ProductPage } from "../features/catalog/pages/ProductPage.tsx";
-import { CheckoutPage } from "../features/checkout/pages/CheckoutPage.tsx";
 import { HomePage } from "../features/home/pages/HomePage.tsx";
 import { OrdersRedirect } from "../features/orders/components/OrdersRedirect.tsx";
-import { OrderPage } from "../features/orders/pages/OrderPage.tsx";
-import { OrdersPage } from "../features/orders/pages/OrdersPage.tsx";
 import { AboutPage } from "../features/pages/pages/AboutPage.tsx";
 import { FaqPage } from "../features/pages/pages/FaqPage.tsx";
 import { NotFoundPage } from "../features/pages/pages/NotFoundPage.tsx";
@@ -72,7 +59,9 @@ const router = createBrowserRouter([
   {
     path: "/",
     element: <Root />,
-    // Shown while the first page's own code loads, which only the admin's pages need.
+    // Shown while the first page's own code loads: checkout, the account, an
+    // order, the sign-in pages and the admin each load when first opened, so
+    // browsing the catalog never downloads them.
     hydrateFallbackElement: <div className="min-h-dvh bg-canvas" />,
     children: [
       { index: true, element: <HomePage /> },
@@ -85,12 +74,12 @@ const router = createBrowserRouter([
       { path: "products/:slug", element: <ProductPage /> },
       { path: "item/:slug", element: <ItemRedirect /> },
       { path: "cart", element: <CartPage /> },
-      { path: "checkout", element: <CheckoutPage /> },
+      { path: "checkout", lazy: async () => ({ Component: (await import("../features/checkout/pages/CheckoutPage.tsx")).CheckoutPage }) },
 
       // OrdersPage sends a signed-out visitor to sign in itself. An order opens
       // for its owner, or for a guest with the key from its confirmation link.
       { path: "orders", element: <OrdersRedirect /> },
-      { path: "orders/:id", element: <OrderPage /> },
+      { path: "orders/:id", lazy: async () => ({ Component: (await import("../features/orders/pages/OrderPage.tsx")).OrderPage }) },
 
       { path: "about", element: <AboutPage /> },
       { path: "contact", element: <ContactPage /> },
@@ -102,24 +91,24 @@ const router = createBrowserRouter([
       {
         element: <GuestOnly />,
         children: [
-          { path: "login", element: <LoginPage /> },
-          { path: "login/2fa", element: <TwoFactorPage /> },
-          { path: "register", element: <RegisterPage /> },
+          { path: "login", lazy: async () => ({ Component: (await import("../features/auth/pages/LoginPage.tsx")).LoginPage }) },
+          { path: "login/2fa", lazy: async () => ({ Component: (await import("../features/auth/pages/TwoFactorPage.tsx")).TwoFactorPage }) },
+          { path: "register", lazy: async () => ({ Component: (await import("../features/auth/pages/RegisterPage.tsx")).RegisterPage }) },
         ],
       },
 
       // Reachable while signed in: holding a session and having forgotten
       // the password are not mutually exclusive.
-      { path: "forgot-password", element: <ForgotPasswordPage /> },
-      { path: "reset-password", element: <ResetPasswordPage /> },
+      { path: "forgot-password", lazy: async () => ({ Component: (await import("../features/auth/pages/ForgotPasswordPage.tsx")).ForgotPasswordPage }) },
+      { path: "reset-password", lazy: async () => ({ Component: (await import("../features/auth/pages/ResetPasswordPage.tsx")).ResetPasswordPage }) },
 
       // Unguarded because it is the page that establishes the session.
-      { path: "oauth/complete", element: <OAuthCompletePage /> },
+      { path: "oauth/complete", lazy: async () => ({ Component: (await import("../features/auth/pages/OAuthCompletePage.tsx")).OAuthCompletePage }) },
 
       // Both send a signed-out visitor to sign in themselves.
-      { path: "account", element: <ProfilePage /> },
-      { path: "account/addresses", element: <AddressesPage /> },
-      { path: "account/orders", element: <OrdersPage /> },
+      { path: "account", lazy: async () => ({ Component: (await import("../features/account/pages/ProfilePage.tsx")).ProfilePage }) },
+      { path: "account/addresses", lazy: async () => ({ Component: (await import("../features/account/pages/AddressesPage.tsx")).AddressesPage }) },
+      { path: "account/orders", lazy: async () => ({ Component: (await import("../features/orders/pages/OrdersPage.tsx")).OrdersPage }) },
 
       AdminRoutes.ROUTE,
 
