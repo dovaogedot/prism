@@ -113,7 +113,13 @@ export const UserPage = () => {
             </Card>
           </div>
 
-          {canManage ? (
+          {canManage && data.id === session?.id ? (
+            <p className="text-sm text-ink-soft">
+              This is your own account. Its staff roles, disabling it, resetting its 2FA and signing it out everywhere are for another admin.
+            </p>
+          ) : null}
+
+          {canManage && data.id !== session?.id ? (
             <>
               <Card className="space-y-4 p-5">
                 <h2 className="font-semibold text-ink">Staff roles</h2>
