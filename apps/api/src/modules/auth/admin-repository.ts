@@ -55,7 +55,7 @@ export type AccountAdminRepository = Readonly<{
   detail: (userId: UserId, now: Date) => Promise<AccountDetail | undefined>;
   setRoles: (input: Readonly<{ userId: UserId; roles: readonly StaffRole[]; actor: StaffActor }>) => Promise<RolesOutcome>;
   setDisabled: (input: Readonly<{ userId: UserId; isDisabled: boolean; actor: StaffActor; now: Date }>) => Promise<AccountOutcome>;
-  /** Turns the account's 2FA off and signs it out everywhere. */
+  /** Turns the account's 2FA off, takes every staff role from it, and signs it out everywhere. */
   resetTwoFactor: (input: Readonly<{ userId: UserId; actor: StaffActor; now: Date }>) => Promise<AccountOutcome>;
   /** Ends every live session of the account. */
   signOut: (input: Readonly<{ userId: UserId; actor: StaffActor; now: Date }>) => Promise<AccountOutcome>;
@@ -231,17 +231,30 @@ export const AccountAdminRepository = {
 
       resetTwoFactor: ({ userId, actor, now }) =>
         db.transaction(async (tx): Promise<AccountOutcome> => {
-          const [reset] = await tx
+          const { admins, target } = await AuthRepository.lockAdminsAnd(tx, userId);
+          if (target === undefined) return { _tag: "NotFound" };
+
+          // Neither a role nor a password alone may open the admin, so the staff roles go with the second factor.
+          const revoked = target.roles;
+          if (revoked.includes("admin") && target.disabledAt === null && admins.length <= 1) return { _tag: "LastAdmin" };
+
+          await tx
             .update(users)
-            .set({ totpSecret: null, totpEnabledAt: null, totpLastStep: null })
-            .where(eq(users.id, userId))
-            .returning({ id: users.id });
-          if (reset === undefined) return { _tag: "NotFound" };
+            .set({ totpSecret: null, totpEnabledAt: null, totpLastStep: null, roles: [] })
+            .where(eq(users.id, userId));
 
           const ended = await revokeAll(tx, userId, now, "two_factor_reset");
           await audit.record(
             tx,
-            entry(actor, "user.reset_two_factor", userId, `Reset two-factor authentication and ended ${ended.length} session(s)`),
+            entry(
+              actor,
+              "user.reset_two_factor",
+              userId,
+              revoked.length === 0
+                ? `Reset two-factor authentication and ended ${ended.length} session(s)`
+                : `Reset two-factor authentication, which took every staff role from the account, and ended ${ended.length} session(s)`,
+              revoked.length === 0 ? undefined : { roles: [revoked, []] },
+            ),
           );
 
           return { _tag: "Changed" };

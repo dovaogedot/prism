@@ -50,7 +50,7 @@ export const UserPage = () => {
     "reset-two-factor": {
       title: "Reset two-factor authentication?",
       label: "Reset 2FA",
-      text: "Its second factor is removed. A staff account must set a new one before the admin opens again.",
+      text: "Its second factor is removed, every session ends, and it loses every staff role. Give the roles back once it has set up 2FA again.",
       done: "Two-factor authentication is reset.",
     },
     "sign-out": { title: "Sign it out everywhere?", label: "Sign out everywhere", text: "Every session ends now; the account can sign in again.", done: "The account is signed out everywhere." },

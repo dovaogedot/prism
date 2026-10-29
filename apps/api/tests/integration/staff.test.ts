@@ -354,14 +354,17 @@ describe("account changes by an admin", () => {
     expect((await Staff.call(harness, support, "GET", "/admin/audit")).statusCode).toBe(403);
   });
 
-  it("resets an account's 2FA, which signs it out", async () => {
+  it("resets an account's 2FA, which signs it out and takes its staff roles", async () => {
     const admin = await Staff.account(harness, "admin@example.com", ["admin"]);
     const target = await Staff.account(harness, "lost-phone@example.com", ["moderator"]);
 
     const reset = await Staff.call(harness, admin, "POST", `/admin/users/${target.userId}/reset-two-factor`);
 
-    expect(jsonOf(reset)).toMatchObject({ twoFactorEnabled: false, liveSessions: 0 });
+    expect(jsonOf(reset)).toMatchObject({ twoFactorEnabled: false, liveSessions: 0, roles: [] });
     expect((await Staff.call(harness, target, "GET", "/auth/me")).statusCode).toBe(401);
+    expect(
+      await harness.database.sql`SELECT changes FROM audit_event WHERE action = 'user.reset_two_factor'`,
+    ).toEqual([{ changes: { roles: [["moderator"], []] } }]);
   });
 });
 
