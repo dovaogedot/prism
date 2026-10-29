@@ -124,12 +124,21 @@ describe("SQL injection through catalog filters", () => {
     expect(jsonOf(matching)["total"]).toBe(1);
   });
 
-  it("leaves every table standing afterwards", async () => {
+  it("leaves every table and row standing after every payload, checked in the same test", async () => {
+    await registerUser(harness, "survivor@example.com");
+    const [before] = await harness.database.sql`SELECT password_hash FROM app_user`;
+
+    for (const payload of SQL_PAYLOADS) {
+      for (const parameter of ["q", "p.color", "category", "brand", "sort"]) {
+        await get(`/api/v1/products?${parameter}=${encodeURIComponent(payload)}`);
+      }
+    }
+
     const products = await harness.database.sql`SELECT count(*)::int AS n FROM product`;
-    const users = await harness.database.sql`SELECT count(*)::int AS n FROM app_user`;
+    const [after] = await harness.database.sql`SELECT password_hash FROM app_user`;
 
     expect(products[0]?.["n"]).toBe(1);
-    expect(users[0]?.["n"]).toBe(0);
+    expect(after).toEqual(before);
   });
 
   it("does not leak database internals when input is rejected", async () => {
@@ -287,14 +296,16 @@ describe("mass assignment", () => {
         email: "sneaky@example.com",
         password: VALID_PASSWORD,
         captchaToken: "t",
-        role: "admin",
+        roles: ["admin"],
+        totpEnabledAt: "2026-01-01T00:00:00.000Z",
         id: "00000000-0000-4000-8000-000000000000",
       },
     });
 
     expect(response.statusCode).toBe(201);
-    expect(jsonOf(response)["user"]).not.toHaveProperty("role");
+    expect(jsonOf(response)["user"]).toMatchObject({ roles: [], twoFactorEnabled: false });
     expect(jsonOf(response)["user"]).not.toMatchObject({ id: "00000000-0000-4000-8000-000000000000" });
+    expect(await harness.database.sql`SELECT roles, totp_enabled_at FROM app_user`).toEqual([{ roles: [], totp_enabled_at: null }]);
   });
 });
 
