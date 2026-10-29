@@ -15,10 +15,15 @@
     "build": "npm run build --workspace @prism/shared",
     "typecheck": "npm run build && npm run typecheck --workspaces --if-present && tsc -p loadtest",
     "test": "npm run build && npm run test --workspaces --if-present",
-    "test:unit": "npm run build && npm run test:unit --workspaces --if-present"
+    "test:unit": "npm run build && npm run test:unit --workspaces --if-present",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "lint": "oxlint --deny-warnings"
   },
   "devDependencies": {
     "@types/k6": "^2.3.1",
+    "oxfmt": "^0.75.0",
+    "oxlint": "^1.90.0",
     "typescript": "^7.0.2"
   },
   "allowScripts": {

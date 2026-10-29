@@ -31,7 +31,7 @@ export const AccountRoutes = {
       },
     );
 
-    routes.get("/account/addresses", { onRequest: guards.requireUser }, async (request, reply) => {
+    routes.get("/account/addresses", { onRequest: guards.requireUser }, async (request) => {
       return { items: await service.addresses(Guards.userOf(request).id) };
     });
 

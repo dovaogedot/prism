@@ -82,6 +82,8 @@ describe("Balatro.SHADERS", () => {
     expect(b).toBeGreaterThan(r);
     expect(b).toBeLessThanOrEqual(1);
     expect(r).toBeGreaterThanOrEqual(0);
+    expect(g).toBeGreaterThanOrEqual(0);
+    expect(g).toBeLessThanOrEqual(1);
     expect(a).toBe(1);
   });
 

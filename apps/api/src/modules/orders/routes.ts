@@ -77,7 +77,7 @@ export const OrderRoutes = {
       },
     );
 
-    routes.get("/orders", { onRequest: guards.requireUser, schema: { querystring: OrderQueryParams.schema } }, async (request, reply) => {
+    routes.get("/orders", { onRequest: guards.requireUser, schema: { querystring: OrderQueryParams.schema } }, async (request) => {
       return service.list(Guards.userOf(request).id, request.query);
     });
 

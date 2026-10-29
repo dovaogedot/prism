@@ -13,7 +13,7 @@ export const NextPath = {
    * a crafted link cannot send anyone to another site after signing in.
    */
   of: (value: string | null): string =>
-    value !== null && /^\/(?![/\\])[^\s\u0000-\u001f]*$/.test(value) ? value : NextPath.HOME,
+    value !== null && /^\/(?![/\\])[^\s\p{Cc}]*$/u.test(value) ? value : NextPath.HOME,
 
   /** The query that names `path` as the place to return to. */
   query: (path: string): string => `?next=${encodeURIComponent(path)}`,

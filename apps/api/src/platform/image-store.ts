@@ -101,7 +101,7 @@ export const ImageStore = {
         .andThen((encoded) =>
           encoded === undefined ? errAsync<Encoded, DomainError>({ _tag: "UnsupportedImage" }) : okAsync<Encoded, DomainError>(encoded),
         )
-        .andThen(({ format, data, info }) =>
+        .andThen(({ format, data }) =>
           // A write that fails is left to reject: the server's fault, logged and answered as one.
           ResultAsync.fromSafePromise(
             (async (): Promise<StoredImage> => {
