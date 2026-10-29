@@ -2,8 +2,6 @@ import { Link, useSearchParams } from "react-router";
 import { match, P } from "ts-pattern";
 import { Alert, Button, Card, Skeleton } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
-import { SignInFirst } from "../../auth/components/SignInFirst.tsx";
-import { useSession } from "../../auth/session.ts";
 import { CatalogParams } from "../../catalog/filters.ts";
 import { OrderFilters, OrderRow } from "../components/index.ts";
 import { OrderParams, useOrders } from "../orders.ts";
@@ -12,15 +10,13 @@ import { AccountPage } from "../../account/components/AccountPage.tsx";
 
 /** The signed-in customer's orders, filtered by status and date and sorted as the URL says. */
 export const OrdersPage = () => {
-  const session = useSession();
 
   const [params, setParams] = useSearchParams();
 
   const query = params.toString();
 
-  const orders = useOrders(query, session !== undefined);
+  const orders = useOrders(query);
 
-  if (session === undefined) return <SignInFirst />;
 
   return (
     <AccountPage text={PageText.orders} heading="Your orders">

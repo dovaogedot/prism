@@ -4,8 +4,6 @@ import { match, P } from "ts-pattern";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Button, ConfirmDialog, EmptyState, Skeleton, Toast } from "../../../shared/ui/index.ts";
 import { Failure } from "../../auth/components/failure.tsx";
-import { SignInFirst } from "../../auth/components/SignInFirst.tsx";
-import { useSession } from "../../auth/session.ts";
 import { useAccountChanges, useSavedAddresses } from "../account.ts";
 import { AccountPage } from "../components/AccountPage.tsx";
 import { AddressCard } from "../components/AddressCard.tsx";
@@ -21,7 +19,6 @@ type Editing = Readonly<{ kind: "none" }> | Readonly<{ kind: "new" }> | Readonly
  * and deleting asks first. A guest is sent to sign in first.
  */
 export const AddressesPage = () => {
-  const session = useSession();
 
   const addresses = useSavedAddresses();
 
@@ -33,7 +30,6 @@ export const AddressesPage = () => {
 
   const [failure, setFailure] = useActionFailure();
 
-  if (session === undefined) return <SignInFirst />;
 
   const isFull = (addresses.data?.length ?? 0) >= SavedAddress.MAX;
 

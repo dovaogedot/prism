@@ -3,10 +3,9 @@ import { match, P } from "ts-pattern";
 import { PageText } from "../../../shared/seo/page-text.ts";
 import { Alert, Card, Skeleton, Toast } from "../../../shared/ui/index.ts";
 import { PasswordFlow } from "../../auth/components/PasswordFlow.tsx";
-import { SignInFirst } from "../../auth/components/SignInFirst.tsx";
 import { TwoFactorDisableFlow } from "../../auth/components/TwoFactorDisableFlow.tsx";
 import { TwoFactorSetupFlow } from "../../auth/components/TwoFactorSetupFlow.tsx";
-import { useSession } from "../../auth/session.ts";
+import { useSignedInSession } from "../../auth/session.ts";
 import { useProfile } from "../account.ts";
 import { AccountPage } from "../components/AccountPage.tsx";
 import { ProfileForm } from "../components/ProfileForm.tsx";
@@ -17,11 +16,10 @@ import { ProfileForm } from "../components/ProfileForm.tsx";
  * in first.
  */
 export const ProfilePage = () => {
-  const session = useSession();
+  const session = useSignedInSession();
 
   const profile = useProfile();
 
-  if (session === undefined) return <SignInFirst />;
 
   return (
     <AccountPage text={PageText.account} heading="Your account">

@@ -15,6 +15,15 @@ import { TokenStore } from "./token-store.ts";
 export const useSession = (): SessionUser | undefined =>
   useSyncExternalStore(TokenStore.subscribe, TokenStore.snapshot)?.user;
 
+/** The signed-in user, on a page under `SignedInOnly`, which never renders without one. */
+export const useSignedInSession = (): SessionUser => {
+  const session = useSession();
+
+  if (session === undefined) throw new Error("A page under SignedInOnly rendered without a session.");
+
+  return session;
+};
+
 /**
  * On first mount, trades the httpOnly refresh cookie for an access token.
  * Until this settles the app cannot know whether it has a signed-in visitor,

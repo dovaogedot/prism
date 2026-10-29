@@ -61,11 +61,10 @@ export const OrderPolling = {
     status === "pending_payment" && now - startedAt < OrderPolling.LIMIT_MS,
 } as const;
 
-/** One page of the signed-in customer's orders, for the query string `query`; nothing is asked while `enabled` is false. */
-export const useOrders = (query: string, enabled: boolean) =>
+/** One page of the signed-in customer's orders, for the query string `query`. */
+export const useOrders = (query: string) =>
   useQuery({
     queryKey: OrderKeys.list(query),
-    enabled,
     queryFn: ({ signal }) => Api.get<OrderList>(Api.withQuery("/orders", query), signal),
     placeholderData: keepPreviousData,
     retry: false,

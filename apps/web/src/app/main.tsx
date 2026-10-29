@@ -10,6 +10,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router";
 import { GuestOnly } from "../features/auth/components/GuestOnly.tsx";
+import { SignedInOnly } from "../features/auth/components/SignedInOnly.tsx";
 import { CartPage } from "../features/cart/pages/CartPage.tsx";
 import { ItemRedirect } from "../features/catalog/components/ItemRedirect.tsx";
 import { ListingPage } from "../features/catalog/pages/ListingPage.tsx";
@@ -94,8 +95,8 @@ const router = createBrowserRouter([
       { path: "cart", element: <CartPage /> },
       { path: "checkout", lazy: async () => ({ Component: (await import("../features/checkout/pages/CheckoutPage.tsx")).CheckoutPage }) },
 
-      // OrdersPage sends a signed-out visitor to sign in itself. An order opens
-      // for its owner, or for a guest with the key from its confirmation link.
+      // `/orders` forwards to `/account/orders`. An order opens for its owner,
+      // or for a guest with the key from its confirmation link.
       { path: "orders", element: <OrdersRedirect /> },
       { path: "orders/:id", lazy: async () => ({ Component: (await import("../features/orders/pages/OrderPage.tsx")).OrderPage }) },
 
@@ -123,10 +124,15 @@ const router = createBrowserRouter([
       // Unguarded because it is the page that establishes the session.
       { path: "oauth/complete", lazy: async () => ({ Component: (await import("../features/auth/pages/OAuthCompletePage.tsx")).OAuthCompletePage }) },
 
-      // Both send a signed-out visitor to sign in themselves.
-      { path: "account", lazy: async () => ({ Component: (await import("../features/account/pages/ProfilePage.tsx")).ProfilePage }) },
-      { path: "account/addresses", lazy: async () => ({ Component: (await import("../features/account/pages/AddressesPage.tsx")).AddressesPage }) },
-      { path: "account/orders", lazy: async () => ({ Component: (await import("../features/orders/pages/OrdersPage.tsx")).OrdersPage }) },
+      // A signed-out visitor signs in first and comes back.
+      {
+        element: <SignedInOnly />,
+        children: [
+          { path: "account", lazy: async () => ({ Component: (await import("../features/account/pages/ProfilePage.tsx")).ProfilePage }) },
+          { path: "account/addresses", lazy: async () => ({ Component: (await import("../features/account/pages/AddressesPage.tsx")).AddressesPage }) },
+          { path: "account/orders", lazy: async () => ({ Component: (await import("../features/orders/pages/OrdersPage.tsx")).OrdersPage }) },
+        ],
+      },
 
       AdminRoutes.ROUTE,
 
