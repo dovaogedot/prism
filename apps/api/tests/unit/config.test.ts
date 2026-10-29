@@ -57,6 +57,14 @@ describe("the first admin's variables", () => {
     ]);
   });
 
+  it("stop the start with a key the code library cannot read, which would lock the admin out", () => {
+    const unreadable = "ADMIN_TOTP_SECRET is not a key an authenticator app can read: use 32 base32 characters, as an app or a generator makes them.";
+
+    // 33 characters, and 34 whose last one leaves bits set past the last whole byte.
+    expect(problemsOf({ ...admin, ADMIN_TOTP_SECRET: "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXPA" })).toEqual([unreadable]);
+    expect(problemsOf({ ...admin, ADMIN_TOTP_SECRET: "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXPA7" })).toEqual([unreadable]);
+  });
+
   it("forgive the spaces, lowercase and padding an authenticator app forgives", () => {
     const config = Config.fromEnvironment(
       Environment.schema.parse({ ...base, ...admin, ADMIN_TOTP_SECRET: "jbsw y3dp ehpk 3pxp jbsw y3dp ehpk 3pxp====" }),

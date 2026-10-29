@@ -26,9 +26,24 @@ export const TotpSecret = {
       z
         .string()
         .regex(/^[A-Z2-7]+$/, "ADMIN_TOTP_SECRET must be base32: letters A to Z and digits 2 to 7.")
-        .min(32, "ADMIN_TOTP_SECRET must be at least 32 base32 characters (160 bits)."),
+        .min(32, "ADMIN_TOTP_SECRET must be at least 32 base32 characters (160 bits).")
+        // Checked only once the rules above hold, so a key gets one message.
+        .refine(
+          (secret): boolean => !/^[A-Z2-7]{32,}$/.test(secret) || TotpSecret.isReadable(secret),
+          "ADMIN_TOTP_SECRET is not a key an authenticator app can read: use 32 base32 characters, as an app or a generator makes them.",
+        ),
     )
     .brand<"TotpSecret">(),
+
+  /** Whether the code library can make codes from `secret`, which it refuses for some lengths and endings. */
+  isReadable: (secret: string): boolean => {
+    try {
+      verifySync({ secret, token: "000000", strategy: "totp", period: 30, digits: 6, epoch: 0 });
+      return true;
+    } catch {
+      return false;
+    }
+  },
 } as const;
 
 /** Enrolling a second factor, and checking the codes it produces. */
