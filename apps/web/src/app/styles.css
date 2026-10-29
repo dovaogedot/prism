@@ -68,6 +68,16 @@
     /* Filtering changes whether the page overflows; a reserved gutter keeps
        the layout from jumping sideways when that flips. */
     scrollbar-gutter: stable;
+    /* The sticky header covers the top of the window: about 108 px while the
+       search row sits under it, 64 px from md. A jump or a focused field
+       stops below it. */
+    scroll-padding-top: 7rem;
+  }
+
+  @media (width >= 48rem) {
+    html {
+      scroll-padding-top: 5rem;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
