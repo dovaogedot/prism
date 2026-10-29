@@ -57,7 +57,7 @@ export const RateLimits = {
   apply: (reply: FastifyReply, result: TakeResult): FastifyReply | undefined => {
     reply.header("RateLimit-Remaining", result.remaining);
 
-    if (result.allowed) return undefined;
+    if (result.isAllowed) return undefined;
 
     return HttpErrors.send(reply, { _tag: "RateLimited", retryAfterSeconds: result.retryAfterSeconds });
   },

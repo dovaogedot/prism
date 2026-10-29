@@ -13,4 +13,4 @@ export const options = {
 
 export const setup = Shop.load;
 export const mixed = Mix.run;
-export const handleSummary = (data: Parameters<typeof Summary.of>[1]) => Summary.of("peak", data);
+export const handleSummary = (data: Parameters<typeof Summary.write>[1]) => Summary.write("peak", data);

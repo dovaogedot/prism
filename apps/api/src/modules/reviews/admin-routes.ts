@@ -19,7 +19,7 @@ export const ReviewAdminRoutes = {
     const params = z.object({ id: ReviewId.schema });
 
     routes.get("/reviews", { ...guards.admin("reviews.moderate"), schema: { querystring: AdminReviewQuery.schema } }, async (request) =>
-      service.queue(request.query),
+      service.listQueue(request.query),
     );
 
     routes.post(

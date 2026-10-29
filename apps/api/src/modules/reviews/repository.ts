@@ -46,7 +46,7 @@ export type ReviewRepository = Readonly<{
   published: (productId: ProductId, sort: ReviewSort, page: number, perPage: number) => Promise<ReviewPage>;
   /** Whether an order of the product reached the customer and stayed theirs. */
   isDeliveredTo: (productId: ProductId, userId: UserId) => Promise<boolean>;
-  own: (productId: ProductId, userId: UserId) => Promise<OwnReview | undefined>;
+  findOwn: (productId: ProductId, userId: UserId) => Promise<OwnReview | undefined>;
   /** The reviews of the product the user found helpful. */
   votesOf: (productId: ProductId, userId: UserId) => Promise<readonly ReviewId[]>;
   /**
@@ -61,7 +61,7 @@ export type ReviewRepository = Readonly<{
   vote: (reviewId: ReviewId, userId: UserId, now: Date) => Promise<VoteOutcome>;
   /** Takes the user's vote back, if there was one. */
   unvote: (reviewId: ReviewId, userId: UserId) => Promise<VoteOutcome>;
-  queue: (query: AdminReviewQuery) => Promise<Page<AdminReviewView>>;
+  listQueue: (query: AdminReviewQuery) => Promise<Page<AdminReviewView>>;
   moderate: (input: Readonly<{ reviewId: ReviewId; decision: Decision; actor: StaffActor; now: Date }>) => Promise<ModerationOutcome>;
   remove: (input: Readonly<{ reviewId: ReviewId; actor: StaffActor }>) => Promise<ModerationOutcome>;
 }>;
@@ -173,7 +173,7 @@ export const ReviewRepository = {
       return row !== undefined;
     },
 
-    own: async (productId, userId) => {
+    findOwn: async (productId, userId) => {
       const [row] = await db
         .select()
         .from(productReviews)
@@ -267,7 +267,7 @@ export const ReviewRepository = {
         return { _tag: "Changed" };
       }),
 
-    queue: async (query) => {
+    listQueue: async (query) => {
       const matching = eq(productReviews.status, query.status);
       const [rows, totals] = await Promise.all([
         db

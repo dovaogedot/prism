@@ -150,7 +150,7 @@ export const CatalogAdminRoutes = {
       },
     );
 
-    routes.get("/categories", guards.admin("catalog.manage"), async () => ({ items: await service.categories() }));
+    routes.get("/categories", guards.admin("catalog.manage"), async () => ({ items: await service.listCategories() }));
 
     routes.post(
       "/categories",
@@ -184,7 +184,7 @@ export const CatalogAdminRoutes = {
       },
     );
 
-    routes.get("/brands", guards.admin("catalog.manage"), async () => ({ items: await service.brands() }));
+    routes.get("/brands", guards.admin("catalog.manage"), async () => ({ items: await service.listBrands() }));
 
     routes.post(
       "/brands",

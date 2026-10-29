@@ -15,14 +15,14 @@ const drain = (count: number, at: number = start) => {
 
 describe("TokenBucket.take", () => {
   it("starts a new key full and takes one token", () => {
-    expect(TokenBucket.take(undefined, start, shape)).toMatchObject({ allowed: true, remaining: 4, retryAfterSeconds: 0 });
+    expect(TokenBucket.take(undefined, start, shape)).toMatchObject({ isAllowed: true, remaining: 4, retryAfterSeconds: 0 });
   });
 
   it("lets a burst up to the capacity through, then refuses", () => {
     const empty = drain(5);
 
     expect(empty.tokens).toBe(0);
-    expect(TokenBucket.take(empty, start, shape)).toMatchObject({ allowed: false, remaining: 0 });
+    expect(TokenBucket.take(empty, start, shape)).toMatchObject({ isAllowed: false, remaining: 0 });
   });
 
   it("refills by elapsed time, counting fractions of a token", () => {
@@ -30,17 +30,17 @@ describe("TokenBucket.take", () => {
 
     // 1.5 s at 0.5 a second is three quarters of a token: not enough yet.
     const early = TokenBucket.take(empty, start + 1500, shape);
-    expect(early.allowed).toBe(false);
+    expect(early.isAllowed).toBe(false);
     expect(early.state.tokens).toBeCloseTo(0.75);
 
     // Half a second later the fraction adds up to a whole token.
-    expect(TokenBucket.take(early.state, start + 2000, shape)).toMatchObject({ allowed: true, remaining: 0 });
+    expect(TokenBucket.take(early.state, start + 2000, shape)).toMatchObject({ isAllowed: true, remaining: 0 });
   });
 
   it("never holds more than the capacity, however long it sat idle", () => {
     const idle = TokenBucket.take(drain(5), start + 24 * 60 * 60 * 1000, shape);
 
-    expect(idle).toMatchObject({ allowed: true, remaining: 4 });
+    expect(idle).toMatchObject({ isAllowed: true, remaining: 4 });
     expect(idle.state.tokens).toBe(4);
   });
 
@@ -58,7 +58,7 @@ describe("TokenBucket.take", () => {
   it("does not refill when the clock moves backwards", () => {
     const empty = drain(5);
 
-    expect(TokenBucket.take(empty, start - 60_000, shape).allowed).toBe(false);
+    expect(TokenBucket.take(empty, start - 60_000, shape).isAllowed).toBe(false);
   });
 });
 
@@ -91,16 +91,16 @@ describe("RateLimiter", () => {
 
     for (let taken = 0; taken < 5; taken += 1) limiter.take("account-login", "mari");
 
-    expect(limiter.take("account-login", "mari").allowed).toBe(false);
-    expect(limiter.take("account-login", "jaan").allowed).toBe(true);
-    expect(limiter.take("credentials", "mari").allowed).toBe(true);
+    expect(limiter.take("account-login", "mari").isAllowed).toBe(false);
+    expect(limiter.take("account-login", "jaan").isAllowed).toBe(true);
+    expect(limiter.take("credentials", "mari").isAllowed).toBe(true);
   });
 
   it("scales every policy", () => {
     const limiter = RateLimiter.create({ clock: Clock.mutable(new Date(start)), scale: 2 });
 
-    for (let taken = 0; taken < 10; taken += 1) expect(limiter.take("account-login", "mari").allowed).toBe(true);
-    expect(limiter.take("account-login", "mari").allowed).toBe(false);
+    for (let taken = 0; taken < 10; taken += 1) expect(limiter.take("account-login", "mari").isAllowed).toBe(true);
+    expect(limiter.take("account-login", "mari").isAllowed).toBe(false);
   });
 
   it("forgets buckets that are full again when it sweeps", () => {
@@ -130,8 +130,8 @@ describe("RateLimiter", () => {
 
     expect(limiter.size()).toBe(3);
     // "b" was dropped, so it starts full again; "a" kept its spent tokens.
-    expect(limiter.take("contact", "b")).toMatchObject({ allowed: true, remaining: 2 });
-    expect(limiter.take("contact", "a")).toMatchObject({ allowed: true, remaining: 0 });
+    expect(limiter.take("contact", "b")).toMatchObject({ isAllowed: true, remaining: 2 });
+    expect(limiter.take("contact", "a")).toMatchObject({ isAllowed: true, remaining: 0 });
   });
 });
 

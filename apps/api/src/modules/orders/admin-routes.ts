@@ -62,7 +62,7 @@ export const OrderAdminRoutes = {
       },
     );
 
-    routes.get("/shipping-methods", guards.admin("delivery.manage"), async () => ({ items: await shipping.all() }));
+    routes.get("/shipping-methods", guards.admin("delivery.manage"), async () => ({ items: await shipping.listAll() }));
 
     routes.post(
       "/shipping-methods",

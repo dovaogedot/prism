@@ -18,7 +18,7 @@ export type BucketShape = Readonly<{ capacity: number; refillPerSecond: number }
 
 /** What taking one token found. */
 export type TakeResult = Readonly<{
-  allowed: boolean;
+  isAllowed: boolean;
   /** Whole tokens left once this request is counted. */
   remaining: number;
   /** Whole seconds until a token is back; 0 when the request was allowed. */
@@ -40,7 +40,7 @@ export const TokenBucket = {
 
     if (available >= 1) {
       return {
-        allowed: true,
+        isAllowed: true,
         remaining: Math.floor(available - 1),
         retryAfterSeconds: 0,
         state: { tokens: available - 1, updatedAt: now },
@@ -48,7 +48,7 @@ export const TokenBucket = {
     }
 
     return {
-      allowed: false,
+      isAllowed: false,
       remaining: 0,
       retryAfterSeconds: Math.max(1, Math.ceil((1 - available) / shape.refillPerSecond)),
       state: { tokens: available, updatedAt: now },

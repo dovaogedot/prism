@@ -48,7 +48,7 @@ export const OrderRoutes = {
 
     routes.get("/checkout/config", async () => deps.payments);
 
-    routes.get("/shipping-methods", { config: { cache: "public" } }, async () => ({ items: await deps.shipping.active() }));
+    routes.get("/shipping-methods", { config: { cache: "public" } }, async () => ({ items: await deps.shipping.listActive() }));
 
     routes.get("/checkout/prefill", { onRequest: guards.requireUser }, async (request, reply) => {
       const result = await service.prefill(Guards.userOf(request).id);

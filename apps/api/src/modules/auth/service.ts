@@ -174,7 +174,7 @@ export const AuthService = {
       if (user.totpSecret === undefined) return errAsync({ _tag: "TwoFactorNotInitialized" });
 
       const taken = deps.limitCodeChecks(user.id);
-      if (!taken.allowed) return errAsync({ _tag: "RateLimited", retryAfterSeconds: taken.retryAfterSeconds });
+      if (!taken.isAllowed) return errAsync({ _tag: "RateLimited", retryAfterSeconds: taken.retryAfterSeconds });
 
       const step = totp.acceptedStep(user.totpSecret, code, user.totpLastStep);
       if (step === undefined) return errAsync({ _tag: "TwoFactorCodeInvalid" });

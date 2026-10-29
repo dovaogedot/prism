@@ -23,11 +23,11 @@ import { AuditLog, type StaffActor } from "../staff/audit.ts";
 /** Every read and write of the delivery options. */
 export type ShippingMethods = Readonly<{
   /** The options checkout offers, in their order. */
-  active: () => Promise<readonly ShippingOption[]>;
+  listActive: () => Promise<readonly ShippingOption[]>;
   /** The active option with `code`, or `undefined`. */
   findActive: (code: ShippingMethodCode) => Promise<ShippingOption | undefined>;
   /** Every option, inactive ones included, with how many orders used each. */
-  all: () => Promise<readonly ShippingMethodView[]>;
+  listAll: () => Promise<readonly ShippingMethodView[]>;
   create: (actor: StaffActor, input: ShippingMethodInput) => ResultAsync<ShippingMethodView, DomainError>;
   update: (actor: StaffActor, code: ShippingMethodCode, input: ShippingMethodInput) => ResultAsync<ShippingMethodView, DomainError>;
   remove: (actor: StaffActor, code: ShippingMethodCode) => ResultAsync<void, DomainError>;
@@ -93,7 +93,7 @@ export const ShippingMethods = {
       );
 
     return {
-      active: async () =>
+      listActive: async () =>
         (
           await db
             .select()
@@ -107,7 +107,7 @@ export const ShippingMethods = {
         return row === undefined || !row.isActive ? undefined : ShippingMethods.optionOf(row);
       },
 
-      all: async () => {
+      listAll: async () => {
         const rows = await db
           .select()
           .from(shippingMethods)

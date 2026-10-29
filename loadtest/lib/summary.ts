@@ -15,7 +15,7 @@ export const Summary = {
   },
 
   /** The whole summary as JSON for the report, under the run's name, and a few lines on screen. */
-  of: (run: string, data: SummaryData): Readonly<Record<string, string>> => ({
+  write: (run: string, data: SummaryData): Readonly<Record<string, string>> => ({
     [`/loadtest/results/${run}.json`]: JSON.stringify(data, null, 2),
     stdout: Summary.text(run, data),
   }),

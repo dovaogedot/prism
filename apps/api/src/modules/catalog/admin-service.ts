@@ -56,10 +56,10 @@ export type CatalogAdminService = Readonly<{
   createProduct: (actor: StaffActor, input: ProductInput) => ResultAsync<AdminProductDetail, DomainError>;
   updateProduct: (actor: StaffActor, productId: ProductId, input: ProductUpdate) => ResultAsync<AdminProductDetail, DomainError>;
   deleteProduct: (actor: StaffActor, productId: ProductId) => ResultAsync<void, DomainError>;
-  categories: () => Promise<readonly AdminCategory[]>;
+  listCategories: () => Promise<readonly AdminCategory[]>;
   saveCategory: (actor: StaffActor, id: CategoryId | undefined, input: CategoryInput) => ResultAsync<AdminCategory, DomainError>;
   deleteCategory: (actor: StaffActor, id: CategoryId) => ResultAsync<void, DomainError>;
-  brands: () => Promise<readonly AdminBrand[]>;
+  listBrands: () => Promise<readonly AdminBrand[]>;
   saveBrand: (actor: StaffActor, id: BrandId | undefined, input: BrandInput) => ResultAsync<AdminBrand, DomainError>;
   deleteBrand: (actor: StaffActor, id: BrandId) => ResultAsync<void, DomainError>;
   /**
@@ -163,20 +163,20 @@ export const CatalogAdminService = {
           );
         }),
 
-      categories: () => repository.categories(),
+      listCategories: () => repository.listCategories(),
 
       saveCategory: (actor, id, input) =>
         ResultAsync.fromSafePromise(repository.saveCategory(id, input, actor)).andThen((outcome) =>
-          savedAmong(outcome, repository.categories, { _tag: "CategoryNotFound" }, "category"),
+          savedAmong(outcome, repository.listCategories, { _tag: "CategoryNotFound" }, "category"),
         ),
 
       deleteCategory: (actor, id) => deleted(repository.deleteCategory(id, actor), { _tag: "CategoryNotFound" }, { _tag: "CategoryInUse" }),
 
-      brands: () => repository.brands(),
+      listBrands: () => repository.listBrands(),
 
       saveBrand: (actor, id, input) =>
         ResultAsync.fromSafePromise(repository.saveBrand(id, input, actor)).andThen((outcome) =>
-          savedAmong(outcome, repository.brands, { _tag: "BrandNotFound" }, "brand"),
+          savedAmong(outcome, repository.listBrands, { _tag: "BrandNotFound" }, "brand"),
         ),
 
       deleteBrand: (actor, id) => deleted(repository.deleteBrand(id, actor), { _tag: "BrandNotFound" }, { _tag: "BrandInUse" }),

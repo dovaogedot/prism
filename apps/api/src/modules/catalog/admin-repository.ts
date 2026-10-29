@@ -76,10 +76,10 @@ export type CatalogAdminRepository = Readonly<{
   updateProduct: (productId: ProductId, input: ProductUpdate, actor: StaffActor, now: Date) => Promise<SaveOutcome<ProductId>>;
   /** Deletes the product; resolves to its pictures, whose files go once the row has, or `undefined` when there is none. */
   deleteProduct: (productId: ProductId, actor: StaffActor) => Promise<readonly Readonly<{ id: ImageId; file: string }>[] | undefined>;
-  categories: () => Promise<readonly AdminCategory[]>;
+  listCategories: () => Promise<readonly AdminCategory[]>;
   saveCategory: (id: CategoryId | undefined, input: CategoryInput, actor: StaffActor) => Promise<SaveOutcome<CategoryId>>;
   deleteCategory: (id: CategoryId, actor: StaffActor) => Promise<DeleteOutcome>;
-  brands: () => Promise<readonly AdminBrand[]>;
+  listBrands: () => Promise<readonly AdminBrand[]>;
   saveBrand: (id: BrandId | undefined, input: BrandInput, actor: StaffActor) => Promise<SaveOutcome<BrandId>>;
   deleteBrand: (id: BrandId, actor: StaffActor) => Promise<DeleteOutcome>;
   /**
@@ -388,7 +388,7 @@ export const CatalogAdminRepository = {
           return images;
         }),
 
-      categories: async () => {
+      listCategories: async () => {
         const [rows, used] = await Promise.all([
           db.select().from(categories).orderBy(asc(categories.name)),
           db.select({ id: products.categoryId, total: count() }).from(products).groupBy(products.categoryId),
@@ -439,7 +439,7 @@ export const CatalogAdminRepository = {
           return { _tag: "Deleted" };
         }),
 
-      brands: async () => {
+      listBrands: async () => {
         const [rows, used] = await Promise.all([
           db.select().from(brands).orderBy(asc(brands.name)),
           db.select({ id: products.brandId, total: count() }).from(products).groupBy(products.brandId),

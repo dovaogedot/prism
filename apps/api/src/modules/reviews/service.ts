@@ -42,7 +42,7 @@ export type ReviewService = Readonly<{
   deleteOwn: (slug: Slug, userId: UserId) => ResultAsync<void, DomainError>;
   vote: (reviewId: ReviewId, userId: UserId) => ResultAsync<void, DomainError>;
   unvote: (reviewId: ReviewId, userId: UserId) => ResultAsync<void, DomainError>;
-  queue: (query: AdminReviewQuery) => Promise<Page<AdminReviewView>>;
+  listQueue: (query: AdminReviewQuery) => Promise<Page<AdminReviewView>>;
   moderate: (actor: StaffActor, reviewId: ReviewId, decision: Decision) => ResultAsync<void, DomainError>;
   remove: (actor: StaffActor, reviewId: ReviewId) => ResultAsync<void, DomainError>;
 }>;
@@ -88,7 +88,7 @@ export const ReviewService = {
           ResultAsync.fromSafePromise(
             Promise.all([
               repository.isDeliveredTo(productId, userId),
-              repository.own(productId, userId),
+              repository.findOwn(productId, userId),
               repository.votesOf(productId, userId),
               deps.firstNameOf(userId),
             ]),
@@ -109,7 +109,7 @@ export const ReviewService = {
             return ResultAsync.fromSafePromise(
               repository
                 .saveOwn({ productId, userId, review, now: clock.now() })
-                .then(() => repository.own(productId, userId)),
+                .then(() => repository.findOwn(productId, userId)),
             ).andThen((saved) =>
               saved === undefined ? errAsync<OwnReview, DomainError>({ _tag: "ReviewNotFound" }) : okAsync<OwnReview, DomainError>(saved),
             );
@@ -127,7 +127,7 @@ export const ReviewService = {
 
       unvote: (reviewId, userId) => settle(repository.unvote(reviewId, userId), ReviewService.voteFailure),
 
-      queue: (query) => repository.queue(query),
+      listQueue: (query) => repository.listQueue(query),
 
       moderate: (actor, reviewId, decision) =>
         settle(repository.moderate({ reviewId, decision, actor, now: clock.now() }), ReviewService.moderationFailure),

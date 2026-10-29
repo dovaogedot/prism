@@ -32,4 +32,4 @@ export const search = Search.run;
 export const cart = Cart.run;
 export const checkout = Checkout.run;
 export const account = Account.run;
-export const handleSummary = (data: Parameters<typeof Summary.of>[1]) => Summary.of("baseline", data);
+export const handleSummary = (data: Parameters<typeof Summary.write>[1]) => Summary.write("baseline", data);
