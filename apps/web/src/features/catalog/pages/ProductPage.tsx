@@ -9,6 +9,8 @@ import { Alert, Card, Skeleton, Stars } from "../../../shared/ui/index.ts";
 import { AddToCart } from "../../cart/components/index.ts";
 import { NotFoundPage } from "../../pages/pages/NotFoundPage.tsx";
 import { ReviewsSection } from "../../reviews/components/ReviewsSection.tsx";
+import { useReviewPage } from "../../reviews/reviews.ts";
+import { useRelatedProducts } from "../catalog.ts";
 import { CatalogSeo } from "../catalog-seo.ts";
 import { Gallery } from "../components/Gallery.tsx";
 import { Measurements } from "../components/Measurements.tsx";
@@ -33,6 +35,12 @@ export const ProductPage = () => {
     queryFn: ({ signal }) => Api.getPublic<ProductDetail>(`/products/${slug}`, signal),
     retry: false,
   });
+
+  // Asked for beside the product, not after it: the sections below find
+  // their first page of reviews and the related products in the cache.
+  useReviewPage(slug, "helpful", 1);
+
+  useRelatedProducts(slug);
 
   const shown = product.data?.slug;
 

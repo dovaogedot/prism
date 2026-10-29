@@ -1,6 +1,6 @@
 /** The catalog reads more than one page shares. */
 
-import type { CategorySummary } from "@prism/shared";
+import type { CategorySummary, ProductSummary } from "@prism/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Api } from "../../shared/api/client.ts";
 
@@ -12,4 +12,11 @@ export const useCategories = () =>
     select: (data) => data.items,
     // The categories change when staff change them, which is rare.
     staleTime: 5 * 60_000,
+  });
+
+/** Other products from the same category as `slug`, in stock first. */
+export const useRelatedProducts = (slug: string) =>
+  useQuery({
+    queryKey: ["product", slug, "related"],
+    queryFn: ({ signal }) => Api.getPublic<{ items: readonly ProductSummary[] }>(`/products/${slug}/related`, signal),
   });

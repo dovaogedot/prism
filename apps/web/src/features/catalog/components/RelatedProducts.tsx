@@ -1,6 +1,4 @@
-import type { ProductSummary } from "@prism/shared";
-import { useQuery } from "@tanstack/react-query";
-import { Api } from "../../../shared/api/client.ts";
+import { useRelatedProducts } from "../catalog.ts";
 import { ProductRow } from "./ProductRow.tsx";
 
 /** The product the others relate to, and the name of its category. */
@@ -8,10 +6,7 @@ export type RelatedProductsProps = Readonly<{ slug: string; categoryName: string
 
 /** Other products from the same category, in stock first. Nothing at all when there are none. */
 export const RelatedProducts = ({ slug, categoryName }: RelatedProductsProps) => {
-  const related = useQuery({
-    queryKey: ["product", slug, "related"],
-    queryFn: ({ signal }) => Api.getPublic<{ items: readonly ProductSummary[] }>(`/products/${slug}/related`, signal),
-  });
+  const related = useRelatedProducts(slug);
 
   const products = related.data?.items ?? [];
   if (products.length === 0) return null;
