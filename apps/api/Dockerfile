@@ -18,10 +18,18 @@ RUN npm ci
 COPY packages/shared ./packages/shared
 RUN npm run build --workspace @prism/shared
 
-COPY apps/api ./apps/api
+# The API's own production packages, installed from the manifests alone: no
+# storefront packages and no dev tools, in a layer that changes only when a
+# dependency does.
+FROM node:26-slim AS packages
+WORKDIR /app
 
-# Drops typescript, vitest and the test containers from the runtime image.
-RUN npm prune --omit=dev
+COPY package.json package-lock.json ./
+COPY packages/shared/package.json ./packages/shared/
+COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
+COPY apps/e2e/package.json ./apps/e2e/
+RUN npm ci --omit=dev --workspace @prism/api
 
 FROM node:26-slim AS runtime
 ENV NODE_ENV=production
@@ -29,7 +37,9 @@ WORKDIR /app
 
 RUN mkdir -p /srv/media && chown node:node /srv/media
 
-COPY --from=build --chown=node:node /app /app
+COPY --from=packages --chown=node:node /app /app
+COPY --from=build --chown=node:node /app/packages/shared/dist /app/packages/shared/dist
+COPY --chown=node:node apps/api /app/apps/api
 
 USER node
 WORKDIR /app/apps/api
