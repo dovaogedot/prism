@@ -577,6 +577,54 @@ describe("rate limiting", () => {
 });
 
 describe("admin routes", () => {
+  /**
+   * What each admin route needs, written out as the README's admin table
+   * states it, so the checks below hold the code to the documented rules
+   * rather than to what the routes say about themselves.
+   */
+  const expected: Readonly<Record<string, Permission | "any-staff">> = {
+    "GET /api/v1/admin/summary": "any-staff",
+    "GET /api/v1/admin/orders": "orders.view",
+    "GET /api/v1/admin/orders/:id": "orders.view",
+    "POST /api/v1/admin/orders/:id/status": "orders.fulfill",
+    "POST /api/v1/admin/orders/:id/cancel": "orders.refund",
+    "POST /api/v1/admin/orders/:id/refund": "orders.refund",
+    "GET /api/v1/admin/products": "catalog.manage",
+    "POST /api/v1/admin/products": "catalog.manage",
+    "GET /api/v1/admin/products/:id": "catalog.manage",
+    "PUT /api/v1/admin/products/:id": "catalog.manage",
+    "DELETE /api/v1/admin/products/:id": "catalog.manage",
+    "GET /api/v1/admin/products/:id/images": "catalog.manage",
+    "POST /api/v1/admin/products/:id/images": "catalog.manage",
+    "PUT /api/v1/admin/products/:id/images": "catalog.manage",
+    "DELETE /api/v1/admin/products/:id/images/:imageId": "catalog.manage",
+    "POST /api/v1/admin/products/import": "catalog.import",
+    "GET /api/v1/admin/categories": "catalog.manage",
+    "POST /api/v1/admin/categories": "catalog.manage",
+    "PUT /api/v1/admin/categories/:id": "catalog.manage",
+    "DELETE /api/v1/admin/categories/:id": "catalog.manage",
+    "GET /api/v1/admin/brands": "catalog.manage",
+    "POST /api/v1/admin/brands": "catalog.manage",
+    "PUT /api/v1/admin/brands/:id": "catalog.manage",
+    "DELETE /api/v1/admin/brands/:id": "catalog.manage",
+    "GET /api/v1/admin/shipping-methods": "delivery.manage",
+    "POST /api/v1/admin/shipping-methods": "delivery.manage",
+    "PUT /api/v1/admin/shipping-methods/:code": "delivery.manage",
+    "DELETE /api/v1/admin/shipping-methods/:code": "delivery.manage",
+    "GET /api/v1/admin/reviews": "reviews.moderate",
+    "POST /api/v1/admin/reviews/:id/approve": "reviews.moderate",
+    "POST /api/v1/admin/reviews/:id/reject": "reviews.moderate",
+    "DELETE /api/v1/admin/reviews/:id": "reviews.moderate",
+    "GET /api/v1/admin/users": "customers.view",
+    "GET /api/v1/admin/users/:id": "customers.view",
+    "PUT /api/v1/admin/users/:id/roles": "staff.manage",
+    "POST /api/v1/admin/users/:id/disable": "staff.manage",
+    "POST /api/v1/admin/users/:id/enable": "staff.manage",
+    "POST /api/v1/admin/users/:id/reset-two-factor": "staff.manage",
+    "POST /api/v1/admin/users/:id/sign-out": "staff.manage",
+    "GET /api/v1/admin/audit": "audit.view",
+  };
+
   /** Every admin route as a request: path parameters filled with ids that match nothing. */
   const adminRequests = () =>
     harness.routes
@@ -587,14 +635,14 @@ describe("admin routes", () => {
           .replace("/api/v1", "")
           .replace(/:(id|imageId)\b/g, randomUUID())
           .replace(/:code\b/g, "no-such-method"),
-        requirement: route.config.permission,
+        route: `${route.method} ${route.url}`,
+        requirement: expected[`${route.method} ${route.url}`],
       }));
 
-  it("names a staff requirement on every admin route", () => {
-    const requests = adminRequests();
+  it("puts every admin route, and only those, in the documented table", () => {
+    const mounted = adminRequests().map((request) => request.route).sort();
 
-    expect(requests.length).toBeGreaterThan(5);
-    for (const request of requests) expect(request.requirement, `${request.method} ${request.url}`).toBeDefined();
+    expect(mounted).toEqual(Object.keys(expected).sort());
   });
 
   it("lets each staff role, alone or with another, through exactly where its permissions allow", async () => {
