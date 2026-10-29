@@ -134,6 +134,9 @@ if (container === null) {
   throw new Error("index.html is missing #root");
 }
 
+// Each page renders its own description, so the one index.html carries for readers that run no script goes.
+document.getElementById("static-description")?.remove();
+
 createRoot(container).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
