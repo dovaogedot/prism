@@ -121,7 +121,7 @@ E2E_BASE_URL=https://localhost:3200 npm run e2e
 - The cart button in the header shows how many items the cart holds, at every width. It opens a **quick preview** with the lines, the subtotal, how far the cart is from free shipping, and links to the cart and to checkout. Adding a product opens it too.
 - **Cart page**: each line with its picture, name, unit price, a quantity stepper, a remove button and the line total. The subtotal changes as soon as a quantity does.
 - Asking for more than the stock says how many are left. A line the shop can no longer supply in full says so, with a button that reduces it to what is left.
-- **Recommended for you**: in-stock products from the same categories as the cart, best rated first.
+- **Recommended for you**: in-stock products not in the cart, those from the cart's categories first, each group best rated first; with an empty cart, the best rated.
 - **Guests** keep their cart for 30 days in the browser that made it. **Members** keep theirs in the account, across devices and sign-ins. Signing in moves a guest's cart into the account's.
 
 ### Checkout
@@ -165,7 +165,7 @@ A declined order releases its stock and mails the reason; the cart keeps its ite
 - **Profile** (`/account`): full name and phone, which checkout fills in. The email is shown but stays as it is. The password and 2FA live here too.
 - **Addresses** (`/account/addresses`): up to 10 saved addresses. One is the default, which checkout starts with.
 - **Two-factor authentication**: on the account page, scan the QR code with an authenticator app, or type its setup key or open the app's link on the same phone, and confirm a code. Sign-in then asks for a code, and so does turning it off. Each code works once. Staff who turn it off lose every staff role with it, after a dialog that names the roles asks first; the last admin cannot turn it off.
-- **Sign out** revokes the session. The account menu holds Orders, Account, Admin for staff, and Sign out.
+- **Sign out** revokes the session. The account menu holds Orders, Account, Addresses, Admin for staff, and Sign out.
 
 ### Contact and the other pages
 
