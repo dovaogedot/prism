@@ -989,12 +989,15 @@ describe("bulk import limits", () => {
 
   it("refuses a column it does not know, rather than writing it anywhere", async () => {
     await seedCatalog(harness, [{ slug: "lamp", name: "Lamp", priceCents: 100, category: "C", brand: "B" }]);
-    const response = await send("slug,name,description,price,stock,category,brand,weight_g,width_mm,height_mm,depth_mm,featured,is_admin\nlamp,Lamp,D,1.00,1,c,b,1,1,1,1,false,true\n", "extra.csv");
-    const [product] = await harness.database.sql`SELECT price_cents FROM product WHERE slug = 'lamp'`;
+    // Every known cell differs from the seeded product, so any partial write would show.
+    const response = await send("slug,name,description,price,stock,category,brand,weight_g,width_mm,height_mm,depth_mm,featured,is_admin\nlamp,Renamed,Written by the import,2.50,7,c,b,1,1,1,1,false,true\n", "extra.csv");
+    const [product] = await harness.database.sql`SELECT name, description, price_cents, stock FROM product WHERE slug = 'lamp'`;
 
     expect(response.statusCode).toBe(422);
     expect(JSON.stringify(jsonOf(response)["error"])).toContain("is_admin");
-    expect(product?.["price_cents"]).toBe(100);
+    expect(product).toMatchObject({ name: "Lamp", price_cents: 100 });
+    expect(product?.["description"]).not.toBe("Written by the import");
+    expect(product?.["stock"]).not.toBe(7);
   });
 
   it("refuses a file that is neither CSV nor JSON", async () => {
