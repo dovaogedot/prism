@@ -61,7 +61,7 @@ Stripe tells the shop how each payment went through a webhook. `COMPOSE_PROFILES
 
 `PAYMENTS_MODE=simulated` in `.env` takes payments without Stripe, on `localhost` only: checkout asks for no card, and every payment succeeds at once. The browser suite and the load test run this way.
 
-The seed is separate from the shop: the shop runs without it, and a failed seed leaves an empty shop. Its data is one archive, `apps/api/seed/data.zip`. It plants reviews and helpful votes too, and gives the demo shopper three delivered orders, whose products are ready to review, and one shipped order. `apps/api/seed/README.md` has the details.
+The seed is separate from the shop: the shop runs without it, and a failed seed leaves an empty shop. Its data is one archive, `apps/api/seed/data.zip`. It plants reviews and helpful votes too, by reviewers who cannot sign in, and gives the demo shopper three delivered orders, whose products are ready to review, and one shipped order. `apps/api/seed/README.md` has the details.
 
 ### Running it without the scripts
 

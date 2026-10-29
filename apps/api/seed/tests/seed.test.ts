@@ -1,5 +1,20 @@
+import { base, en, Faker } from "@faker-js/faker";
 import { describe, expect, it } from "vitest";
 import { Seed } from "../seed.ts";
+
+describe("Seed.exampleAddressOf", () => {
+  it("moves a drawn address to the .example domain, keeping the rest", () => {
+    expect(Seed.exampleAddressOf("Ada.Lovelace12@gmail.com")).toBe("ada.lovelace12@gmail.example");
+  });
+
+  it("gives every drawn reviewer an address of their own", () => {
+    const reviewers = Seed.drawReviewers(new Faker({ locale: [en, base], seed: Seed.REVIEW_SEED }));
+    const addresses = reviewers.map((reviewer) => Seed.exampleAddressOf(reviewer.drawn));
+
+    expect(new Set(addresses).size).toBe(Seed.REVIEWER_COUNT);
+    expect(addresses.every((address) => address.endsWith(".example"))).toBe(true);
+  });
+});
 
 describe("Seed.slugOf", () => {
   it("lowercases and joins words with single dashes", () => {

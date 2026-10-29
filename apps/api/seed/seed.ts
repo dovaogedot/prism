@@ -4,8 +4,10 @@
  * on each other's reviews, and the catalog beside this file, which
  * `fetch/fetch-catalog.ts` writes from its sources. Stock, sizes, reviews and
  * votes are drawn from faker under fixed seeds, so two runs against an
- * empty database plant the same shop. A database that already holds
- * products is left alone. Run as a script it seeds the database named by
+ * empty database plant the same shop. Only the demo account has a password,
+ * and every reviewer's address is on the reserved `.example` domain. A
+ * database that already holds products keeps its catalog; a seed only moves
+ * the reviewers an earlier one left on their drawn addresses. Run as a script it seeds the database named by
  * `DATABASE_URL`, sealing with `DATA_ENCRYPTION_KEY`, and copies the
  * pictures under `MEDIA_DIR`.
  */
@@ -25,7 +27,7 @@ import {
   type ShippingAddress,
   type UserId,
 } from "@prism/shared";
-import { asc, count, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { Database, type Database as Db, type Transaction } from "../src/db/client.ts";
 import {
@@ -40,6 +42,7 @@ import {
   productReviews,
   products,
   reviewVotes,
+  sessions,
   shippingMethods,
   users,
 } from "../src/db/schema.ts";
@@ -124,6 +127,52 @@ export const Seed = {
   catalog: async (): Promise<SeedCatalog> =>
     SeedCatalog.schema.parse(JSON.parse(await readFile(new URL("catalog.json", Seed.CATALOG_DIR), "utf8"))),
 
+  /**
+   * The reviewers in the order the generator draws them: the address it
+   * draws first, then the byline. Drawing exactly this keeps every review and
+   * vote the same from one seed to the next.
+   */
+  drawReviewers: (draw: Faker): readonly Readonly<{ drawn: string; byline: string }>[] =>
+    Array.from({ length: Seed.REVIEWER_COUNT }, () => ({
+      drawn: draw.internet.email(),
+      byline: `${draw.person.firstName()} ${draw.person.lastName().slice(0, 1)}.`,
+    })),
+
+  /** A drawn address moved to the reserved `.example` top-level domain, whose inboxes belong to nobody. */
+  exampleAddressOf: (drawn: string): Email => Email.schema.parse(drawn.replace(/\.[^.@]+$/, ".example")),
+
+  /**
+   * Moves every reviewer an earlier seed made at its drawn address to its
+   * `.example` address, with no password and no live session, so nobody
+   * signs in as one. Resolves to how many it moved; once they are moved, it
+   * moves none.
+   */
+  retireDrawnAddresses: async (db: Db, cipher: FieldCipher, now: Date): Promise<number> => {
+    const draw = new Faker({ locale: [en, base], seed: Seed.REVIEW_SEED });
+    let moved = 0;
+
+    for (const { drawn } of Seed.drawReviewers(draw)) {
+      const address = Seed.exampleAddressOf(drawn);
+
+      await db.transaction(async (tx) => {
+        const [account] = await tx
+          .update(users)
+          .set({ email: cipher.seal(address), emailIndex: cipher.index("account-email", address), passwordHash: null })
+          .where(eq(users.emailIndex, cipher.index("account-email", Email.schema.parse(drawn))))
+          .returning({ id: users.id });
+        if (account === undefined) return;
+
+        await tx
+          .update(sessions)
+          .set({ revokedAt: now, revokedReason: "password_reset" })
+          .where(and(eq(sessions.userId, account.id), isNull(sessions.revokedAt)));
+        moved += 1;
+      });
+    }
+
+    return moved;
+  },
+
   /** The instant `days` days before `now`. */
   daysBefore: (now: Date, days: number): Date => new Date(now.getTime() - days * 24 * 60 * 60 * 1000),
 
@@ -140,6 +189,8 @@ export const Seed = {
     const images = ImageStore.create(mediaDirectory);
     const [existing] = await db.select({ total: count() }).from(products);
     if (existing !== undefined && existing.total > 0) {
+      const moved = await Seed.retireDrawnAddresses(db, cipher, new Date());
+      if (moved > 0) onProgress(`Moved ${moved} seeded reviewers to .example addresses, with no password.`);
       await Seed.variants(db, images);
       return { _tag: "Present", products: existing.total };
     }
@@ -148,13 +199,11 @@ export const Seed = {
     const draw = new Faker({ locale: [en, base], seed: Seed.REVIEW_SEED });
     await mkdir(mediaDirectory, { recursive: true });
 
+    // Only the demo shopper signs in; the reviewers have no password.
     const passwordHash = await Hasher.argon2().hash(Seed.DEMO_PASSWORD);
     const people = [
       { email: Seed.DEMO_EMAIL, byline: Seed.DEMO_NAME.split(" ")[0] ?? Seed.DEMO_NAME },
-      ...Array.from({ length: Seed.REVIEWER_COUNT }, () => ({
-        email: Email.schema.parse(draw.internet.email()),
-        byline: `${draw.person.firstName()} ${draw.person.lastName().slice(0, 1)}.`,
-      })),
+      ...Seed.drawReviewers(draw).map(({ drawn, byline }) => ({ email: Seed.exampleAddressOf(drawn), byline })),
     ];
 
     const planted = await db.transaction(async (tx) => {
@@ -164,9 +213,8 @@ export const Seed = {
           people.map((person) => ({
             email: cipher.seal(person.email),
             emailIndex: cipher.index("account-email", person.email),
-            passwordHash,
             ...(person.email === Seed.DEMO_EMAIL
-              ? { fullName: cipher.seal(Seed.DEMO_NAME), phone: cipher.seal(Seed.DEMO_PHONE) }
+              ? { passwordHash, fullName: cipher.seal(Seed.DEMO_NAME), phone: cipher.seal(Seed.DEMO_PHONE) }
               : {}),
           })),
         )
@@ -174,13 +222,18 @@ export const Seed = {
         .returning({ id: users.id, emailIndex: users.emailIndex });
 
       const reviewers: Reviewer[] = [];
+      // Found by its address: an account that already existed is not among the rows the insert returns.
+      let shopper: Reviewer | undefined;
       for (const person of people) {
         const index = cipher.index("account-email", person.email);
         const account = accounts.find((row) => row.emailIndex.equals(index));
-        if (account !== undefined) reviewers.push({ id: account.id, byline: person.byline });
+        if (account === undefined) continue;
+
+        const reviewer = { id: account.id, byline: person.byline };
+        reviewers.push(reviewer);
+        if (person.email === Seed.DEMO_EMAIL) shopper = reviewer;
       }
 
-      const shopper = reviewers[0];
       const catalog = await Seed.catalog();
 
       const brandSlugs = new Set<string>();
