@@ -39,6 +39,13 @@ describe("ProductSearch.likePattern", () => {
   });
 });
 
+describe("ProductSearch.isShownAtLeast", () => {
+  it("counts a rating at a threshold once its card shows the threshold, rounded to one decimal", () => {
+    expect([3.94, 3.95, 3.96, 4].map((average) => ProductSearch.shownRating(average))).toEqual([3.9, 4, 4, 4]);
+    expect([3.94, 3.95, 3.96, 4].map((average) => ProductSearch.isShownAtLeast(average, 4))).toEqual([false, true, true, true]);
+  });
+});
+
 describe("ProductSearch.ratingLabel", () => {
   it("names the top threshold without an 'up'", () => {
     expect(ProductSearch.ratingLabel(5)).toBe("5 stars");
@@ -86,14 +93,15 @@ describe("ProductSearch.conditions", () => {
       rating,
     );
 
-    expect(render(and(...conditions) ?? sql``).params).toEqual(["lamps", "acme", "globex", 100, 5000, 4]);
+    // The rating is bound as the tenths a card rounds up from: 4 stars is 39.5 tenths.
+    expect(render(and(...conditions) ?? sql``).params).toEqual(["lamps", "acme", "globex", 100, 5000, 39.5]);
   });
 
   it("leaves out the filter of the lifted facet", () => {
     const full = query({ category: slug("lamps"), brands: [slug("acme")], priceMinCents: 1, minRating: 2 });
 
-    expect(render(and(...ProductSearch.conditions(full, rating, "brand")) ?? sql``).params).toEqual(["lamps", 1, 2]);
-    expect(render(and(...ProductSearch.conditions(full, rating, "price")) ?? sql``).params).toEqual(["lamps", "acme", 2]);
+    expect(render(and(...ProductSearch.conditions(full, rating, "brand")) ?? sql``).params).toEqual(["lamps", 1, 19.5]);
+    expect(render(and(...ProductSearch.conditions(full, rating, "price")) ?? sql``).params).toEqual(["lamps", "acme", 19.5]);
     expect(render(and(...ProductSearch.conditions(full, rating, "rating")) ?? sql``).params).toEqual(["lamps", "acme", 1]);
   });
 
@@ -117,7 +125,7 @@ describe("ProductSearch.shelf and narrowing", () => {
     const full = query({ text: "lamp", category: slug("lamps"), brands: [slug("acme")], minRating: 3 });
 
     expect(render(and(...ProductSearch.shelf(full)) ?? sql``).params).toEqual(["lamp", "%lamp%", "lamps"]);
-    expect(render(and(...ProductSearch.narrowing(full, rating)) ?? sql``).params).toEqual(["acme", 3]);
+    expect(render(and(...ProductSearch.narrowing(full, rating)) ?? sql``).params).toEqual(["acme", 29.5]);
   });
 
   it("renders no conditions as a true filter", () => {

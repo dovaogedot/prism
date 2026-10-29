@@ -133,6 +133,17 @@ describe("GET /api/v1/products", () => {
     expect(jsonOf(await get("/api/v1/products?rating=1"))["total"]).toBe(2);
   });
 
+  it("filters and counts a rating as its card shows it, rounded to one decimal", async () => {
+    await harness.database.sql`UPDATE product SET rating_average = 3.96, rating_count = 25 WHERE slug = 'oak-chair'`;
+
+    const atLeastFour = jsonOf(await get("/api/v1/products?rating=4"));
+    const facets = jsonOf(await get("/api/v1/products"))["facets"] as { ratings: { value: string; count: number }[] };
+    const chair = (atLeastFour["items"] as { slug: string; rating: { average: number } }[]).find((item) => item.slug === "oak-chair");
+
+    expect(chair?.rating.average).toBe(4);
+    expect(facets.ratings.find((bucket) => bucket.value === "4")?.count).toBe(atLeastFour["total"]);
+  });
+
   it("filters by any named property, with values within one name as alternatives", async () => {
     expect(jsonOf(await get("/api/v1/products?p.color=red"))["total"]).toBe(2);
     expect(jsonOf(await get("/api/v1/products?p.color=red&p.color=black"))["total"]).toBe(3);

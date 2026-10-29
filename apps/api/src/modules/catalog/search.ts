@@ -32,6 +32,16 @@ export const ProductSearch = {
   ratingLabel: (threshold: number): string =>
     threshold >= 5 ? "5 stars" : `${threshold} stars & up`,
 
+  /** An average rating as a card shows it: rounded to one decimal. */
+  shownRating: (average: number): number => Math.round(average * 10) / 10,
+
+  /**
+   * Whether a card shows `average` at `threshold` stars or more. A rating
+   * rounds up from half a tenth below, so this is the same comparison the
+   * filter makes in SQL.
+   */
+  isShownAtLeast: (average: number, threshold: number): boolean => average * 10 >= threshold * 10 - 0.5,
+
   /**
    * `plainto_tsquery` treats the input as words to AND together and escapes
    * the operators itself, so `red & | !` searches for the word "red".
@@ -88,7 +98,8 @@ export const ProductSearch = {
       where.push(lte(products.priceCents, query.priceMaxCents));
     }
     if (lifted !== "rating" && query.minRating !== undefined) {
-      where.push(sql`${rating.average} >= ${query.minRating}`);
+      // As `isShownAtLeast` compares, so the filter keeps every product whose card shows the rating or more.
+      where.push(sql`${rating.average} * 10 >= ${query.minRating * 10 - 0.5}`);
     }
 
     for (const filter of query.properties) {

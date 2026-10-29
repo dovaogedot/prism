@@ -114,7 +114,7 @@ export const CatalogRepository = {
       category: { slug: row.categorySlug, name: row.categoryName },
       brand: { slug: row.brandSlug, name: row.brandName },
       images: row.images.map(ImageRows.view),
-      rating: { average: Math.round(row.average * 10) / 10, count: row.count },
+      rating: { average: ProductSearch.shownRating(row.average), count: row.count },
     });
 
     const conditions = (query: ProductQuery, lifted: LiftedFacet, match: TextMatch) =>
@@ -162,7 +162,7 @@ export const CatalogRepository = {
       return ProductSearch.RATING_THRESHOLDS.map((threshold) => ({
         value: String(threshold),
         label: ProductSearch.ratingLabel(threshold),
-        count: rows.reduce((sum, row) => (row.average >= threshold ? sum + row.matching : sum), 0),
+        count: rows.reduce((sum, row) => (ProductSearch.isShownAtLeast(row.average, threshold) ? sum + row.matching : sum), 0),
       }));
     };
 
