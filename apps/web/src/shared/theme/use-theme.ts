@@ -3,8 +3,9 @@
  *
  * One of the two themes is always in force. A stored value picks one; with
  * nothing stored the theme follows the operating system until the visitor
- * picks for themselves. The inline script in index.html reads the same key by
- * the same rule, so the first paint is already the right one.
+ * picks for themselves. `public/theme.js`, which index.html loads before the
+ * app, reads the same key by the same rule, so the first paint is already the
+ * right one.
  *
  * The `dark` class on the root element is the one record of the theme in
  * force, so every component that reads the theme sees the same one.
