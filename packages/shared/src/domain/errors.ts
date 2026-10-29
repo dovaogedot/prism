@@ -70,6 +70,7 @@ export type DomainError =
   | Readonly<{ _tag: "ShippingMethodInUse" }>
   | Readonly<{ _tag: "OrderTransitionNotAllowed" }>
   | Readonly<{ _tag: "OrderTotalTooSmall" }>
+  | Readonly<{ _tag: "OrderTotalTooLarge" }>
   | Readonly<{ _tag: "AddressNotFound" }>
   | Readonly<{ _tag: "AddressLimitReached" }>
   /** Carries how long until the next attempt can pass. */
@@ -150,6 +151,7 @@ export const DomainError = {
     ShippingMethodInUse: 409,
     OrderTransitionNotAllowed: 409,
     OrderTotalTooSmall: 422,
+    OrderTotalTooLarge: 422,
     AddressNotFound: 404,
     AddressLimitReached: 409,
     RateLimited: 429,
@@ -215,6 +217,7 @@ export const DomainError = {
     ShippingMethodInUse: "Orders use this delivery option, so it can be deactivated but not deleted.",
     OrderTransitionNotAllowed: "The order cannot move to that status from where it is.",
     OrderTotalTooSmall: "The order total must be at least €0.50.",
+    OrderTotalTooLarge: "The order total can be at most €999,999.99. Split it into smaller orders.",
     AddressNotFound: "We could not find that address.",
     AddressLimitReached: "You can save at most 10 addresses. Delete one first.",
     RateLimited: "Too many attempts. Please wait a moment and try again.",

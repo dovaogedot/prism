@@ -128,6 +128,8 @@ export const OrderService = {
 
   /** Stripe's smallest charge in euros, which every order total has to reach. */
   MINIMUM_TOTAL_CENTS: 50,
+  /** Stripe's largest charge in euros, which also keeps every order sum inside its integer column. */
+  MAXIMUM_TOTAL_CENTS: 99_999_999,
 
   METHOD_UNAVAILABLE: "This shipping method is not available any more. Choose another.",
 
@@ -312,6 +314,7 @@ export const OrderService = {
       // the customer saw the same number.
       const totals = Pricing.totals(view.lines, option);
       if (totals.totalCents < OrderService.MINIMUM_TOTAL_CENTS) return err({ _tag: "OrderTotalTooSmall" });
+      if (totals.totalCents > OrderService.MAXIMUM_TOTAL_CENTS) return err({ _tag: "OrderTotalTooLarge" });
       if (totals.totalCents !== body.expectedTotalCents) return err({ _tag: "CartChanged" });
 
       if ((await deps.verifier.verify(body.address)) === "not_found") {

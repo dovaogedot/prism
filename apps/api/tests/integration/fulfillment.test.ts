@@ -388,6 +388,17 @@ describe("placement", () => {
     expect(jsonOf(response)["error"]).toMatchObject({ code: "OrderTotalTooSmall" });
   });
 
+  it("refuses a total over Stripe's largest charge before reserving anything", async () => {
+    await harness.database.sql`UPDATE product SET price_cents = 10000000, stock = 50 WHERE slug = 'desk-lamp'`;
+    const filled = await Shop.fill(harness, [["desk-lamp", 10]]);
+
+    const response = await Shop.place(harness, filled, { expectedTotalCents: await Shop.totalOf(harness, filled) });
+
+    expect(response.statusCode).toBe(422);
+    expect(jsonOf(response)["error"]).toMatchObject({ code: "OrderTotalTooLarge" });
+    expect(await Shop.stockOf(harness, "desk-lamp")).toBe(50);
+  });
+
   it("records the method's name and the delivery dates on the order", async () => {
     const placed = await paidOrder();
 
