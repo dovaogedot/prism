@@ -12,6 +12,7 @@
 import { existsSync, readFileSync } from "node:fs"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { startHarness, type Harness } from "../../apps/api/tests/support/harness.ts"
+import { StressSteps } from "../../loadtest/lib/steps.ts"
 
 const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8")
 const bottlenecks = readme.slice(readme.indexOf("\n### Bottlenecks\n"), readme.indexOf("\n## Testing\n"))
@@ -43,7 +44,7 @@ describe("the README's bottlenecks", () => {
   it("name the bottlenecks fixed, each with its cause, its fix and the figures before and after", () => {
     const fixed = rowsUnder("| Bottleneck | Cause | Fix | Without the fix | With it |")
 
-    expect(fixed.map((row) => row[0])).toEqual(["Ratings", "Category pictures", "JIT compilation"])
+    expect(fixed.map((row) => row[0])).toEqual(["Ratings", "Category pictures", "JIT compilation", "Facet counts"])
     expect(fixed.filter((row) => row.length !== 5 || row.some((cell) => cell.length === 0))).toEqual([])
   })
 
@@ -87,11 +88,12 @@ describe("the fixes the README says were made", () => {
 describe.runIf(existsSync(new URL("queries-stress.csv", results)) && existsSync(new URL("stats-stress.csv", results)))(
   "the stress run's own records",
   () => {
-    it("put the property facet first among Postgres's costliest statements, at the mean the README quotes", () => {
+    it("put the quick search's suggestions first among Postgres's costliest statements, at the mean the README quotes", () => {
       const [, first = ""] = readFileSync(new URL("queries-stress.csv", results), "utf8").split("\n")
       const [, , mean = ""] = first.split(",")
 
-      expect(first).toContain('from ""product_property""')
+      // Only the suggestions select a product's slug, name and price unqualified, from the product table alone.
+      expect(first).toContain('select ""slug"", ""name"", ""price_cents""')
       expect(bottlenecks).toContain(`the costliest statement, ${Number(mean).toFixed(1)} ms a call over the stress run`)
     })
 
@@ -103,7 +105,8 @@ describe.runIf(existsSync(new URL("queries-stress.csv", results)) && existsSync(
           .map((line) => Number.parseFloat(line.split(",")[2] ?? "")),
       )
 
-      expect(bottlenecks).toContain(`The API reaches ${peak.toFixed(0)}% of its 2 CPUs at 1,000 users`)
+      const most = Math.max(...StressSteps.TARGETS).toLocaleString("en-US")
+      expect(bottlenecks).toContain(`The API reaches ${peak.toFixed(0)}% of its 2 CPUs at ${most} users`)
     })
   },
 )

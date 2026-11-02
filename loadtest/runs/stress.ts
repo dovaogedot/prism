@@ -1,5 +1,5 @@
 /**
- * The breaking point: the mixed workload in steps from 25 to 1,000 users, a
+ * The breaking point: the mixed workload in steps from 25 to 3,000 users, a
  * minute at each. It stops once p95 over the whole run passes 5 seconds or
  * errors pass 5%. The report reads the samples step by step, the ramp and
  * the held minute apart, for the most users a held minute served with p95

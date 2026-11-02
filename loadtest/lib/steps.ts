@@ -5,7 +5,7 @@
 
 export const StressSteps = {
   /** The users each step reaches, in order. */
-  TARGETS: [25, 50, 100, 150, 200, 300, 400, 500, 600, 800, 1000],
+  TARGETS: [25, 50, 100, 150, 200, 300, 400, 500, 600, 800, 1000, 1250, 1500, 2000, 2500, 3000],
   /** How long a step takes to reach its users from the step before. */
   RAMP_SECONDS: 30,
   /** How long a step then holds its users. */
