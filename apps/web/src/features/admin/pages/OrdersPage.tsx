@@ -45,7 +45,7 @@ export const OrdersPage = () => {
           {OrderStatus.NAMES.map((status) => (
             <button
               className={`rounded-full border px-3 py-1 text-xs font-medium ${
-                statuses.includes(status) ? "border-accent bg-accent-wash text-ink" : "border-line text-ink-soft hover:border-line-strong"
+                statuses.includes(status) ? "border-accent bg-accent-wash text-ink" : "border-edge text-ink-soft hover:border-ink-faint"
               }`}
               key={status}
               type="button"

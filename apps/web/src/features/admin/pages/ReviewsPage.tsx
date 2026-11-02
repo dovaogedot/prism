@@ -61,7 +61,7 @@ export const ReviewsPage = () => {
       <div className="flex flex-wrap gap-2" role="group" aria-label="Status">
         {ReviewStatus.NAMES.map((name) => (
           <button
-            className={`rounded-full border px-3.5 py-1.5 text-sm font-medium ${name === status ? "border-accent bg-accent-wash text-ink" : "border-line text-ink-soft hover:border-line-strong"}`}
+            className={`rounded-full border px-3.5 py-1.5 text-sm font-medium ${name === status ? "border-accent bg-accent-wash text-ink" : "border-edge text-ink-soft hover:border-ink-faint"}`}
             key={name}
             type="button"
             aria-pressed={name === status}

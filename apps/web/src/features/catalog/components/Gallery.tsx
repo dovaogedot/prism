@@ -30,7 +30,7 @@ export const Gallery = ({ images, name }: GalleryProps) => {
         />
         {image === undefined ? null : (
           <button
-            className="absolute bottom-3 right-3 rounded-lg border border-line bg-surface/90 px-3 py-1.5 text-xs font-semibold text-ink backdrop-blur hover:border-line-strong"
+            className="absolute bottom-3 right-3 rounded-lg border border-edge bg-surface/90 px-3 py-1.5 text-xs font-semibold text-ink backdrop-blur hover:border-ink-faint"
             type="button"
             onClick={() => setEnlarged(true)}
           >

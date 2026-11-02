@@ -123,7 +123,7 @@ export const CartPreviewButton = () => {
                 {freeShipping === undefined ? null : <p className="text-sm text-ink-soft">{freeShipping}</p>}
                 <div className="grid grid-cols-2 gap-2">
                   <Link
-                    className="rounded-lg border border-line bg-sunken px-3 py-2 text-center text-sm font-semibold text-ink hover:border-line-strong"
+                    className="rounded-lg border border-edge bg-sunken px-3 py-2 text-center text-sm font-semibold text-ink hover:border-ink-faint"
                     to="/cart"
                   >
                     View cart

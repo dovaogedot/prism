@@ -80,7 +80,7 @@ export const ReviewForm = ({ slug, viewer }: ReviewFormProps) => {
                   />
                   <span className="sr-only">{stars === 1 ? "1 star" : `${stars} stars`}</span>
                   <svg
-                    className={`size-7 ${rating !== undefined && stars <= rating ? "text-accent" : "text-edge"}`}
+                    className={`size-7 ${rating !== undefined && stars <= rating ? "text-accent" : "text-star-empty"}`}
                     viewBox="0 0 20 20"
                     fill="currentColor"
                     aria-hidden="true"

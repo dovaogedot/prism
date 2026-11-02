@@ -9,7 +9,7 @@ export const ViewToggle = ({ view, onChange }: ViewToggleProps) => {
   const stateClass = (isOn: boolean) => (isOn ? "bg-accent text-accent-ink" : "text-ink-soft hover:text-ink")
 
   return (
-    <div className="flex shrink-0 rounded-lg border border-line bg-surface p-0.5" role="group" aria-label="View">
+    <div className="flex shrink-0 rounded-lg border border-edge bg-surface p-0.5" role="group" aria-label="View">
       <button
         className={`${buttonClass} ${stateClass(view === "grid")}`}
         type="button"

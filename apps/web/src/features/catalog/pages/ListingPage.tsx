@@ -218,7 +218,7 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
             <div className="mb-4 flex flex-wrap gap-2" ref={chipList}>
               {activeChips.map((chip, index) => (
                 <button
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2 py-0.5 text-xs text-ink-soft hover:border-line-strong hover:text-ink"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-edge bg-surface px-2 py-0.5 text-xs text-ink-soft hover:border-ink-faint hover:text-ink"
                   key={`${chip.key}=${chip.value}`}
                   type="button"
                   onClick={() => {

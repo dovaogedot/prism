@@ -1,7 +1,7 @@
 /**
  * What the suite measures on a page: its head tags, its headings, whether it
- * spills sideways at a width, what axe-core finds, and what the
- * Content-Security-Policy refused.
+ * spills sideways at a width, the edges of its controls, what axe-core
+ * finds, and what the Content-Security-Policy refused.
  */
 
 import { AxeBuilder } from "@axe-core/playwright"
@@ -152,6 +152,90 @@ export const Checks = {
 
     return overflow
   },
+
+  /** The tallest a button, link or group may be and still count as a control rather than a card, in CSS pixels. */
+  CONTROL_HEIGHT_MAX: 48,
+  /** The least contrast a control's edge has against what is behind it. */
+  EDGE_CONTRAST: 2,
+
+  /**
+   * Every control on the page whose edge breaks the rule, each as
+   * `<control>: <why>`; none when all keep it. A control is a form field, or a
+   * button, link or group up to `CONTROL_HEIGHT_MAX` tall: a taller one is a
+   * card, drawn with the lighter line. Its edge is `--color-edge`, or the
+   * accent of a chosen control or the danger color of a refused field, and
+   * has `EDGE_CONTRAST` against the first opaque background behind it.
+   */
+  findControlEdgeFaults: (page: Page): Promise<readonly string[]> =>
+    page.evaluate(
+      ({ heightMax, contrastMin }) => {
+        // A canvas turns any CSS color, oklch included, into sRGB channels and an alpha.
+        const canvas = document.createElement("canvas")
+        canvas.width = 1
+        canvas.height = 1
+        const context = canvas.getContext("2d", { willReadFrequently: true })
+        if (context === null) throw new Error("No 2D canvas to read colors with")
+
+        const channelsOf = (color: string): readonly number[] => {
+          context.clearRect(0, 0, 1, 1)
+          context.fillStyle = color
+          context.fillRect(0, 0, 1, 1)
+          const [red = 0, green = 0, blue = 0, alpha = 0] = context.getImageData(0, 0, 1, 1).data
+          return [red, green, blue, alpha / 255]
+        }
+        const luminanceOf = (color: readonly number[]): number => {
+          const linear = (channel: number) => (channel / 255 <= 0.04045 ? channel / 255 / 12.92 : ((channel / 255 + 0.055) / 1.055) ** 2.4)
+          return 0.2126 * linear(color[0] ?? 0) + 0.7152 * linear(color[1] ?? 0) + 0.0722 * linear(color[2] ?? 0)
+        }
+        const contrastOf = (first: readonly number[], second: readonly number[]): number => {
+          const [lighter = 0, darker = 0] = [luminanceOf(first), luminanceOf(second)].toSorted((a, b) => b - a)
+          return (lighter + 0.05) / (darker + 0.05)
+        }
+        const isSame = (first: readonly number[], second: readonly number[]): boolean =>
+          first.slice(0, 3).every((channel, index) => Math.abs(channel - (second[index] ?? 0)) <= 2)
+        // The backgrounds behind an element, painted over one another up to the first opaque one.
+        const backdropOf = (element: Element): readonly number[] => {
+          const layers: (readonly number[])[] = []
+          for (let node = element.parentElement; node !== null; node = node.parentElement) {
+            const color = channelsOf(getComputedStyle(node).backgroundColor)
+            if ((color[3] ?? 0) > 0) layers.push(color)
+            if ((color[3] ?? 0) >= 0.99) break
+          }
+          let base: readonly number[] = layers.pop() ?? [255, 255, 255, 1]
+          for (let layer = layers.pop(); layer !== undefined; layer = layers.pop()) {
+            const alpha = layer[3] ?? 1
+            base = base.map((channel, index) => (index === 3 ? 1 : channel * (1 - alpha) + (layer?.[index] ?? 0) * alpha))
+          }
+          return base
+        }
+
+        const root = getComputedStyle(document.documentElement)
+        const allowed = ["--color-edge", "--color-accent", "--color-danger"].map((name) => channelsOf(root.getPropertyValue(name)))
+        const fields = new Set(["INPUT", "SELECT", "TEXTAREA"])
+
+        return [...document.querySelectorAll("button, a[href], input, select, textarea, summary, [role=group]")].flatMap((element) => {
+          const box = element.getBoundingClientRect()
+          if (box.width === 0 || box.height === 0 || (!fields.has(element.tagName) && box.height > heightMax)) return []
+
+          const style = getComputedStyle(element)
+          const side = (["Top", "Right", "Bottom", "Left"] as const).find(
+            (name) => Number.parseFloat(style[`border${name}Width`]) > 0 && (channelsOf(style[`border${name}Color`])[3] ?? 0) > 0,
+          )
+          if (side === undefined) return []
+
+          const edge = channelsOf(style[`border${side}Color`])
+          const contrast = contrastOf(edge, backdropOf(element))
+          const name = `${element.tagName.toLowerCase()} "${(element.getAttribute("aria-label") ?? element.textContent ?? "").trim().slice(0, 40)}"`
+          return [
+            ...(allowed.some((color) => isSame(color, edge))
+              ? []
+              : [`${name}: edge rgb(${edge.slice(0, 3).join(", ")}) is not the shared edge`]),
+            ...(contrast >= contrastMin ? [] : [`${name}: edge has ${contrast.toFixed(2)}:1 against its background`]),
+          ]
+        })
+      },
+      { heightMax: Checks.CONTROL_HEIGHT_MAX, contrastMin: Checks.EDGE_CONTRAST },
+    ),
 
   /**
    * Google's CAPTCHA frames. axe leaves them out: their markup is Google's,

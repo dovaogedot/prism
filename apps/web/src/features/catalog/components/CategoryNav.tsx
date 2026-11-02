@@ -16,7 +16,7 @@ export const CategoryNav = ({ links }: CategoryNavProps) => (
             className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
               link.isCurrent
                 ? "border-accent bg-accent-wash font-semibold text-ink"
-                : "border-line bg-surface text-ink-soft hover:border-line-strong hover:text-ink"
+                : "border-edge bg-surface text-ink-soft hover:border-ink-faint hover:text-ink"
             }`}
             to={link.href}
             aria-current={link.isCurrent ? "page" : undefined}

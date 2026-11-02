@@ -1,7 +1,8 @@
 /**
  * Every storefront page, in both themes: what axe-core finds, one h1, a
  * title under 60 characters and a description of 155 to 160, no sideways
- * spill at any of the widths, nothing the Content-Security-Policy refused,
+ * spill at any of the widths, one edge on every control at 2:1 against the
+ * page, nothing the Content-Security-Policy refused,
  * no request of the shop's own refused but the ones a page expects, and no
  * error of the shop's own in the console. Google's CAPTCHA script gets a
  * stand-in on every page check, and one test loads the real one.
@@ -94,6 +95,7 @@ for (const theme of Checks.THEMES) {
         expect(facts.descriptions[0]?.length ?? 0, facts.descriptions[0]).toBeGreaterThanOrEqual(155)
         expect(facts.descriptions[0]?.length ?? 0, facts.descriptions[0]).toBeLessThanOrEqual(160)
         expect(await Checks.axe(page)).toEqual([])
+        expect(await Checks.findControlEdgeFaults(page)).toEqual([])
         expect(await Checks.overflowAt(page, Checks.WIDTHS)).toEqual(Object.fromEntries(Checks.WIDTHS.map((width) => [width, 0])))
         expect(await Checks.cspViolations(page)).toEqual([])
         expect(refused.filter((request) => !expected.includes(request))).toEqual([])

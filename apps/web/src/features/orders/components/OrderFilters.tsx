@@ -27,7 +27,7 @@ export const OrderFilters = () => {
   const chosen = OrderParams.statuses(params)
   const sort = OrderSort.schema.catch("newest").parse(params.get("sort") ?? "newest")
 
-  const dateInput = "rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink hover:border-line-strong"
+  const dateInput = "rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-ink hover:border-ink-faint"
 
   return (
     <div className="space-y-4">
@@ -42,7 +42,7 @@ export const OrderFilters = () => {
               aria-pressed={on}
               onClick={() => filter(UrlParams.toggle(params, "status", status))}
               className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                on ? "border-accent bg-accent text-accent-ink" : "border-line text-ink-soft hover:border-line-strong hover:text-ink"
+                on ? "border-accent bg-accent text-accent-ink" : "border-edge text-ink-soft hover:border-ink-faint hover:text-ink"
               }`}
             >
               {OrderStatus.label[status]}

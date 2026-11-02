@@ -54,7 +54,7 @@ export const ProviderButtons = ({ next }: ProviderButtonsProps) => {
               href={`${Api.BASE}/auth/oauth/${provider}`}
               // The provider's sign-in leaves the site; the path waits for the return.
               onClick={() => NextPath.remember(next)}
-              className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-line bg-surface px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-line-strong hover:bg-sunken"
+              className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-edge bg-surface px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-ink-faint hover:bg-sunken"
             >
               {ProviderMark[provider]}
               Continue with {OAuthProvider.label[provider]}

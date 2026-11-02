@@ -32,7 +32,7 @@ export const Measurements = ({ product }: MeasurementsProps) => {
       <div className="mb-1 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-ink">Measurements</h2>
 
-        <div className="flex rounded-lg border border-line p-0.5" role="group" aria-label="Unit system">
+        <div className="flex rounded-lg border border-edge p-0.5" role="group" aria-label="Unit system">
           {(["metric", "imperial"] as const).map((option) => (
             <button
               className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-colors ${

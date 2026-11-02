@@ -62,7 +62,7 @@ export const QuantityStepper = ({ value, max, onChange, label, disabled = false 
         onKeyDown={(event) => {
           if (event.key === "Enter") commit()
         }}
-        className="h-8 w-11 border-x border-line bg-surface text-center text-sm tabular-nums text-ink [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        className="h-8 w-11 border-x border-edge bg-surface text-center text-sm tabular-nums text-ink [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       />
       <button
         type="button"

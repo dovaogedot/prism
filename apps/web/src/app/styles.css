@@ -19,8 +19,10 @@
   --color-sunken: oklch(96.3% 0.003 90);
   --color-line: oklch(91.5% 0.004 90);
   --color-line-strong: oklch(84% 0.006 90);
-  /* The edge that marks out a control and the empty part of a rating: 3:1 on every background. */
-  --color-edge: oklch(62% 0.008 265);
+  /* The edge of every control: 2:1 against the page, the panels and the sunken fills. */
+  --color-edge: oklch(74.5% 0.008 265);
+  /* The empty part of a rating: 3:1 on every background. */
+  --color-star-empty: oklch(62% 0.008 265);
   --color-ink: oklch(21% 0.008 265);
   --color-ink-soft: oklch(45% 0.012 265);
   --color-ink-faint: oklch(52.5% 0.012 265);
@@ -44,7 +46,8 @@
   --color-sunken: oklch(23% 0.008 265);
   --color-line: oklch(27.5% 0.009 265);
   --color-line-strong: oklch(35% 0.011 265);
-  --color-edge: oklch(55% 0.012 265);
+  --color-edge: oklch(42.5% 0.012 265);
+  --color-star-empty: oklch(55% 0.012 265);
   --color-ink: oklch(96% 0.004 90);
   --color-ink-soft: oklch(76% 0.011 265);
   --color-ink-faint: oklch(65.5% 0.012 265);

@@ -7,7 +7,7 @@ export type ButtonTone = "accent" | "quiet" | "ghost" | "danger"
 
 const TONES: Record<ButtonTone, string> = {
   accent: "bg-accent text-accent-ink hover:bg-accent-hover active:scale-[.98] shadow-sm",
-  quiet: "bg-sunken text-ink border border-line hover:border-line-strong active:scale-[.98]",
+  quiet: "bg-sunken text-ink border border-edge hover:border-ink-faint active:scale-[.98]",
   ghost: "text-ink-soft hover:text-ink hover:bg-sunken",
   danger: "bg-danger text-danger-ink hover:opacity-90 active:scale-[.98]",
 }

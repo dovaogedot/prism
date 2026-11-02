@@ -24,7 +24,7 @@ export const HelpfulButton = ({ slug, reviewId, count, isVoted }: HelpfulButtonP
   if (session === undefined) {
     return (
       <Link
-        className={`${buttonClass} border-line text-ink-soft hover:border-line-strong hover:text-ink`}
+        className={`${buttonClass} border-edge text-ink-soft hover:border-ink-faint hover:text-ink`}
         to={`/login${NextPath.query(pathname)}`}
       >
         {label}
@@ -35,7 +35,7 @@ export const HelpfulButton = ({ slug, reviewId, count, isVoted }: HelpfulButtonP
 
   return (
     <button
-      className={`${buttonClass} ${isVoted ? "border-accent bg-accent-wash text-ink" : "border-line text-ink-soft hover:border-line-strong hover:text-ink"}`}
+      className={`${buttonClass} ${isVoted ? "border-accent bg-accent-wash text-ink" : "border-edge text-ink-soft hover:border-ink-faint hover:text-ink"}`}
       type="button"
       aria-pressed={isVoted}
       disabled={vote.isPending}

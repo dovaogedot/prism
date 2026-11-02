@@ -167,7 +167,7 @@ export const ProductImages = ({ productId, images }: ProductImagesProps) => {
             Picture file
           </label>
           <input
-            className="block w-full text-sm text-ink-soft file:mr-3 file:rounded-lg file:border file:border-line file:bg-sunken file:px-3 file:py-2 file:text-sm file:font-medium file:text-ink"
+            className="block w-full text-sm text-ink-soft file:mr-3 file:rounded-lg file:border file:border-edge file:bg-sunken file:px-3 file:py-2 file:text-sm file:font-medium file:text-ink"
             id="image-file"
             type="file"
             accept="image/jpeg,image/png,image/webp"
