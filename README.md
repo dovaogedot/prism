@@ -131,7 +131,7 @@ E2E_BASE_URL=https://localhost:3200 npm run e2e
 One page, in five parts, with the order summary beside it, or folded at the top on a narrow screen. The summary has steppers and remove buttons too.
 
 1. **Contact**: name, email, phone.
-2. **Shipping address**. Once it is complete, the page looks it up in OpenStreetMap and says "Address found", or that it could not find it.
+2. **Shipping address**. A street needs its name, not only a number, and a city its full name. Once the address is complete, the page looks it up in OpenStreetMap and says "Address found", or that it could not find it.
 3. **Billing address**: "Same as the shipping address" is checked until you uncheck it.
 4. **Delivery**: the delivery options staff set, each with its price and the dates it should arrive between.
 5. **Payment**: Stripe's card fields.
@@ -165,7 +165,7 @@ A declined order releases its stock and mails the reason; the cart keeps its ite
 - **Password reset**: "Forgot your password?" mails a link to the Mailpit inbox. Setting the new password signs every session out.
 - **The account** has three tabs of one width: Profile, Addresses and Orders.
 - **Profile** (`/account`): full name and phone, which checkout fills in. The email is shown but stays as it is. The password and 2FA live here too; changing the password asks for the current one and signs out every other session.
-- **Addresses** (`/account/addresses`): up to 10 saved addresses. One is the default, which checkout starts with.
+- **Addresses** (`/account/addresses`): up to 10 saved addresses. One is the default, which checkout starts with. The form checks an address as checkout does, and saving refuses one OpenStreetMap cannot find, under the street field.
 - **Two-factor authentication**: on the account page, scan the QR code with an authenticator app, or type its setup key or open the app's link on the same phone, and confirm a code, with the current password when the account has one. Sign-in then asks for a code, and so does turning it off. Each code works once. Staff who turn it off lose every staff role with it, after a dialog that names the roles asks first; the last admin cannot turn it off.
 - **Sign out** revokes the session. The account menu holds Orders, Account, Addresses, Admin for staff, and Sign out.
 
@@ -256,7 +256,7 @@ Every route is under `/api/v1` and answers JSON. A refusal is `{ "error": { "cod
 | `GET /orders/:id` | One order. A guest adds `?key=`. |
 | `POST /orders/:id/cancel` | Cancels an order not yet processing, and refunds it if paid. |
 | `GET /account/profile` | The signed-in customer's name and phone. `PUT` changes them. |
-| `GET /account/addresses` | Their saved addresses. `POST` saves one more. |
+| `GET /account/addresses` | Their saved addresses. `POST` saves one more, refusing one the address lookup cannot find. |
 | `PUT /account/addresses/:id` | Changes one; `isDefault: true` makes it the default. `DELETE` deletes it. |
 | `POST /support/messages` | Sends the contact form. Body: `name`, `email`, `topic`, `orderNumber`, `message`, `captchaToken`. Answers 202 once the support inbox's mail is out, and 503 `MessageNotSent` when it is not. |
 | `GET /seo/robots.txt`, `GET /seo/sitemap.xml` | The crawler files, which the web server serves at `/robots.txt` and `/sitemap.xml`. |

@@ -5,6 +5,7 @@
  * search engines read, and the cache headers of all of it.
  */
 
+import { AddressCheck } from "@prism/shared"
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 import { z } from "zod"
 import { CHECKOUT, Shop } from "../support/commerce.ts"
@@ -93,6 +94,80 @@ describe("the profile and saved addresses", () => {
 
     expect(items.filter((item) => item.isDefault).map((item) => item.label)).toEqual(["Place 7"])
     expect(items[0]?.label).toBe("Place 7")
+  })
+
+  it("refuses to save or change an address the lookup cannot find, under the street, and keeps the one saved", async () => {
+    const { accessToken } = await registerUser(harness, "mari@example.com")
+    const caller = { token: accessToken }
+    const created = await Shop.call(harness, "POST", "/account/addresses", caller, address())
+    harness.addressVerifier.answer("not_found")
+
+    const added = await Shop.call(harness, "POST", "/account/addresses", caller, address({ label: "Office" }))
+    const changed = await Shop.call(
+      harness,
+      "PUT",
+      `/account/addresses/${String(jsonOf(created)["id"])}`,
+      caller,
+      address({ label: "Moved" }),
+    )
+
+    for (const refused of [added, changed]) {
+      expect(refused.statusCode).toBe(422)
+      expect(jsonOf(refused)["error"]).toMatchObject({
+        code: "ValidationFailed",
+        issues: [{ path: "address.line1", message: AddressCheck.NOT_FOUND }],
+      })
+    }
+    const { items } = jsonOf(await Shop.call(harness, "GET", "/account/addresses", caller)) as { items: { label: string }[] }
+    expect(items.map((item) => item.label)).toEqual(["Home"])
+  })
+
+  it("saves an address on its format alone when the lookup cannot answer", async () => {
+    const { accessToken } = await registerUser(harness, "mari@example.com")
+    harness.addressVerifier.answer("unavailable")
+
+    const created = await Shop.call(harness, "POST", "/account/addresses", { token: accessToken }, address())
+
+    expect(created.statusCode).toBe(201)
+  })
+
+  it("names the street and the city of an address like 233, f, without asking the lookup", async () => {
+    const { accessToken } = await registerUser(harness, "mari@example.com")
+
+    const refused = await Shop.call(
+      harness,
+      "POST",
+      "/account/addresses",
+      { token: accessToken },
+      address({ address: { line1: "233", line2: "3", city: "f", postalCode: "12312", country: "EE" } }),
+    )
+
+    expect(refused.statusCode).toBe(422)
+    expect(jsonOf(refused)["error"]).toMatchObject({
+      issues: [
+        { path: "address.line1", message: "Enter the street name as well as the house number." },
+        { path: "address.city", message: "Enter the city's full name." },
+      ],
+    })
+    expect(harness.addressVerifier.asked).toEqual([])
+  })
+
+  it("still lists an address saved before the street and city rules it would now fail", async () => {
+    const { accessToken } = await registerUser(harness, "mari@example.com")
+    const caller = { token: accessToken }
+    await Shop.call(harness, "POST", "/account/addresses", caller, address())
+    const older = {
+      label: "Old",
+      fullName: "Mari Maasikas",
+      phone: "+37251234567",
+      address: { line1: "233", city: "f", postalCode: "12312", country: "EE" },
+    }
+    await harness.database.sql`UPDATE address SET details = ${harness.cipher.seal(older)}`
+
+    const listed = await Shop.call(harness, "GET", "/account/addresses", caller)
+
+    expect(listed.statusCode).toBe(200)
+    expect(jsonOf(listed)).toMatchObject({ items: [{ label: "Old", address: older.address }] })
   })
 
   it("makes the first address the default", async () => {

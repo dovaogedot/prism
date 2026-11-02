@@ -83,6 +83,13 @@ export const ShippingAddress = {
       country: Country.schema,
     })
     .superRefine((address, context) => {
+      // A house number alone, such as "233", names no street.
+      if (!/\p{L}/u.test(address.line1)) {
+        context.addIssue({ code: "custom", path: ["line1"], message: "Enter the street name as well as the house number." })
+      }
+      if (address.city.length < 2 || !/\p{L}/u.test(address.city)) {
+        context.addIssue({ code: "custom", path: ["city"], message: "Enter the city's full name." })
+      }
       if (!Country.postalCode[address.country].test(address.postalCode)) {
         context.addIssue({
           code: "custom",
@@ -91,6 +98,19 @@ export const ShippingAddress = {
         })
       }
     }),
+
+  /**
+   * An address as it was stored: its shape alone. The rules a typed address
+   * meets can tighten after an address was saved or an order placed, and
+   * reading it back must not fail on them.
+   */
+  storedSchema: z.object({
+    line1: z.string(),
+    line2: z.string().optional(),
+    city: z.string(),
+    postalCode: z.string(),
+    country: Country.schema,
+  }),
 } as const
 
 /** The code a delivery option is stored and chosen by. Only the schema makes one. */

@@ -3,7 +3,9 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useId, useState, type ReactNode } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { Alert, Button, Field, PostalAddressFields } from "../../../shared/ui/index.ts"
+import { ServerIssues } from "../../../shared/ui/server-issues.ts"
 import { Failure } from "../../../shared/api/failure.tsx"
+import { AddressLookup } from "../../checkout/components/index.ts"
 
 /** The address being changed, or none for a new one; what saving does; and how to leave without saving. */
 export type AddressFormProps = Readonly<{
@@ -38,12 +40,20 @@ export const AddressForm = ({ address, onSave, onCancel }: AddressFormProps) => 
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(undefined)
-    await onSave(values).catch((reason: unknown) => setFailure(Failure.describe(reason)))
+    await onSave(values).catch((reason: unknown) =>
+      // A refused field, such as an address the lookup cannot find, shows under that field.
+      setFailure(
+        Failure.describeUnplaced(reason, (issues) =>
+          ServerIssues.place(issues, ["label", "fullName", "phone", "address", "isDefault"], form.setError),
+        ),
+      ),
+    )
   })
 
   const errors = form.formState.errors
 
-  const country = useWatch({ control: form.control, name: "address.country" })
+  const typed = useWatch({ control: form.control, name: "address" })
+  const country = typed.country
 
   return (
     <form className="space-y-4 rounded-lg border border-line bg-surface p-5" onSubmit={(event) => void submit(event)} noValidate>
@@ -84,6 +94,7 @@ export const AddressForm = ({ address, onSave, onCancel }: AddressFormProps) => 
           country: { registered: form.register("address.country"), error: errors.address?.country?.message },
         }}
       />
+      <AddressLookup address={typed} />
 
       <label className="flex items-center gap-2.5 text-sm text-ink">
         <input className="size-4 accent-[var(--color-accent)]" type="checkbox" {...form.register("isDefault")} />

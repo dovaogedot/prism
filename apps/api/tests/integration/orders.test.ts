@@ -377,3 +377,14 @@ describe("signed-in checkout", () => {
     expect((await Shop.call(harness, "GET", `/orders/${placed.orderId}`)).statusCode).toBe(404)
   })
 })
+
+describe("an order placed before the address rules tightened", () => {
+  it("still opens with the address it was placed with", async () => {
+    const guest = await Shop.fill(harness, [["desk-lamp", 1]])
+    const placed = await Shop.placed(harness, guest)
+    const older = { line1: "233", city: "f", postalCode: "12312", country: "EE" }
+    await harness.database.sql`UPDATE customer_order SET shipping_address = ${harness.cipher.seal(older)}`
+
+    expect(await orderOf(placed.orderId, placed.key)).toMatchObject({ address: older })
+  })
+})

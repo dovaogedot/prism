@@ -57,6 +57,15 @@ describe("ShippingAddress", () => {
     })
   })
 
+  it("refuses a street that is only a number and a city that is one letter, as in 233, f", () => {
+    expect(issuesOf(ShippingAddress.schema.safeParse({ ...address, line1: "233", city: "f" }))).toEqual({
+      line1: "Enter the street name as well as the house number.",
+      city: "Enter the city's full name.",
+    })
+    expect(issuesOf(ShippingAddress.schema.safeParse({ ...address, city: "12" }))).toEqual({ city: "Enter the city's full name." })
+    expect(ShippingAddress.schema.safeParse({ ...address, line1: "Tamme talu", city: "Ii" }).success).toBe(true)
+  })
+
   it("checks the postal code against the country, with an example in the message", () => {
     expect(issuesOf(ShippingAddress.schema.safeParse({ ...address, postalCode: "1011" }))).toEqual({
       postalCode: "Enter a postal code like 10111.",

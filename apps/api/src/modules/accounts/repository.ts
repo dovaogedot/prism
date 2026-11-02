@@ -40,7 +40,7 @@ export const AccountRepository = {
     label: z.string(),
     fullName: z.string(),
     phone: z.string(),
-    address: ShippingAddress.schema,
+    address: ShippingAddress.storedSchema,
   }),
 
   create: (db: Database, cipher: FieldCipher): AccountRepository => {

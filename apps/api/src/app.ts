@@ -328,7 +328,7 @@ export const App = {
     const shippingMethods = ShippingMethods.create(database.db, audit, clock)
     const reviewRepository = ReviewRepository.create(database.db, audit)
     const accountRepository = AccountRepository.create(database.db, cipher)
-    const accountService = AccountService.create({ repository: accountRepository, users: authRepository, clock })
+    const accountService = AccountService.create({ repository: accountRepository, users: authRepository, clock, verifier: addressVerifier })
     const supportService = SupportService.create({ mailer, captcha, inbox: config.mail.support })
     const reviewService = ReviewService.create({
       repository: reviewRepository,

@@ -1,36 +1,16 @@
-import { AddressCheck, ShippingAddress } from "@prism/shared"
-import { useQuery } from "@tanstack/react-query"
 import { useWatch } from "react-hook-form"
-import { match, P } from "ts-pattern"
-import { Api } from "../../../shared/api/client.ts"
 import { PostalAddressFields } from "../../../shared/ui/index.ts"
 import type { CheckoutFormApi } from "../checkout.ts"
-import { useDebounced } from "../../../shared/hooks/use-debounced.ts"
+import { AddressLookup } from "./AddressLookup.tsx"
 
 /** The form the fields belong to. */
 export type AddressFieldsProps = Readonly<{ form: CheckoutFormApi }>
 
-/**
- * Where the parcel goes. Once the address passes the format check and the
- * customer stops typing, the page asks whether the street exists there, and
- * says so under the fields. Placing the order asks again on the server.
- */
+/** Where the parcel goes, and under the fields whether the street exists there. */
 export const AddressFields = ({ form }: AddressFieldsProps) => {
   const errors = form.formState.errors.address
 
   const typed = useWatch({ control: form.control, name: "address" })
-
-  const parsed = ShippingAddress.schema.safeParse(typed)
-
-  const settled = useDebounced(parsed.success ? JSON.stringify(parsed.data) : undefined, 700)
-
-  const check = useQuery({
-    queryKey: ["checkout", "address", settled],
-    queryFn: () => Api.post<AddressCheck>("/checkout/address", JSON.parse(settled ?? "{}")),
-    enabled: settled !== undefined,
-    staleTime: Number.POSITIVE_INFINITY,
-    retry: false,
-  })
 
   const country = typed.country
 
@@ -50,16 +30,7 @@ export const AddressFields = ({ form }: AddressFieldsProps) => {
         }}
       />
 
-      <div aria-live="polite" className="min-h-5 text-sm">
-        {match({ settled, check })
-          .with({ settled: P.nullish }, () => null)
-          .with({ check: { status: "pending" } }, () => <span className="text-ink-faint">Checking the address…</span>)
-          .with({ check: { data: { status: "verified" } } }, () => <span className="text-accent">✓ Address found.</span>)
-          .with({ check: { data: { status: "not_found" } } }, () => <span className="text-warn">{AddressCheck.NOT_FOUND}</span>)
-          .otherwise(() => (
-            <span className="text-ink-faint">We could not check the address right now; its format is fine.</span>
-          ))}
-      </div>
+      <AddressLookup address={typed} />
     </fieldset>
   )
 }

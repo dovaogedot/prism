@@ -1,5 +1,7 @@
 export { AddressFields } from "./AddressFields.tsx"
 export type { AddressFieldsProps } from "./AddressFields.tsx"
+export { AddressLookup } from "./AddressLookup.tsx"
+export type { AddressLookupProps } from "./AddressLookup.tsx"
 export { CheckoutBody } from "./CheckoutBody.tsx"
 export type { CheckoutBodyProps, CheckoutPayments } from "./CheckoutBody.tsx"
 export { ContactFields } from "./ContactFields.tsx"

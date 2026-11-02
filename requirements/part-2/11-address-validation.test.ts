@@ -2,9 +2,11 @@
  * REQUIREMENTS_2.md: "The system validates entered shipping address for
  * accuracy."
  *
- * Accuracy is a lookup in OpenStreetMap's geocoder. Through the API the
- * lookup is a stand-in a test steers; the shop's own geocoder client is
- * checked against a local server that answers as the geocoder does.
+ * Accuracy is a lookup in OpenStreetMap's geocoder, made as checkout is typed,
+ * when an order is placed and when an address is saved to the account.
+ * Through the API the lookup is a stand-in a test steers; the shop's own
+ * geocoder client is checked against a local server that answers as the
+ * geocoder does.
  */
 
 import { createServer, type IncomingMessage, type Server } from "node:http"
@@ -13,7 +15,7 @@ import type { ShippingAddress } from "@prism/shared"
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 import { AddressVerifier } from "../../apps/api/src/platform/address-verifier.ts"
 import { CHECKOUT, Shop } from "../../apps/api/tests/support/commerce.ts"
-import { jsonOf, seedCatalog, startHarness, type Harness } from "../../apps/api/tests/support/harness.ts"
+import { jsonOf, registerUser, seedCatalog, startHarness, type Harness } from "../../apps/api/tests/support/harness.ts"
 
 let harness: Harness
 
@@ -70,6 +72,41 @@ describe("placing an order", () => {
 
     expect((await Shop.place(harness, guest)).statusCode).toBe(201)
     expect(harness.addressVerifier.asked).toEqual([CHECKOUT.address])
+  })
+})
+
+describe("saving an address to the account", () => {
+  const saved = (address: object) => ({ label: "Home", fullName: "Mari Maasikas", phone: "+372 5123 4567", address })
+
+  it("is refused for an address the lookup cannot find, on the street field, and saves nothing", async () => {
+    const { accessToken } = await registerUser(harness, "mari@example.com")
+    harness.addressVerifier.answer("not_found")
+
+    const response = await Shop.call(harness, "POST", "/account/addresses", { token: accessToken }, saved(CHECKOUT.address))
+
+    expect(response.statusCode).toBe(422)
+    expect(jsonOf(response)["error"]).toMatchObject({ code: "ValidationFailed", issues: [{ path: "address.line1", message: NOT_FOUND }] })
+    expect(jsonOf(await Shop.call(harness, "GET", "/account/addresses", { token: accessToken }))).toEqual({ items: [] })
+  })
+
+  it("names a street that is only a number and a one-letter city before asking anyone", async () => {
+    const { accessToken } = await registerUser(harness, "mari@example.com")
+
+    const response = await Shop.call(
+      harness,
+      "POST",
+      "/account/addresses",
+      { token: accessToken },
+      saved({ line1: "233", city: "f", postalCode: "12312", country: "EE" }),
+    )
+
+    expect(jsonOf(response)["error"]).toMatchObject({
+      issues: [
+        { path: "address.line1", message: "Enter the street name as well as the house number." },
+        { path: "address.city", message: "Enter the city's full name." },
+      ],
+    })
+    expect(harness.addressVerifier.asked).toEqual([])
   })
 })
 
