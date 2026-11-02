@@ -36,10 +36,11 @@ export const QuantityStepper = ({ value, max, onChange, label, disabled = false 
     if (allowed !== value) onChange(allowed)
   }
 
-  const button = "grid size-8 place-items-center text-ink-soft transition-colors hover:bg-sunken hover:text-ink disabled:opacity-40"
+  const button = "grid h-full w-9 place-items-center text-ink-soft transition-colors hover:bg-sunken hover:text-ink disabled:opacity-40"
 
   return (
-    <div className="inline-flex items-center overflow-hidden rounded-lg border border-edge bg-surface">
+    // h-10: as tall as a button and a field beside it.
+    <div className="inline-flex h-10 items-stretch overflow-hidden rounded-lg border border-edge bg-surface">
       <button
         type="button"
         aria-label={`One fewer ${label}`}
@@ -62,7 +63,7 @@ export const QuantityStepper = ({ value, max, onChange, label, disabled = false 
         onKeyDown={(event) => {
           if (event.key === "Enter") commit()
         }}
-        className="h-8 w-11 border-x border-edge bg-surface text-center text-sm tabular-nums text-ink [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        className="w-11 border-x border-edge bg-surface text-center text-sm tabular-nums text-ink [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       />
       <button
         type="button"

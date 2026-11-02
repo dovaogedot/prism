@@ -57,3 +57,13 @@ test("the two-factor setup puts its button in the code field's row, after the fi
   expect(button.x).toBeGreaterThanOrEqual(field.x + field.width)
   expect(Checks.middleGap(field, button)).toBeLessThanOrEqual(Checks.TOLERANCE)
 })
+
+test("the quantity stepper beside Add to cart is as tall as the button, and level with it", async ({ page }) => {
+  await Checks.open(page, `/products/${Stack.PRODUCT_SLUG}`)
+
+  const button = await Checks.boxOf(page.getByRole("button", { name: "Add to cart" }))
+  const stepper = await Checks.boxOf(page.getByRole("spinbutton", { name: /^Quantity of / }).locator("xpath=.."))
+
+  expect(Math.abs(stepper.height - button.height), `${stepper.height} and ${button.height}`).toBeLessThanOrEqual(Checks.TOLERANCE)
+  expect(Checks.middleGap(stepper, button)).toBeLessThanOrEqual(Checks.TOLERANCE)
+})
