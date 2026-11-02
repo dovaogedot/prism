@@ -9,6 +9,10 @@ import type { ResultAsync } from "neverthrow"
 import { hasZodFastifySchemaValidationErrors } from "fastify-type-provider-zod"
 
 export const HttpErrors = {
+  /** What a fault of the server's own tells the customer: that their input was not the cause, and what to do. */
+  FAULT:
+    "This did not go through because of a fault in the shop, not anything you entered. Try again, and if it keeps failing, tell us through the contact page.",
+
   /** Answers a request with the status and body an error is defined to carry. */
   send: (reply: FastifyReply, error: DomainError): FastifyReply => {
     if (error._tag === "RateLimited") reply.header("Retry-After", error.retryAfterSeconds)
@@ -73,7 +77,7 @@ export const HttpErrors = {
       request.log.error({ err: error }, "unhandled error")
 
       return reply.status(500).send({
-        error: { code: "InternalError", message: "Something went wrong on our side.", issues: [] },
+        error: { code: "InternalError", message: HttpErrors.FAULT, issues: [] },
       })
     })
 

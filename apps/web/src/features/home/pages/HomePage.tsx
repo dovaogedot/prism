@@ -9,6 +9,7 @@ import { Alert, ImageSet, Skeleton } from "../../../shared/ui/index.ts"
 import { useCategories } from "../../catalog/catalog.ts"
 import { ProductRow, RecentlyViewedRow } from "../../catalog/components/index.ts"
 import { CategoryTile } from "../components/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
 
 /**
  * The home page: what the shop is, the featured products, the categories,
@@ -62,9 +63,7 @@ export const HomePage = () => {
         )}
       </section>
 
-      {home.status === "error" ? (
-        <Alert title="The shop's rows did not load">Something went wrong at our end. Try again in a moment.</Alert>
-      ) : null}
+      {home.status === "error" ? <Alert title="The shop's rows did not load">{Failure.message(home.error)}</Alert> : null}
 
       {match(home)
         .with({ status: "pending" }, () => (

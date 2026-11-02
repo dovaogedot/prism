@@ -65,12 +65,18 @@ const isErrorResponse = (payload: unknown): payload is ErrorResponse =>
 export const Api = {
   BASE: "/api/v1",
 
-  /** What a refusal without a readable body is reported as. */
-  UNREADABLE: {
+  /**
+   * What a refusal without a readable body is reported as. A 502, 503 or 504
+   * comes from the proxy in front of the API, while the API restarts or is
+   * too busy to answer.
+   */
+  describeUnreadable: (status: number): ErrorResponse["error"] => ({
     code: "InternalError",
-    message: "Something went wrong at our end.",
+    message: [502, 503, 504].includes(status)
+      ? "The shop is restarting or too busy to answer. Wait a few seconds and try again."
+      : "The shop sent an answer this page cannot read. Reload the page and try again.",
     issues: [],
-  } satisfies ErrorResponse["error"],
+  }),
 
   /**
    * Whether a 401's body is a refusal that a fresh access token can cure: no
@@ -174,7 +180,7 @@ export const Api = {
 
     if (!response.ok) {
       const payload: unknown = await response.json().catch(() => null)
-      throw new ApiError(response.status, isErrorResponse(payload) ? payload.error : Api.UNREADABLE)
+      throw new ApiError(response.status, isErrorResponse(payload) ? payload.error : Api.describeUnreadable(response.status))
     }
 
     return response

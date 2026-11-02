@@ -15,6 +15,7 @@ import { ProductKeys, useRelatedProducts } from "../catalog.ts"
 import { CatalogSeo } from "../catalog-seo.ts"
 import { Gallery, Measurements, ProductJsonLd, RecentlyViewedRow, RelatedProducts, SpecRow, Stock } from "../components/index.ts"
 import { RecentlyViewed } from "../recently-viewed.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
 
 /**
  * One product's page: the breadcrumb trail, the pictures, the price and
@@ -69,10 +70,10 @@ export const ProductPage = () => {
   return (
     <div className="mx-auto max-w-6xl space-y-14 px-4 py-8 sm:px-6">
       {match(product)
-        .with({ status: "error" }, () => (
+        .with({ status: "error" }, ({ error }) => (
           <div className="space-y-4">
             <h1 className="text-2xl font-semibold tracking-tight text-ink">This product did not load</h1>
-            <Alert>Something went wrong at our end. Try again in a moment.</Alert>
+            <Alert>{Failure.message(error)}</Alert>
           </div>
         ))
         .with({ data: P.nullish }, () => (

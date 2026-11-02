@@ -9,6 +9,7 @@ import { useReviewPage, useReviewViewer } from "../reviews.ts"
 import { RatingSummary } from "./RatingSummary.tsx"
 import { ReviewCard } from "./ReviewCard.tsx"
 import { ReviewForm } from "./ReviewForm.tsx"
+import { Failure } from "../../../shared/api/failure.tsx"
 
 /** The product whose reviews the section shows. */
 export type ReviewsSectionProps = Readonly<{ slug: string }>
@@ -66,7 +67,7 @@ export const ReviewsSection = ({ slug }: ReviewsSectionProps) => {
 
         <div>
           {match(reviews)
-            .with({ status: "error" }, () => <Alert title="The reviews did not load">Try again in a moment.</Alert>)
+            .with({ status: "error" }, ({ error }) => <Alert title="The reviews did not load">{Failure.message(error)}</Alert>)
             .with({ data: P.nullish }, () => (
               <div className="space-y-4">
                 <Skeleton className="h-24 w-full" />

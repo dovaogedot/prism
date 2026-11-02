@@ -461,6 +461,9 @@ describe("password recovery", () => {
       })
 
       expect(response.statusCode).toBe(500)
+      expect(JSON.parse(response.body)).toMatchObject({
+        error: { code: "InternalError", message: expect.stringContaining("not anything you entered") },
+      })
 
       const [after] = await selectHash()
       const tokens = await harness.database.sql`SELECT used_at FROM password_reset_token`

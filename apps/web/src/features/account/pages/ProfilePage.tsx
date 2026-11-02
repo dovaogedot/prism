@@ -6,6 +6,7 @@ import { PasswordFlow, TwoFactorDisableFlow, TwoFactorSetupFlow } from "../../au
 import { useSignedInSession } from "../../auth/session.ts"
 import { useProfile } from "../account.ts"
 import { AccountPage, ProfileForm } from "../components/index.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
 
 /**
  * The signed-in customer's own page: the profile checkout starts from, the
@@ -23,7 +24,7 @@ export const ProfilePage = () => {
       <Card className="p-5">
         <h2 className="mb-3 font-semibold text-ink">Profile</h2>
         {match(profile)
-          .with({ status: "error" }, () => <Alert>The profile did not load. Try again in a moment.</Alert>)
+          .with({ status: "error" }, ({ error }) => <Alert title="The profile did not load">{Failure.message(error)}</Alert>)
           .with({ data: P.nonNullable.select() }, (found) => <ProfileForm profile={found} />)
           .otherwise(() => (
             <Skeleton className="h-40 w-full" />

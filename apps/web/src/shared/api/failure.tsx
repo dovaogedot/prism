@@ -9,8 +9,8 @@ export const Failure = {
   /** The sentence for a request that never reached the server. */
   OFFLINE: "We could not reach the server. Try again.",
 
-  /** The sentence for anything else that went wrong, which is a fault of the page's own. */
-  UNEXPECTED: "Something went wrong on this page. Reload it and try again.",
+  /** The sentence for a failure that is neither the API's refusal nor a lost connection: a fault of the page's own. */
+  UNEXPECTED: "This page hit a fault of its own, not anything you entered. Reload it and try again.",
 
   /**
    * The sentence for a failure that is not the API's refusal: a lost

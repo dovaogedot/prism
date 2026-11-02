@@ -34,7 +34,7 @@ export const AddressesPage = () => {
       {failure === undefined ? null : <Alert>{failure}</Alert>}
 
       {match(addresses)
-        .with({ status: "error" }, () => <Alert>Your addresses did not load. Try again in a moment.</Alert>)
+        .with({ status: "error" }, ({ error }) => <Alert title="Your addresses did not load">{Failure.message(error)}</Alert>)
         .with({ data: P.nonNullable.select() }, (found) => (
           <>
             <div className="flex flex-wrap items-center justify-between gap-3">

@@ -16,6 +16,7 @@ import { useCategories } from "../catalog.ts"
 import { CategoryNav, Facets, ProductCard, ProductListItem, ViewToggle, type CategoryLink } from "../components/index.ts"
 import { CatalogParams } from "../filters.ts"
 import { Listing, type ListingKind } from "../listing.ts"
+import { Failure } from "../../../shared/api/failure.tsx"
 
 /** Which address the listing is drawn for. */
 export type ListingPageProps = Readonly<{ kind: ListingKind }>
@@ -253,9 +254,7 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
           </div>
 
           {match(results)
-            .with({ status: "error" }, () => (
-              <Alert title="We could not load the products">Something went wrong at our end. Try again in a moment.</Alert>
-            ))
+            .with({ status: "error" }, ({ error }) => <Alert title="We could not load the products">{Failure.message(error)}</Alert>)
             .with({ data: P.nullish }, () => (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
                 {Array.from({ length: 8 }, (_, index) => (

@@ -12,6 +12,7 @@ import { useSession } from "../../auth/session.ts"
 import { AdminAccess, AdminKeys } from "../admin.ts"
 import { StepUpDialog } from "./StepUpDialog.tsx"
 import { StepUpForm } from "./StepUpForm.tsx"
+import { Failure } from "../../../shared/api/failure.tsx"
 
 /** The admin's pages, which open only past the gate. */
 export type StaffGateProps = Readonly<{ children: ReactNode }>
@@ -93,7 +94,7 @@ export const StaffGate = ({ children }: StaffGateProps) => {
     .with({ status: "error" }, () => (
       <div className={frameClass}>
         <h1 className="text-2xl font-semibold tracking-tight text-ink">The admin did not open</h1>
-        <Alert>Something went wrong at our end. Try again in a moment.</Alert>
+        <Alert>{Failure.message(summary.error)}</Alert>
       </div>
     ))
     .with({ status: "pending" }, () => (
