@@ -3,7 +3,7 @@
  * takes in cents, and slugs made from a name.
  */
 
-import { ProductFields, ProductInput, ShippingMethodCode, ShippingMethodInput, type ShippingMethodView } from "@prism/shared"
+import { FieldChecks, ProductFields, ProductInput, ShippingMethodCode, ShippingMethodInput, type ShippingMethodView } from "@prism/shared"
 import { z } from "zod"
 
 export const Cents = {
@@ -78,7 +78,11 @@ export const ShippingFields = {
         .min(0, "Use 0 or more.")
         .max(1000, "Use at most 1000."),
     })
-    .refine((form) => form.minDays <= form.maxDays, { message: "The latest day cannot come before the earliest.", path: ["maxDays"] }),
+    .refine((form) => form.minDays <= form.maxDays, {
+      message: "The latest day cannot come before the earliest.",
+      path: ["maxDays"],
+      when: FieldChecks.runWhenValid("minDays", "maxDays"),
+    }),
 } as const
 
 /** The delivery option form as staff fill it in. */

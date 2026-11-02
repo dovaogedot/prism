@@ -95,6 +95,14 @@ describe("ShippingAddress", () => {
     expect(ShippingAddress.schema.safeParse({ ...address, line1: "Tamme talu", city: "Ii" }).success).toBe(true)
   })
 
+  it("checks each part on its own, while the other parts are still empty or wrong", () => {
+    expect(issuesOf(ShippingAddress.schema.safeParse({ line1: "233", city: "", postalCode: "1011", country: "EE" }))).toEqual({
+      line1: "Enter the street name as well as the house number.",
+      city: "Enter the city.",
+      postalCode: "Enter a postal code like 10111.",
+    })
+  })
+
   it("checks the postal code against the country, with an example in the message", () => {
     expect(issuesOf(ShippingAddress.schema.safeParse({ ...address, postalCode: "1011" }))).toEqual({
       postalCode: "Enter a postal code like 10111.",

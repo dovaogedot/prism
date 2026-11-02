@@ -5,6 +5,7 @@
 
 import { z } from "zod"
 import { Email, UserId, type OAuthProvider } from "./auth.ts"
+import { FieldChecks } from "./field-checks.ts"
 import { BrandId, CategoryId, ImageId, Slug, StoredInteger, StoredText, type ProductId, type ProductImage } from "./catalog.ts"
 import { OptionalText, ReviewStatus, type OwnReview } from "./reviews.ts"
 import { ShippingMethodCode, type ShippingOption } from "./checkout.ts"
@@ -170,6 +171,7 @@ export const ShippingMethodInput = {
     .refine((input) => input.minDays <= input.maxDays, {
       message: "The latest day cannot come before the earliest.",
       path: ["maxDays"],
+      when: FieldChecks.runWhenValid("minDays", "maxDays"),
     }),
 } as const
 

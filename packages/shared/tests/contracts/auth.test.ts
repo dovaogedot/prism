@@ -4,6 +4,7 @@ import {
   Email,
   LoginInput,
   Password,
+  RegisterForm,
   RegisterInput,
   ResetPasswordInput,
   TotpCode,
@@ -131,6 +132,22 @@ describe("RegisterInput.schema", () => {
       const paths = result.error.issues.map((issue) => issue.path.join("."))
       expect(new Set(paths)).toEqual(new Set(["email", "password", "captchaToken"]))
     }
+  })
+})
+
+describe("RegisterForm.schema", () => {
+  it("says the passwords differ while another field is still wrong", () => {
+    const parsed = RegisterForm.schema.safeParse({
+      email: "not an email",
+      password: validPassword,
+      confirmPassword: `${validPassword}s`,
+      captchaToken: "token",
+    })
+
+    expect(parsed.error?.issues.map((issue) => [issue.path.join("."), issue.message])).toContainEqual([
+      "confirmPassword",
+      "The two passwords do not match.",
+    ])
   })
 })
 

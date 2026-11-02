@@ -7,6 +7,7 @@
 import { AsYouType, parsePhoneNumberFromString } from "libphonenumber-js"
 import { z } from "zod"
 import { Email } from "./auth.ts"
+import { FieldChecks } from "./field-checks.ts"
 
 /** A country the shop ships to, with the shape of its postal codes. */
 export type Country = (typeof Country.CODES)[number]
@@ -137,7 +138,16 @@ export type ShippingAddress = z.infer<typeof ShippingAddress.schema>
 export const ShippingAddress = {
   schema: z
     .object({
-      line1: z.string().trim().min(3, "Enter the street and house number.").max(120, "Use at most 120 characters."),
+      line1: z
+        .string()
+        .trim()
+        .min(3, "Enter the street and house number.")
+        .max(120, "Use at most 120 characters.")
+        // A house number alone, such as "233", names no street. Asked only of a line long enough, so a blank one gets one message.
+        .refine((line) => /\p{L}/u.test(line), {
+          message: "Enter the street name as well as the house number.",
+          when: (payload) => payload.issues.length === 0,
+        }),
       /** An apartment or floor. A blank field is absent. */
       line2: z
         .string()
@@ -145,26 +155,30 @@ export const ShippingAddress = {
         .max(120, "Use at most 120 characters.")
         .transform((line) => (line.length === 0 ? undefined : line))
         .optional(),
-      city: z.string().trim().min(1, "Enter the city.").max(80, "Use at most 80 characters."),
+      city: z
+        .string()
+        .trim()
+        .min(1, "Enter the city.")
+        .max(80, "Use at most 80 characters.")
+        .refine((city) => city.length >= 2 && /\p{L}/u.test(city), {
+          message: "Enter the city's full name.",
+          when: (payload) => payload.issues.length === 0,
+        }),
       postalCode: z.string().trim().toUpperCase().min(1, "Enter the postal code.").max(12, "Use at most 12 characters."),
       country: Country.schema,
     })
-    .superRefine((address, context) => {
-      // A house number alone, such as "233", names no street.
-      if (!/\p{L}/u.test(address.line1)) {
-        context.addIssue({ code: "custom", path: ["line1"], message: "Enter the street name as well as the house number." })
-      }
-      if (address.city.length < 2 || !/\p{L}/u.test(address.city)) {
-        context.addIssue({ code: "custom", path: ["city"], message: "Enter the city's full name." })
-      }
-      if (!Country.postalCode[address.country].test(address.postalCode)) {
-        context.addIssue({
-          code: "custom",
-          path: ["postalCode"],
-          message: `Enter a postal code like ${Country.postalCodeExample[address.country]}.`,
-        })
-      }
-    }),
+    .superRefine(
+      (address, context) => {
+        if (!Country.postalCode[address.country].test(address.postalCode)) {
+          context.addIssue({
+            code: "custom",
+            path: ["postalCode"],
+            message: `Enter a postal code like ${Country.postalCodeExample[address.country]}.`,
+          })
+        }
+      },
+      { when: FieldChecks.runWhenValid("postalCode", "country") },
+    ),
 
   /**
    * An address as it was stored: its shape alone. The rules a typed address

@@ -5,6 +5,7 @@
  */
 
 import { z } from "zod"
+import { FieldChecks } from "./field-checks.ts"
 import type { StaffRole } from "./staff.ts"
 
 /**
@@ -43,7 +44,11 @@ export const Password = {
   /** The browser-only confirmation field and the check that it matches. */
   confirmation: z.string().min(1, "Repeat the password."),
   matches: (values: Readonly<{ password: string; confirmPassword: string }>) => values.password === values.confirmPassword,
-  mismatch: { message: "The two passwords do not match.", path: ["confirmPassword"] },
+  mismatch: {
+    message: "The two passwords do not match.",
+    path: ["confirmPassword"],
+    when: FieldChecks.runWhenValid("password", "confirmPassword"),
+  },
 }
 
 /** A six-digit authenticator code. */
