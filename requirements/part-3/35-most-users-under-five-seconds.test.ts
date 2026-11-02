@@ -53,8 +53,8 @@ const reportedLimit = (): readonly [number, number] => {
 }
 
 /**
- * Each step's p95 and error rate over the minute it held its users, read
- * from k6's samples. The ramp to a step is left out: most of it runs below
+ * Each reached step's p95 and error rate over the minute it held its users,
+ * read from k6's samples. The ramp to a step is left out: most of it runs below
  * the step's users.
  */
 const measuredSteps = async (): Promise<readonly Step[]> => {
@@ -93,14 +93,20 @@ const measuredSteps = async (): Promise<readonly Step[]> => {
     }
   }
 
-  return held.map((step, index) => {
+  // A step the run stopped before reaching has no samples, and serves no one.
+  return held.flatMap((step, index) => {
     const sorted = step.durations.toSorted((a, b) => a - b)
-
-    return {
-      users: StressSteps.TARGETS[index] ?? 0,
-      p95: sorted[Math.min(sorted.length - 1, Math.floor(0.95 * sorted.length))] ?? 0,
-      errors: step.requests === 0 ? 0 : step.failures / step.requests,
+    if (sorted.length === 0) {
+      return []
     }
+
+    return [
+      {
+        users: StressSteps.TARGETS[index] ?? 0,
+        p95: sorted[Math.min(sorted.length - 1, Math.floor(0.95 * sorted.length))] ?? 0,
+        errors: step.requests === 0 ? 0 : step.failures / step.requests,
+      },
+    ]
   })
 }
 
