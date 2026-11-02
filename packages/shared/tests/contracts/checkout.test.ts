@@ -42,6 +42,9 @@ describe("Contact", () => {
     expect(problemOf("12ab")).toBe("Start with the country code, such as +372 for Estonia.")
     expect(problemOf("+999 1234567")).toBe("Check the country code after the +: no country uses it.")
     expect(problemOf("+372 123")).toBe("This is not a phone number in Estonia. Check the digits after +372.")
+    // A number too short to parse still names the country its flag shows.
+    expect(problemOf("+372 5")).toBe("This is not a phone number in Estonia. Check the digits after +372.")
+    expect(problemOf("+1 212")).toBe("Check the digits after +1: they make no phone number there.")
     expect(problemOf("+1234567890123456")).toBeDefined()
   })
 

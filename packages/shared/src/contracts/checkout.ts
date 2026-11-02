@@ -84,14 +84,20 @@ export const PhoneNumber = {
   findProblem: (digits: string): string | undefined => {
     if (!digits.startsWith("+")) return "Start with the country code, such as +372 for Estonia."
 
-    const parsed = parsePhoneNumberFromString(digits)
-    if (parsed === undefined) return "Check the country code after the +: no country uses it."
-    if (parsed.isValid()) return undefined
+    // The code is read the way the field reads it for its flag: a number too short to parse still has one.
+    const typer = new AsYouType()
+    typer.input(digits)
+    const code = typer.getCallingCode()
+    if (code === undefined) return "Check the country code after the +: no country uses it."
 
-    const country = parsed.country === undefined ? undefined : PhoneNumber.countryNames.of(parsed.country)
+    const parsed = parsePhoneNumberFromString(digits)
+    if (parsed?.isValid() === true) return undefined
+
+    const isoCode = parsed?.country ?? typer.getCountry()
+    const country = isoCode === undefined ? undefined : PhoneNumber.countryNames.of(isoCode)
     return country === undefined
-      ? `Check the digits after +${parsed.countryCallingCode}: they make no phone number there.`
-      : `This is not a phone number in ${country}. Check the digits after +${parsed.countryCallingCode}.`
+      ? `Check the digits after +${code}: they make no phone number there.`
+      : `This is not a phone number in ${country}. Check the digits after +${code}.`
   },
 
   schema: z
