@@ -26,7 +26,7 @@ export const AddressFields = ({ form }: AddressFieldsProps) => {
           line2: { registered: form.register("address.line2"), error: errors?.line2?.message },
           city: { registered: form.register("address.city"), error: errors?.city?.message },
           postalCode: { registered: form.register("address.postalCode"), error: errors?.postalCode?.message },
-          country: { registered: form.register("address.country"), error: errors?.country?.message },
+          country: { registered: form.register("address.country", { deps: ["address.postalCode"] }), error: errors?.country?.message },
         }}
       />
 

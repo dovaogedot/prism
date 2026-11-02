@@ -46,7 +46,10 @@ export const BillingFields = ({ form }: BillingFieldsProps) => {
               line2: { registered: form.register("billingAddress.line2"), error: errors?.line2?.message },
               city: { registered: form.register("billingAddress.city"), error: errors?.city?.message },
               postalCode: { registered: form.register("billingAddress.postalCode"), error: errors?.postalCode?.message },
-              country: { registered: form.register("billingAddress.country"), error: errors?.country?.message },
+              country: {
+                registered: form.register("billingAddress.country", { deps: ["billingAddress.postalCode"] }),
+                error: errors?.country?.message,
+              },
             }}
           />
         </div>

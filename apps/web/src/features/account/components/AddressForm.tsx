@@ -1,10 +1,12 @@
 import { SavedAddressInput, type SavedAddress } from "@prism/shared"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useId, useState, type ReactNode } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { useForm, useWatch } from "react-hook-form"
 import { Alert, Button, Field, PhoneField, PostalAddressFields } from "../../../shared/ui/index.ts"
 import { ServerIssues } from "../../../shared/ui/server-issues.ts"
 import { Failure } from "../../../shared/api/failure.tsx"
+import { AddressLookups } from "../../checkout/address-lookup.ts"
 import { AddressLookup } from "../../checkout/components/index.ts"
 
 /** The address being changed, or none for a new one; what saving does; and how to leave without saving. */
@@ -17,6 +19,8 @@ export type AddressFormProps = Readonly<{
 /** One saved address: what to call it, who receives the parcel, and where. */
 export const AddressForm = ({ address, onSave, onCancel }: AddressFormProps) => {
   const [failure, setFailure] = useState<ReactNode | undefined>(undefined)
+
+  const client = useQueryClient()
 
   // Two forms can be open at once, so every field id is unique to its form.
   const prefix = useId()
@@ -41,10 +45,14 @@ export const AddressForm = ({ address, onSave, onCancel }: AddressFormProps) => 
   const submit = form.handleSubmit(async (values) => {
     setFailure(undefined)
     await onSave(values).catch((reason: unknown) =>
-      // A refused field, such as an address the lookup cannot find, shows under that field.
+      // A refused field shows under that field; an address the lookup cannot find shows under the address.
       setFailure(
         Failure.describeUnplaced(reason, (issues) =>
-          ServerIssues.place(issues, ["label", "fullName", "phone", "address", "isDefault"], form.setError),
+          ServerIssues.place(
+            AddressLookups.takeNotFound(client, values.address, issues),
+            ["label", "fullName", "phone", "address", "isDefault"],
+            form.setError,
+          ),
         ),
       ),
     )
@@ -85,7 +93,10 @@ export const AddressForm = ({ address, onSave, onCancel }: AddressFormProps) => 
           line2: { registered: form.register("address.line2"), error: errors.address?.line2?.message },
           city: { registered: form.register("address.city"), error: errors.address?.city?.message },
           postalCode: { registered: form.register("address.postalCode"), error: errors.address?.postalCode?.message },
-          country: { registered: form.register("address.country"), error: errors.address?.country?.message },
+          country: {
+            registered: form.register("address.country", { deps: ["address.postalCode"] }),
+            error: errors.address?.country?.message,
+          },
         }}
       />
       <AddressLookup address={typed} />

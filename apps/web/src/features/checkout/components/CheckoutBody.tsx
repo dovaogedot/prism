@@ -9,6 +9,7 @@ import {
   type PlaceOrderResult,
   type SavedAddress,
   type ShippingOption,
+  type ShippingAddress,
 } from "@prism/shared"
 import { zodResolver } from "@hookform/resolvers/zod"
 import type { Stripe, StripeElements } from "@stripe/stripe-js"
@@ -23,6 +24,7 @@ import { Alert, Button, Card, IssueList } from "../../../shared/ui/index.ts"
 import { Failure } from "../../../shared/api/failure.tsx"
 import { CartCache } from "../../cart/cart.ts"
 import { CheckoutDefaults, CheckoutIssues, PaymentErrors, PaymentMode } from "../checkout.ts"
+import { AddressLookups } from "../address-lookup.ts"
 import { NextPath } from "../../auth/next-path.ts"
 import { AddressFields } from "./AddressFields.tsx"
 import { BillingFields } from "./BillingFields.tsx"
@@ -95,7 +97,7 @@ export const CheckoutBody = ({ cart, options, payments, prefill, savedAddresses 
     setCartProblem(undefined)
   }, [contents])
 
-  const refused = (reason: unknown): void => {
+  const refused = (reason: unknown, address: ShippingAddress): void => {
     const failure = Api.failureOf(reason)
 
     if (failure === undefined) {
@@ -105,7 +107,8 @@ export const CheckoutBody = ({ cart, options, payments, prefill, savedAddresses 
 
     match(failure.code)
       .with("ValidationFailed", () => {
-        const { fields, other } = CheckoutIssues.split(failure.issues)
+        // An address the lookup cannot find shows under the address, not on one of its fields.
+        const { fields, other } = CheckoutIssues.split(AddressLookups.takeNotFound(client, address, failure.issues))
 
         // The first field the server refused takes focus, so the customer lands on it.
         fields.forEach((field, index) => form.setError(field.path, { message: field.message }, { shouldFocus: index === 0 }))
@@ -129,7 +132,7 @@ export const CheckoutBody = ({ cart, options, payments, prefill, savedAddresses 
     if (payments.status === "simulated") {
       const placed = await Api.post<PlaceOrderResult>("/orders", { ...values, expectedTotalCents: totals.totalCents }).catch(
         (reason: unknown) => {
-          refused(reason)
+          refused(reason, values.address)
           return undefined
         },
       )
@@ -153,7 +156,7 @@ export const CheckoutBody = ({ cart, options, payments, prefill, savedAddresses 
 
     const placed = await Api.post<PlaceOrderResult>("/orders", { ...values, expectedTotalCents: totals.totalCents }).catch(
       (reason: unknown) => {
-        refused(reason)
+        refused(reason, values.address)
         return undefined
       },
     )

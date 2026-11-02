@@ -70,7 +70,7 @@ export const ShippingMethodForm = ({ option, nextPosition, onSave, onCancel }: S
           min={1}
           max={30}
           error={errors.minDays?.message}
-          {...form.register("minDays", number)}
+          {...form.register("minDays", { ...number, deps: ["maxDays"] })}
         />
         <Field
           label="Latest business day"

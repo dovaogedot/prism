@@ -82,7 +82,7 @@ export const ResetPasswordPage = () => {
               autoComplete="new-password"
               hint={`At least ${Password.MIN_LENGTH} characters.`}
               error={form.formState.errors.password?.message}
-              {...form.register("password")}
+              {...form.register("password", { deps: ["confirmPassword"] })}
             />
 
             <Field

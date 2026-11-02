@@ -70,7 +70,7 @@ export const PasswordFlow = ({ hasPassword, onDone }: PasswordFlowProps) => {
         type="password"
         autoComplete="new-password"
         error={form.formState.errors.password?.message}
-        {...form.register("password")}
+        {...form.register("password", { deps: ["confirmPassword"] })}
       />
 
       <Field
