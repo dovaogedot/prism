@@ -37,6 +37,7 @@ export const LoginPage = () => {
   const [captchaRound, setCaptchaRound] = useState(0)
 
   const form = useForm({
+    mode: "onTouched",
     resolver: zodResolver(LoginInput.schema),
     defaultValues: { email: "", password: "" },
   })

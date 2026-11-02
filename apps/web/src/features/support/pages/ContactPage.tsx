@@ -30,6 +30,7 @@ export const ContactPage = () => {
   const [captchaRound, setCaptchaRound] = useState(0)
 
   const form = useForm({
+    mode: "onTouched",
     resolver: zodResolver(SupportMessageInput.schema),
     defaultValues: { name: "", email: session?.email ?? "", topic: "order", orderNumber: "", message: "", captchaToken: "" },
   })

@@ -21,6 +21,7 @@ export const CategoryForm = ({ initial, onSave, onCancel }: CategoryFormProps) =
   const [isSlugTyped, setSlugTyped] = useState(initial !== undefined)
 
   const form = useForm({
+    mode: "onTouched",
     resolver: zodResolver(CategoryInput.schema),
     defaultValues: { name: initial?.name ?? "", slug: initial?.slug ?? "", description: initial?.description ?? "" },
   })

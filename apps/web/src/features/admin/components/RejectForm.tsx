@@ -8,7 +8,11 @@ export type RejectFormProps = Readonly<{ isBusy: boolean; onReject: (reason: str
 
 /** The reason a review is not published, which its author reads. */
 export const RejectForm = ({ isBusy, onReject, onCancel }: RejectFormProps) => {
-  const form = useForm({ resolver: zodResolver(RejectReviewInput.schema), defaultValues: { reason: "" } })
+  const form = useForm({
+    mode: "onTouched",
+    resolver: zodResolver(RejectReviewInput.schema),
+    defaultValues: { reason: "" },
+  })
 
   return (
     <form className="space-y-4" onSubmit={(event) => void form.handleSubmit((values) => onReject(values.reason))(event)} noValidate>

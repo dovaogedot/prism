@@ -29,6 +29,7 @@ export const ProductForm = ({ initial, categories, brands, submitLabel, onSave }
   const [isSlugTyped, setSlugTyped] = useState(initial !== undefined)
 
   const form = useForm({
+    mode: "onTouched",
     resolver: zodResolver(ProductFormSchema.schema),
     defaultValues: initial ?? {
       name: "",

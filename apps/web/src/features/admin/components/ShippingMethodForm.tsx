@@ -6,6 +6,7 @@ import { Alert, Button, Field } from "../../../shared/ui/index.ts"
 import { Failure } from "../../../shared/api/failure.tsx"
 import { ShippingFields, ShippingForm } from "../forms.ts"
 import { ServerIssues } from "../../../shared/ui/server-issues.ts"
+import { useRecheck } from "../../../shared/hooks/use-recheck.ts"
 
 /** The option being changed, or none for a new one; where a new one goes in the list; what saving does; and how to leave. */
 export type ShippingMethodFormProps = Readonly<{
@@ -23,7 +24,13 @@ export type ShippingMethodFormProps = Readonly<{
 export const ShippingMethodForm = ({ option, nextPosition, onSave, onCancel }: ShippingMethodFormProps) => {
   const [failure, setFailure] = useState<ReactNode | undefined>(undefined)
 
-  const form = useForm({ resolver: zodResolver(ShippingFields.schema), defaultValues: ShippingForm.of(option, nextPosition) })
+  const form = useForm({
+    mode: "onTouched",
+    resolver: zodResolver(ShippingFields.schema),
+    defaultValues: ShippingForm.of(option, nextPosition),
+  })
+
+  useRecheck(form, "minDays", "maxDays")
 
   const errors = form.formState.errors
   const number = { valueAsNumber: true } as const
@@ -70,7 +77,7 @@ export const ShippingMethodForm = ({ option, nextPosition, onSave, onCancel }: S
           min={1}
           max={30}
           error={errors.minDays?.message}
-          {...form.register("minDays", { ...number, deps: ["maxDays"] })}
+          {...form.register("minDays", number)}
         />
         <Field
           label="Latest business day"

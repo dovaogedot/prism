@@ -20,6 +20,7 @@ export const ProfileForm = ({ profile }: ProfileFormProps) => {
   const [failure, setFailure] = useState<ReactNode | undefined>(undefined)
 
   const form = useForm({
+    mode: "onTouched",
     resolver: zodResolver(ProfileInput.schema),
     defaultValues: { fullName: profile.fullName ?? "", phone: profile.phone ?? "" },
   })

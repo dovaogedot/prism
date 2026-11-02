@@ -15,6 +15,7 @@ export const StepUpForm = ({ onDone }: StepUpFormProps) => {
   const [failure, setFailure] = useState<string | undefined>(undefined)
 
   const form = useForm({
+    mode: "onTouched",
     resolver: zodResolver(TwoFactorCodeInput.schema),
     defaultValues: { code: "" },
   })

@@ -2,12 +2,14 @@ import { useWatch } from "react-hook-form"
 import { PostalAddressFields } from "../../../shared/ui/index.ts"
 import type { CheckoutFormApi } from "../checkout.ts"
 import { AddressLookup } from "./AddressLookup.tsx"
+import { useRecheck } from "../../../shared/hooks/use-recheck.ts"
 
 /** The form the fields belong to. */
 export type AddressFieldsProps = Readonly<{ form: CheckoutFormApi }>
 
 /** Where the parcel goes, and under the fields whether the street exists there. */
 export const AddressFields = ({ form }: AddressFieldsProps) => {
+  useRecheck(form, "address.country", "address.postalCode")
   const errors = form.formState.errors.address
 
   const typed = useWatch({ control: form.control, name: "address" })
@@ -26,7 +28,7 @@ export const AddressFields = ({ form }: AddressFieldsProps) => {
           line2: { registered: form.register("address.line2"), error: errors?.line2?.message },
           city: { registered: form.register("address.city"), error: errors?.city?.message },
           postalCode: { registered: form.register("address.postalCode"), error: errors?.postalCode?.message },
-          country: { registered: form.register("address.country", { deps: ["address.postalCode"] }), error: errors?.country?.message },
+          country: { registered: form.register("address.country"), error: errors?.country?.message },
         }}
       />
 

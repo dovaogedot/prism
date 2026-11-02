@@ -8,6 +8,7 @@ import { ServerIssues } from "../../../shared/ui/server-issues.ts"
 import { Failure } from "../../../shared/api/failure.tsx"
 import { AddressLookups } from "../../checkout/address-lookup.ts"
 import { AddressLookup } from "../../checkout/components/index.ts"
+import { useRecheck } from "../../../shared/hooks/use-recheck.ts"
 
 /** The address being changed, or none for a new one; what saving does; and how to leave without saving. */
 export type AddressFormProps = Readonly<{
@@ -26,6 +27,7 @@ export const AddressForm = ({ address, onSave, onCancel }: AddressFormProps) => 
   const prefix = useId()
 
   const form = useForm({
+    mode: "onTouched",
     resolver: zodResolver(SavedAddressInput.schema),
     defaultValues: {
       label: address?.label ?? "",
@@ -41,6 +43,8 @@ export const AddressForm = ({ address, onSave, onCancel }: AddressFormProps) => 
       isDefault: address?.isDefault ?? false,
     },
   })
+
+  useRecheck(form, "address.country", "address.postalCode")
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(undefined)
@@ -94,7 +98,7 @@ export const AddressForm = ({ address, onSave, onCancel }: AddressFormProps) => 
           city: { registered: form.register("address.city"), error: errors.address?.city?.message },
           postalCode: { registered: form.register("address.postalCode"), error: errors.address?.postalCode?.message },
           country: {
-            registered: form.register("address.country", { deps: ["address.postalCode"] }),
+            registered: form.register("address.country"),
             error: errors.address?.country?.message,
           },
         }}

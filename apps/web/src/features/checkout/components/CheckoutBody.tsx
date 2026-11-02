@@ -75,6 +75,7 @@ export const CheckoutBody = ({ cart, options, payments, prefill, savedAddresses 
   const [paymentError, setPaymentError] = useState<string | undefined>(undefined)
 
   const form = useForm({
+    mode: "onTouched",
     resolver: zodResolver(CheckoutForm.schema),
     defaultValues: prefill === undefined ? CheckoutDefaults.empty(options[0].code) : CheckoutDefaults.fromPrefill(prefill, options),
   })

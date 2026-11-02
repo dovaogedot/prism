@@ -29,6 +29,7 @@ export const TwoFactorSetupFlow = ({ hasPassword, onDone }: TwoFactorSetupFlowPr
   const [starting, setStarting] = useState(false)
 
   const form = useForm({
+    mode: "onTouched",
     resolver: zodResolver(hasPassword ? EnableTwoFactorInput.withPassword : EnableTwoFactorInput.schema),
     defaultValues: hasPassword ? { code: "", currentPassword: "" } : { code: "" },
   })

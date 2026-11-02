@@ -37,6 +37,7 @@ export const TwoFactorDisableFlow = ({ onDone }: TwoFactorDisableFlowProps) => {
   const [held, setHeld] = useState<HeldRoles | undefined>(undefined)
 
   const form = useForm({
+    mode: "onTouched",
     resolver: zodResolver(TwoFactorCodeInput.schema),
     defaultValues: { code: "" },
   })

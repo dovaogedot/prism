@@ -7,6 +7,7 @@ import { Api } from "../../../shared/api/client.ts"
 import { Alert, Button, Field } from "../../../shared/ui/index.ts"
 import { TokenStore } from "../../../shared/api/token-store.ts"
 import { Failure } from "../../../shared/api/failure.tsx"
+import { useRecheck } from "../../../shared/hooks/use-recheck.ts"
 
 /** Whether the account has a password to confirm, and what happens once the new one is saved. */
 export type PasswordFlowProps = Readonly<{ hasPassword: boolean; onDone: () => void }>
@@ -20,9 +21,12 @@ export const PasswordFlow = ({ hasPassword, onDone }: PasswordFlowProps) => {
   const [failure, setFailure] = useState<string | undefined>(undefined)
 
   const form = useForm({
+    mode: "onTouched",
     resolver: zodResolver(hasPassword ? PasswordForm.change : PasswordForm.set),
     defaultValues: { currentPassword: "", password: "", confirmPassword: "" },
   })
+
+  useRecheck(form, "password", "confirmPassword")
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(undefined)
@@ -70,7 +74,7 @@ export const PasswordFlow = ({ hasPassword, onDone }: PasswordFlowProps) => {
         type="password"
         autoComplete="new-password"
         error={form.formState.errors.password?.message}
-        {...form.register("password", { deps: ["confirmPassword"] })}
+        {...form.register("password")}
       />
 
       <Field

@@ -21,6 +21,7 @@ export const BrandForm = ({ initial, onSave, onCancel }: BrandFormProps) => {
   const [isSlugTyped, setSlugTyped] = useState(initial !== undefined)
 
   const form = useForm({
+    mode: "onTouched",
     resolver: zodResolver(BrandInput.schema),
     defaultValues: { name: initial?.name ?? "", slug: initial?.slug ?? "" },
   })

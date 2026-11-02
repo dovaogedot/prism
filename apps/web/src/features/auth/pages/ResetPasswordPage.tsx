@@ -11,6 +11,7 @@ import { Failure } from "../../../shared/api/failure.tsx"
 import { TokenStore } from "../../../shared/api/token-store.ts"
 import { PageMeta } from "../../../shared/seo/PageMeta.tsx"
 import { PageText } from "../../../shared/seo/page-text.ts"
+import { useRecheck } from "../../../shared/hooks/use-recheck.ts"
 
 /** Choosing a new password against a token from an email. A link without its token says so and offers a new one. */
 export const ResetPasswordPage = () => {
@@ -22,9 +23,12 @@ export const ResetPasswordPage = () => {
   const token = ResetToken.schema.safeParse(params.get("token")).data
 
   const form = useForm({
+    mode: "onTouched",
     resolver: zodResolver(ResetPasswordForm.schema),
     defaultValues: { password: "", confirmPassword: "" },
   })
+
+  useRecheck(form, "password", "confirmPassword")
 
   const submit = form.handleSubmit(async (values) => {
     if (token === undefined) return
@@ -82,7 +86,7 @@ export const ResetPasswordPage = () => {
               autoComplete="new-password"
               hint={`At least ${Password.MIN_LENGTH} characters.`}
               error={form.formState.errors.password?.message}
-              {...form.register("password", { deps: ["confirmPassword"] })}
+              {...form.register("password")}
             />
 
             <Field

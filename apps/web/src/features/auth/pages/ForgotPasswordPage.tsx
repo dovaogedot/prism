@@ -18,6 +18,7 @@ export const ForgotPasswordPage = () => {
   const [failure, setFailure] = useState<string | undefined>(undefined)
 
   const form = useForm({
+    mode: "onTouched",
     resolver: zodResolver(ForgotPasswordInput.schema),
     defaultValues: { email: "" },
   })

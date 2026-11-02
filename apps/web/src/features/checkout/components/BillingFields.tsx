@@ -1,6 +1,7 @@
 import { useWatch } from "react-hook-form"
 import { PostalAddressFields } from "../../../shared/ui/index.ts"
 import type { CheckoutFormApi } from "../checkout.ts"
+import { useRecheck } from "../../../shared/hooks/use-recheck.ts"
 
 /** The form the fields belong to. */
 export type BillingFieldsProps = Readonly<{ form: CheckoutFormApi }>
@@ -10,6 +11,7 @@ export type BillingFieldsProps = Readonly<{ form: CheckoutFormApi }>
  * unticks the box, which brings up an address of its own.
  */
 export const BillingFields = ({ form }: BillingFieldsProps) => {
+  useRecheck(form, "billingAddress.country", "billingAddress.postalCode")
   const billing = useWatch({ control: form.control, name: "billingAddress" })
 
   const errors = form.formState.errors.billingAddress
@@ -47,7 +49,7 @@ export const BillingFields = ({ form }: BillingFieldsProps) => {
               city: { registered: form.register("billingAddress.city"), error: errors?.city?.message },
               postalCode: { registered: form.register("billingAddress.postalCode"), error: errors?.postalCode?.message },
               country: {
-                registered: form.register("billingAddress.country", { deps: ["billingAddress.postalCode"] }),
+                registered: form.register("billingAddress.country"),
                 error: errors?.country?.message,
               },
             }}

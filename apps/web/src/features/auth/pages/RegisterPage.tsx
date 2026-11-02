@@ -13,6 +13,7 @@ import { PageMeta } from "../../../shared/seo/PageMeta.tsx"
 import { PageText } from "../../../shared/seo/page-text.ts"
 import { NextPath } from "../next-path.ts"
 import { TokenStore } from "../../../shared/api/token-store.ts"
+import { useRecheck } from "../../../shared/hooks/use-recheck.ts"
 
 /** Opening an account, which signs in on success. */
 export const RegisterPage = () => {
@@ -25,9 +26,12 @@ export const RegisterPage = () => {
   const [captchaRound, setCaptchaRound] = useState(0)
 
   const form = useForm({
+    mode: "onTouched",
     resolver: zodResolver(RegisterForm.schema),
     defaultValues: { email: "", password: "", confirmPassword: "", captchaToken: "" },
   })
+
+  useRecheck(form, "password", "confirmPassword")
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(undefined)
@@ -87,7 +91,7 @@ export const RegisterPage = () => {
           autoComplete="new-password"
           hint={`At least ${Password.MIN_LENGTH} characters.`}
           error={form.formState.errors.password?.message}
-          {...form.register("password", { deps: ["confirmPassword"] })}
+          {...form.register("password")}
         />
 
         <Field

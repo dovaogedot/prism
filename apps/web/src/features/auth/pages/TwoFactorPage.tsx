@@ -37,6 +37,7 @@ export const TwoFactorPage = () => {
   const [challengeToken] = useState(() => ChallengeState.read(state))
 
   const form = useForm({
+    mode: "onTouched",
     resolver: zodResolver(CodeForm.schema),
     defaultValues: { code: "" },
   })

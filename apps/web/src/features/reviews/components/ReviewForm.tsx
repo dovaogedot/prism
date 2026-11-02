@@ -24,6 +24,7 @@ export const ReviewForm = ({ slug, viewer }: ReviewFormProps) => {
   const own = viewer.own
 
   const form = useForm({
+    mode: "onTouched",
     resolver: zodResolver(ReviewInput.schema),
     defaultValues: {
       ...(own === undefined ? {} : { rating: own.rating }),
