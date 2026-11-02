@@ -10,7 +10,8 @@
  *   node loadtest/report.ts baseline|normal|peak|stress
  */
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { closeSync, existsSync, openSync, readFileSync, readSync, writeFileSync } from "node:fs"
+import { StringDecoder } from "node:string_decoder"
 import { StressSteps } from "./lib/steps.ts"
 
 /** The part of k6's end-of-run summary the report reads. */
@@ -27,6 +28,26 @@ const Report = {
   read: (file: string): string | undefined => {
     const url = new URL(file, Report.RESULTS)
     return existsSync(url) ? readFileSync(url, "utf8") : undefined
+  },
+
+  /** The lines of a results file that exists, read a chunk at a time, so a file of any size fits in memory. */
+  readLines: function* (file: string): Generator<string> {
+    const descriptor = openSync(new URL(file, Report.RESULTS), "r")
+    const chunk = Buffer.alloc(1 << 20)
+    // Keeps a character whose bytes a chunk boundary splits until the rest of it arrives.
+    const decoder = new StringDecoder("utf8")
+    let rest = ""
+
+    try {
+      for (let size = readSync(descriptor, chunk); size > 0; size = readSync(descriptor, chunk)) {
+        const lines = (rest + decoder.write(chunk.subarray(0, size))).split("\n")
+        rest = lines.pop() ?? ""
+        yield* lines
+      }
+    } finally {
+      closeSync(descriptor)
+    }
+    yield rest + decoder.end()
   },
 
   /** The fields of one CSV line, with quoted fields unquoted. */
@@ -140,16 +161,16 @@ const Report = {
    * never counts: most of its time is spent below its step's users.
    */
   steps: (): string => {
-    const text = Report.read("stress-samples.csv")
-    if (text === undefined) return "No samples: the stress run writes them."
+    const file = "stress-samples.csv"
+    if (!existsSync(new URL(file, Report.RESULTS))) return "No samples: the stress run writes them."
 
-    const [header = "", ...lines] = text.split("\n")
+    const [header = ""] = Report.readLines(file)
     const columns = Report.fields(header)
     const at = (name: string): number => columns.indexOf(name)
 
     // The scenario begins with its first count of users; the setup's requests come before it.
     let start = Number.POSITIVE_INFINITY
-    for (const line of lines) {
+    for (const line of Report.readLines(file)) {
       const fields = Report.fields(line)
       if (fields[at("metric_name")] === "vus") start = Math.min(start, Number(fields[at("timestamp")]))
     }
@@ -158,7 +179,7 @@ const Report = {
     // Stage 2n is the ramp to step n, and stage 2n + 1 holds it.
     const stages = new Map<number, { durations: number[]; failures: number; requests: number }>()
 
-    for (const line of lines) {
+    for (const line of Report.readLines(file)) {
       const fields = Report.fields(line)
       const metric = fields[at("metric_name")]
       const second = Number(fields[at("timestamp")])
