@@ -32,8 +32,9 @@ const Group = ({
   children,
 }: Readonly<{ title: string; chosen: boolean; onClear: () => void; children: ReactNode }>) => (
   // min-w-0: a fieldset is otherwise never narrower than its longest row, and would overflow the rail.
-  <fieldset className="relative min-w-0 space-y-1.5">
-    <legend className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-ink-faint">{title}</legend>
+  <fieldset className="relative min-w-0">
+    {/* Floated, the legend sits inside the group's box rather than on its border, so the button lines up beside it. */}
+    <legend className="float-left mb-1.5 w-full pr-16 text-xs font-semibold uppercase tracking-wider text-ink-faint">{title}</legend>
     {match(chosen)
       .with(true, () => (
         <button className="absolute right-0 top-0 text-xs font-medium text-accent hover:underline" type="button" onClick={onClear}>
@@ -42,7 +43,7 @@ const Group = ({
       ))
       .with(false, () => null)
       .exhaustive()}
-    {children}
+    <div className="clear-both space-y-1.5">{children}</div>
   </fieldset>
 )
 
@@ -196,19 +197,6 @@ const PriceFacet = ({ facets, params, onChange }: FacetsProps) => {
 /** Every filter the shelf can be narrowed by, apart from the category; the price and rating last. */
 export const Facets = ({ facets, params, onChange }: FacetsProps) => (
   <div className="space-y-6">
-    {match(CatalogParams.isFiltered(params))
-      .with(true, () => (
-        <button
-          type="button"
-          onClick={() => onChange(CatalogParams.cleared(params))}
-          className="text-sm font-medium text-accent hover:underline"
-        >
-          Clear all filters
-        </button>
-      ))
-      .with(false, () => null)
-      .exhaustive()}
-
     <Checklist title="Brand" keyName="brand" buckets={facets.brands} params={params} onChange={onChange} />
 
     {facets.properties.map((property) => (

@@ -67,3 +67,43 @@ test("the quantity stepper beside Add to cart is as tall as the button, and leve
   expect(Math.abs(stepper.height - button.height), `${stepper.height} and ${button.height}`).toBeLessThanOrEqual(Checks.TOLERANCE)
   expect(Checks.middleGap(stepper, button)).toBeLessThanOrEqual(Checks.TOLERANCE)
 })
+
+test("the shop keeps the filter row open, so the first filter moves no result, and ends the row with Clear all filters", async ({
+  page,
+}) => {
+  await Checks.open(page, "/shop")
+  const results = page.getByRole("region", { name: / items/ }).getByRole("listitem")
+  const before = await Checks.boxOf(results.first())
+
+  await page.getByRole("group", { name: "Brand" }).getByRole("checkbox").first().click()
+  const chip = page.getByRole("button", { name: /^Remove / })
+  await chip.waitFor()
+  await expect(page.getByRole("region", { name: / items/ })).toHaveAttribute("aria-busy", "false")
+
+  const after = await Checks.boxOf(results.first())
+  const clearAll = await Checks.boxOf(page.getByRole("button", { name: "Clear all filters" }))
+  const list = await Checks.boxOf(
+    page
+      .getByRole("region", { name: / items/ })
+      .getByRole("list")
+      .first(),
+  )
+
+  expect(Math.abs(after.y - before.y), `${before.y} then ${after.y}`).toBeLessThanOrEqual(Checks.TOLERANCE)
+  expect(Math.abs(clearAll.x + clearAll.width - (list.x + list.width))).toBeLessThanOrEqual(Checks.TOLERANCE)
+  expect(Checks.middleGap(clearAll, await Checks.boxOf(chip))).toBeLessThanOrEqual(Checks.TOLERANCE)
+  expect(await Checks.findControlEdgeFaults(page)).toEqual([])
+})
+
+test("a filter group's Clear all sits level with its heading, above the group's first row", async ({ page }) => {
+  await Checks.open(page, "/shop")
+  const brand = page.getByRole("group", { name: "Brand" })
+  await brand.getByRole("checkbox").first().click()
+
+  const clear = await Checks.boxOf(brand.getByRole("button", { name: /^Clear all/ }))
+  const heading = await Checks.boxOf(brand.locator("legend"))
+  const firstRow = await Checks.boxOf(brand.locator("label").first())
+
+  expect(Checks.middleGap(clear, heading)).toBeLessThanOrEqual(Checks.TOLERANCE)
+  expect(clear.y + clear.height).toBeLessThanOrEqual(firstRow.y)
+})

@@ -214,11 +214,12 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
             </p>
           ) : null}
 
-          {results.data === undefined ? null : (
-            <div className="mb-4 flex flex-wrap gap-2" ref={chipList}>
+          {/* Holds a row open before any filter is on, so the first chip moves no result down. */}
+          <div className="mb-4 flex min-h-6 items-start gap-2">
+            <div className="flex flex-wrap gap-2" ref={chipList}>
               {activeChips.map((chip, index) => (
                 <button
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-edge bg-surface px-2 py-0.5 text-xs text-ink-soft hover:border-ink-faint hover:text-ink"
+                  className="inline-flex h-6 items-center gap-1.5 rounded-lg border border-edge bg-surface px-2 text-xs text-ink-soft hover:border-ink-faint hover:text-ink"
                   key={`${chip.key}=${chip.value}`}
                   type="button"
                   onClick={() => {
@@ -232,7 +233,24 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
                 </button>
               ))}
             </div>
-          )}
+
+            {match(CatalogParams.isFiltered(params))
+              .with(true, () => (
+                <button
+                  className="ml-auto h-6 shrink-0 text-sm font-medium text-accent hover:underline"
+                  type="button"
+                  onClick={() => {
+                    // No chip is left to take focus, so it goes to the results heading.
+                    setRemovedChipAt(0)
+                    filter(CatalogParams.cleared(params))
+                  }}
+                >
+                  Clear all filters
+                </button>
+              ))
+              .with(false, () => null)
+              .exhaustive()}
+          </div>
 
           {match(results)
             .with({ status: "error" }, () => (
