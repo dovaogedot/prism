@@ -11,7 +11,8 @@ export type PhoneFieldProps = Omit<FieldProps, "type" | "leading"> & Readonly<{ 
 /**
  * A phone number with its country code: the field shows the flag of the
  * country the number belongs to, and puts a space after the code once it is
- * typed. A handset stands in until the digits name a country.
+ * typed. A deletion that leaves a space at the end takes it too, so the next
+ * one reaches a digit. A handset stands in until the digits name a country.
  */
 export const PhoneField = ({ typed, onChange, ...rest }: PhoneFieldProps) => {
   const country = PhoneNumber.findCountry(typed)
@@ -34,7 +35,8 @@ export const PhoneField = ({ typed, onChange, ...rest }: PhoneFieldProps) => {
         )
       }
       onChange={(event) => {
-        const spaced = PhoneNumber.spaceAfterCode(event.target.value)
+        const isDeletion = event.nativeEvent instanceof InputEvent && event.nativeEvent.inputType.startsWith("delete")
+        const spaced = PhoneNumber.spaceAfterCode(isDeletion ? event.target.value.trimEnd() : event.target.value)
         if (spaced !== event.target.value) event.target.value = spaced
         void onChange?.(event)
       }}

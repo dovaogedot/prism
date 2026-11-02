@@ -108,7 +108,10 @@ test("a filter group's Clear all sits level with its heading, above the group's 
   expect(clear.y + clear.height).toBeLessThanOrEqual(firstRow.y)
 })
 
-test("a phone field puts a space after the country code and shows that country's flag inside the field", async ({ context, page }) => {
+test("a phone field puts a space after the country code, takes it away again when deleting, and shows that country's flag inside the field", async ({
+  context,
+  page,
+}) => {
   await Stack.registerCustomer(context.request, "phone-flag")
   await Checks.open(page, "/account")
   const phone = page.getByLabel("Phone", { exact: true })
@@ -128,6 +131,12 @@ test("a phone field puts a space after the country code and shows that country's
   expect(flag.x).toBeGreaterThan(field.x)
   expect(flag.x + flag.width).toBeLessThan(field.x + 40)
   expect(Checks.middleGap(flag, field)).toBeLessThanOrEqual(Checks.TOLERANCE)
+
+  // Deleting back to the code leaves no space to delete by hand.
+  for (const _ of "5123") await phone.press("Backspace")
+  await expect(phone).toHaveValue("+372")
+  await phone.press("Backspace")
+  await expect(phone).toHaveValue("+37")
 
   await phone.fill("")
   await phone.pressSequentially("+12124567890")
