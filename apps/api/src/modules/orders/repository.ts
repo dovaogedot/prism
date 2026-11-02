@@ -229,7 +229,7 @@ export const OrderRepository = {
       subtotalCents: row.subtotalCents,
       shippingCents: row.shippingCents,
       totalCents: row.totalCents,
-      contact: cipher.open(row.contact, Contact.schema),
+      contact: cipher.open(row.contact, Contact.storedSchema),
       address: cipher.open(row.shippingAddress, ShippingAddress.storedSchema),
       ...(row.billingAddress === null ? {} : { billingAddress: cipher.open(row.billingAddress, ShippingAddress.storedSchema) }),
       ...(row.accessKey === null ? {} : { key: cipher.open(row.accessKey, OrderKey.schema) }),
@@ -474,7 +474,7 @@ export const OrderRepository = {
         return {
           ...page,
           items: page.items.map(({ contact, isGuest, ...summary }) => {
-            const opened = cipher.open(contact, Contact.schema)
+            const opened = cipher.open(contact, Contact.storedSchema)
             return { ...summary, customerName: opened.fullName, customerEmail: opened.email, isGuest }
           }),
         }

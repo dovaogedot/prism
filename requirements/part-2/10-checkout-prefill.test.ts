@@ -72,7 +72,7 @@ describe("a signed-in customer's checkout form", () => {
     })
 
     expect(await formOf(me)).toEqual({
-      contact: { fullName: "Mari Maasikas", email: "buyer@example.com", phone: "+37251234567" },
+      contact: { fullName: "Mari Maasikas", email: "buyer@example.com", phone: "+372 51234567" },
       address: { line1: "Pikk 1", line2: "", city: "Tartu", postalCode: "51003", country: "EE" },
       shippingMethod: "standard",
     })
@@ -90,7 +90,7 @@ describe("a signed-in customer's checkout form", () => {
     expect(placed.statusCode).toBe(201)
 
     expect(await formOf(me)).toEqual({
-      contact: { fullName: "Kaur Kask", email: "kaur@example.com", phone: "+37255550101" },
+      contact: { fullName: "Kaur Kask", email: "kaur@example.com", phone: "+372 55550101" },
       address: { line1: "Riia 12", line2: "Apartment 3", city: "Tartu", postalCode: "51010", country: "EE" },
       shippingMethod: "express",
     })

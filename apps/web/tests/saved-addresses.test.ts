@@ -7,7 +7,7 @@ const address = (label: string, isDefault: boolean) =>
     id: label,
     label,
     fullName: "Mari Maasikas",
-    phone: "+37251234567",
+    phone: "+372 51234567",
     address: { line1: `${label} 1`, city: "Tallinn", postalCode: "10117", country: "EE" },
     isDefault,
   }) as unknown as SavedAddress

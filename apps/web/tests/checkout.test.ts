@@ -88,7 +88,7 @@ describe("CheckoutDefaults.fromPrefill", () => {
   })
 
   it("starts a returning customer with the last order's details", () => {
-    const contact = { fullName: "Mari Maasikas", email, phone: "+37251234567" }
+    const contact = { fullName: "Mari Maasikas", email, phone: "+372 51234567" }
     const address = { line1: "Narva mnt 7", city: "Tallinn", postalCode: "10117", country: "EE" as const }
 
     expect(CheckoutDefaults.fromPrefill({ email, contact, address, shippingMethod: express.code }, [standard, express])).toEqual({

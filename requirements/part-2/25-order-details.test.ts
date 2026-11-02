@@ -55,7 +55,7 @@ describe("an order's details", () => {
       number: placed.number,
       status: "shipped",
       createdAt: expect.any(String),
-      contact: { fullName: "Mari Maasikas", email: "mari@example.com", phone: "+37251234567" },
+      contact: { fullName: "Mari Maasikas", email: "mari@example.com", phone: "+372 51234567" },
       address: { line1: "Narva mnt 7", city: "Tallinn", postalCode: "10117", country: "EE" },
       shippingMethod: "standard",
       shippingMethodName: "Standard",

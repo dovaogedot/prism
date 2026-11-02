@@ -358,7 +358,7 @@ describe("encryption at rest", () => {
     }
 
     expect(await orderOf(placed.orderId, placed.key)).toMatchObject({
-      contact: { fullName: "Mari Maasikas", email: "mari@example.com", phone: "+37251234567" },
+      contact: { fullName: "Mari Maasikas", email: "mari@example.com", phone: "+372 51234567" },
       address: { line1: "Narva mnt 7", city: "Tallinn", postalCode: "10117", country: "EE" },
     })
   })
@@ -378,7 +378,16 @@ describe("signed-in checkout", () => {
   })
 })
 
-describe("an order placed before the address rules tightened", () => {
+describe("an order placed before the address and phone rules tightened", () => {
+  it("still opens with a phone that has no country code", async () => {
+    const guest = await Shop.fill(harness, [["desk-lamp", 1]])
+    const placed = await Shop.placed(harness, guest)
+    const older = { fullName: "Mari Maasikas", email: "mari@example.com", phone: "51234567" }
+    await harness.database.sql`UPDATE customer_order SET contact = ${harness.cipher.seal(older)}`
+
+    expect(await orderOf(placed.orderId, placed.key)).toMatchObject({ contact: older })
+  })
+
   it("still opens with the address it was placed with", async () => {
     const guest = await Shop.fill(harness, [["desk-lamp", 1]])
     const placed = await Shop.placed(harness, guest)

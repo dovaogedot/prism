@@ -70,7 +70,7 @@ test("checkout has fields for the contact, the address, the delivery and the pay
     "LV-1010 Riga",
     "Latvia",
     "liis@example.com",
-    "+37120000001",
+    "+371 20000001",
   ])
   await expect(page.getByRole("heading", { level: 2, name: "Delivery" }).locator("..")).toContainText("Express")
   await expect(page.getByRole("heading", { level: 2, name: "Payment" }).locator("..")).toContainText("Paid")

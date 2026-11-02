@@ -4,6 +4,7 @@
  * field message is written for a person.
  */
 
+import { AsYouType, parsePhoneNumberFromString } from "libphonenumber-js"
 import { z } from "zod"
 import { Email } from "./auth.ts"
 
@@ -49,20 +50,80 @@ export const Country = {
   } as const satisfies Record<"EE" | "LV" | "LT" | "FI" | "SE" | "DE" | "FR" | "NL" | "PL", string>,
 } as const
 
+/**
+ * A phone number of any country, kept as its country code, one space and the
+ * rest of its digits: `+372 51234567`. Google's numbering data, through
+ * libphonenumber-js, tells which country a number belongs to and whether its
+ * digits make a number there.
+ */
+export const PhoneNumber = {
+  /** Country names in English, such as "Estonia" for EE. */
+  countryNames: new Intl.DisplayNames(["en"], { type: "region" }),
+
+  /** The ISO code of the country a number typed so far belongs to; `undefined` while its digits do not say. */
+  findCountry: (typed: string): string | undefined => {
+    const typer = new AsYouType()
+    typer.input(typed)
+    return typer.getCountry()
+  },
+
+  /** `typed` with a space after its country code, once a whole code starts it and nothing parts the two yet. */
+  spaceAfterCode: (typed: string): string => {
+    const typer = new AsYouType()
+    typer.input(typed)
+    const code = typer.getCallingCode()
+    if (code === undefined) return typed
+
+    const trimmed = typed.trimStart()
+    const rest = trimmed.slice(code.length + 1)
+
+    return !trimmed.startsWith(`+${code}`) || rest.length === 0 || /^[\s().-]/.test(rest) ? typed : `+${code} ${rest}`
+  },
+
+  /** What is wrong with `digits`, a number with its grouping removed; `undefined` when nothing is. */
+  findProblem: (digits: string): string | undefined => {
+    if (!digits.startsWith("+")) return "Start with the country code, such as +372 for Estonia."
+
+    const parsed = parsePhoneNumberFromString(digits)
+    if (parsed === undefined) return "Check the country code after the +: no country uses it."
+    if (parsed.isValid()) return undefined
+
+    const country = parsed.country === undefined ? undefined : PhoneNumber.countryNames.of(parsed.country)
+    return country === undefined
+      ? `Check the digits after +${parsed.countryCallingCode}: they make no phone number there.`
+      : `This is not a phone number in ${country}. Check the digits after +${parsed.countryCallingCode}.`
+  },
+
+  schema: z
+    .string()
+    .trim()
+    .min(1, "Enter a phone number.")
+    // Spaces, dots, dashes and brackets are how people group the digits.
+    .transform((phone) => phone.replace(/[\s().-]/g, ""))
+    .superRefine((digits, context) => {
+      const problem = PhoneNumber.findProblem(digits)
+      if (problem !== undefined) context.addIssue({ code: "custom", message: problem })
+    })
+    .transform((digits) => {
+      const parsed = parsePhoneNumberFromString(digits)
+      return parsed === undefined ? digits : `+${parsed.countryCallingCode} ${parsed.nationalNumber}`
+    }),
+} as const
+
 /** Who the order is for and how to reach them. */
 export type Contact = z.infer<typeof Contact.schema>
 export const Contact = {
   schema: z.object({
     fullName: z.string().trim().min(2, "Enter your full name.").max(100, "Use at most 100 characters."),
     email: Email.schema,
-    phone: z
-      .string()
-      .trim()
-      .min(1, "Enter a phone number.")
-      // Spaces, dots, dashes and brackets are how people group the digits.
-      .transform((phone) => phone.replace(/[\s().-]/g, ""))
-      .pipe(z.string().regex(/^\+?\d{7,15}$/, "Enter a phone number like +372 5123 4567.")),
+    phone: PhoneNumber.schema,
   }),
+
+  /**
+   * A contact as it was stored: the phone by its shape alone, since the rules
+   * a typed number meets can tighten after an order was placed.
+   */
+  storedSchema: z.object({ fullName: z.string(), email: Email.schema, phone: z.string() }),
 } as const
 
 /** Where the parcel goes. */

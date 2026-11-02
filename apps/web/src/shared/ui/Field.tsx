@@ -11,29 +11,42 @@ export type FieldProps = ComponentProps<"input"> &
     error?: string | undefined
     /** A control in the input's row, after it, such as the button that submits it. */
     action?: ReactNode
+    /** Drawn inside the input, before the text, such as a phone number's flag. */
+    leading?: ReactNode
   }>
 
 /** A labeled input, with its hint and error tied to it for a screen reader. */
-export const Field = ({ label, hint, error, action, id, className = "", ...rest }: FieldProps) => {
+export const Field = ({ label, hint, error, action, leading, id, className = "", ...rest }: FieldProps) => {
   const fieldId = id ?? rest.name ?? label.toLowerCase().replace(/\s+/g, "-")
   const describedBy = [hint === undefined ? null : `${fieldId}-hint`, error === undefined ? null : `${fieldId}-error`].filter(
     (value): value is string => value !== null,
   )
 
-  const input = (
+  const field = (
     <input
       {...rest}
       id={fieldId}
       aria-invalid={error !== undefined}
       aria-describedby={describedBy.length === 0 ? undefined : describedBy.join(" ")}
       className={[
-        "w-full min-w-0 rounded-lg border bg-surface px-3 py-2.5 text-sm text-ink",
+        "w-full min-w-0 rounded-lg border bg-surface py-2.5 pr-3 text-sm text-ink",
+        leading === undefined ? "pl-3" : "pl-10",
         "placeholder:text-ink-faint transition-colors",
         error === undefined ? "border-edge hover:border-ink-faint" : "border-danger",
         className,
       ].join(" ")}
     />
   )
+
+  const input =
+    leading === undefined ? (
+      field
+    ) : (
+      <div className="relative">
+        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">{leading}</span>
+        {field}
+      </div>
+    )
 
   return (
     <div className="space-y-1.5">

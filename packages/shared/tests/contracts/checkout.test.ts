@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { AddToCartInput } from "../../src/contracts/cart.ts"
-import { Contact, Country, DeclineCodes, PlaceOrderInput, ShippingAddress } from "../../src/contracts/checkout.ts"
+import { Contact, Country, DeclineCodes, PhoneNumber, PlaceOrderInput, ShippingAddress } from "../../src/contracts/checkout.ts"
 
 /** The messages a failed parse reports, keyed by the dotted path of each field. */
 const issuesOf = (result: { success: boolean; error?: { issues: readonly { path: PropertyKey[]; message: string }[] } }) =>
@@ -14,12 +14,17 @@ describe("Contact", () => {
     expect(Contact.schema.parse({ ...contact, email: " Mari@Example.COM " })).toEqual({
       fullName: "Mari Maasikas",
       email: "mari@example.com",
-      phone: "+37251234567",
+      phone: "+372 51234567",
     })
   })
 
-  it("accepts the separators people type in a phone number", () => {
-    expect(Contact.schema.parse({ ...contact, phone: "(030) 123-456.78" }).phone).toBe("03012345678")
+  it("accepts the separators people type in a phone number, and keeps one space after the country code", () => {
+    expect(Contact.schema.parse({ ...contact, phone: "+49 (30) 123-456.78" }).phone).toBe("+49 3012345678")
+  })
+
+  it("accepts a number of any country", () => {
+    expect(Contact.schema.parse({ ...contact, phone: "+1 212 456 7890" }).phone).toBe("+1 2124567890")
+    expect(Contact.schema.parse({ ...contact, phone: "+7 912 345 6789" }).phone).toBe("+7 9123456789")
   })
 
   it("names every missing field with its own sentence", () => {
@@ -30,16 +35,37 @@ describe("Contact", () => {
     })
   })
 
-  it("refuses a malformed email and phone", () => {
-    expect(issuesOf(Contact.schema.safeParse({ ...contact, email: "mari@", phone: "12ab" }))).toEqual({
-      email: "Enter a valid email address.",
-      phone: "Enter a phone number like +372 5123 4567.",
-    })
+  it("asks for the country code, a code some country uses, and digits that make a number there", () => {
+    const problemOf = (phone: string) => issuesOf(Contact.schema.safeParse({ ...contact, phone }))["phone"]
+
+    expect(problemOf("5123 4567")).toBe("Start with the country code, such as +372 for Estonia.")
+    expect(problemOf("12ab")).toBe("Start with the country code, such as +372 for Estonia.")
+    expect(problemOf("+999 1234567")).toBe("Check the country code after the +: no country uses it.")
+    expect(problemOf("+372 123")).toBe("This is not a phone number in Estonia. Check the digits after +372.")
+    expect(problemOf("+1234567890123456")).toBeDefined()
   })
 
-  it("refuses a phone that is too short or too long", () => {
-    expect(Contact.schema.safeParse({ ...contact, phone: "123456" }).success).toBe(false)
-    expect(Contact.schema.safeParse({ ...contact, phone: "+1234567890123456" }).success).toBe(false)
+  it("refuses a malformed email", () => {
+    expect(issuesOf(Contact.schema.safeParse({ ...contact, email: "mari@" }))).toEqual({ email: "Enter a valid email address." })
+  })
+})
+
+describe("PhoneNumber", () => {
+  it("names the country of a number as it is typed, once its digits say", () => {
+    expect(PhoneNumber.findCountry("+3")).toBeUndefined()
+    expect(PhoneNumber.findCountry("+3725")).toBe("EE")
+    // The countries that share +1 tell apart only by a whole number.
+    expect(PhoneNumber.findCountry("+1 212 456")).toBeUndefined()
+    expect(PhoneNumber.findCountry("+1 212 456 7890")).toBe("US")
+  })
+
+  it("puts one space after a whole country code, and leaves a number that has one, or no whole code yet, as it is", () => {
+    expect(PhoneNumber.spaceAfterCode("+3725")).toBe("+372 5")
+    expect(PhoneNumber.spaceAfterCode("+3725123")).toBe("+372 5123")
+    expect(PhoneNumber.spaceAfterCode("+372 5123")).toBe("+372 5123")
+    expect(PhoneNumber.spaceAfterCode("+372")).toBe("+372")
+    expect(PhoneNumber.spaceAfterCode("+37")).toBe("+37")
+    expect(PhoneNumber.spaceAfterCode("5123")).toBe("5123")
   })
 })
 

@@ -1,4 +1,5 @@
-import { Field } from "../../../shared/ui/index.ts"
+import { useWatch } from "react-hook-form"
+import { Field, PhoneField } from "../../../shared/ui/index.ts"
 import type { CheckoutFormApi } from "../checkout.ts"
 
 /** The form the fields belong to. */
@@ -7,6 +8,8 @@ export type ContactFieldsProps = Readonly<{ form: CheckoutFormApi }>
 /** Who the order is for: name, email and phone. */
 export const ContactFields = ({ form }: ContactFieldsProps) => {
   const errors = form.formState.errors.contact
+
+  const phone = useWatch({ control: form.control, name: "contact.phone" })
 
   return (
     <fieldset className="space-y-4">
@@ -23,10 +26,9 @@ export const ContactFields = ({ form }: ContactFieldsProps) => {
           error={errors?.email?.message}
           {...form.register("contact.email")}
         />
-        <Field
+        <PhoneField
           label="Phone"
-          type="tel"
-          autoComplete="tel"
+          typed={phone}
           hint="For the courier."
           error={errors?.phone?.message}
           {...form.register("contact.phone")}

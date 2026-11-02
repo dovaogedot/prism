@@ -83,10 +83,16 @@ describe("invalid formats", () => {
       "Enter a valid email address.",
     ],
     [
-      "a phone number",
-      { contact: { fullName: "Mari Maasikas", email: "mari@example.com", phone: "12" } },
+      "a phone number without its country code",
+      { contact: { fullName: "Mari Maasikas", email: "mari@example.com", phone: "5123 4567" } },
       "contact.phone",
-      "Enter a phone number like +372 5123 4567.",
+      "Start with the country code, such as +372 for Estonia.",
+    ],
+    [
+      "a phone number too short for its country",
+      { contact: { fullName: "Mari Maasikas", email: "mari@example.com", phone: "+372 123" } },
+      "contact.phone",
+      "This is not a phone number in Estonia. Check the digits after +372.",
     ],
     [
       "a postal code",

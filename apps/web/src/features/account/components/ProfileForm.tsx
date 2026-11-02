@@ -1,8 +1,8 @@
 import { ProfileInput, type Profile } from "@prism/shared"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useState, type ReactNode } from "react"
-import { useForm } from "react-hook-form"
-import { Alert, Button, Field, Toast } from "../../../shared/ui/index.ts"
+import { useForm, useWatch } from "react-hook-form"
+import { Alert, Button, Field, PhoneField, Toast } from "../../../shared/ui/index.ts"
 import { Failure } from "../../../shared/api/failure.tsx"
 import { useAccountChanges } from "../account.ts"
 
@@ -23,6 +23,8 @@ export const ProfileForm = ({ profile }: ProfileFormProps) => {
     resolver: zodResolver(ProfileInput.schema),
     defaultValues: { fullName: profile.fullName ?? "", phone: profile.phone ?? "" },
   })
+
+  const phone = useWatch({ control: form.control, name: "phone" })
 
   const submit = form.handleSubmit(async (values) => {
     setFailure(undefined)
@@ -47,7 +49,7 @@ export const ProfileForm = ({ profile }: ProfileFormProps) => {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Full name" autoComplete="name" error={form.formState.errors.fullName?.message} {...form.register("fullName")} />
-        <Field label="Phone" type="tel" autoComplete="tel" error={form.formState.errors.phone?.message} {...form.register("phone")} />
+        <PhoneField label="Phone" typed={phone ?? ""} error={form.formState.errors.phone?.message} {...form.register("phone")} />
       </div>
 
       <Button type="submit" busy={form.formState.isSubmitting}>

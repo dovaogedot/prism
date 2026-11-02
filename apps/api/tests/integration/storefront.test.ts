@@ -46,7 +46,7 @@ describe("the profile and saved addresses", () => {
     const profile = await Shop.call(harness, "PUT", "/account/profile", caller, { fullName: "Mari Maasikas", phone: "+372 5123 4567" })
     await Shop.call(harness, "POST", "/account/addresses", caller, address())
 
-    expect(jsonOf(profile)).toEqual({ email: "mari@example.com", fullName: "Mari Maasikas", phone: "+37251234567" })
+    expect(jsonOf(profile)).toEqual({ email: "mari@example.com", fullName: "Mari Maasikas", phone: "+372 51234567" })
     const [user] = await harness.database.sql`
       SELECT full_name, phone FROM app_user WHERE email_index = ${emailIndexOf(harness, "mari@example.com")}`
     const [saved] = await harness.database.sql`SELECT details FROM address`
@@ -60,7 +60,7 @@ describe("the profile and saved addresses", () => {
 
   it("clears a profile field sent empty", async () => {
     const { accessToken } = await registerUser(harness, "mari@example.com")
-    await Shop.call(harness, "PUT", "/account/profile", { token: accessToken }, { fullName: "Mari", phone: "+37251234567" })
+    await Shop.call(harness, "PUT", "/account/profile", { token: accessToken }, { fullName: "Mari", phone: "+372 51234567" })
 
     const cleared = await Shop.call(harness, "PUT", "/account/profile", { token: accessToken }, { fullName: "Mari", phone: "" })
 
@@ -159,7 +159,7 @@ describe("the profile and saved addresses", () => {
     const older = {
       label: "Old",
       fullName: "Mari Maasikas",
-      phone: "+37251234567",
+      phone: "+372 51234567",
       address: { line1: "233", city: "f", postalCode: "12312", country: "EE" },
     }
     await harness.database.sql`UPDATE address SET details = ${harness.cipher.seal(older)}`
@@ -227,7 +227,7 @@ describe("checkout with an account", () => {
 
     expect(jsonOf(await Shop.call(harness, "GET", "/checkout/prefill", { token: accessToken }))).toEqual({
       email: "buyer@example.com",
-      contact: { fullName: "Kadri Tamm", email: "mari@example.com", phone: "+37255551234" },
+      contact: { fullName: "Kadri Tamm", email: "mari@example.com", phone: "+372 55551234" },
       address: { line1: "Pikk 1", city: "Tartu", postalCode: "51003", country: "EE" },
       shippingMethod: "express",
     })

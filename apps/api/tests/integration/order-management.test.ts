@@ -337,7 +337,7 @@ describe("GET /checkout/prefill", () => {
 
     expect(jsonOf(await Shop.call(harness, "GET", "/checkout/prefill", { token: accessToken }))).toEqual({
       email: "buyer@example.com",
-      contact: { fullName: "Mari Maasikas", email: "mari@example.com", phone: "+37251234567" },
+      contact: { fullName: "Mari Maasikas", email: "mari@example.com", phone: "+372 51234567" },
       address: { line1: "Narva mnt 7", city: "Tallinn", postalCode: "10117", country: "EE" },
       shippingMethod: "standard",
     })

@@ -75,7 +75,7 @@ export const Seed = {
   DEMO_EMAIL: Email.schema.parse("shopper@prism.test"),
   DEMO_PASSWORD: "correct horse battery staple",
   DEMO_NAME: "Kadri Tamm",
-  DEMO_PHONE: "+37251234567",
+  DEMO_PHONE: "+372 51234567",
   DEMO_ADDRESS: { line1: "Narva mnt 7", city: "Tallinn", postalCode: "10117", country: "EE" } satisfies ShippingAddress,
   DEMO_METHOD: ShippingMethodCode.schema.parse("standard"),
   REVIEWER_COUNT: 40,

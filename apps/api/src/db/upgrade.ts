@@ -89,7 +89,7 @@ export const Upgrade = {
     // The order's contact was sealed already; its email gains the index staff search by.
     for (const raw of await tx.execute(sql`SELECT id, contact FROM customer_order`)) {
       const order = Upgrade.orderRow.parse(raw)
-      const contact = cipher.open(order.contact, Contact.schema)
+      const contact = cipher.open(order.contact, Contact.storedSchema)
 
       await tx.execute(sql`UPDATE customer_order SET email_index = ${cipher.index("order-email", contact.email)} WHERE id = ${order.id}`)
     }

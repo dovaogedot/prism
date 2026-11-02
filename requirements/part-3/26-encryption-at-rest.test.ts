@@ -118,7 +118,7 @@ describe("the API", () => {
     const addresses = jsonOf(await Shop.call(harness, "GET", "/account/addresses", caller))["items"]
     const order = jsonOf(await Shop.call(harness, "GET", `/orders/${orderId}?key=${typed["guest order key"] ?? ""}`))
 
-    expect(profile).toEqual({ email: "mari.maasikas@example.com", fullName: "Mari Maasikas", phone: "+37251234567" })
+    expect(profile).toEqual({ email: "mari.maasikas@example.com", fullName: "Mari Maasikas", phone: "+372 51234567" })
     expect(addresses).toEqual([expect.objectContaining({ address: expect.objectContaining({ line1: "Lossi plats 1a", city: "Tartu" }) })])
     expect(order).toMatchObject({
       contact: { fullName: "Jaan Tamm", email: "jaan.tamm@example.com" },

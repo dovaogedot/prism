@@ -107,3 +107,30 @@ test("a filter group's Clear all sits level with its heading, above the group's 
   expect(Checks.middleGap(clear, heading)).toBeLessThanOrEqual(Checks.TOLERANCE)
   expect(clear.y + clear.height).toBeLessThanOrEqual(firstRow.y)
 })
+
+test("a phone field puts a space after the country code and shows that country's flag inside the field", async ({ context, page }) => {
+  await Stack.registerCustomer(context.request, "phone-flag")
+  await Checks.open(page, "/account")
+  const phone = page.getByLabel("Phone", { exact: true })
+  const mark = phone.locator("xpath=preceding-sibling::span//*[local-name()='svg']")
+
+  // A handset stands in until the digits name a country.
+  await phone.fill("")
+  const handset = await mark.innerHTML()
+
+  await phone.pressSequentially("+3725123")
+  await expect(phone).toHaveValue("+372 5123")
+  await expect.poll(() => mark.innerHTML()).not.toBe(handset)
+  const estonia = await mark.innerHTML()
+
+  const field = await Checks.boxOf(phone)
+  const flag = await Checks.boxOf(mark)
+  expect(flag.x).toBeGreaterThan(field.x)
+  expect(flag.x + flag.width).toBeLessThan(field.x + 40)
+  expect(Checks.middleGap(flag, field)).toBeLessThanOrEqual(Checks.TOLERANCE)
+
+  await phone.fill("")
+  await phone.pressSequentially("+12124567890")
+  await expect(phone).toHaveValue("+1 2124567890")
+  await expect.poll(() => mark.innerHTML()).not.toBe(estonia)
+})

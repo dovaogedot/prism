@@ -88,7 +88,7 @@ describe("an order's details", () => {
     const placed = await paidOrder()
 
     expect(jsonOf(await Shop.call(harness, "GET", `/orders/${placed.orderId}?key=${placed.key}`))).toMatchObject({
-      contact: { fullName: "Mari Maasikas", email: "mari@example.com", phone: "+37251234567" },
+      contact: { fullName: "Mari Maasikas", email: "mari@example.com", phone: "+372 51234567" },
       address: CHECKOUT.address,
       billingAddress: BILLING,
     })

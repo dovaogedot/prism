@@ -16,7 +16,7 @@ const order: OrderRecord = {
   subtotalCents: 5000,
   shippingCents: 0,
   totalCents: 5000,
-  contact: Contact.schema.parse({ fullName: `Mari ${hostile}`, email: "mari@example.com", phone: "+37251234567" }),
+  contact: Contact.schema.parse({ fullName: `Mari ${hostile}`, email: "mari@example.com", phone: "+372 51234567" }),
   address: ShippingAddress.schema.parse({ line1: "Narva mnt 7", city: "Tallinn", postalCode: "10117", country: "EE" }),
   key: OrderKey.schema.parse("A".repeat(43)),
   paymentDueAt: new Date("2026-08-07T12:30:00Z"),

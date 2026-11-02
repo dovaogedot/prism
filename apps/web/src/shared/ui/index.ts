@@ -9,6 +9,8 @@ export { Spinner } from "./Spinner.tsx"
 
 export { Field } from "./Field.tsx"
 export type { FieldProps } from "./Field.tsx"
+export { PhoneField } from "./PhoneField.tsx"
+export type { PhoneFieldProps } from "./PhoneField.tsx"
 
 export { SelectField } from "./SelectField.tsx"
 export type { SelectFieldProps } from "./SelectField.tsx"

@@ -2,7 +2,7 @@ import { SavedAddressInput, type SavedAddress } from "@prism/shared"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useId, useState, type ReactNode } from "react"
 import { useForm, useWatch } from "react-hook-form"
-import { Alert, Button, Field, PostalAddressFields } from "../../../shared/ui/index.ts"
+import { Alert, Button, Field, PhoneField, PostalAddressFields } from "../../../shared/ui/index.ts"
 import { ServerIssues } from "../../../shared/ui/server-issues.ts"
 import { Failure } from "../../../shared/api/failure.tsx"
 import { AddressLookup } from "../../checkout/components/index.ts"
@@ -53,6 +53,7 @@ export const AddressForm = ({ address, onSave, onCancel }: AddressFormProps) => 
   const errors = form.formState.errors
 
   const typed = useWatch({ control: form.control, name: "address" })
+  const phone = useWatch({ control: form.control, name: "phone" })
   const country = typed.country
 
   return (
@@ -74,14 +75,7 @@ export const AddressForm = ({ address, onSave, onCancel }: AddressFormProps) => 
           error={errors.fullName?.message}
           {...form.register("fullName")}
         />
-        <Field
-          label="Phone"
-          id={`${prefix}-phone`}
-          type="tel"
-          autoComplete="tel"
-          error={errors.phone?.message}
-          {...form.register("phone")}
-        />
+        <PhoneField label="Phone" id={`${prefix}-phone`} typed={phone} error={errors.phone?.message} {...form.register("phone")} />
       </div>
       <PostalAddressFields
         idPrefix={prefix}
