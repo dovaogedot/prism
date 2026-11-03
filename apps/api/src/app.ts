@@ -145,9 +145,10 @@ export const App = {
 
     const app = Fastify({
       logger: { level: config.logLevel, serializers: { req: App.requestForLog } },
-      // Caddy terminates the connection. Trusting the private ranges, rather
-      // than the whole X-Forwarded-For chain, takes the first address no proxy
-      // on this network vouched for, whatever the caller put in the header.
+      // Caddy terminates the connection, and its X-Forwarded-For keeps what
+      // the caller wrote only when Caddy trusts the caller as a proxy.
+      // Trusting the private ranges, rather than the whole chain, takes the
+      // first address no proxy on this network vouched for.
       trustProxy: "loopback, linklocal, uniquelocal",
       bodyLimit: 256 * 1024,
     })

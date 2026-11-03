@@ -5,13 +5,14 @@
 #
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
-# Four things differ. The images are pulled rather than built, because a
-# server small enough to be cheap is not big enough to run a Vite build.
-# Nothing binds a public address, because a reverse proxy in front of this
-# owns 80 and 443 and forwards to these loopback ports. And every service
-# restarts by itself, because a reboot should bring the shop back up without
-# anyone logging in. And the storefront serves plain HTTP, because that proxy
-# terminates TLS with the server's real certificate.
+# What differs: the images are pulled rather than built, because a server
+# small enough to be cheap is not big enough to run a Vite build. Nothing
+# binds a public address, because a reverse proxy in front of this owns 80
+# and 443 and forwards to these loopback ports. Every service restarts by
+# itself, because a reboot should bring the shop back up without anyone
+# logging in. And the storefront serves plain HTTP and takes the visitor's
+# address from that proxy, because the proxy terminates TLS with the
+# server's real certificate.
 #
 # Nothing here knows where it is deployed. The image references, the ports and
 # every credential arrive as environment variables, so the same two files run
@@ -60,5 +61,10 @@ services:
       # The server's own proxy terminates TLS with its real certificate and
       # forwards plain HTTP to the loopback port below.
       WEB_TLS: "off"
+      # That proxy sets X-Forwarded-For to the visitor's address, and reaches
+      # the container through Docker's port forwarding, from a private
+      # address. Only the server itself reaches the loopback port, so the
+      # private ranges are trusted to name the visitor.
+      WEB_TRUSTED_PROXIES: private_ranges
     ports: !override
       - "127.0.0.1:${WEB_PORT:?set WEB_PORT}:3000"

@@ -4,12 +4,16 @@
 	persist_config off
 
 	servers {
-		# A request that arrives from a private address came through a proxy
-		# of this deployment: Docker's port forwarding, or the server's own
-		# reverse proxy. Trusting those keeps the visitor's address in
-		# X-Forwarded-For, which the API's rate limits key on, instead of
-		# replacing it with the proxy's.
-		trusted_proxies static private_ranges
+		# The proxies in front of this server, whose X-Forwarded-For header
+		# names the visitor: the API's rate limits key on that address.
+		# Production names the private ranges its own reverse proxy connects
+		# from. Unset, as on a laptop, nobody is trusted: whatever a visitor
+		# puts in the header is replaced with the address they connect from,
+		# so a made-up address buys no budget of its own.
+		trusted_proxies static {$WEB_TRUSTED_PROXIES}
+		# Read from the right, the visitor is the first address in the header
+		# that is not a trusted proxy.
+		trusted_proxies_strict
 	}
 }
 
