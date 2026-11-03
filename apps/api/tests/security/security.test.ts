@@ -1015,6 +1015,10 @@ describe("the Content-Security-Policy the web server sends", () => {
     ).toBe(true)
   })
 
+  it("lets the page's own requests reach only the shop, Stripe's API and Google's CAPTCHA", () => {
+    expect(directives.get("connect-src")).toEqual(["'self'", "https://api.stripe.com", "https://www.google.com/recaptcha/"])
+  })
+
   it("refuses plugins, foreign base URLs, foreign form targets and every frame around the shop", () => {
     expect(directives.get("object-src")).toEqual(["'none'"])
     expect(directives.get("base-uri")).toEqual(["'self'"])

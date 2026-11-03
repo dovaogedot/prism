@@ -56,7 +56,7 @@
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
 		# Only this origin, Stripe's payment fields and Google's CAPTCHA. No inline
 		# script anywhere; inline styles stay, because both widgets set them.
-		Content-Security-Policy "default-src 'self'; script-src 'self' https://js.stripe.com https://*.js.stripe.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/; frame-src https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/; connect-src 'self' https://api.stripe.com; img-src 'self' data: https://*.stripe.com; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		Content-Security-Policy "default-src 'self'; script-src 'self' https://js.stripe.com https://*.js.stripe.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/; frame-src https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/; connect-src 'self' https://api.stripe.com https://www.google.com/recaptcha/; img-src 'self' data: https://*.stripe.com; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 		-Server
 	}
 }
