@@ -45,11 +45,11 @@ export const Seo = {
 
   /**
    * A description of 155 to 160 characters from `fragments`, in their order,
-   * each ended as a sentence. The first fragment opens it, cut at a word boundary with an ellipsis
-   * when that makes room; each later fragment is kept whole or left out. Of
-   * every way to land in range, the one with the longest opening wins, then
-   * the one keeping the earliest fragments. When none lands in range, the
-   * longest text within 160 is returned.
+   * each ended as a sentence. The first fragment opens it, cut at a word
+   * boundary when that makes room; each later fragment is kept whole or left
+   * out. Of every way to land in range, the one with the longest opening
+   * wins, then the one keeping the earliest fragments. When none lands in
+   * range, the longest text within 160 is returned.
    */
   description: (fragments: readonly string[]): string => {
     const [lead = "", ...rest] = fragments.map(Seo.sentence).filter((fragment) => fragment.length > 0)
@@ -73,12 +73,16 @@ export const Seo = {
     return best
   },
 
-  /** The ways a description can open with `lead`: whole when it fits, then cut shorter word by word. */
+  /**
+   * The ways a description can open with `lead`: whole when it fits, then
+   * cut shorter word by word, with an ellipsis unless the cut ends a sentence.
+   */
   openings: (lead: string): readonly string[] => {
     const openings: string[] = lead.length <= Seo.DESCRIPTION_MAX ? [lead] : []
 
     for (let max = Math.min(lead.length, Seo.DESCRIPTION_MAX) - 1; max >= Seo.OPENING_MIN; max -= 1) {
-      const opening = `${Seo.cut(lead, max - 1)}…`
+      const kept = Seo.cut(lead, max - 1)
+      const opening = /[.!?]$/.test(kept) ? kept : `${kept}…`
       if (opening !== openings.at(-1)) openings.push(opening)
     }
 

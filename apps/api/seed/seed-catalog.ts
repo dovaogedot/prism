@@ -2,6 +2,21 @@
 
 import { z } from "zod"
 
+/** A property's value as the catalog file holds it. */
+export const SeedPropertyValue = {
+  /**
+   * `value` in the one spelling the catalog keeps for what it says, so a
+   * filter lists it once: a count of rooms reads "1 room" or "4 rooms",
+   * however its source wrote the case and the plural.
+   */
+  normalize: (value: string): string => {
+    const rooms = /^(\d+) rooms?$/i.exec(value)?.[1]
+    if (rooms === undefined) return value
+
+    return rooms === "1" ? "1 room" : `${rooms} rooms`
+  },
+} as const
+
 /** One product of the catalog file; `image` is its picture's file name under the seed's media directory. */
 export type SeedProduct = z.infer<typeof SeedProduct.schema>
 
@@ -11,7 +26,7 @@ export const SeedProduct = {
     description: z.string(),
     priceCents: z.number().int().nonnegative(),
     image: z.string().min(1),
-    properties: z.record(z.string(), z.string()),
+    properties: z.record(z.string(), z.string().transform(SeedPropertyValue.normalize)),
   }),
 } as const
 

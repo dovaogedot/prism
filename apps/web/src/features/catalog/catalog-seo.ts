@@ -32,26 +32,33 @@ export const CatalogSeo = {
   CLOSING: ["Tracked delivery across Europe.", "Returns within 14 days.", "Secure card payment.", "Order today at Prism.", "Buy now."],
 
   /**
-   * The product's name and category. Two products of one category that
-   * share a name are told apart by their `type` property, which names what
-   * kind of thing each is, or by their slug when they have none.
+   * The product's name. Two products of one category that share a name are
+   * told apart by their `type` property, which names what kind of thing
+   * each is, or by their slug when they have none.
    */
-  productTitle: (product: ProductText): string => {
-    const base = `${product.name} - ${product.category.name}`
-    if (!product.isNameShared) return base
+  distinctName: (product: ProductText): string => {
+    if (!product.isNameShared) return product.name
 
     const type = product.properties.find((property) => property.name.toLowerCase() === "type")?.value ?? product.slug
-    return `${product.name} (${type}) - ${product.category.name}`
+    return `${product.name} (${type})`
   },
 
-  /** The product's own description first, then what it is, how it rates, its price and how it ships. */
+  /** The product's name and category, unique in the shop. */
+  productTitle: (product: ProductText): string => `${CatalogSeo.distinctName(product)} - ${product.category.name}`,
+
+  /**
+   * What the product is, then its own description, how it rates, its price
+   * and how it ships. It opens with the name, so products that share their
+   * description text still get descriptions of their own.
+   */
   productDescription: (product: ProductText): string => {
     const { count, average } = product.rating
     const price = Price.format(product.priceCents)
+    // A collection whose name has its own article, such as The Binding of Isaac, takes no second one.
+    const collection = /^the /i.test(product.category.name) ? product.category.name : `the ${product.category.name}`
 
     return Seo.description([
-      product.description,
-      `${product.name} by ${product.brand.name}, from the ${product.category.name} collection.`,
+      `${CatalogSeo.distinctName(product)} by ${product.brand.name}, from ${collection} collection. ${product.description}`,
       ...(average === undefined ? [] : [`Rated ${average.toFixed(1)} out of 5 by ${count} ${count === 1 ? "customer" : "customers"}.`]),
       product.stock > 0 ? `In stock at ${price}.` : `${price}, currently out of stock.`,
       ...CatalogSeo.CLOSING,

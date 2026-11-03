@@ -68,6 +68,14 @@ describe("Seo.description", () => {
     expect(text).toMatch(/word…$/)
   })
 
+  it("takes no ellipsis where the cut ends a sentence", () => {
+    // 155 characters, so the cut that keeps it whole lands in range.
+    const sentence = `${"word ".repeat(31).trim()}.`
+    const text = Seo.description([`${sentence} ${"more ".repeat(30)}`])
+
+    expect(text).toBe(sentence)
+  })
+
   it("keeps later fragments whole, and leaves out one that would pass the limit", () => {
     const opening = "a".repeat(100)
 
@@ -96,6 +104,13 @@ describe("the catalog's titles and descriptions", () => {
       .filter(({ description }) => description.length < 155 || description.length > 160)
 
     expect(misses).toEqual([])
+  })
+
+  it.each(variants)("gives every seeded product a description of its own, $label", ({ products }) => {
+    const descriptions = products.map((product) => CatalogSeo.productDescription(product))
+
+    // Products that share their own description text, such as one game's pottery sherds, still differ by name.
+    expect(descriptions.filter((description, index) => descriptions.indexOf(description) !== index)).toEqual([])
   })
 
   it("gives every seeded product a unique title under 60 characters", () => {

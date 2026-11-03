@@ -1,9 +1,11 @@
 /**
- * The tables' CHECK constraints, each proven by a row that breaks it. The
- * database is the last line of defense, so every rule here holds even for a
- * write that bypasses the services.
+ * The tables' CHECK constraints, each proven by a row that breaks it, and
+ * the data migrations, each run over the rows it fixes. The database is the
+ * last line of defense, so every rule here holds even for a write that
+ * bypasses the services.
  */
 
+import { readdir, readFile } from "node:fs/promises"
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 import { insertUser, seedCatalog, startHarness, type Harness } from "../support/harness.ts"
 
@@ -279,6 +281,43 @@ describe("product_image and product_review", () => {
     await violates(rate("0", "2"), "product_rating_range")
     await violates(rate("5.5", "2"), "product_rating_range")
     await violates(rate("3", "-1"), "product_rating_range")
+  })
+})
+
+describe("product_property", () => {
+  /** Runs the statements of the migration whose name ends in `name` once more. */
+  const migrate = async (name: string): Promise<void> => {
+    const folder = new URL("../../drizzle/", import.meta.url)
+    const file = (await readdir(folder)).find((entry) => entry.endsWith(`_${name}.sql`))
+    if (file === undefined) throw new Error(`No migration is named ${name}.`)
+
+    await harness.database.sql.unsafe(await readFile(new URL(file, folder), "utf8"))
+  }
+
+  it("spells each count of rooms one way once migrated, and leaves every other value alone", async () => {
+    const recharges = {
+      "kidney-bean": "1 Rooms",
+      d8: "4 Rooms",
+      "the-poop": "1 room",
+      "mr-boom": "2 rooms",
+      "edens-soul": "12 rooms (one time use)",
+    }
+    await seedCatalog(
+      harness,
+      Object.entries(recharges).map(([slug, recharge]) => ({ slug, name: slug, priceCents: 100, properties: { recharge } })),
+    )
+
+    await migrate("room_counts_one_spelling")
+    const rows = await harness.database.sql`
+      SELECT p.slug, pp.value FROM product_property pp JOIN product p ON p.id = pp.product_id ORDER BY p.slug`
+
+    expect(Object.fromEntries(rows.map((row) => [row["slug"], row["value"]]))).toEqual({
+      "kidney-bean": "1 room",
+      d8: "4 rooms",
+      "the-poop": "1 room",
+      "mr-boom": "2 rooms",
+      "edens-soul": "12 rooms (one time use)",
+    })
   })
 })
 
