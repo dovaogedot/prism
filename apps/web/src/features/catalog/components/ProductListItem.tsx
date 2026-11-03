@@ -25,7 +25,7 @@ export const ProductListItem = ({ product }: ProductListItemProps) => (
         <Stars rating={product.rating.average} count={product.rating.count} />
       </div>
 
-      <div className="flex items-baseline gap-3 sm:flex-col sm:items-end sm:gap-1">
+      <div className="flex flex-wrap items-baseline gap-x-3 sm:flex-col sm:items-end sm:gap-1">
         <span className="text-lg font-semibold tabular-nums text-ink">{Price.format(product.priceCents)}</span>
         <Stock className="text-xs" count={product.stock} />
       </div>

@@ -1,6 +1,7 @@
 /**
- * Layout the eye would check, measured: what is meant to line up does, and
- * pages meant to share a width do, within a pixel of rounding.
+ * Layout the eye would check, measured: what is meant to line up does,
+ * pages meant to share a width do, within a pixel of rounding, and a label
+ * meant for one line keeps to it.
  */
 
 import { expect, test } from "@playwright/test"
@@ -94,6 +95,41 @@ test("a quantity typed past the stock becomes the stock, and a note under the ro
 
   await field.fill("2")
   await expect(note).toBeHidden()
+})
+
+test("a product card keeps its stock on one line and inside the card at 320 pixels, under the price when both do not fit", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 900 })
+
+  // The dearest products first: the longest prices leave the least room beside them.
+  for (const path of ["/shop?sort=price_desc", "/shop"]) {
+    await Checks.open(page, path)
+    const faults = await page
+      .getByRole("region", { name: / items/ })
+      .getByRole("article")
+      .evaluateAll((cards) =>
+        cards.flatMap((card) => {
+          const name = card.querySelector("h3")?.textContent ?? "a card"
+          const label = [...card.querySelectorAll("span")].find((span) =>
+            /^(In stock|Only \d+ left|Sold out)$/.test(span.textContent ?? ""),
+          )
+          if (label === undefined) return [`${name}: no stock label`]
+
+          // A flex item is one box however its text wraps, so the lines are counted from where the text's own boxes start.
+          const range = document.createRange()
+          range.selectNodeContents(label)
+          const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size
+          const isInside = label.getBoundingClientRect().right <= card.getBoundingClientRect().right
+          return [
+            ...(lines === 1 ? [] : [`${name}: "${label.textContent}" takes ${lines} lines`]),
+            ...(isInside ? [] : [`${name}: the stock spills out`]),
+          ]
+        }),
+      )
+
+    expect(faults, path).toEqual([])
+  }
 })
 
 test("the shop keeps the filter row open, so the first filter moves no result, and ends the row with Clear all filters", async ({

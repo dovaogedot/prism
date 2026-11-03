@@ -31,7 +31,8 @@ export const ProductCard = ({ product, isPriority = false }: ProductCardProps) =
 
       <Stars rating={product.rating.average} count={product.rating.count} />
 
-      <div className="mt-auto flex items-baseline justify-between gap-2 pt-1">
+      {/* A card too narrow for both puts the stock under the price. */}
+      <div className="mt-auto flex flex-wrap items-baseline justify-between gap-x-2 pt-1">
         <span className="text-base font-semibold tabular-nums text-ink">{Price.format(product.priceCents)}</span>
         <Stock className="text-xs" count={product.stock} />
       </div>
