@@ -164,12 +164,12 @@ describe("ImportFile.parseCsv", () => {
     expect(parsed.issues.map((issue) => issue.column).sort()).toEqual(["featured", "name", "stock"])
   })
 
-  it("refuses more than 5,000 rows", () => {
+  it("refuses more than 5,000 rows without reading one", () => {
     const rows = Array.from({ length: 5001 }, (_, index) => row({ slug: `item-${index}` }))
+    const parsed = ImportFile.parseCsv([HEADER, ...rows].join("\n"))
 
-    expect(ImportFile.parseCsv([HEADER, ...rows].join("\n")).issues).toEqual([
-      { message: "The file has 5001 rows; an import takes at most 5000." },
-    ])
+    expect(parsed.issues).toEqual([{ message: "The file has 5001 rows; an import takes at most 5000." }])
+    expect([parsed.rows, parsed.slugs]).toEqual([[], []])
   })
 })
 

@@ -184,6 +184,9 @@ export const ImportFile = {
       }
     }
 
+    // A file over the row limit is refused whole, with no row read.
+    if (body.length > ImportFile.MAX_ROWS) return { rows: [], slugs: [], issues }
+
     const rows: { row: number; product: ImportRow }[] = []
     const slugs: ImportSlug[] = []
 
