@@ -1,9 +1,9 @@
 /**
  * What a visitor does with a keyboard and a screen reader in mind: the skip
  * link, the header's controls, the search box, the cart preview, the links
- * of an order's page, and where focus lands when a page changes. And the
- * answers a crawler gets: a real 404 for an address outside the route list,
- * and for a product or a category the shop does not have.
+ * of an order's page, and where focus and the view land when a page changes.
+ * And the answers a crawler gets: a real 404 for an address outside the
+ * route list, and for a product or a category the shop does not have.
  */
 
 import { expect, test } from "@playwright/test"
@@ -124,6 +124,33 @@ test("opening a page by a click or a key moves focus to its heading, which shows
     await expect(heading, open).toBeFocused()
     expect(await Checks.outlineOf(heading), open).toBe("none")
   }
+})
+
+test("a page loaded afresh opens at the top, and a reload and Back return to where a page was scrolled", async ({ page }) => {
+  const readScroll = (): Promise<number> => page.evaluate(() => window.scrollY)
+  const scrollTo = async (top: number): Promise<void> => {
+    await page.evaluate((y) => window.scrollTo(0, y), top)
+    await expect.poll(readScroll).toBe(top)
+  }
+  // Short, so every page here scrolls further than the positions below.
+  await page.setViewportSize({ width: 1280, height: 500 })
+
+  await Checks.open(page, "/terms")
+  await scrollTo(400)
+  // As an address typed into the same tab: a document load of its own.
+  await Checks.open(page, "/privacy")
+  expect(await readScroll()).toBe(0)
+
+  await scrollTo(300)
+  await page.reload({ waitUntil: "load" })
+  await expect.poll(readScroll).toBe(300)
+
+  // A click that does not scroll the link into view first, which would move the place Back returns to.
+  await page.getByRole("contentinfo").getByRole("link", { name: "About us" }).dispatchEvent("click")
+  await expect(page).toHaveURL(/\/about$/)
+  await expect.poll(readScroll).toBe(0)
+  await page.goBack()
+  await expect.poll(readScroll).toBe(300)
 })
 
 test("an address outside the route list answers 404 with the shop's page, and a page inside it 200", async ({ request }) => {

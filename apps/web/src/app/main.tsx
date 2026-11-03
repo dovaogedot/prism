@@ -73,6 +73,14 @@ TokenStore.subscribe(() => {
   }
 })
 
+// The router files a page's scroll position under its history entry's key,
+// and reads an entry that a document load opened, which has none, as
+// "default": every page loaded afresh in the tab would open where the last
+// one was left. Such an entry gets a key of its own, which a reload keeps.
+if (typeof window.history.state?.key !== "string") {
+  window.history.replaceState({ ...window.history.state, key: Math.random().toString(36).slice(2, 10) }, "")
+}
+
 const router = createBrowserRouter([
   {
     path: "/",

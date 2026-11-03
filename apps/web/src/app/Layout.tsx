@@ -17,8 +17,9 @@ import { useWide } from "../shared/layout/use-wide.ts"
  * Every page under it can put its own part of the drawer in through
  * `useDrawer`. The drawer closes when the page widens past the width it is
  * for and when the shopper goes to another page. A new page opens at the
- * top, and Back and Forward return to where a page was scrolled; a page that
- * changes only its filters or sort keeps the scroll.
+ * top, from a link and from a fresh load alike, and a reload, Back and
+ * Forward return to where a page was scrolled; a page that changes only its
+ * filters or sort keeps the scroll.
  */
 export const Layout = () => {
   const { pathname } = useLocation()
