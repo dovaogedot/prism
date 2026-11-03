@@ -104,7 +104,7 @@ E2E_BASE_URL=https://localhost:3200 npm run e2e
 - **Home** (`/`): featured products, a tile per category, "Top rated", "New arrivals", and the products this browser viewed last.
 - **The listing**: the whole shop (`/shop`), one category (`/categories/<slug>`) and search results (`/search?q=`) share one page: the result count, the filters, the sort, the pages, and a grid or a list. The view, the filters and the page live in the URL, so a view is a link. On search results, the category links narrow the results to one category and drop every other filter.
 - **Quick search** sits in the header of every page. From two letters it suggests products with their picture and price, and "Search for ..." last. The arrow keys move, Enter opens and Escape closes. `/` jumps to the box from anywhere.
-- **Typos**: when nothing matches exactly, the results show similar names under 'No exact matches for "...". Showing similar names.'
+- **Typos**: when nothing matches exactly, the results show similar names under 'No exact matches for "...". Showing similar names.' Quick search suggests similar names too when no name contains the typed text.
 - **Filters**: brands, a price range, a minimum rating, and one group per property of the matching products, each value with its count. A group with a value chosen shows "Clear all" beside its heading. A value the other filters leave nothing for is grayed out, not removed. A narrow screen puts the filters in a drawer, below the menu; its "Filters" button opens the drawer at the filters.
 - **Active filters** sit in a row under the count, each with a cross, and "Clear all filters" ends the row on the right; it keeps the search text and the category. The row is held open before any filter is on, so turning one on moves no result.
 - **Sort**: relevance, price either way, rating, or newest.
@@ -234,7 +234,7 @@ Every route is under `/api/v1` and answers JSON. A refusal is `{ "error": { "cod
 | `GET /home` | Featured, top-rated and newest products. The page takes the categories from `GET /categories`. |
 | `GET /categories` | Every category with its description, product count and a picture. |
 | `GET /products` | Searches the catalog. See the query keys below. |
-| `GET /products/suggest?q=` | Names containing the typed text, those starting with it first, with a thumbnail and the price. |
+| `GET /products/suggest?q=` | Names containing the typed text, those starting with it first, with a thumbnail and the price. When no name contains it, the names that resemble it most, as the search's similar-name fallback finds them. |
 | `GET /products/:slug` | One product with its measurements in both unit systems. |
 | `GET /products/:slug/related` | Up to 8 products from the same category. |
 | `GET /products/:slug/reviews` | Approved reviews with the average, which is absent while there are none, and the distribution. Reads `sort` (`helpful`, `newest`, `highest`, `lowest`) and `page`. |

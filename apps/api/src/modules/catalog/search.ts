@@ -129,7 +129,7 @@ export const ProductSearch = {
         return [desc(products.ratingAverage), desc(products.ratingCount), asc(products.slug)]
       case "relevance":
         if (query.text !== undefined && match === "similar") {
-          return [desc(sql`similarity(${products.name}, ${query.text})`), asc(products.name), asc(products.slug)]
+          return ProductSearch.similarityOrder(query.text)
         }
         return query.text === undefined
           ? [asc(products.name), asc(products.slug)]
@@ -142,6 +142,9 @@ export const ProductSearch = {
             ]
     }
   },
+
+  /** The names that resemble `text` most first, as a similar match ranks them. */
+  similarityOrder: (text: string): SQL[] => [desc(sql`similarity(${products.name}, ${text})`), asc(products.name), asc(products.slug)],
 
   /** Typed prefixes first, then any other substring match, alphabetically. */
   suggestionOrder: (text: string): SQL[] => [desc(ilike(products.name, ProductSearch.prefixPattern(text))), asc(products.name)],

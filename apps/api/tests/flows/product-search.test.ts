@@ -229,14 +229,16 @@ describe("consistency", () => {
     }
   })
 
-  it("suggests only products the same search would list", async () => {
-    for (const text of ["la", "sword", "dia", "o"]) {
+  it("suggests only products the same search would list, a misspelling's similar names included", async () => {
+    for (const text of ["la", "sword", "dia", "o", "diamnd sword"]) {
       const suggested = (
-        jsonOf(await harness.app.inject({ method: "GET", url: `/api/v1/products/suggest?q=${text}&limit=20` }))["items"] as {
+        jsonOf(await harness.app.inject({ method: "GET", url: `/api/v1/products/suggest?q=${encodeURIComponent(text)}&limit=20` }))[
+          "items"
+        ] as {
           slug: string
         }[]
       ).map((item) => item.slug)
-      const listed = await everything(`q=${text}`)
+      const listed = await everything(`q=${encodeURIComponent(text)}`)
 
       expect(suggested.length, text).toBeGreaterThan(0)
       expect(listed, text).toEqual(expect.arrayContaining(suggested))

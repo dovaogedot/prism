@@ -32,6 +32,11 @@ import { ImageRows, type ImageRow } from "./images.ts"
 /** Every read the catalog makes. */
 export type CatalogRepository = Readonly<{
   search: (query: ProductQuery) => Promise<ProductSearchResult>
+  /**
+   * At most `limit` products whose names hold `text`, those starting with it
+   * first; when no name holds it, those whose names resemble it, as the
+   * search's similar match finds them.
+   */
   suggest: (text: string, limit: number) => Promise<readonly Suggestion[]>
   findBySlug: (slug: Slug) => Promise<ProductDetail | undefined>
   /**
@@ -275,6 +280,30 @@ export const CatalogRepository = {
           .limit(limit)
       ).map(toSummary)
 
+    /** Products as the quick search offers them, in the order and number given. */
+    const suggestions = async (where: SQL, order: readonly SQL[], limit: number): Promise<readonly Suggestion[]> =>
+      (
+        await db
+          .select({
+            slug: products.slug,
+            name: products.name,
+            priceCents: products.priceCents,
+            // The table and a literal column: drizzle renders a bare column in a single-table select.
+            image: sql<ImageRow | null>`(
+              SELECT ${ImageRows.json("i")} FROM product_image i WHERE i.product_id = ${products}."id" ORDER BY i.position LIMIT 1
+            )`,
+          })
+          .from(products)
+          .where(where)
+          .orderBy(...order)
+          .limit(limit)
+      ).map((row) => ({
+        slug: row.slug,
+        name: row.name,
+        priceCents: row.priceCents,
+        ...(row.image === null ? {} : { image: ImageRows.view(row.image) }),
+      }))
+
     const categorySummaries = async (): Promise<readonly CategorySummary[]> => {
       const rows = await db
         .select({
@@ -315,28 +344,13 @@ export const CatalogRepository = {
         return similar.total > 0 ? { matched: "similar", ...similar } : { matched: "exact", ...exact }
       },
 
-      suggest: async (text, limit) =>
-        (
-          await db
-            .select({
-              slug: products.slug,
-              name: products.name,
-              priceCents: products.priceCents,
-              // The table and a literal column: drizzle renders a bare column in a single-table select.
-              image: sql<ImageRow | null>`(
-                SELECT ${ImageRows.json("i")} FROM product_image i WHERE i.product_id = ${products}."id" ORDER BY i.position LIMIT 1
-              )`,
-            })
-            .from(products)
-            .where(ilike(products.name, ProductSearch.likePattern(text)))
-            .orderBy(...ProductSearch.suggestionOrder(text))
-            .limit(limit)
-        ).map((row) => ({
-          slug: row.slug,
-          name: row.name,
-          priceCents: row.priceCents,
-          ...(row.image === null ? {} : { image: ImageRows.view(row.image) }),
-        })),
+      suggest: async (text, limit) => {
+        const named = await suggestions(ilike(products.name, ProductSearch.likePattern(text)), ProductSearch.suggestionOrder(text), limit)
+        if (named.length > 0) return named
+
+        // No name holds the text as typed: names that resemble it catch a misspelling, as the results page's fallback does.
+        return suggestions(ProductSearch.textCondition(text, "similar"), ProductSearch.similarityOrder(text), limit)
+      },
 
       home: async () => {
         const [featured, topRated, newest] = await Promise.all([

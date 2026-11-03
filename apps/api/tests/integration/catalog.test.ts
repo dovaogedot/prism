@@ -278,6 +278,13 @@ describe("GET /api/v1/products/suggest", () => {
     expect(slugsOf(jsonOf(await get("/api/v1/products/suggest?q=fl")))).toEqual(["floor-lamp"])
   })
 
+  it("offers the names most like a misspelling when no name holds it", async () => {
+    const slugsOf = (body: Record<string, unknown>) => (body["items"] as { slug: string }[]).map((item) => item.slug)
+
+    expect(slugsOf(jsonOf(await get("/api/v1/products/suggest?q=flor%20lamp")))).toEqual(["floor-lamp", "desk-lamp"])
+    expect(slugsOf(jsonOf(await get("/api/v1/products/suggest?q=qqqq")))).toEqual([])
+  })
+
   it("caps the list at the requested limit", async () => {
     const body = jsonOf(await get("/api/v1/products/suggest?q=a&limit=1"))
     expect((body["items"] as unknown[]).length).toBe(1)
