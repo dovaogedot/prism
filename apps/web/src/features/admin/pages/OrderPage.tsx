@@ -211,7 +211,11 @@ export const OrderPage = () => {
               <h2 className="mb-2 font-semibold text-ink">Delivery</h2>
               <p className="text-ink">{data.shippingMethodName}</p>
               <p className="text-ink-soft">Expected {DeliveryDates.format(data.estimatedDelivery)}</p>
-              {data.trackingNumber === undefined ? null : <p className="font-mono text-ink">{data.trackingNumber}</p>}
+              {data.trackingNumber === undefined ? null : (
+                <p className="text-ink-soft">
+                  Tracking number <span className="break-all font-mono text-ink">{data.trackingNumber}</span>
+                </p>
+              )}
               <p className="pt-2 text-ink">{data.address.line1}</p>
               {data.address.line2 === undefined ? null : <p className="text-ink-soft">{data.address.line2}</p>}
               <p className="text-ink-soft">

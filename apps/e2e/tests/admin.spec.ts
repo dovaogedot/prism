@@ -235,3 +235,25 @@ test("a picture without a file or a description is told so under the field it la
   const up = await Checks.boxOf(adminPage.getByRole("button", { name: "Move picture 1 up" }))
   expect(Checks.middleGap(up, await Checks.boxOf(main))).toBeLessThanOrEqual(Checks.TOLERANCE)
 })
+
+test("a shipped order's Delivery box labels its tracking number", async ({ context }) => {
+  await Stack.fillCart(context.request)
+  const placed = await Stack.placeOrder(context.request)
+  const headers = { authorization: `Bearer ${adminToken}` }
+  await expect
+    .poll(
+      async () =>
+        ((await (await admin.request.get(`/api/v1/admin/orders/${placed.orderId}`, { headers })).json()) as { status: string }).status,
+    )
+    .toBe("payment_successful")
+  for (const step of [{ status: "processing" }, { status: "shipped", trackingNumber: "PR123456789EE" }]) {
+    const answer = await admin.request.post(`/api/v1/admin/orders/${placed.orderId}/status`, { headers, data: step })
+    expect(answer.status(), await answer.text()).toBe(200)
+  }
+
+  await Checks.open(adminPage, `/admin/orders/${placed.orderId}`)
+
+  await expect(adminPage.getByRole("heading", { level: 2, name: "Delivery" }).locator("xpath=..")).toContainText(
+    "Tracking number PR123456789EE",
+  )
+})
