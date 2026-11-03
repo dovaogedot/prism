@@ -54,6 +54,15 @@ export const TokenBucket = {
     }
   },
 
+  /**
+   * Refills `state` for the time since it was last counted and puts one
+   * token back, never past the capacity.
+   */
+  giveBack: (state: BucketState, now: number, shape: BucketShape): BucketState => ({
+    tokens: Math.min(shape.capacity, state.tokens + (Math.max(0, now - state.updatedAt) / 1000) * shape.refillPerSecond + 1),
+    updatedAt: now,
+  }),
+
   /** Whether the bucket has refilled to its capacity by `now`, which makes it the same as no bucket. */
   isFull: (state: BucketState, now: number, shape: BucketShape): boolean =>
     state.tokens + (Math.max(0, now - state.updatedAt) / 1000) * shape.refillPerSecond >= shape.capacity,
@@ -84,7 +93,8 @@ export const RateLimitPolicy = {
   table: {
     // Everything that checks a password or a code: the thing worth guessing.
     credentials: { key: "address", capacity: 10, refillPerSecond: 1 / 6 },
-    // One account guessed at from many addresses still runs dry.
+    // One account guessed at from many addresses still runs dry. A sign-in
+    // with the right password gives its token back, so only failures count.
     "account-login": { key: "account", capacity: 5, refillPerSecond: 1 / 60 },
     // Every TOTP check of one account, from any address and any route, takes from one bucket.
     "account-code": { key: "account", capacity: 5, refillPerSecond: 1 / 60 },
@@ -126,6 +136,12 @@ export const RateLimitPolicy = {
 export type RateLimiter = Readonly<{
   /** Takes one token from the bucket of `key` under `policy`. */
   take: (policy: RateLimitPolicyName, key: string) => TakeResult
+  /**
+   * Puts back the token a request took from the bucket of `key` under
+   * `policy`, for a request that turns out not to count, and returns the
+   * whole tokens the bucket holds after. A key with no bucket is full.
+   */
+  giveBack: (policy: RateLimitPolicyName, key: string) => number
   /** The policy as scaled for this limiter. */
   policyOf: (policy: RateLimitPolicyName) => RateLimitPolicy
   /** How many buckets are held across every policy. */
@@ -217,6 +233,20 @@ export const RateLimiter = {
         map.set(key, result.state)
 
         return result
+      },
+
+      giveBack: (name, key) => {
+        const policy = policyOf(name)
+        const map = bucketsOf(name)
+        const previous = map.get(key)
+
+        if (previous === undefined) return Math.floor(policy.capacity)
+
+        const state = TokenBucket.giveBack(previous, options.clock.now().getTime(), policy)
+        map.delete(key)
+        map.set(key, state)
+
+        return Math.floor(state.tokens)
       },
 
       policyOf,

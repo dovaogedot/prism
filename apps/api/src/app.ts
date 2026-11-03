@@ -409,6 +409,7 @@ export const App = {
               ...(config.oauth.mode === "mock" ? { mockOAuthSecret: config.tokens.secret } : {}),
               publicWebOrigin: config.http.webOrigin,
               limitAccount: (email) => limiter.take("account-login", cipher.index("account-email", email).toString("hex")),
+              refundAccount: (email) => limiter.giveBack("account-login", cipher.index("account-email", email).toString("hex")),
             })
           },
           { prefix: "/auth" },

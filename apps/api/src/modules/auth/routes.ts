@@ -44,6 +44,8 @@ export type AuthRouteDependencies = Readonly<{
    * holds however many addresses the guesses come from.
    */
   limitAccount: (email: Email) => TakeResult
+  /** Puts back the token `limitAccount` took for `email`, and returns the whole tokens left. */
+  refundAccount: (email: Email) => number
 }>
 
 export const AuthRoutes = {
@@ -88,8 +90,10 @@ export const AuthRoutes = {
     })
 
     routes.post("/login", { config: credentials, schema: { body: LoginInput.schema } }, async (request, reply) => {
+      // Every attempt holds a token while its password is checked, so guesses
+      // sent at once cannot all pass on one look at the bucket. A sign-in that
+      // gets past the password gives it back: only failed attempts count.
       const taken = deps.limitAccount(request.body.email)
-      reply.header("RateLimit-Remaining", taken.remaining)
 
       const result = await service.login({
         email: request.body.email,
@@ -98,6 +102,8 @@ export const AuthRoutes = {
         isCaptchaRequired: !taken.isAllowed,
         context: AuthRoutes.contextOf(request),
       })
+
+      reply.header("RateLimit-Remaining", result.isOk() && taken.isAllowed ? deps.refundAccount(request.body.email) : taken.remaining)
 
       if (result.isErr()) return HttpErrors.send(reply, result.error)
 

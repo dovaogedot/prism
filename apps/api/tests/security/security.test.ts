@@ -587,6 +587,32 @@ describe("rate limiting", () => {
     expect(solved.statusCode).toBe(200)
   })
 
+  it("counts only failed sign-ins against an account, so its owner can sign in again and again", async () => {
+    const accountLogin = RateLimitPolicy.table["account-login"]
+    await fromAddress("198.51.100.90", "POST", "/api/v1/auth/register", {
+      email: "frequent-owner@example.com",
+      password: VALID_PASSWORD,
+      captchaToken: "test-token",
+    })
+    const signIn = (address: string) =>
+      fromAddress(address, "POST", "/api/v1/auth/login", { email: "frequent-owner@example.com", password: VALID_PASSWORD })
+    const statuses: number[] = []
+
+    for (let index = 0; index <= accountLogin.capacity * 2; index += 1) {
+      statuses.push((await signIn(`198.51.100.${100 + index}`)).statusCode)
+    }
+
+    for (let index = 0; index < accountLogin.capacity; index += 1) {
+      await guess(`198.51.100.${120 + index}`, "frequent-owner@example.com")
+    }
+
+    const afterGuesses = await signIn("198.51.100.130")
+
+    expect(statuses.every((status) => status === 200)).toBe(true)
+    expect(afterGuesses.statusCode).toBe(429)
+    expect(jsonOf(afterGuesses)["error"]).toMatchObject({ code: "CaptchaRequired" })
+  })
+
   it("ignores a forwarded address the caller made up", async () => {
     // With the whole X-Forwarded-For chain trusted, a caller could name a new
     // address on every request and never spend the same budget twice. The

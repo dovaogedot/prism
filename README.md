@@ -161,7 +161,7 @@ A declined order releases its stock and mails the reason; the cart keeps its ite
 ### Accounts
 
 - **Register**: email address, a password of at least twelve characters, and the CAPTCHA.
-- **Sign in** with the password or a provider button. After too many attempts at one account, from anywhere, the page asks for the CAPTCHA with the password, so guessing slows down without locking the owner out. On localhost with no provider keys, the button opens a stand-in consent page, where any address works. A page that asks you to sign in sends you back to it afterwards.
+- **Sign in** with the password or a provider button. After too many failed attempts at one account, from anywhere, the page asks for the CAPTCHA with the password, so guessing slows down without locking the owner out. On localhost with no provider keys, the button opens a stand-in consent page, where any address works. A page that asks you to sign in sends you back to it afterwards.
 - **Password reset**: "Forgot your password?" mails a link to the Mailpit inbox. Setting the new password signs every session out.
 - **The account** has three tabs of one width: Profile, Addresses and Orders.
 - **Profile** (`/account`): full name and phone, which checkout fills in. The email is shown but stays as it is. The password and 2FA live here too; changing the password asks for the current one and signs out every other session.
@@ -325,7 +325,7 @@ The schema is `apps/api/src/db/schema.ts`, and the migrations under `apps/api/dr
   | Policy | Routes | Counted per | Burst | Refill |
   | --- | --- | --- | --- | --- |
   | `credentials` | everything that checks a password or a code | client address | 10 | 1 every 6 s |
-  | `account-login` | sign-in, besides `credentials`; once it is empty, sign-in asks for a CAPTCHA instead of refusing | account | 5 | 1 every 60 s |
+  | `account-login` | failed sign-ins, besides `credentials`; a sign-in with the right password gives its token back; once it is empty, sign-in asks for a CAPTCHA instead of refusing | account | 5 | 1 every 60 s |
   | `account-code` | every 2FA code check of one account, besides `credentials` | account | 5 | 1 every 60 s |
   | `session` | refresh, provider sign-in | client address | 30 | 1 per s |
   | `checkout` | placing an order, the address lookup | client address | 10 | 1 every 6 s |

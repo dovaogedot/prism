@@ -62,6 +62,18 @@ describe("TokenBucket.take", () => {
   })
 })
 
+describe("TokenBucket.giveBack", () => {
+  it("puts one token back, never past the capacity", () => {
+    expect(TokenBucket.giveBack(drain(5), start, shape).tokens).toBe(1)
+    expect(TokenBucket.giveBack(drain(1), start, shape).tokens).toBe(5)
+  })
+
+  it("counts the refill since the bucket was last counted", () => {
+    // A second at 0.5 a second refills half a token, besides the one given back.
+    expect(TokenBucket.giveBack(drain(5), start + 1000, shape)).toEqual({ tokens: 1.5, updatedAt: start + 1000 })
+  })
+})
+
 describe("TokenBucket.isFull", () => {
   it("is true once a bucket has refilled to its capacity", () => {
     const empty = drain(5)
@@ -94,6 +106,23 @@ describe("RateLimiter", () => {
     expect(limiter.take("account-login", "mari").isAllowed).toBe(false)
     expect(limiter.take("account-login", "jaan").isAllowed).toBe(true)
     expect(limiter.take("credentials", "mari").isAllowed).toBe(true)
+  })
+
+  it("gives a taken token back, so a request that does not count leaves the bucket as it was", () => {
+    const limiter = RateLimiter.create({ clock: Clock.mutable(new Date(start)), scale: 1 })
+
+    for (let taken = 0; taken < 5; taken += 1) limiter.take("account-login", "mari")
+
+    expect(limiter.giveBack("account-login", "mari")).toBe(1)
+    expect(limiter.take("account-login", "mari").isAllowed).toBe(true)
+    expect(limiter.take("account-login", "mari").isAllowed).toBe(false)
+  })
+
+  it("holds no bucket for a key given back without one", () => {
+    const limiter = RateLimiter.create({ clock: Clock.mutable(new Date(start)), scale: 1 })
+
+    expect(limiter.giveBack("account-login", "mari")).toBe(5)
+    expect(limiter.size()).toBe(0)
   })
 
   it("scales every policy", () => {
