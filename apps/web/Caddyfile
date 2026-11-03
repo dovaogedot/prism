@@ -1,3 +1,17 @@
+# The listeners of each WEB_TLS mode, which the global options below import,
+# so they come first. Over HTTPS, plain HTTP sent to the port, such as an
+# address typed without https://, is redirected to HTTPS instead of refused.
+(listeners-self-signed) {
+	listener_wrappers {
+		http_redirect
+		tls
+	}
+}
+
+# Plain HTTP is all this mode serves, so there is nothing to redirect.
+(listeners-off) {
+}
+
 {
 	admin off
 	auto_https off
@@ -14,6 +28,10 @@
 		# Read from the right, the visitor is the first address in the header
 		# that is not a trusted proxy.
 		trusted_proxies_strict
+		# No HTTP/3: it runs over UDP, which no stack publishes, so a browser
+		# is never told to look for it.
+		protocols h1 h2
+		import listeners-{$WEB_TLS}
 	}
 }
 
