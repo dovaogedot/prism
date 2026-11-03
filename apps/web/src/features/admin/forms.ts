@@ -3,7 +3,7 @@
  * takes in cents, and slugs made from a name.
  */
 
-import { FieldChecks, ProductFields, ProductInput, ShippingMethodCode, ShippingMethodInput, type ShippingMethodView } from "@prism/shared"
+import { FieldChecks, ProductFields, ProductInput, ShippingMethodInput, type ShippingMethodView } from "@prism/shared"
 import { z } from "zod"
 
 export const Cents = {
@@ -56,8 +56,8 @@ export const ProductForm = {
 export const ShippingFields = {
   schema: z
     .strictObject({
-      code: ShippingMethodCode.schema,
-      name: z.string().trim().min(1, "Enter a name.").max(60, "Use at most 60 characters."),
+      code: ShippingMethodInput.schema.shape.code,
+      name: ShippingMethodInput.schema.shape.name,
       // In euros, then held to the API's limits in cents.
       price: Euros.schema.pipe(ShippingMethodInput.schema.shape.priceCents),
       freeFrom: Euros.optional.pipe(ShippingMethodInput.schema.shape.freeFromCents),

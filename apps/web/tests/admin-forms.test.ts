@@ -41,6 +41,12 @@ describe("the prices of the product and delivery forms", () => {
   })
 })
 
+describe("the delivery option form's code", () => {
+  it("asks staff to enter one, not to choose one as checkout does", () => {
+    expect(ShippingFields.schema.shape.code.safeParse("").error?.issues[0]?.message).toBe("Enter a code.")
+  })
+})
+
 describe("a slug made from a name", () => {
   it("joins lowercase words with dashes and drops accents and punctuation", () => {
     expect(Slugs.fromName("Diamond Sword")).toBe("diamond-sword")

@@ -149,7 +149,8 @@ export type ShippingMethodInput = z.infer<typeof ShippingMethodInput.schema>
 export const ShippingMethodInput = {
   schema: z
     .strictObject({
-      code: ShippingMethodCode.schema,
+      // Staff type the code in, where checkout's message would ask them to choose one.
+      code: z.string({ error: "Enter a code." }).trim().min(1, "Enter a code.").pipe(ShippingMethodCode.schema),
       name: z.string().trim().min(1, "Enter a name.").max(60, "Use at most 60 characters."),
       priceCents: z
         .number({ error: "Enter a price." })
