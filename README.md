@@ -217,7 +217,7 @@ Every route is under `/api/v1` and answers JSON. A refusal is `{ "error": { "cod
 | `POST /auth/register` | Opens an account. Body: `email`, `password`, `captchaToken`. |
 | `POST /auth/login` | Signs in. Answers a grant, or a challenge when 2FA is on. |
 | `POST /auth/login/2fa` | Finishes a challenged sign-in with a code. |
-| `POST /auth/refresh` | Trades the refresh cookie for a new access token and cookie. |
+| `POST /auth/refresh` | Trades the refresh cookie for a new access token and cookie. Without a refresh cookie it answers 204 with no body: no session. A cookie that is unknown, expired, reused or from an ended session answers 401. |
 | `POST /auth/logout` | Revokes the session. |
 | `GET /auth/me` | The signed-in user, with their staff roles and whether the session passed a code check. |
 | `POST /auth/password/forgot` | Sends a reset link. Answers the same whether the address exists. |

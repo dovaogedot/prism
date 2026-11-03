@@ -261,13 +261,26 @@ describe("POST /auth/refresh — rotation and reuse", () => {
     expect(jsonOf(response)["error"]).toMatchObject({ code: "RefreshTokenInvalid" })
   })
 
-  it("rejects a refresh with no cookie at all", async () => {
+  it("answers a refresh with no cookie at all with no session, and no failure", async () => {
     const response = await harness.app.inject({
       method: "POST",
       url: "/api/v1/auth/refresh",
     })
 
+    expect(response.statusCode).toBe(204)
+    expect(response.body).toBe("")
+    expect(response.headers["set-cookie"]).toBeUndefined()
+  })
+
+  it("refuses an empty refresh cookie", async () => {
+    const response = await harness.app.inject({
+      method: "POST",
+      url: "/api/v1/auth/refresh",
+      cookies: { prism_refresh: "" },
+    })
+
     expect(response.statusCode).toBe(401)
+    expect(jsonOf(response)["error"]).toMatchObject({ code: "RefreshTokenInvalid" })
   })
 
   it("refuses a refresh token past its lifetime", async () => {

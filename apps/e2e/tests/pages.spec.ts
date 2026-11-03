@@ -80,8 +80,7 @@ for (const theme of Checks.THEMES) {
           if (message.type() === "error" && Checks.isOwnError(message, origin)) errors.push(message.text())
         })
 
-        // A guest's page asks to refresh a session it does not have, and is refused by design.
-        const expected = [...(entry.isSignedIn === true ? [] : ["401 POST /api/v1/auth/refresh"]), ...(entry.refused ?? [])]
+        const expected = entry.refused ?? []
         const refused: string[] = []
         page.on("response", (answer) => {
           const url = new URL(answer.url())

@@ -120,8 +120,10 @@ export const Api = {
   },
 
   /**
-   * Trades the refresh cookie for a fresh access token. Concurrent callers
-   * share one attempt, and the tabs of one browser take turns.
+   * Trades the refresh cookie for a fresh access token, and resolves to
+   * whether a session came back. A browser with no cookie gets a 204, which
+   * means signed out. Concurrent callers share one attempt, and the tabs of
+   * one browser take turns.
    */
   refresh: (): Promise<boolean> => {
     if (Refresh.inFlight !== undefined) return Refresh.inFlight
@@ -141,6 +143,11 @@ export const Api = {
           if (response.status === 401 || response.status === 403) {
             TokenStore.clear()
           }
+          return false
+        }
+
+        if (response.status === 204) {
+          TokenStore.clear()
           return false
         }
 

@@ -135,7 +135,12 @@ export const AuthRoutes = {
     })
 
     routes.post("/refresh", { config: session }, async (request, reply) => {
-      const presented = RefreshToken.schema.safeParse(request.cookies[Cookies.REFRESH])
+      const cookie = request.cookies[Cookies.REFRESH]
+
+      // A visitor with no cookie at all has no session, which is an answer, not a failure.
+      if (cookie === undefined) return reply.status(204).send()
+
+      const presented = RefreshToken.schema.safeParse(cookie)
 
       if (!presented.success) return HttpErrors.send(reply, { _tag: "RefreshTokenInvalid" })
 
