@@ -53,7 +53,8 @@ run_e2e() {
     rm -rf apps/e2e/test-results
     docker cp prism-e2e-suite:/app/apps/e2e/test-results apps/e2e/test-results >/dev/null 2>&1 || true
     docker rm prism-e2e-suite >/dev/null 2>&1 || true
-    if [ -n "$(ls -A apps/e2e/test-results 2>/dev/null)" ]; then
+    # Playwright keeps a trace of each failed test only, beside a record of the run that every run leaves.
+    if [ -n "$(find apps/e2e/test-results -name trace.zip -print -quit 2>/dev/null)" ]; then
       echo "Traces of the failed tests: apps/e2e/test-results (npx playwright show-trace <trace.zip>)."
     fi
   fi

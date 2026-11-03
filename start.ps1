@@ -147,7 +147,8 @@ if ($action -eq "test" -and $args.Count -gt 1 -and $args[1] -eq "e2e") {
       $traces = Join-Path $PSScriptRoot "apps\e2e\test-results"
       if (Test-Path $traces) { Remove-Item -Recurse -Force $traces }
       docker cp prism-e2e-suite:/app/apps/e2e/test-results $traces 2>&1 | Out-Null
-      if ((Test-Path $traces) -and (Get-ChildItem $traces)) {
+      # Playwright keeps a trace of each failed test only, beside a record of the run that every run leaves.
+      if ((Test-Path $traces) -and (Get-ChildItem $traces -Recurse -Filter trace.zip | Select-Object -First 1)) {
         Write-Host "Traces of the failed tests: apps\e2e\test-results (npx playwright show-trace <trace.zip>)."
       }
     }
