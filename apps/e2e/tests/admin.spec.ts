@@ -1,8 +1,8 @@
 /**
  * The admin: its gate, which keeps customers out and makes staff set up a
  * second factor before anything opens, what staff lose by turning it off,
- * and every admin page in both themes held to the same checks as the
- * storefront.
+ * every admin page in both themes held to the same checks as the
+ * storefront, and where a few pages put what they say.
  *
  * The admin signs in once for the whole file: a TOTP code works once, and
  * the refresh cookie rotates with every use, so the pages share one session.
@@ -206,4 +206,32 @@ test("deleting asks first, and canceling deletes nothing", async () => {
     .getByRole("button", { name: "Delete brand" })
     .click()
   await expect(deleteButton).toBeHidden()
+})
+
+test("a picture without a file or a description is told so under the field it lacks, and so is a picture's emptied description", async () => {
+  const product = (await (await admin.request.get(`/api/v1/products/${Stack.PRODUCT_SLUG}`)).json()) as Readonly<{ id: string }>
+  await Checks.open(adminPage, `/admin/products/${product.id}`)
+  const pictures = adminPage.getByRole("heading", { level: 2, name: "Pictures" }).locator("xpath=..")
+  const file = adminPage.getByLabel("Picture file")
+  const description = adminPage.getByLabel("Describe the picture", { exact: true })
+
+  await pictures.getByRole("button", { name: "Upload" }).click()
+  await expect(file).toHaveAccessibleDescription(/Choose a picture to upload\./)
+
+  // A single transparent pixel.
+  const pixel = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64")
+  await file.setInputFiles({ name: "pixel.png", mimeType: "image/png", buffer: pixel })
+  await pictures.getByRole("button", { name: "Upload" }).click()
+  await expect(file).not.toHaveAccessibleDescription(/Choose a picture/)
+  await expect(description).toHaveAccessibleDescription("Describe what the picture shows.")
+  await expect(description).toBeFocused()
+
+  const main = adminPage.getByLabel("Describe the main picture")
+  await main.fill("")
+  await main.blur()
+  await expect(main).toHaveAccessibleDescription("Describe what the picture shows.")
+  await expect(pictures.getByRole("alert").filter({ hasText: /alt:|Describe picture/ })).toHaveCount(0)
+  // The message under the field moves neither the picture's buttons nor the field.
+  const up = await Checks.boxOf(adminPage.getByRole("button", { name: "Move picture 1 up" }))
+  expect(Checks.middleGap(up, await Checks.boxOf(main))).toBeLessThanOrEqual(Checks.TOLERANCE)
 })

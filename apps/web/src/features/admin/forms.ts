@@ -1,9 +1,16 @@
 /**
  * How the admin's forms read what staff type: prices in euros, which the API
- * takes in cents, and slugs made from a name.
+ * takes in cents, slugs made from a name, and a picture to upload.
  */
 
-import { FieldChecks, ProductFields, ProductInput, ShippingMethodInput, type ShippingMethodView } from "@prism/shared"
+import {
+  FieldChecks,
+  ImageAlt,
+  ProductFields,
+  ProductInput,
+  ShippingMethodInput,
+  type ShippingMethodView,
+} from "@prism/shared"
 import { z } from "zod"
 
 export const Cents = {
@@ -113,5 +120,23 @@ export const ShippingForm = {
     maxDays: form.maxDays,
     isActive: form.isActive,
     position: form.position,
+  }),
+} as const
+
+/** The form that adds a picture to a product: the file, the text that describes it, and whether it is pixel art. */
+export const PictureUploadForm = {
+  schema: z.strictObject({
+    // A file input holds the files chosen, which are none until one is.
+    file: z
+      .custom<FileList>((files) => files instanceof FileList, "Choose a picture to upload.")
+      .transform((files, context) => {
+        const file = files.item(0)
+        if (file !== null) return file
+
+        context.addIssue({ code: "custom", message: "Choose a picture to upload." })
+        return z.NEVER
+      }),
+    alt: ImageAlt.schema,
+    isPixelArt: z.boolean(),
   }),
 } as const
