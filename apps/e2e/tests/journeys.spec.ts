@@ -2,7 +2,8 @@
  * What a visitor does with a keyboard and a screen reader in mind: the skip
  * link, the header's controls, the search box, the cart preview, and where
  * focus lands when a page changes. And the answers a crawler gets: a real
- * 404 for an address outside the route list.
+ * 404 for an address outside the route list, and for a product or a
+ * category the shop does not have.
  */
 
 import { expect, test } from "@playwright/test"
@@ -123,6 +124,19 @@ test("an address outside the route list answers 404 with the shop's page, and a 
   expect(missing.status()).toBe(404)
   expect(await missing.text()).toContain('<div id="root">')
   expect(present.status()).toBe(200)
+})
+
+test("an unknown product or category answers 404 with the shop's page, and a known one 200", async ({ request }) => {
+  for (const path of ["/products/no-such-product", "/categories/no-such-category"]) {
+    const missing = await request.get(path)
+
+    expect(missing.status(), path).toBe(404)
+    expect(await missing.text(), path).toContain('<div id="root">')
+  }
+
+  for (const path of [`/products/${Stack.PRODUCT_SLUG}`, "/categories/minecraft"]) {
+    expect((await request.get(path)).status(), path).toBe(200)
+  }
 })
 
 test("an unknown product shows the not-found page and asks search engines to skip it", async ({ page }) => {

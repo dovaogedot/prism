@@ -2,14 +2,17 @@
  * What search engines read: `robots.txt`, which keeps them out of private
  * pages and names the sitemap, and `sitemap.xml`, which lists every public
  * page with its absolute address. The web container serves both at the
- * site's root.
+ * site's root. And whether a product's or a category's page has one to show,
+ * which the web container asks before it answers that page, so that a page
+ * of an unknown slug answers with status 404.
  */
 
-import type { Slug } from "@prism/shared"
-import { asc } from "drizzle-orm"
+import { Slug } from "@prism/shared"
+import { asc, eq } from "drizzle-orm"
 import type { FastifyInstance } from "fastify"
 import type { Database } from "../../db/client.ts"
 import { categories, products } from "../../db/schema.ts"
+import { HttpErrors } from "../../http/errors.ts"
 import { Html } from "../../http/html.ts"
 
 /** What the SEO routes are served from. */
@@ -17,6 +20,9 @@ export type SeoRouteDependencies = Readonly<{ db: Database; webOrigin: string }>
 
 /** One address of the sitemap, with when it last changed when that is known. */
 export type SitemapEntry = Readonly<{ path: string; lastModified?: Date }>
+
+/** The sections of the storefront whose pages show one product or one category, named by its slug. */
+export type PageSection = "products" | "categories"
 
 export const SeoRoutes = {
   /** Pages nobody should find through a search engine: they are personal, or empty without a session. */
@@ -36,6 +42,9 @@ export const SeoRoutes = {
 
   /** The fixed pages every sitemap lists. */
   FIXED: ["/", "/shop", "/about", "/contact", "/faq", "/terms", "/privacy"],
+
+  /** The sections whose pages the web container asks about. */
+  PAGE_SECTIONS: ["products", "categories"] as const satisfies readonly PageSection[],
 
   robots: (webOrigin: string): string =>
     ["User-agent: *", ...SeoRoutes.PRIVATE.map((path) => `Disallow: ${path}`), "", `Sitemap: ${webOrigin}/sitemap.xml`, ""].join("\n"),
@@ -69,6 +78,18 @@ export const SeoRoutes = {
     ]
   },
 
+  /** Whether the shop has the product or category whose page `section`/`text` is. A text that is no slug names none. */
+  hasPage: async (db: Database, section: PageSection, text: string): Promise<boolean> => {
+    const slug = Slug.schema.safeParse(text)
+    if (!slug.success) return false
+
+    const found =
+      section === "products"
+        ? await db.select({ slug: products.slug }).from(products).where(eq(products.slug, slug.data)).limit(1)
+        : await db.select({ slug: categories.slug }).from(categories).where(eq(categories.slug, slug.data)).limit(1)
+    return found.length > 0
+  },
+
   register: (app: FastifyInstance, deps: SeoRouteDependencies): void => {
     const shared = { cache: "public" } as const
 
@@ -79,5 +100,14 @@ export const SeoRoutes = {
     app.get("/seo/sitemap.xml", { config: shared }, async (_request, reply) =>
       reply.type("application/xml; charset=utf-8").send(SeoRoutes.sitemap(deps.webOrigin, await SeoRoutes.entries(deps.db))),
     )
+
+    // The web server asks before it answers a product's or a category's page, so an unknown slug gets status 404.
+    for (const section of SeoRoutes.PAGE_SECTIONS) {
+      app.get<{ Params: { slug: string } }>(`/seo/pages/${section}/:slug`, { config: shared }, async (request, reply) =>
+        (await SeoRoutes.hasPage(deps.db, section, request.params.slug))
+          ? reply.status(204).send()
+          : HttpErrors.send(reply, { _tag: section === "products" ? "ProductNotFound" : "CategoryNotFound" }),
+      )
+    }
   },
 } as const

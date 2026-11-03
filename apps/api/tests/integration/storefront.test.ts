@@ -385,6 +385,16 @@ describe("what search engines read", () => {
     }
   })
 
+  it("says whether a product's or a category's page has one to show, so the web server can answer 404 for one that does not", async () => {
+    const statusOf = async (url: string) => (await harness.app.inject({ method: "GET", url })).statusCode
+
+    expect(await statusOf("/api/v1/seo/pages/products/diamond-sword")).toBe(204)
+    expect(await statusOf("/api/v1/seo/pages/categories/weapons")).toBe(204)
+    expect(await statusOf("/api/v1/seo/pages/products/no-such-product")).toBe(404)
+    expect(await statusOf("/api/v1/seo/pages/categories/no-such-category")).toBe(404)
+    expect(await statusOf("/api/v1/seo/pages/products/Not_A_Slug")).toBe(404)
+  })
+
   it("keeps crawlers out of private pages and names the sitemap", async () => {
     const response = await harness.app.inject({ method: "GET", url: "/api/v1/seo/robots.txt" })
 
