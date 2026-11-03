@@ -102,7 +102,7 @@ describe("GET /api/v1/products", () => {
       { value: "4", label: "4 stars & up", count: 1 },
       { value: "3", label: "3 stars & up", count: 2 },
       { value: "2", label: "2 stars & up", count: 2 },
-      { value: "1", label: "1 stars & up", count: 2 },
+      { value: "1", label: "1 star & up", count: 2 },
     ])
   })
 

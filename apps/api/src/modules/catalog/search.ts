@@ -26,7 +26,11 @@ export const ProductSearch = {
   RATING_THRESHOLDS: [5, 4, 3, 2, 1] as const,
 
   /** What a rating threshold reads as in the facet rail. */
-  ratingLabel: (threshold: number): string => (threshold >= 5 ? "5 stars" : `${threshold} stars & up`),
+  ratingLabel: (threshold: number): string => {
+    if (threshold >= 5) return "5 stars"
+
+    return `${threshold} ${threshold === 1 ? "star" : "stars"} & up`
+  },
 
   /**
    * Whether a card shows `average` at `threshold` stars or more. A rating

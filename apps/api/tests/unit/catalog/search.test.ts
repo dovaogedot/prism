@@ -49,6 +49,10 @@ describe("ProductSearch.ratingLabel", () => {
     expect(ProductSearch.ratingLabel(5)).toBe("5 stars")
     expect(ProductSearch.ratingLabel(3)).toBe("3 stars & up")
   })
+
+  it("names one star in the singular", () => {
+    expect(ProductSearch.ratingLabel(1)).toBe("1 star & up")
+  })
 })
 
 describe("ProductSearch.conditions", () => {
