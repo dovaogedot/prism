@@ -18,6 +18,8 @@ $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
 $WebPortDefault = "3000"
+# The API's address when .env has none, as docker-compose.yml gives it.
+$PublicWebUrlDefault = "https://localhost:3000"
 $RabbitPortDefault = "15672"
 $EnvFile = Join-Path $PSScriptRoot ".env"
 
@@ -261,10 +263,21 @@ $admin
 
 "@
 
-# Links in emails and the OAuth redirects are built from PUBLIC_WEB_URL, and
-# the storefront answers https only.
-if (Get-Content $EnvFile | Where-Object { $_ -like "PUBLIC_WEB_URL=http://*" }) {
+# Links in emails and the OAuth redirects are built from PUBLIC_WEB_URL, so it
+# has to be the address the storefront answers at: HTTPS, and on this machine
+# the port WEB_PORT publishes.
+$publicUrl = (Get-Content $EnvFile | Where-Object { $_ -like "PUBLIC_WEB_URL=*" } | Select-Object -First 1) -replace "^PUBLIC_WEB_URL=", ""
+if (-not $publicUrl) { $publicUrl = $PublicWebUrlDefault }
+if ($publicUrl -like "http://*") {
   Write-Host "  Note: PUBLIC_WEB_URL in .env starts with http://. Change it to https://localhost:$webPort"
   Write-Host "  and run .\start.cmd again, or the links in emails and the OAuth sign-ins will not work."
   Write-Host ""
+} elseif ($publicUrl -match "^https://(localhost|127\.0\.0\.1)(:(\d+))?(/|$)") {
+  $publicPort = if ($Matches[3]) { $Matches[3] } else { "443" }
+  if ($publicPort -ne $webPort) {
+    Write-Host "  Note: PUBLIC_WEB_URL is $publicUrl, but the storefront listens on port $webPort (WEB_PORT)."
+    Write-Host "  Set PUBLIC_WEB_URL=https://localhost:$webPort in .env and run .\start.cmd again, or the links"
+    Write-Host "  in emails and the OAuth sign-ins will not work."
+    Write-Host ""
+  }
 }

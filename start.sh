@@ -17,6 +17,8 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 readonly WEB_PORT_DEFAULT=3000
+# The API's address when .env has none, as docker-compose.yml gives it.
+readonly PUBLIC_WEB_URL_DEFAULT=https://localhost:3000
 readonly RABBITMQ_UI_PORT_DEFAULT=15672
 
 # The browser suite's stack: a project of its own, never the one above, with
@@ -254,10 +256,18 @@ ${admin}
 
 BANNER
 
-# Links in emails and the OAuth redirects are built from PUBLIC_WEB_URL, and
-# the storefront answers https only.
-if grep -qE '^PUBLIC_WEB_URL=http://' .env; then
+# Links in emails and the OAuth redirects are built from PUBLIC_WEB_URL, so it
+# has to be the address the storefront answers at: HTTPS, and on this machine
+# the port WEB_PORT publishes.
+public_url="$(grep -E '^PUBLIC_WEB_URL=' .env | cut -d= -f2- || true)"
+public_url="${public_url:-$PUBLIC_WEB_URL_DEFAULT}"
+if [[ $public_url == http://* ]]; then
   echo "  Note: PUBLIC_WEB_URL in .env starts with http://. Change it to https://localhost:${web_port}"
   echo "  and run ./start.sh again, or the links in emails and the OAuth sign-ins will not work."
+  echo
+elif [[ $public_url =~ ^https://(localhost|127\.0\.0\.1)(:([0-9]+))?(/|$) ]] && [ "${BASH_REMATCH[3]:-443}" != "$web_port" ]; then
+  echo "  Note: PUBLIC_WEB_URL is ${public_url}, but the storefront listens on port ${web_port} (WEB_PORT)."
+  echo "  Set PUBLIC_WEB_URL=https://localhost:${web_port} in .env and run ./start.sh again, or the links"
+  echo "  in emails and the OAuth sign-ins will not work."
   echo
 fi

@@ -38,7 +38,7 @@ On Windows each command is `.\start.cmd ...` with the same arguments.
 
 Both passwords are `prism` unless `.env` sets them, and both pages answer on this machine only.
 
-The storefront answers HTTPS, with a self-signed certificate that the web container makes on its first start. The browser warns about it once: accept the warning to go on. An address typed with `http://` is redirected to HTTPS. The certificate lasts 825 days and stays in a volume, so the browser's exception keeps working until `./start.sh reset`. Links in mail and the provider sign-ins are built from `PUBLIC_WEB_URL`, which is `https://localhost:3000`; `./start.sh` says so when `.env` holds an `http://` address.
+The storefront answers HTTPS, with a self-signed certificate that the web container makes on its first start. The browser warns about it once: accept the warning to go on. An address typed with `http://` is redirected to HTTPS. The certificate lasts 825 days and stays in a volume, so the browser's exception keeps working until `./start.sh reset`. Links in mail and the provider sign-ins are built from `PUBLIC_WEB_URL`, which is `https://localhost:3000`, so a port of your own in `WEB_PORT` goes into it too. `./start.sh` says so when it starts with `http://`, or names another port than `WEB_PORT`.
 
 | Account      | Sign-in                                                                           |
 | ------------ | --------------------------------------------------------------------------------- |
