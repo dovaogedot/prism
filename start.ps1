@@ -21,6 +21,7 @@ $WebPortDefault = "3000"
 # The API's address when .env has none, as docker-compose.yml gives it.
 $PublicWebUrlDefault = "https://localhost:3000"
 $RabbitPortDefault = "15672"
+$MailpitPortDefault = "8025"
 $EnvFile = Join-Path $PSScriptRoot ".env"
 
 # The browser suite's stack: a project of its own, never the one above. A
@@ -200,6 +201,8 @@ $webPort = (Get-Content $EnvFile | Where-Object { $_ -like "WEB_PORT=*" } | Sele
 if (-not $webPort) { $webPort = $WebPortDefault }
 $rabbitPort = (Get-Content $EnvFile | Where-Object { $_ -like "RABBITMQ_UI_PORT=*" } | Select-Object -First 1) -replace "^RABBITMQ_UI_PORT=", ""
 if (-not $rabbitPort) { $rabbitPort = $RabbitPortDefault }
+$mailpitPort = (Get-Content $EnvFile | Where-Object { $_ -like "MAILPIT_PORT=*" } | Select-Object -First 1) -replace "^MAILPIT_PORT=", ""
+if (-not $mailpitPort) { $mailpitPort = $MailpitPortDefault }
 
 # The API's own rule: simulated whatever the keys, Stripe with both keys, off otherwise.
 $paymentsMode = (Get-Content $EnvFile | Where-Object { $_ -like "PAYMENTS_MODE=*" } | Select-Object -First 1) -replace "^PAYMENTS_MODE=", ""
@@ -251,7 +254,7 @@ Write-Host @"
   Prism is up.
 
     Storefront      https://localhost:$webPort   (self-signed certificate: accept the warning once)
-    Inbox (Mailpit) http://localhost:8025    prism / MAILPIT_PASSWORD
+    Inbox (Mailpit) http://localhost:$mailpitPort   prism / MAILPIT_PASSWORD
     RabbitMQ UI     http://localhost:$rabbitPort   prism / RABBITMQ_PASSWORD
     Payments        $payments
 

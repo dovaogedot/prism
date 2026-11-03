@@ -20,6 +20,7 @@ readonly WEB_PORT_DEFAULT=3000
 # The API's address when .env has none, as docker-compose.yml gives it.
 readonly PUBLIC_WEB_URL_DEFAULT=https://localhost:3000
 readonly RABBITMQ_UI_PORT_DEFAULT=15672
+readonly MAILPIT_PORT_DEFAULT=8025
 
 # The browser suite's stack: a project of its own, never the one above, with
 # the stripe service kept down whatever .env says.
@@ -195,6 +196,8 @@ web_port="$(grep -E '^WEB_PORT=' .env | cut -d= -f2 || true)"
 web_port="${web_port:-$WEB_PORT_DEFAULT}"
 rabbit_port="$(grep -E '^RABBITMQ_UI_PORT=' .env | cut -d= -f2 || true)"
 rabbit_port="${rabbit_port:-$RABBITMQ_UI_PORT_DEFAULT}"
+mailpit_port="$(grep -E '^MAILPIT_PORT=' .env | cut -d= -f2 || true)"
+mailpit_port="${mailpit_port:-$MAILPIT_PORT_DEFAULT}"
 
 # The API's own rule: simulated whatever the keys, Stripe with both keys, off otherwise.
 payments_mode="$(grep -E '^PAYMENTS_MODE=' .env | cut -d= -f2 || true)"
@@ -244,7 +247,7 @@ cat <<BANNER
   Prism is up.
 
     Storefront      https://localhost:${web_port}   (self-signed certificate: accept the warning once)
-    Inbox (Mailpit) http://localhost:8025    prism / MAILPIT_PASSWORD
+    Inbox (Mailpit) http://localhost:${mailpit_port}   prism / MAILPIT_PASSWORD
     RabbitMQ UI     http://localhost:${rabbit_port}   prism / RABBITMQ_PASSWORD
     Payments        ${payments}
 

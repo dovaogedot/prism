@@ -36,7 +36,7 @@ On Windows each command is `.\start.cmd ...` with the same arguments.
 | Inbox for the shop's mail (Mailpit), as `prism` / `MAILPIT_PASSWORD` | <http://localhost:8025>         |
 | RabbitMQ management UI, as `prism` / `RABBITMQ_PASSWORD`             | <http://localhost:15672>        |
 
-Both passwords are `prism` unless `.env` sets them, and both pages answer on this machine only.
+Both passwords are `prism` unless `.env` sets them, and both pages answer on this machine only. `WEB_PORT`, `MAILPIT_PORT` and `RABBITMQ_UI_PORT` in `.env` move the storefront, the inbox and the management UI to other ports, and the start banner names the ports in use.
 
 The storefront answers HTTPS, with a self-signed certificate that the web container makes on its first start. The browser warns about it once: accept the warning to go on. An address typed with `http://` is redirected to HTTPS. The certificate lasts 825 days and stays in a volume, so the browser's exception keeps working until `./start.sh reset`. Links in mail and the provider sign-ins are built from `PUBLIC_WEB_URL`, which is `https://localhost:3000`, so a port of your own in `WEB_PORT` goes into it too. `./start.sh` says so when it starts with `http://`, or names another port than `WEB_PORT`.
 

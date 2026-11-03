@@ -34,7 +34,7 @@ services:
     ports:
       # Order and password-reset emails land here: this is the inbox a reviewer
       # opens. On this machine only, since it holds every reset link.
-      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:${MAILPIT_PORT:-8025}:8025"
     healthcheck:
       test: ["CMD", "/mailpit", "readyz"]
       interval: 3s
