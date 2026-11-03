@@ -154,7 +154,7 @@ A declined order releases its stock and mails the reason; the cart keeps its ite
 ### Orders
 
 - **Orders** (`/account/orders`, signed in): status chips, any number at once, a date range whose ends both count, and newest, oldest or status order. The filters live in the URL.
-- **Order page**: status, a timeline of every change, the tracking number once shipped, the items, each linked to its product while the shop still sells it, totals, delivery option and expected dates, the addresses, and how it was paid. A guest opens it from the link in the confirmation mail; a member who follows a mail's link while signed out signs in first and comes back to it.
+- **Order page**: status, a timeline of every change, the tracking number once shipped, the items, each name a link to its product while the shop still sells it, totals, delivery option and expected dates, the addresses, and how it was paid. A guest opens it from the link in the confirmation mail; a member who follows a mail's link while signed out signs in first and comes back to it.
 - **Cancel** works until the order is processing. A paid order is refunded in full, which shows in the timeline and arrives as a second mail.
 - Staff move a paid order to processing, then shipped with a tracking number, then delivered. The customer gets a mail when it ships and when it arrives. An order unpaid for 30 minutes is canceled and its stock released; when Stripe answers the cancel that the payment already went through, the payment is recorded and refunded in full.
 

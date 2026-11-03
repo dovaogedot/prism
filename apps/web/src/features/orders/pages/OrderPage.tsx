@@ -111,23 +111,20 @@ export const OrderPage = () => {
                   <ul className="divide-y divide-line">
                     {data.lines.map((line) => (
                       <li key={line.productId ?? line.name} className="flex items-center gap-3 py-3">
-                        {line.slug === undefined ? (
-                          <Picture
-                            image={line.image}
-                            name={line.name}
-                            className="size-14 shrink-0 rounded-lg border border-line"
-                            sizes="3.5rem"
-                          />
-                        ) : (
-                          <Link to={`/products/${line.slug}`} className="shrink-0">
-                            <Picture image={line.image} name={line.name} className="size-14 rounded-lg border border-line" sizes="3.5rem" />
-                          </Link>
-                        )}
+                        <Picture
+                          image={line.image}
+                          name={line.name}
+                          className="size-14 shrink-0 rounded-lg border border-line"
+                          sizes="3.5rem"
+                        />
                         <div className="min-w-0 flex-1">
                           {line.slug === undefined ? (
                             <p className="truncate text-sm font-medium text-ink">{line.name}</p>
                           ) : (
-                            <Link to={`/products/${line.slug}`} className="block truncate text-sm font-medium text-ink hover:text-accent">
+                            <Link
+                              className="block truncate text-sm font-medium text-accent underline-offset-2 hover:underline"
+                              to={`/products/${line.slug}`}
+                            >
                               {line.name}
                             </Link>
                           )}

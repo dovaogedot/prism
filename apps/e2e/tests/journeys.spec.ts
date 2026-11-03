@@ -104,17 +104,13 @@ test("adding to the cart opens its preview, and Escape closes it and gives focus
   await expect(cart).toBeFocused()
 })
 
-test("an order's page links each item to its product, by its picture and its name", async ({ page }) => {
+test("an order's page links each item's name to its product", async ({ page }) => {
   await Stack.fillCart(page.request)
   await Checks.open(page, await Stack.placeOrder(page.request))
 
   const items = page.getByRole("heading", { level: 2, name: "Items" }).locator("xpath=..")
-  const links = items.getByRole("link", { name: "Diamond Sword", exact: true })
-  await expect(links).toHaveCount(2)
 
-  for (const link of await links.all()) {
-    await expect(link).toHaveAttribute("href", `/products/${Stack.PRODUCT_SLUG}`)
-  }
+  await expect(items.getByRole("link", { name: "Diamond Sword", exact: true })).toHaveAttribute("href", `/products/${Stack.PRODUCT_SLUG}`)
 })
 
 test("opening a page by a click or a key moves focus to its heading, which shows no focus ring", async ({ page }) => {
