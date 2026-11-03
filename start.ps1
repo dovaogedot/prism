@@ -198,8 +198,17 @@ if (-not $webPort) { $webPort = $WebPortDefault }
 $rabbitPort = (Get-Content $EnvFile | Where-Object { $_ -like "RABBITMQ_UI_PORT=*" } | Select-Object -First 1) -replace "^RABBITMQ_UI_PORT=", ""
 if (-not $rabbitPort) { $rabbitPort = $RabbitPortDefault }
 
-$stripeKey = (Get-Content $EnvFile | Where-Object { $_ -like "STRIPE_SECRET_KEY=*" } | Select-Object -First 1) -replace "^STRIPE_SECRET_KEY=", ""
-$payments = if ($stripeKey) { "Stripe test mode" } else { "off until STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY are in .env" }
+# The API's own rule: simulated whatever the keys, Stripe with both keys, off otherwise.
+$paymentsMode = (Get-Content $EnvFile | Where-Object { $_ -like "PAYMENTS_MODE=*" } | Select-Object -First 1) -replace "^PAYMENTS_MODE=", ""
+$stripeSecretKey = (Get-Content $EnvFile | Where-Object { $_ -like "STRIPE_SECRET_KEY=*" } | Select-Object -First 1) -replace "^STRIPE_SECRET_KEY=", ""
+$stripePublishableKey = (Get-Content $EnvFile | Where-Object { $_ -like "STRIPE_PUBLISHABLE_KEY=*" } | Select-Object -First 1) -replace "^STRIPE_PUBLISHABLE_KEY=", ""
+$payments = if ($paymentsMode -eq "simulated") {
+  "simulated: every order is paid at once, and no card is asked for"
+} elseif ($stripeSecretKey -and $stripePublishableKey) {
+  "Stripe test mode"
+} else {
+  "off until STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY are in .env"
+}
 
 Write-Host ""
 Write-Host -NoNewline "Waiting for the storefront"

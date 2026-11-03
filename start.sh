@@ -193,7 +193,13 @@ web_port="${web_port:-$WEB_PORT_DEFAULT}"
 rabbit_port="$(grep -E '^RABBITMQ_UI_PORT=' .env | cut -d= -f2 || true)"
 rabbit_port="${rabbit_port:-$RABBITMQ_UI_PORT_DEFAULT}"
 
-if [ -n "$(grep -E '^STRIPE_SECRET_KEY=' .env | cut -d= -f2)" ]; then
+# The API's own rule: simulated whatever the keys, Stripe with both keys, off otherwise.
+payments_mode="$(grep -E '^PAYMENTS_MODE=' .env | cut -d= -f2 || true)"
+stripe_secret_key="$(grep -E '^STRIPE_SECRET_KEY=' .env | cut -d= -f2- || true)"
+stripe_publishable_key="$(grep -E '^STRIPE_PUBLISHABLE_KEY=' .env | cut -d= -f2- || true)"
+if [ "$payments_mode" = "simulated" ]; then
+  payments="simulated: every order is paid at once, and no card is asked for"
+elif [ -n "$stripe_secret_key" ] && [ -n "$stripe_publishable_key" ]; then
   payments="Stripe test mode"
 else
   payments="off until STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY are in .env"
