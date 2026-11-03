@@ -135,8 +135,17 @@ export const ListingPage = ({ kind }: ListingPageProps) => {
       })),
     ])
 
+  // Another page of results opens at their heading, which takes focus, so
+  // reading starts at the top of the new page rather than at its pages.
   const goToPage = (page: number): void => {
-    setParams(CatalogParams.set(params, "page", String(page)))
+    setParams(CatalogParams.set(params, "page", String(page)), { preventScrollReset: true })
+
+    const heading = document.getElementById("results-heading")
+    if (heading === null) return
+
+    heading.scrollIntoView({ block: "start" })
+    heading.tabIndex = -1
+    heading.focus({ preventScroll: true })
   }
 
   const sortOptions = ProductSort.NAMES.map((option) => (

@@ -153,6 +153,33 @@ test("a page loaded afresh opens at the top, and a reload and Back return to whe
   await expect.poll(readScroll).toBe(300)
 })
 
+test("another page of results or of reviews opens at its heading, which takes focus", async ({ page, request }) => {
+  await Checks.open(page, "/shop")
+  await page.getByRole("navigation", { name: "Result pages" }).getByRole("button", { name: "Next" }).click()
+
+  const results = page.locator("#results-heading")
+  await expect(results).toContainText("page 2 of")
+  await expect(results).toBeFocused()
+  expect((await Checks.boxOf(results)).y).toBeGreaterThanOrEqual(0)
+  expect((await Checks.boxOf(results)).y).toBeLessThan(200)
+
+  // The most reviewed product of the first page of the shop has more than one page of reviews, ten to a page.
+  const listed = (await (await request.get("/api/v1/products?perPage=60")).json()) as Readonly<{
+    items: readonly Readonly<{ slug: string; rating: Readonly<{ count: number }> }>[]
+  }>
+  const [most] = listed.items.toSorted((a, b) => b.rating.count - a.rating.count)
+  expect(most?.rating.count ?? 0, "reviews of the most reviewed product").toBeGreaterThan(10)
+  await Checks.open(page, `/products/${most?.slug ?? Stack.PRODUCT_SLUG}`)
+  const pages = page.getByRole("navigation", { name: "Review pages" })
+  await pages.getByRole("button", { name: "Next" }).click()
+
+  const reviews = page.getByRole("heading", { level: 2, name: "Reviews" })
+  await expect(pages).toContainText("Page 2 of")
+  await expect(reviews).toBeFocused()
+  expect((await Checks.boxOf(reviews)).y).toBeGreaterThanOrEqual(0)
+  expect((await Checks.boxOf(reviews)).y).toBeLessThan(200)
+})
+
 test("an address outside the route list answers 404 with the shop's page, and a page inside it 200", async ({ request }) => {
   const missing = await request.get("/no-such-page")
   const present = await request.get("/about")

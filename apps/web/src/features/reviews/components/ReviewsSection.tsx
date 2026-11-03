@@ -114,9 +114,14 @@ export const ReviewsSection = ({ slug }: ReviewsSectionProps) => {
                   page={data.page}
                   totalPages={data.totalPages}
                   label="Review pages"
+                  // Another page of reviews opens at the section's heading, which takes focus.
                   onPage={(next) => {
                     setPage(next)
-                    heading.current?.scrollIntoView({ block: "start" })
+                    if (heading.current === null) return
+
+                    heading.current.scrollIntoView({ block: "start" })
+                    heading.current.tabIndex = -1
+                    heading.current.focus({ preventScroll: true })
                   }}
                 />
               </>
