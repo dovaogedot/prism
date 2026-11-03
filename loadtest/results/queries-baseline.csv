@@ -1,0 +1,11 @@
+calls,total_ms,mean_ms,query
+60,93,1.55,"select ""slug"", ""name"", ""price_cents"", ( SELECT json_build_object($4, i.id, $5, i.file, $6, i.alt, $7, i.width, $8, i.height, $9, i.is_pixel_art) FROM product_im"
+15,36,2.42,"select ""product_property"".""name"", ""product_property"".""value"", count(*) filter (where $2) from ""product_property"" inner join ""product"" on ""product_property"".""pro"
+20,34,1.72,"select ""product_property"".""name"", ""product_property"".""value"", count(*) filter (where ""product"".""rating_average"" * $4 >= $1) from ""product_property"" inner join """
+15,29,1.95,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+15,29,1.94,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+20,28,1.41,"select ""brand"".""slug"", ""brand"".""name"", count(*) filter (where ""product"".""rating_average"" * $4 >= $1) from ""product"" inner join ""category"" on ""product"".""category"
+20,28,1.38,"select min(""product"".""price_cents""), max(""product"".""price_cents"") from ""product"" inner join ""category"" on ""product"".""category_id"" = ""category"".""id"" inner join """
+20,27,1.37,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+20,27,1.36,"select ""product"".""rating_average"", count(*) filter (where $3) from ""product"" inner join ""category"" on ""product"".""category_id"" = ""category"".""id"" inner join ""bran"
+7,26,3.65,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"

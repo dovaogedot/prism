@@ -4,12 +4,12 @@
  *
  * Checks the README names each bottleneck with its cause and its fix or
  * proposed solution, that the fixes it says were made are in the database
- * the API runs on, and, when `loadtest/results` holds the stress run, that
- * the figures it quotes come from there. Explaining them is the student's
- * part.
+ * the API runs on, and that the figures it quotes come from the stress run's
+ * records, which the repository keeps in `loadtest/results`. Explaining them
+ * is the student's part.
  */
 
-import { existsSync, readFileSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { startHarness, type Harness } from "../../apps/api/tests/support/harness.ts"
 import { StressSteps } from "../../loadtest/lib/steps.ts"
@@ -85,28 +85,25 @@ describe("the fixes the README says were made", () => {
   })
 })
 
-describe.runIf(existsSync(new URL("queries-stress.csv", results)) && existsSync(new URL("stats-stress.csv", results)))(
-  "the stress run's own records",
-  () => {
-    it("put the quick search's suggestions first among Postgres's costliest statements, at the mean the README quotes", () => {
-      const [, first = ""] = readFileSync(new URL("queries-stress.csv", results), "utf8").split("\n")
-      const [, , mean = ""] = first.split(",")
+describe("the stress run's own records", () => {
+  it("put the quick search's suggestions first among Postgres's costliest statements, at the mean the README quotes", () => {
+    const [, first = ""] = readFileSync(new URL("queries-stress.csv", results), "utf8").split("\n")
+    const [, , mean = ""] = first.split(",")
 
-      // Only the suggestions select a product's slug, name and price unqualified, from the product table alone.
-      expect(first).toContain('select ""slug"", ""name"", ""price_cents""')
-      expect(bottlenecks).toContain(`the costliest statement, ${Number(mean).toFixed(1)} ms a call over the stress run`)
-    })
+    // Only the suggestions select a product's slug, name and price unqualified, from the product table alone.
+    expect(first).toContain('select ""slug"", ""name"", ""price_cents""')
+    expect(bottlenecks).toContain(`the costliest statement, ${Number(mean).toFixed(1)} ms a call over the stress run`)
+  })
 
-    it("show the API's peak CPU the README quotes", () => {
-      const peak = Math.max(
-        ...readFileSync(new URL("stats-stress.csv", results), "utf8")
-          .split("\n")
-          .filter((line) => line.includes(",prism-load-api-1,"))
-          .map((line) => Number.parseFloat(line.split(",")[2] ?? "")),
-      )
+  it("show the API's peak CPU the README quotes", () => {
+    const peak = Math.max(
+      ...readFileSync(new URL("stats-stress.csv", results), "utf8")
+        .split("\n")
+        .filter((line) => line.includes(",prism-load-api-1,"))
+        .map((line) => Number.parseFloat(line.split(",")[2] ?? "")),
+    )
 
-      const most = Math.max(...StressSteps.TARGETS).toLocaleString("en-US")
-      expect(bottlenecks).toContain(`The API reaches ${peak.toFixed(0)}% of its 2 CPUs at ${most} users`)
-    })
-  },
-)
+    const most = Math.max(...StressSteps.TARGETS).toLocaleString("en-US")
+    expect(bottlenecks).toContain(`The API reaches ${peak.toFixed(0)}% of its 2 CPUs at ${most} users`)
+  })
+})

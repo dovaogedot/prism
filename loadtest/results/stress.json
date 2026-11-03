@@ -1,0 +1,858 @@
+{
+  "setup_data": {
+    "categories": [
+      "balatro",
+      "minecraft",
+      "the-binding-of-isaac"
+    ],
+    "products": [
+      {
+        "id": "8fbd8730-204d-4888-a724-05f78948994c",
+        "name": "King of Hearts",
+        "slug": "king-of-hearts"
+      },
+      {
+        "name": "Oak Fence Gate",
+        "slug": "oak-fence-gate",
+        "id": "fcd55bd3-65cc-4a63-ac8a-465efb301b2b"
+      },
+      {
+        "id": "b51f29ca-6f8a-43ff-8ddb-88573b719e8a",
+        "name": "Player Head",
+        "slug": "player-head"
+      },
+      {
+        "id": "a7c3c3cf-c211-412f-aec1-9b1dde78a9b0",
+        "name": "Polished Blackstone Slab",
+        "slug": "polished-blackstone-slab"
+      },
+      {
+        "name": "Shulker Spawn Egg",
+        "slug": "shulker-spawn-egg",
+        "id": "6a64ba83-a44a-43cb-bfc3-467b65f333ec"
+      },
+      {
+        "id": "4a47733f-e0d2-41cf-a84a-d3404bfbd60e",
+        "name": "Acacia Door",
+        "slug": "acacia-door"
+      },
+      {
+        "id": "d7aff868-8da3-4f7e-83c1-1e3e5d87c531",
+        "name": "Acrobat",
+        "slug": "acrobat"
+      },
+      {
+        "slug": "card-sharp",
+        "id": "c0bd5f29-09f9-4859-9083-ef8d5b2bac2f",
+        "name": "Card Sharp"
+      },
+      {
+        "id": "6bd31376-b9a8-44f1-b322-6f8e1b00720a",
+        "name": "Crimson Fence Gate",
+        "slug": "crimson-fence-gate"
+      },
+      {
+        "id": "befd2bc0-6764-4c63-ba66-4f51257e8640",
+        "name": "Iron Horse Armor",
+        "slug": "iron-horse-armor"
+      },
+      {
+        "name": "Music Disc Creator",
+        "slug": "music-disc-creator",
+        "id": "547dfa19-8f0c-4514-8891-fc03278c4c1b"
+      },
+      {
+        "name": "Orange Carpet",
+        "slug": "orange-carpet",
+        "id": "c3812066-35db-472b-ad8e-1f99498e3866"
+      },
+      {
+        "id": "b9281424-809b-42d1-9bc7-7ca70089ab3e",
+        "name": "Orange Wool Stairs",
+        "slug": "orange-wool-stairs"
+      },
+      {
+        "id": "306e1c4d-a391-433c-8637-8930033ebe3d",
+        "name": "Purple Wool Slab",
+        "slug": "purple-wool-slab"
+      },
+      {
+        "id": "e6940cf6-abfb-46af-8556-dd0cd0193b00",
+        "name": "Red Candle",
+        "slug": "red-candle-2"
+      },
+      {
+        "slug": "spelunker-hat",
+        "id": "b2a500fe-c04b-4451-9465-bce3fe84ba4b",
+        "name": "Spelunker Hat"
+      },
+      {
+        "id": "ae47b385-2817-4c52-ba9e-99bf9c332fe4",
+        "name": "Test Block",
+        "slug": "test-block"
+      },
+      {
+        "slug": "the-hierophant",
+        "id": "b919f113-a8fb-44ae-adc3-c8d85c089cb7",
+        "name": "The Hierophant"
+      },
+      {
+        "slug": "trophy",
+        "id": "3bf4c173-8fee-4e8f-94bb-cdd901ef93d8",
+        "name": "Trophy"
+      },
+      {
+        "name": "Antidote",
+        "slug": "antidote",
+        "id": "3093f472-8a6c-4ca8-9624-964921c8e878"
+      },
+      {
+        "slug": "black-wool-stairs",
+        "id": "aaa21fbd-c713-410e-9c59-2fdb924e8d0c",
+        "name": "Black Wool Stairs"
+      },
+      {
+        "id": "be82ba52-070f-4187-9882-74c17d9a3a88",
+        "name": "Bogged Spawn Egg",
+        "slug": "bogged-spawn-egg"
+      },
+      {
+        "id": "66bc8d82-7045-4f3e-910b-3316caee7de5",
+        "name": "Buried Treasure Map",
+        "slug": "buried-treasure-map"
+      },
+      {
+        "name": "Burnt Penny",
+        "slug": "burnt-penny",
+        "id": "1a0f6749-6b85-48c5-8da0-2295279aee6d"
+      },
+      {
+        "name": "Cobblestone Slab",
+        "slug": "cobblestone-slab",
+        "id": "82038b32-bd00-4174-862f-efda965f23f7"
+      },
+      {
+        "name": "Crack The Sky",
+        "slug": "crack-the-sky",
+        "id": "68349843-5be5-4ec0-bbdc-e56587079e47"
+      },
+      {
+        "id": "22b65755-287e-47b3-95e5-21d7f74a2460",
+        "name": "Dark Oak Pressure Plate",
+        "slug": "dark-oak-pressure-plate"
+      },
+      {
+        "id": "0853cf28-9a1f-47ce-9452-0476bf958013",
+        "name": "Diorite Slab",
+        "slug": "diorite-slab"
+      },
+      {
+        "slug": "eraser",
+        "id": "656f4bcf-9e87-472a-9811-befd3a556376",
+        "name": "Eraser"
+      },
+      {
+        "slug": "glowing-obsidian",
+        "id": "d9419ddc-86d6-4c59-86aa-c6da28737227",
+        "name": "Glowing Obsidian"
+      },
+      {
+        "id": "e851c0d6-5638-4fe3-b9a8-8b440d6b4c9b",
+        "name": "Gunpowder",
+        "slug": "gunpowder"
+      },
+      {
+        "id": "82feb0de-0f91-46dc-8dd9-e5a3dc27de4f",
+        "name": "Horn Coral",
+        "slug": "horn-coral"
+      },
+      {
+        "id": "1864394e-4b4e-4eb4-945a-5730bb6e80cd",
+        "name": "La Baguette",
+        "slug": "la-baguette"
+      },
+      {
+        "id": "d74a922b-b347-42d2-a94c-cf4bcd282720",
+        "name": "Lil Haunt",
+        "slug": "lil-haunt"
+      },
+      {
+        "id": "3371ccfc-a1cf-4d1d-96fd-1cd5e264f53b",
+        "name": "Lime Wool Slab",
+        "slug": "lime-wool-slab"
+      },
+      {
+        "id": "eb6d4ddd-897c-40f0-9bfb-5f1475860858",
+        "name": "Mangrove Propagule",
+        "slug": "mangrove-propagule"
+      },
+      {
+        "id": "c7d2a410-3440-4706-835b-671347953f12",
+        "name": "Music Disc Blocks",
+        "slug": "music-disc-blocks"
+      },
+      {
+        "id": "1cd939b6-89e3-4537-8563-3f8bd47fd671",
+        "name": "Netherite Ingot",
+        "slug": "netherite-ingot"
+      },
+      {
+        "slug": "netherite-leggings",
+        "id": "c09e99e8-4f61-497a-b629-c092560f9d44",
+        "name": "Netherite Leggings"
+      },
+      {
+        "id": "25c68561-6696-4018-9614-6c2633fff1a6",
+        "name": "Phantom Membrane",
+        "slug": "phantom-membrane"
+      },
+      {
+        "slug": "red-banner",
+        "id": "a0ebc299-6a75-4937-b1ab-a01945014962",
+        "name": "Red Banner"
+      },
+      {
+        "id": "e06730ff-0e09-4aab-8c7c-45bcd36d5a37",
+        "name": "Restock",
+        "slug": "restock"
+      },
+      {
+        "name": "Séance",
+        "slug": "s-ance",
+        "id": "2e6aa3bd-af76-47e3-89c3-8636664c5a40"
+      },
+      {
+        "id": "bab60d6e-e700-421d-b82c-267939c9dbad",
+        "name": "Soul of Samson",
+        "slug": "soul-of-samson"
+      },
+      {
+        "id": "298d3433-0571-48b8-ad18-b162fdebf5f5",
+        "name": "Suplex!",
+        "slug": "suplex"
+      },
+      {
+        "slug": "target",
+        "id": "74ca2a5b-4f81-4e49-a442-4304be1500d6",
+        "name": "Target"
+      },
+      {
+        "id": "9581f1ab-cc53-469e-9171-139d99ae6019",
+        "name": "Tech X",
+        "slug": "tech-x"
+      },
+      {
+        "id": "3ff95c9f-e89c-42d3-8f9e-8f6032fcb3be",
+        "name": "The Tower",
+        "slug": "the-tower"
+      },
+      {
+        "id": "b75aa41c-82d0-4811-b74b-9707ec1fc84f",
+        "name": "The Wheel of Fortune",
+        "slug": "the-wheel-of-fortune"
+      },
+      {
+        "slug": "zombie-head",
+        "id": "81af0381-b618-4672-ab74-44cf430f2d86",
+        "name": "Zombie Head"
+      },
+      {
+        "id": "566d6d3a-d4c1-4896-9ff4-2a15a37cd787",
+        "name": "7 of Diamonds",
+        "slug": "7-of-diamonds"
+      },
+      {
+        "id": "bf9b74e4-ca59-4e71-aae8-d8f455a9ed64",
+        "name": "Agent Spawn Egg",
+        "slug": "agent-spawn-egg"
+      },
+      {
+        "slug": "antimatter",
+        "id": "34083f4b-42ff-4b2b-8c47-a90feb93f54a",
+        "name": "Antimatter"
+      },
+      {
+        "id": "8baf9707-d874-4da4-8b55-453f8f57aec1",
+        "name": "Barium Sulfate",
+        "slug": "barium-sulfate"
+      },
+      {
+        "name": "Bee Spawn Egg",
+        "slug": "bee-spawn-egg",
+        "id": "386caea1-881a-4905-914f-ebe4e23bf1db"
+      },
+      {
+        "name": "Birch Wood",
+        "slug": "birch-wood",
+        "id": "11e65e41-1344-47c2-ac50-6b46da0e1f44"
+      },
+      {
+        "id": "d8825ab4-fff2-44e1-9c56-85e9bf77b19c",
+        "name": "Blue Terracotta",
+        "slug": "blue-terracotta"
+      },
+      {
+        "id": "63123ed5-94e9-4b03-bb8b-f88869a912a0",
+        "name": "Blue Wool Stairs",
+        "slug": "blue-wool-stairs"
+      },
+      {
+        "id": "73c12566-93ef-47c5-8099-9013eb93ebc4",
+        "name": "Bread",
+        "slug": "bread"
+      },
+      {
+        "id": "3c9a27b5-8afb-4a8e-826e-a0ed05403576",
+        "name": "Breakfast",
+        "slug": "breakfast"
+      }
+    ]
+  },
+  "root_group": {
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": [
+      {
+        "name": "type a name",
+        "path": "::type a name",
+        "id": "2a9931204eca97d258c206f6424f6166",
+        "groups": [],
+        "checks": [
+            {
+              "name": "suggest answered 2xx",
+              "path": "::type a name::suggest answered 2xx",
+              "id": "6c33178c2fadcc543217009ed1e72f79",
+              "passes": 82173,
+              "fails": 0
+            }
+          ]
+      },
+      {
+        "path": "::open home",
+        "id": "465565d449949e7d5192e8a78a4869ac",
+        "groups": [],
+        "checks": [
+            {
+              "name": "home answered 2xx",
+              "path": "::open home::home answered 2xx",
+              "id": "f9cb10ac864c8b3ae766c9fd39889722",
+              "passes": 54220,
+              "fails": 0
+            }
+          ],
+        "name": "open home"
+      },
+      {
+        "groups": [],
+        "checks": [
+            {
+              "passes": 27391,
+              "fails": 0,
+              "name": "search results answered 2xx",
+              "path": "::see results::search results answered 2xx",
+              "id": "304ffbe24006afa1a8fda2d29efe4970"
+            }
+          ],
+        "name": "see results",
+        "path": "::see results",
+        "id": "63c66532d0a8985661c584aff4fd5583"
+      },
+      {
+        "checks": [
+          {
+            "passes": 32541,
+            "fails": 0,
+            "name": "add to cart answered 2xx",
+            "path": "::add to cart::add to cart answered 2xx",
+            "id": "77a68a51cd5780cc9668227b25633dd9"
+          }
+        ],
+        "name": "add to cart",
+        "path": "::add to cart",
+        "id": "2d37542368a4aab15aeddb289d87bac9",
+        "groups": []
+      },
+      {
+        "groups": [],
+        "checks": [
+            {
+              "id": "56b56de3b703e5eac5569e0b3d9c0a7d",
+              "passes": 81611,
+              "fails": 0,
+              "name": "product answered 2xx",
+              "path": "::open product::product answered 2xx"
+            },
+            {
+              "name": "reviews answered 2xx",
+              "path": "::open product::reviews answered 2xx",
+              "id": "e29c03702cbf8cc547e74021611e29d9",
+              "passes": 54220,
+              "fails": 0
+            },
+            {
+              "passes": 54220,
+              "fails": 0,
+              "name": "related answered 2xx",
+              "path": "::open product::related answered 2xx",
+              "id": "30582d3d48b1bae80df745c3f0809af7"
+            }
+          ],
+        "name": "open product",
+        "path": "::open product",
+        "id": "eeceaac9fbf54b6b1a519a6902823192"
+      },
+      {
+        "name": "open category",
+        "path": "::open category",
+        "id": "45af206d042b0ca2594c41e2f940f755",
+        "groups": [],
+        "checks": [
+            {
+              "passes": 54220,
+              "fails": 0,
+              "name": "category answered 2xx",
+              "path": "::open category::category answered 2xx",
+              "id": "97e7fa4a72e352e2bf8360eacfc8d960"
+            }
+          ]
+      },
+      {
+        "name": "fill cart",
+        "path": "::fill cart",
+        "id": "ac1c0136265fde0adda91c589faed4cc",
+        "groups": [],
+        "checks": [
+            {
+              "name": "add to cart answered 2xx",
+              "path": "::fill cart::add to cart answered 2xx",
+              "id": "6fe95d45796eae469af23edd84f9ec34",
+              "passes": 5480,
+              "fails": 0
+            }
+          ]
+      },
+      {
+        "path": "::next page",
+        "id": "c1171579405d23f12de4d33da64fc9cd",
+        "groups": [],
+        "checks": [
+            {
+              "passes": 54220,
+              "fails": 0,
+              "name": "category page 2 answered 2xx",
+              "path": "::next page::category page 2 answered 2xx",
+              "id": "5bed288f97eef23554cbad0f269cc6a0"
+            }
+          ],
+        "name": "next page"
+      },
+      {
+        "checks": [
+          {
+            "path": "::place order::cart answered 2xx",
+            "id": "0c1962b3d4ea142217af99e11153f81e",
+            "passes": 5480,
+            "fails": 0,
+            "name": "cart answered 2xx"
+          },
+          {
+            "fails": 0,
+            "name": "shipping methods answered 2xx",
+            "path": "::place order::shipping methods answered 2xx",
+            "id": "2d0ebe07d64c6b908baed87aaa27e6fd",
+            "passes": 5480
+          },
+          {
+            "name": "place order answered 2xx",
+            "path": "::place order::place order answered 2xx",
+            "id": "76114d2b3a7479424d033b891846cdb6",
+            "passes": 5480,
+            "fails": 0
+          }
+        ],
+        "name": "place order",
+        "path": "::place order",
+        "id": "a634605b3aa60613cf7ad6ea6fd73c19",
+        "groups": []
+      },
+      {
+        "id": "6152df99e4a05ee4111ba9e27a713189",
+        "groups": [],
+        "checks": [
+            {
+              "path": "::wait for payment::order answered 2xx",
+              "id": "190f3646262a60e41a639146b1c6c2c3",
+              "passes": 30928,
+              "fails": 0,
+              "name": "order answered 2xx"
+            },
+            {
+              "name": "order paid",
+              "path": "::wait for payment::order paid",
+              "id": "9bc9bf4140eb29ab59c077c160796fc9",
+              "passes": 4799,
+              "fails": 0
+            },
+            {
+              "passes": 0,
+              "fails": 681,
+              "name": "order paid within 10 seconds",
+              "path": "::wait for payment::order paid within 10 seconds",
+              "id": "dc66d077d01d926285f2cbc2502e0f58"
+            }
+          ],
+        "name": "wait for payment",
+        "path": "::wait for payment"
+      },
+      {
+        "name": "change quantity",
+        "path": "::change quantity",
+        "id": "2e8237dca1934b7c7ed85dd910948a34",
+        "groups": [],
+        "checks": [
+            {
+              "name": "change quantity answered 2xx",
+              "path": "::change quantity::change quantity answered 2xx",
+              "id": "9e6c52b1d2dde56cf58bf26c7babeca1",
+              "passes": 16272,
+              "fails": 0
+            }
+          ]
+      },
+      {
+        "name": "open cart",
+        "path": "::open cart",
+        "id": "169f129b54c71fa28870c4165174c31b",
+        "groups": [],
+        "checks": [
+            {
+              "fails": 0,
+              "name": "cart answered 2xx",
+              "path": "::open cart::cart answered 2xx",
+              "id": "a3c08bb2db56863c85160ec599acaf02",
+              "passes": 16272
+            },
+            {
+              "path": "::open cart::recommendations answered 2xx",
+              "id": "c5829eb2f6ec878c1e68805ac6a53192",
+              "passes": 16272,
+              "fails": 0,
+              "name": "recommendations answered 2xx"
+            }
+          ]
+      },
+      {
+        "path": "::register",
+        "id": "7be41b407e4072a759dd42b3be494f42",
+        "groups": [],
+        "checks": [
+            {
+              "path": "::register::register answered 2xx",
+              "id": "add6214d637f894d44e0819f1a2aef24",
+              "passes": 5305,
+              "fails": 0,
+              "name": "register answered 2xx"
+            }
+          ],
+        "name": "register"
+      },
+      {
+        "name": "sign in",
+        "path": "::sign in",
+        "id": "afae718186856df8d2a255f407910c34",
+        "groups": [],
+        "checks": [
+            {
+              "id": "a40868289160caf6a7841fdbf0525891",
+              "passes": 5305,
+              "fails": 0,
+              "name": "sign in answered 2xx",
+              "path": "::sign in::sign in answered 2xx"
+            }
+          ]
+      },
+      {
+        "id": "bf87cdc6d7607d80744bcc3e17dcd814",
+        "groups": [],
+        "checks": [
+            {
+              "name": "me answered 2xx",
+              "path": "::read account::me answered 2xx",
+              "id": "8e93916f2123d6e8c0b81b8c7dfeb6c4",
+              "passes": 5305,
+              "fails": 0
+            }
+          ],
+        "name": "read account",
+        "path": "::read account"
+      },
+      {
+        "name": "refresh session",
+        "path": "::refresh session",
+        "id": "f0b096fb2f001a0d0d2e4eba55913f35",
+        "groups": [],
+        "checks": [
+            {
+              "path": "::refresh session::refresh answered 2xx",
+              "id": "5642b10abd587c561bb112b522b0e5e0",
+              "passes": 5305,
+              "fails": 0,
+              "name": "refresh answered 2xx"
+            }
+          ]
+      }
+    ],
+    "checks": [],
+    "name": ""
+  },
+  "options": {
+    "summaryTrendStats": [
+      "avg",
+      "min",
+      "med",
+      "max",
+      "p(90)",
+      "p(95)",
+      "p(99)"
+    ],
+    "summaryTimeUnit": "",
+    "noColor": false
+  },
+  "state": {
+    "testRunDurationMs": 1468698.284619,
+    "isStdOutTTY": false,
+    "isStdErrTTY": false
+  },
+  "metrics": {
+    "vus": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "max": 3000,
+        "value": 2,
+        "min": 0
+      }
+    },
+    "http_req_receiving": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 0.013857,
+        "med": 0.096459,
+        "max": 14.179597,
+        "p(90)": 0.266123,
+        "p(95)": 0.30848884999999987,
+        "p(99)": 0.4675518399999999,
+        "avg": 0.13845455829995545
+      }
+    },
+    "checks": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 0.9989072178182868,
+        "passes": 622499,
+        "fails": 681
+      }
+    },
+    "vus_max": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "max": 3000,
+        "value": 3000,
+        "min": 3000
+      }
+    },
+    "http_reqs": {
+      "values": {
+        "rate": 420.5778725752649,
+        "count": 617702
+      },
+      "type": "counter",
+      "contains": "default"
+    },
+    "http_req_tls_handshaking": {
+      "values": {
+        "med": 0,
+        "max": 13.158999,
+        "p(90)": 0,
+        "p(95)": 0,
+        "p(99)": 0,
+        "avg": 0.00524445681412719,
+        "min": 0
+      },
+      "type": "trend",
+      "contains": "time"
+    },
+    "http_req_connecting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 0,
+        "max": 29.941632,
+        "p(90)": 0,
+        "p(95)": 0,
+        "p(99)": 0,
+        "avg": 0.0011154926647477267,
+        "min": 0
+      }
+    },
+    "http_req_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(99)": 7133.840970689993,
+        "avg": 769.6338675067597,
+        "min": 1.197142,
+        "med": 147.4682725,
+        "max": 11998.167666,
+        "p(90)": 2186.4841035,
+        "p(95)": 3218.43488879999
+      },
+      "thresholds": {
+        "p(95)<5000": {
+          "ok": true
+        }
+      }
+    },
+    "transaction_success": {
+      "values": {
+        "rate": 0.9983051184923768,
+        "passes": 401117,
+        "fails": 681
+      },
+      "thresholds": {
+        "rate>=0.98": {
+          "ok": true
+        }
+      },
+      "type": "rate",
+      "contains": "default"
+    },
+    "http_req_waiting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 769.4143338614939,
+        "min": 1.086448,
+        "med": 147.19691,
+        "max": 11997.894592,
+        "p(90)": 2186.3502502,
+        "p(95)": 3218.255510149989,
+        "p(99)": 7133.641381249994
+      }
+    },
+    "iteration_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 11794.1031497074,
+        "min": 2604.261613,
+        "med": 9051.847576,
+        "max": 135993.649434,
+        "p(90)": 18370.3743455,
+        "p(95)": 22937.15808929999,
+        "p(99)": 53780.41787693003
+      }
+    },
+    "data_received": {
+      "contains": "data",
+      "values": {
+        "count": 3016505146,
+        "rate": 2053863.0551900738
+      },
+      "type": "counter"
+    },
+    "group_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 2.411886,
+        "med": 150.9477875,
+        "max": 115030.412149,
+        "p(90)": 3276.878553099998,
+        "p(95)": 5439.94766645,
+        "p(99)": 9939.766624029986,
+        "avg": 1215.975431933727
+      }
+    },
+    "http_req_blocked": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(99)": 0.000749,
+        "avg": 0.007319918316598914,
+        "min": 0.000087,
+        "med": 0.000284,
+        "max": 31.619507,
+        "p(90)": 0.000367,
+        "p(95)": 0.000428
+      }
+    },
+    "iterations": {
+      "contains": "default",
+      "values": {
+        "count": 108668,
+        "rate": 73.989328603451
+      },
+      "type": "counter"
+    },
+    "http_req_failed": {
+      "values": {
+        "rate": 0,
+        "passes": 0,
+        "fails": 617702
+      },
+      "thresholds": {
+        "rate<0.05": {
+          "ok": true
+        }
+      },
+      "type": "rate",
+      "contains": "default"
+    },
+    "http_req_sending": {
+      "values": {
+        "p(95)": 0.12744394999999994,
+        "p(99)": 0.25630496999999997,
+        "avg": 0.08107908693512314,
+        "min": 0.013744,
+        "med": 0.073144,
+        "max": 15.62967,
+        "p(90)": 0.108499
+      },
+      "type": "trend",
+      "contains": "time"
+    },
+    "transactions": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 401798,
+        "rate": 273.57422842243716
+      }
+    },
+    "http_req_duration{expected_response:true}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 769.6338675067597,
+        "min": 1.197142,
+        "med": 147.4682725,
+        "max": 11998.167666,
+        "p(90)": 2186.4841035,
+        "p(95)": 3218.43488879999,
+        "p(99)": 7133.840970689993
+      }
+    },
+    "data_sent": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 63353610,
+        "rate": 43135.8916010682
+      }
+    }
+  }
+}

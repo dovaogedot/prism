@@ -14,8 +14,9 @@ coverage/
 apps/api/seed/catalog.json
 apps/api/seed/media/
 
-# Load runs: k6 summaries, samples, container stats and the tables made from them.
-loadtest/results/
+# The stress run's every sample: too large for the repository. The rest of
+# loadtest/results, the summaries, stats and tables made from it, is kept.
+loadtest/results/stress-samples.csv
 
 # The browser suite's output from a local run.
 apps/e2e/test-results/

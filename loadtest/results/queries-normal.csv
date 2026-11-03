@@ -1,0 +1,11 @@
+calls,total_ms,mean_ms,query
+426,888,2.09,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+426,881,2.07,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+426,792,1.86,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+573,671,1.17,"select ""slug"", ""name"", ""price_cents"", ( SELECT json_build_object($4, i.id, $5, i.file, $6, i.alt, $7, i.width, $8, i.height, $9, i.is_pixel_art) FROM product_im"
+147,393,2.67,"select ""product_property"".""name"", ""product_property"".""value"", count(*) filter (where $2) from ""product_property"" inner join ""product"" on ""product_property"".""pro"
+147,222,1.51,"select ""product"".""rating_average"", count(*) filter (where $2) from ""product"" inner join ""category"" on ""product"".""category_id"" = ""category"".""id"" inner join ""bran"
+147,203,1.38,"select ""brand"".""slug"", ""brand"".""name"", count(*) filter (where $2) from ""product"" inner join ""category"" on ""product"".""category_id"" = ""category"".""id"" inner join """
+55,198,3.59,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+147,189,1.28,"select min(""product"".""price_cents""), max(""product"".""price_cents"") from ""product"" inner join ""category"" on ""product"".""category_id"" = ""category"".""id"" inner join """
+184,137,0.74,"select ""product_property"".""name"", ""product_property"".""value"", count(*) filter (where ""product"".""rating_average"" * $4 >= $1) from ""product_property"" inner join """

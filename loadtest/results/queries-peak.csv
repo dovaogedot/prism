@@ -1,0 +1,11 @@
+calls,total_ms,mean_ms,query
+1049,2141,2.04,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+1049,2095,2.00,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+1049,1958,1.87,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+1521,1787,1.17,"select ""slug"", ""name"", ""price_cents"", ( SELECT json_build_object($4, i.id, $5, i.file, $6, i.alt, $7, i.width, $8, i.height, $9, i.is_pixel_art) FROM product_im"
+171,494,2.89,"select ""product_property"".""name"", ""product_property"".""value"", count(*) filter (where $2) from ""product_property"" inner join ""product"" on ""product_property"".""pro"
+446,405,0.91,"select ""product_property"".""name"", ""product_property"".""value"", count(*) filter (where ""product"".""rating_average"" * $4 >= $1) from ""product_property"" inner join """
+111,388,3.50,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+106,384,3.62,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+102,370,3.63,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+171,286,1.67,"select ""product"".""rating_average"", count(*) filter (where $2) from ""product"" inner join ""category"" on ""product"".""category_id"" = ""category"".""id"" inner join ""bran"

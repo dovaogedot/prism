@@ -1,12 +1,11 @@
 /**
  * REQUIREMENTS_3.md: "Load test report shows transaction throughput."
  *
- * The README's figures are checked against k6's summaries of each run when
- * `loadtest/results` holds them, which a load run leaves on the machine that
- * ran it.
+ * The README's figures are checked against k6's summaries of each run, which
+ * the repository keeps in `loadtest/results`.
  */
 
-import { existsSync, readFileSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 
 const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8")
@@ -14,8 +13,8 @@ const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8")
 /** Where k6's end-of-run summary of `run` is kept. */
 const summaryOf = (run: string): URL => new URL(`../../loadtest/results/${run}.json`, import.meta.url)
 
-/** The runs whose summaries this machine holds. */
-const summarized = ["baseline", "normal", "peak", "stress"].filter((run) => existsSync(summaryOf(run)))
+/** Every load run the README reports. */
+const runs = ["baseline", "normal", "peak", "stress"]
 
 /** One run's row of the README's results table. */
 type Reported = { requests: number; requestsPerSecond: number; transactionsPerSecond: number }
@@ -47,11 +46,11 @@ const reportedRuns = (): ReadonlyMap<string, Reported> => {
 
 describe("the README's load test report", () => {
   it("gives the transactions and requests per second of every run", () => {
-    const runs = reportedRuns()
+    const reported = reportedRuns()
 
-    expect([...runs.keys()]).toEqual(["baseline", "normal", "peak", "stress"])
+    expect([...reported.keys()]).toEqual(runs)
 
-    for (const [run, row] of runs) {
+    for (const [run, row] of reported) {
       expect(row.transactionsPerSecond, run).toBeGreaterThan(0)
       expect(row.requestsPerSecond, run).toBeGreaterThanOrEqual(row.transactionsPerSecond)
     }
@@ -63,8 +62,8 @@ describe("the README's load test report", () => {
   })
 })
 
-describe.runIf(summarized.length > 0)("k6's summaries", () => {
-  it.each(summarized)("hold the figures the README gives for the %s run", (run) => {
+describe("k6's summaries", () => {
+  it.each(runs)("hold the figures the README gives for the %s run", (run) => {
     const metrics = (JSON.parse(readFileSync(summaryOf(run), "utf8")) as { metrics: Record<string, { values: Record<string, number> }> })
       .metrics
     const valueOf = (metric: string, stat: string): number => metrics[metric]?.values[stat] ?? Number.NaN

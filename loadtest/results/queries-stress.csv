@@ -1,0 +1,11 @@
+calls,total_ms,mean_ms,query
+82173,111854,1.36,"select ""slug"", ""name"", ""price_cents"", ( SELECT json_build_object($4, i.id, $5, i.file, $6, i.alt, $7, i.width, $8, i.height, $9, i.is_pixel_art) FROM product_im"
+54220,109823,2.03,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+54220,105601,1.95,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+54220,104392,1.93,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+5574,25441,4.56,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+5511,24252,4.40,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+5187,23828,4.59,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+7320,21638,2.96,"select ""product_property"".""name"", ""product_property"".""value"", count(*) filter (where $2) from ""product_property"" inner join ""product"" on ""product_property"".""pro"
+27391,12873,0.47,"select ""product"".""id"", ""product"".""slug"", ""product"".""name"", ""product"".""price_cents"", ""product"".""stock"", ""category"".""slug"", ""category"".""name"", ""brand"".""slug"", ""br"
+9631,8071,0.84,"select ""product_property"".""name"", ""product_property"".""value"", count(*) filter (where ""product"".""rating_average"" * $4 >= $1) from ""product_property"" inner join """

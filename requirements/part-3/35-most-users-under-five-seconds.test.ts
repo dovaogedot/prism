@@ -2,9 +2,10 @@
  * REQUIREMENTS_3.md: "Load test report identifies maximum concurrent users
  * before response times exceed 5 seconds."
  *
- * The README's report is checked against its own table always, and against
- * the stress run's raw samples when `loadtest/results` holds them, which a
- * load run leaves on the machine that ran it.
+ * The README's report is checked against its own table, and against what the
+ * stress run measured: k6's raw samples when `loadtest/results` holds them,
+ * which only the machine that ran the run has, and otherwise the step table
+ * of the run's report, `stress.md`, which the repository keeps.
  */
 
 import { createReadStream, existsSync, readFileSync } from "node:fs"
@@ -14,6 +15,7 @@ import { StressSteps } from "../../loadtest/lib/steps.ts"
 
 const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8")
 const samples = new URL("../../loadtest/results/stress-samples.csv", import.meta.url)
+const report = new URL("../../loadtest/results/stress.md", import.meta.url)
 
 /** A step of the stress run as k6's samples give it: its users, its p95 in milliseconds, and its share of failed requests. */
 type Step = { users: number; p95: number; errors: number }
@@ -110,6 +112,30 @@ const measuredSteps = async (): Promise<readonly Step[]> => {
   })
 }
 
+/**
+ * Each held step's p95 and error rate as the stress run's report gives them:
+ * the p95 in whole milliseconds, and the errors to a hundredth of a percent.
+ */
+const reportedSteps = (): readonly Step[] => {
+  const text = readFileSync(report, "utf8")
+  const table = text.slice(text.indexOf("Step by step:")).split("\n\n")[1] ?? ""
+
+  return table
+    .split("\n")
+    .slice(2)
+    .flatMap((line) => {
+      const [stage = "", p95 = "", errors = ""] = line
+        .split("|")
+        .slice(1, 4)
+        .map((cell) => cell.trim())
+      const held = /^Held at (\d+)$/.exec(stage)
+
+      return held === null
+        ? []
+        : [{ users: Number(held[1]), p95: Number(p95.replace(/ ms$/, "")), errors: Number(errors.replace(/%$/, "")) / 100 }]
+    })
+}
+
 describe("the README's load test report", () => {
   it("names the most users served before p95 passed 5 seconds, and its own table bears it out", () => {
     const [most, next] = reportedLimit()
@@ -121,18 +147,18 @@ describe("the README's load test report", () => {
     expect(Math.max(...rows.filter((row) => row.most < next).map((row) => row.most))).toBe(most)
   })
 
-  it.runIf(existsSync(samples))(
-    "agrees with the stress run's samples: the same most users, and the p95 of every step it lists",
+  it(
+    "agrees with what the stress run measured: the same most users, and the p95 of every step it lists",
     { timeout: 300_000 },
     async () => {
-      const measured = await measuredSteps()
+      const measured = existsSync(samples) ? await measuredSteps() : reportedSteps()
       const served = measured.filter((step) => step.p95 < 5000 && step.errors < 0.05)
 
       expect(Math.max(...served.map((step) => step.users))).toBe(reportedLimit()[0])
 
       for (const row of reportedRows()) {
         const p95s = measured.filter((step) => step.users >= row.fewest && step.users <= row.most).map((step) => step.p95)
-        // The README rounds to whole milliseconds below a second, and to a tenth of a second above.
+        // The README rounds to whole milliseconds below a second, and to a tenth of a second above; the report to whole milliseconds.
         const tolerance = row.high < 1000 ? 0.5 : 50
 
         expect(p95s.length, `${row.fewest} users`).toBeGreaterThan(0)

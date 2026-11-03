@@ -364,6 +364,8 @@ Each user follows one scenario with 1 to 3 seconds between steps: browse (home, 
 
 Measured on an Intel Core i5-12400F (6 cores, 12 threads) under WSL2, with k6 on the same machine, against the seeded catalog: 3,390 products, 45,751 reviews and 198,334 helpful votes.
 
+The repository keeps what these runs left in `loadtest/results/`: each run's `<run>.md`, its k6 summary `<run>.json`, `stats-<run>.csv` and `queries-<run>.csv`. The stress run's raw samples, `stress-samples.csv`, are too large for it and stay on the machine that ran the run; without them, the requirement checks compare the README with the step table of `stress.md`, which the report made from those samples. A new run overwrites the files of its name.
+
 | Run | Requests | Requests/s | Transactions/s | p50 | p90 | p95 | p99 | Errors | Transactions successful | Peak CPU of the API / Postgres |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `baseline` | 480 | 3.8 | 2.5 | 6 ms | 15 ms | 25 ms | 31 ms | 0% | 100% | 16% / 5% |

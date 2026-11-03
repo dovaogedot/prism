@@ -6,7 +6,7 @@ apps/api/seed/catalog.json
 apps/api/seed/media
 apps/e2e/test-results
 apps/e2e/playwright-report
-loadtest/results
+loadtest/results/stress-samples.csv
 # Planning and review notes kept beside the repository, not part of it.
 PART_*.md
 PLAN.md
