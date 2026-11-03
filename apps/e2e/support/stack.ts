@@ -85,4 +85,34 @@ export const Stack = {
     const answer = await request.post("/api/v1/cart/items", { data: { productId: product.id, quantity: 1 } })
     expect(answer.status(), await answer.text()).toBe(200)
   },
+
+  /**
+   * Places a guest order of the cart of `request`'s browser context with the
+   * first delivery option, and resolves to the address of the order's page.
+   */
+  placeOrder: async (request: APIRequestContext): Promise<string> => {
+    const cart = (await (await request.get("/api/v1/cart")).json()) as Readonly<{ subtotalCents: number }>
+    const methods = (await (await request.get("/api/v1/shipping-methods")).json()) as Readonly<{
+      items: readonly Readonly<{ code: string; priceCents: number; freeFromCents?: number }>[]
+    }>
+    const [option] = methods.items
+
+    if (option === undefined) {
+      throw new Error("Checkout offers no delivery option.")
+    }
+
+    const isFree = option.freeFromCents !== undefined && cart.subtotalCents >= option.freeFromCents
+    const answer = await request.post("/api/v1/orders", {
+      data: {
+        contact: { fullName: "Mari Maasikas", email: `order-${Date.now()}@example.com`, phone: "+372 5123 4567" },
+        address: { line1: "Narva mnt 7", city: "Tallinn", postalCode: "10117", country: "EE" },
+        shippingMethod: option.code,
+        expectedTotalCents: cart.subtotalCents + (isFree ? 0 : option.priceCents),
+      },
+    })
+    expect(answer.status(), await answer.text()).toBe(201)
+    const placed = (await answer.json()) as Readonly<{ orderId: string; key: string }>
+
+    return `/orders/${placed.orderId}?key=${placed.key}`
+  },
 } as const

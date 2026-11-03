@@ -133,7 +133,8 @@ export type OrderEvent = Readonly<{
 export type OrderLine = Readonly<{
   /** Absent once the product has left the catalog. */
   productId?: ProductId
-  slug: Slug
+  /** The product's slug as it stands, after any rename; absent once the product has left the catalog. */
+  slug?: Slug
   name: string
   image?: ProductImage
   unitPriceCents: number

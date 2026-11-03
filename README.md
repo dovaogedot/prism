@@ -154,7 +154,7 @@ A declined order releases its stock and mails the reason; the cart keeps its ite
 ### Orders
 
 - **Orders** (`/account/orders`, signed in): status chips, any number at once, a date range whose ends both count, and newest, oldest or status order. The filters live in the URL.
-- **Order page**: status, a timeline of every change, the tracking number once shipped, the items, totals, delivery option and expected dates, the addresses, and how it was paid. A guest opens it from the link in the confirmation mail; a member who follows a mail's link while signed out signs in first and comes back to it.
+- **Order page**: status, a timeline of every change, the tracking number once shipped, the items, each linked to its product while the shop still sells it, totals, delivery option and expected dates, the addresses, and how it was paid. A guest opens it from the link in the confirmation mail; a member who follows a mail's link while signed out signs in first and comes back to it.
 - **Cancel** works until the order is processing. A paid order is refunded in full, which shows in the timeline and arrives as a second mail.
 - Staff move a paid order to processing, then shipped with a tracking number, then delivered. The customer gets a mail when it ships and when it arrives. An order unpaid for 30 minutes is canceled and its stock released; when Stripe answers the cancel that the payment already went through, the payment is recorded and refunded in full.
 
@@ -253,7 +253,7 @@ Every route is under `/api/v1` and answers JSON. A refusal is `{ "error": { "cod
 | `POST /checkout/address` | Looks an address up: `verified`, `not_found` or `unavailable`. |
 | `POST /orders` | Places an order from the caller's cart. Body: `contact`, `address`, `shippingMethod`, `expectedTotalCents`, and optionally `billingAddress` and `shouldSaveAddress`. Answers the order and what the browser confirms the payment with; a guest also gets the order's key. |
 | `GET /orders` | The signed-in customer's orders. Reads `status` (repeats), `from`, `to`, `sort` (`newest`, `oldest`, `status`), `page`, `perPage`. |
-| `GET /orders/:id` | One order. A guest adds `?key=`. |
+| `GET /orders/:id` | One order. A guest adds `?key=`. Each line carries the product's current `slug` while the product is in the catalog. |
 | `POST /orders/:id/cancel` | Cancels an order not yet processing, and refunds it if paid. |
 | `GET /account/profile` | The signed-in customer's name and phone. `PUT` changes them. |
 | `GET /account/addresses` | Their saved addresses. `POST` saves one more, refusing one the address lookup cannot find. |

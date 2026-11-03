@@ -110,18 +110,24 @@ export const OrderPage = () => {
                   <h2 className="mb-2 text-base font-semibold text-ink">Items</h2>
                   <ul className="divide-y divide-line">
                     {data.lines.map((line) => (
-                      <li key={`${line.slug}:${line.name}`} className="flex items-center gap-3 py-3">
-                        <Picture
-                          image={line.image}
-                          name={line.name}
-                          className="size-14 shrink-0 rounded-lg border border-line"
-                          sizes="3.5rem"
-                        />
+                      <li key={line.productId ?? line.name} className="flex items-center gap-3 py-3">
+                        {line.slug === undefined ? (
+                          <Picture
+                            image={line.image}
+                            name={line.name}
+                            className="size-14 shrink-0 rounded-lg border border-line"
+                            sizes="3.5rem"
+                          />
+                        ) : (
+                          <Link to={`/products/${line.slug}`} className="shrink-0">
+                            <Picture image={line.image} name={line.name} className="size-14 rounded-lg border border-line" sizes="3.5rem" />
+                          </Link>
+                        )}
                         <div className="min-w-0 flex-1">
-                          {line.productId === undefined ? (
+                          {line.slug === undefined ? (
                             <p className="truncate text-sm font-medium text-ink">{line.name}</p>
                           ) : (
-                            <Link to={`/products/${line.slug}`} className="truncate text-sm font-medium text-ink hover:text-accent">
+                            <Link to={`/products/${line.slug}`} className="block truncate text-sm font-medium text-ink hover:text-accent">
                               {line.name}
                             </Link>
                           )}

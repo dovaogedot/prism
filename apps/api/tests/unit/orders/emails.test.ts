@@ -73,4 +73,13 @@ describe("order emails", () => {
   it("carries the tracking number of a shipped order", () => {
     expect(emails.shipped.text).toContain("PR123456789EE")
   })
+
+  it("links a review of each delivered product still in the catalog, and none of a product that left it", () => {
+    const gone = { name: "Old Vase", unitPriceCents: 1000, quantity: 1, lineTotalCents: 1000 }
+    const lamp = { slug: Slug.schema.parse("lamp"), name: "Lamp", unitPriceCents: 2500, quantity: 1, lineTotalCents: 2500 }
+    const delivered = OrderEmail.delivered({ ...order, lines: [lamp, gone] }, url, "https://shop.example.com")
+
+    expect(delivered.text).toContain("https://shop.example.com/products/lamp#reviews-heading")
+    expect(delivered.text).not.toContain("Review Old Vase")
+  })
 })

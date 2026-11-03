@@ -185,17 +185,13 @@ export const OrderRepository = {
       ORDER BY i.position LIMIT 1
     )`
 
-    // The product's slug as it stands, so a link still opens it after staff rename it; the copy once it is deleted.
-    const lineSlug = sql<typeof orderLines.$inferSelect.productSlug>`COALESCE(
-      (SELECT p.slug FROM product p WHERE p.id = ${orderLines}."product_id"),
-      ${orderLines}."product_slug"
-    )`
-
     const linesOf = async (orderId: OrderId): Promise<readonly OrderLine[]> => {
+      // The product's slug as it stands, so a link still opens it after staff
+      // rename it; none once the product has left the catalog.
       const rows = await db
         .select({
           productId: orderLines.productId,
-          slug: lineSlug,
+          slug: products.slug,
           name: orderLines.productName,
           unitPriceCents: orderLines.unitPriceCents,
           quantity: orderLines.quantity,
@@ -203,12 +199,13 @@ export const OrderRepository = {
           image: lineImage,
         })
         .from(orderLines)
+        .leftJoin(products, eq(products.id, orderLines.productId))
         .where(eq(orderLines.orderId, orderId))
         .orderBy(asc(orderLines.productName))
 
       return rows.map((row) => ({
         ...(row.productId === null ? {} : { productId: row.productId }),
-        slug: row.slug,
+        ...(row.slug === null ? {} : { slug: row.slug }),
         name: row.name,
         ...(row.image === null ? {} : { image: ImageRows.view(row.image) }),
         unitPriceCents: row.unitPriceCents,

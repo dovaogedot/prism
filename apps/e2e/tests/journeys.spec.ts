@@ -1,9 +1,9 @@
 /**
  * What a visitor does with a keyboard and a screen reader in mind: the skip
- * link, the header's controls, the search box, the cart preview, and where
- * focus lands when a page changes. And the answers a crawler gets: a real
- * 404 for an address outside the route list, and for a product or a
- * category the shop does not have.
+ * link, the header's controls, the search box, the cart preview, the links
+ * of an order's page, and where focus lands when a page changes. And the
+ * answers a crawler gets: a real 404 for an address outside the route list,
+ * and for a product or a category the shop does not have.
  */
 
 import { expect, test } from "@playwright/test"
@@ -102,6 +102,19 @@ test("adding to the cart opens its preview, and Escape closes it and gives focus
   await expect(preview).toBeVisible()
   await page.keyboard.press("Escape")
   await expect(cart).toBeFocused()
+})
+
+test("an order's page links each item to its product, by its picture and its name", async ({ page }) => {
+  await Stack.fillCart(page.request)
+  await Checks.open(page, await Stack.placeOrder(page.request))
+
+  const items = page.getByRole("heading", { level: 2, name: "Items" }).locator("xpath=..")
+  const links = items.getByRole("link", { name: "Diamond Sword", exact: true })
+  await expect(links).toHaveCount(2)
+
+  for (const link of await links.all()) {
+    await expect(link).toHaveAttribute("href", `/products/${Stack.PRODUCT_SLUG}`)
+  }
 })
 
 test("opening a page by a click or a key moves focus to its heading, which shows no focus ring", async ({ page }) => {

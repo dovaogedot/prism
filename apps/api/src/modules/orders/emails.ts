@@ -140,9 +140,9 @@ export const OrderEmail = {
 
   /** The parcel arrived: a thank-you, with a link to review each product still in the catalog. */
   delivered: (order: OrderRecord, orderUrl: string, webOrigin: string): OutboundEmail => {
-    const links = order.lines
-      .filter((line) => line.productId !== undefined)
-      .map((line) => ({ label: `Review ${line.name}`, url: `${webOrigin}/products/${line.slug}#reviews-heading` }))
+    const links = order.lines.flatMap((line) =>
+      line.slug === undefined ? [] : [{ label: `Review ${line.name}`, url: `${webOrigin}/products/${line.slug}#reviews-heading` }],
+    )
 
     return OrderEmail.compose({
       subject: `Order ${OrderEmail.numberOf(order.number)} delivered`,

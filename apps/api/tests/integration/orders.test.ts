@@ -72,6 +72,26 @@ describe("POST /orders", () => {
     expect(harness.gateway.calls.createIntent).toEqual([{ paymentId: placed.charge.id, amountCents: 17_000 }])
   })
 
+  it("gives each line the product's slug as it stands, and none once the product has left the catalog", async () => {
+    const placed = await Shop.placed(
+      harness,
+      await Shop.fill(harness, [
+        ["desk-lamp", 1],
+        ["oak-chair", 1],
+      ]),
+    )
+    await harness.database.sql`UPDATE product SET slug = 'brass-desk-lamp' WHERE slug = 'desk-lamp'`
+    await harness.database.sql`DELETE FROM product WHERE slug = 'oak-chair'`
+
+    const order = await orderOf(placed.orderId, placed.key)
+
+    expect(order["lines"]).toEqual([
+      expect.objectContaining({ name: "Desk Lamp", slug: "brass-desk-lamp", productId: expect.any(String) }),
+      expect.not.objectContaining({ slug: expect.anything() }),
+    ])
+    expect(order["lines"]).toMatchObject([{ name: "Desk Lamp" }, { name: "Oak Chair" }])
+  })
+
   it("charges what the server prices, with shipping under the free threshold", async () => {
     const guest = await Shop.fill(harness, [["desk-lamp", 1]])
     const placed = await Shop.placed(harness, guest)

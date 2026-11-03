@@ -157,7 +157,7 @@ export const OrderPage = () => {
               <h2 className="mb-2 font-semibold text-ink">Items</h2>
               <ul className="divide-y divide-line text-sm">
                 {data.lines.map((line) => (
-                  <li className="flex items-baseline justify-between gap-4 py-2" key={`${line.slug}:${line.name}`}>
+                  <li className="flex items-baseline justify-between gap-4 py-2" key={line.productId ?? line.name}>
                     <span className="min-w-0">
                       <span className="text-ink">{line.name}</span>
                       <span className="text-ink-soft">
