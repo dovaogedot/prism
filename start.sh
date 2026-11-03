@@ -56,8 +56,9 @@ run_e2e() {
     rm -rf apps/e2e/test-results
     docker cp prism-e2e-suite:/app/apps/e2e/test-results apps/e2e/test-results >/dev/null 2>&1 || true
     docker rm prism-e2e-suite >/dev/null 2>&1 || true
-    # Playwright keeps a trace of each failed test only, beside a record of the run that every run leaves.
-    if [ -n "$(find apps/e2e/test-results -name trace.zip -print -quit 2>/dev/null)" ]; then
+    # Playwright keeps a trace of each failed test only, in a folder of its own,
+    # beside a record of the run that every run leaves.
+    if ls apps/e2e/test-results/*/trace.zip >/dev/null 2>&1; then
       echo "Traces of the failed tests: apps/e2e/test-results (npx playwright show-trace <trace.zip>)."
     fi
   fi
@@ -264,11 +265,13 @@ BANNER
 # the port WEB_PORT publishes.
 public_url="$(grep -E '^PUBLIC_WEB_URL=' .env | cut -d= -f2- || true)"
 public_url="${public_url:-$PUBLIC_WEB_URL_DEFAULT}"
+# An HTTPS address on this machine; its third group is the port, when it names one.
+local_https_url='^https://(localhost|127\.0\.0\.1)(:([0-9]+))?(/|$)'
 if [[ $public_url == http://* ]]; then
   echo "  Note: PUBLIC_WEB_URL in .env starts with http://. Change it to https://localhost:${web_port}"
   echo "  and run ./start.sh again, or the links in emails and the OAuth sign-ins will not work."
   echo
-elif [[ $public_url =~ ^https://(localhost|127\.0\.0\.1)(:([0-9]+))?(/|$) ]] && [ "${BASH_REMATCH[3]:-443}" != "$web_port" ]; then
+elif [[ $public_url =~ $local_https_url ]] && [ "${BASH_REMATCH[3]:-443}" != "$web_port" ]; then
   echo "  Note: PUBLIC_WEB_URL is ${public_url}, but the storefront listens on port ${web_port} (WEB_PORT)."
   echo "  Set PUBLIC_WEB_URL=https://localhost:${web_port} in .env and run ./start.sh again, or the links"
   echo "  in emails and the OAuth sign-ins will not work."
