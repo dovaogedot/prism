@@ -68,6 +68,34 @@ test("the quantity stepper beside Add to cart is as tall as the button, and leve
   expect(Checks.middleGap(stepper, button)).toBeLessThanOrEqual(Checks.TOLERANCE)
 })
 
+test("a quantity typed past the stock becomes the stock, and a note under the row says how many are left without moving Add to cart", async ({
+  page,
+  request,
+}) => {
+  const listed = (await (await request.get("/api/v1/products?perPage=60")).json()) as Readonly<{
+    items: readonly Readonly<{ slug: string; name: string; stock: number }>[]
+  }>
+  const product = listed.items.find((item) => item.stock > 0 && item.stock < 99)
+  if (product === undefined) throw new Error("No product of the first page has from 1 to 98 in stock.")
+  await Checks.open(page, `/products/${product.slug}`)
+  const field = page.getByRole("spinbutton", { name: `Quantity of ${product.name}` })
+  const add = page.getByRole("button", { name: "Add to cart" })
+  const before = await Checks.boxOf(add)
+
+  await field.fill("500")
+  await field.press("Enter")
+
+  const note = page.getByRole("status").filter({ hasText: `Only ${product.stock} left.` })
+  await expect(field).toHaveValue(String(product.stock))
+  await expect(note).toBeVisible()
+  expect(await Checks.boxOf(add)).toEqual(before)
+  expect((await Checks.boxOf(note)).y).toBeGreaterThanOrEqual(before.y + before.height)
+  expect(await Checks.axe(page)).toEqual([])
+
+  await field.fill("2")
+  await expect(note).toBeHidden()
+})
+
 test("the shop keeps the filter row open, so the first filter moves no result, and ends the row with Clear all filters", async ({
   page,
 }) => {

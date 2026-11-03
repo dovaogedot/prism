@@ -1,4 +1,4 @@
-import { Quantity, type ProductDetail } from "@prism/shared"
+import type { ProductDetail } from "@prism/shared"
 import { useState } from "react"
 import { Link } from "react-router"
 import { match } from "ts-pattern"
@@ -27,13 +27,7 @@ export const AddToCart = ({ product }: AddToCartProps) => {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        <QuantityStepper
-          value={quantity}
-          max={Math.min(product.stock, Quantity.MAX)}
-          onChange={setQuantity}
-          label={product.name}
-          disabled={add.isPending}
-        />
+        <QuantityStepper value={quantity} stock={product.stock} onChange={setQuantity} label={product.name} disabled={add.isPending} />
         <Button
           type="button"
           busy={add.isPending}

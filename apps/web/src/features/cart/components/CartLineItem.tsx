@@ -1,4 +1,4 @@
-import { Cart, Price, Quantity, type CartLine } from "@prism/shared"
+import { Cart, Price, type CartLine } from "@prism/shared"
 import { Link } from "react-router"
 import { match, P } from "ts-pattern"
 import { Picture } from "../../catalog/components/index.ts"
@@ -43,7 +43,7 @@ export const CartLineItem = ({ line, compact = false }: CartLineItemProps) => {
         <div className="flex flex-wrap items-center gap-3">
           <QuantityStepper
             value={line.quantity}
-            max={Math.max(line.quantity, Math.min(line.stock, Quantity.MAX))}
+            stock={line.stock}
             onChange={(quantity) => setQuantity.mutate({ productId: line.productId, quantity })}
             label={line.name}
             disabled={remove.isPending}
