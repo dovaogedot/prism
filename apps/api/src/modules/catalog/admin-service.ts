@@ -184,7 +184,7 @@ export const CatalogAdminService = {
         // A file with problems is only checked, so its references are named in the same answer.
         const isCheckOnly = dryRun || parsed.issues.length > 0
 
-        return ResultAsync.fromSafePromise(repository.importProducts(parsed.rows, isCheckOnly, actor, clock.now())).andThen((outcome) => {
+        return ResultAsync.fromSafePromise(repository.importProducts(parsed, isCheckOnly, actor, clock.now())).andThen((outcome) => {
           const issues = [...parsed.issues, ...(outcome._tag === "Invalid" ? outcome.issues : [])].toSorted(
             (a, b) => (a.row ?? 0) - (b.row ?? 0) || (a.column ?? "").localeCompare(b.column ?? ""),
           )

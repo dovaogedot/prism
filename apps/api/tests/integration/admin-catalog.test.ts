@@ -371,6 +371,28 @@ describe("bulk import", () => {
     expect(await harness.database.sql`SELECT count(*)::int AS n FROM product`).toEqual([{ n: 1 }])
   })
 
+  it("names unknown categories and brands in the same report as the file's other problems", async () => {
+    const broken = [
+      HEADER,
+      csvRow("table-lamp", "Table Lamp", "12.901").replace(",lamps,", ",chairs,"),
+      csvRow("wall-lamp", "Wall Lamp").replace(",acme,", ",nobody,"),
+    ].join("\n")
+
+    const dry = jsonOf(await importFile(broken, "lamps.csv", true))
+    const real = await importFile(broken, "lamps.csv", false)
+
+    expect(dry["issues"]).toEqual([
+      { row: 2, column: "category", message: "No category has this slug." },
+      { row: 2, column: "price", message: "Write the price in euros with at most two decimals, such as 12.90." },
+      { row: 3, column: "brand", message: "No brand has this slug." },
+    ])
+    expect(jsonOf(real)["error"]).toMatchObject({
+      code: "ImportInvalid",
+      issues: [{ path: "2:category" }, { path: "2:price" }, { path: "3:brand" }],
+    })
+    expect(await harness.database.sql`SELECT count(*)::int AS n FROM product`).toEqual([{ n: 1 }])
+  })
+
   it("refuses 5,001 rows and a 3 MB file", async () => {
     const many = [HEADER, ...Array.from({ length: 5001 }, (_, index) => csvRow(`lamp-${index}`, `Lamp ${index}`))].join("\n")
 

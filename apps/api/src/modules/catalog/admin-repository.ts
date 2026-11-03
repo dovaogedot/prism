@@ -16,7 +16,6 @@ import {
   type CategoryId,
   type CategoryInput,
   type ImageId,
-  type ImportRow,
   type ProductId,
   type ProductImage,
   type ProductInput,
@@ -31,7 +30,7 @@ import { brands, categories, productImages, productProperties, products } from "
 import type { StoredImage } from "../../platform/image-store.ts"
 import { AuditLog, type StaffActor } from "../staff/audit.ts"
 import { ImageRows, type ImageRow } from "./images.ts"
-import type { ImportIssue } from "./import.ts"
+import type { ImportIssue, ImportSlug, ParsedImport } from "./import.ts"
 import { ProductSearch } from "./search.ts"
 
 /** What a create or an update of a product, category or brand found. */
@@ -80,17 +79,13 @@ export type CatalogAdminRepository = Readonly<{
   saveBrand: (id: BrandId | undefined, input: BrandInput, actor: StaffActor) => Promise<SaveOutcome<BrandId>>
   deleteBrand: (id: BrandId, actor: StaffActor) => Promise<DeleteOutcome>
   /**
-   * Checks the rows against the database: every category and brand must
-   * exist. With `dryRun` it only counts; otherwise it writes every row, each
-   * slug creating or updating its product. The check and the writes are one
+   * Checks the file against the database: every category and brand any of
+   * its rows names must exist, the rows with other problems included. With
+   * `dryRun` it only counts; otherwise it writes every row, each slug
+   * creating or updating its product. The check and the writes are one
    * transaction, so what was checked is what is written.
    */
-  importProducts: (
-    rows: readonly Readonly<{ row: number; product: ImportRow }>[],
-    dryRun: boolean,
-    actor: StaffActor,
-    now: Date,
-  ) => Promise<ImportOutcome>
+  importProducts: (file: Pick<ParsedImport, "rows" | "slugs">, dryRun: boolean, actor: StaffActor, now: Date) => Promise<ImportOutcome>
   /** The product's pictures in order; `undefined` when there is no such product. */
   imagesOf: (productId: ProductId) => Promise<readonly ProductImage[] | undefined>
   /** Files a stored picture as the product's last, unless the product already has the most it may. */
@@ -522,56 +517,43 @@ export const CatalogAdminRepository = {
           return { _tag: "Deleted" }
         }),
 
-      importProducts: (rows, dryRun, actor, now) =>
+      importProducts: ({ rows, slugs }, dryRun, actor, now) =>
         db.transaction(async (tx): Promise<ImportOutcome> => {
-          const slugsOf = (pick: (product: ImportRow) => Slug) => [...new Set(rows.map((entry) => pick(entry.product)))]
+          const named = (column: ImportSlug["column"]): readonly ImportSlug[] => slugs.filter((entry) => entry.column === column)
+          const distinct = (entries: readonly ImportSlug[]): Slug[] => [...new Set(entries.map((entry) => entry.slug))]
+          const categorySlugs = named("category")
+          const brandSlugs = named("brand")
+          const productSlugs = [...new Set(rows.map((entry) => entry.product.slug))]
           // Shared locks keep every category and brand the file names from being deleted or changed until the rows are written.
           const [categoryRows, brandRows, existing] = await Promise.all([
-            rows.length === 0
+            categorySlugs.length === 0
               ? []
               : tx
                   .select({ id: categories.id, slug: categories.slug })
                   .from(categories)
-                  .where(
-                    inArray(
-                      categories.slug,
-                      slugsOf((product) => product.category),
-                    ),
-                  )
+                  .where(inArray(categories.slug, distinct(categorySlugs)))
                   .for("share"),
-            rows.length === 0
+            brandSlugs.length === 0
               ? []
               : tx
                   .select({ id: brands.id, slug: brands.slug })
                   .from(brands)
-                  .where(
-                    inArray(
-                      brands.slug,
-                      slugsOf((product) => product.brand),
-                    ),
-                  )
+                  .where(inArray(brands.slug, distinct(brandSlugs)))
                   .for("share"),
-            rows.length === 0
-              ? []
-              : tx
-                  .select({ slug: products.slug })
-                  .from(products)
-                  .where(
-                    inArray(
-                      products.slug,
-                      slugsOf((product) => product.slug),
-                    ),
-                  ),
+            productSlugs.length === 0 ? [] : tx.select({ slug: products.slug }).from(products).where(inArray(products.slug, productSlugs)),
           ])
           const categoryIds = new Map(categoryRows.map((row) => [row.slug, row.id]))
           const brandIds = new Map(brandRows.map((row) => [row.slug, row.id]))
           const known = new Set(existing.map((row) => row.slug))
 
-          const issues: ImportIssue[] = []
-          for (const { row, product: candidate } of rows) {
-            if (!categoryIds.has(candidate.category)) issues.push({ row, column: "category", message: "No category has this slug." })
-            if (!brandIds.has(candidate.brand)) issues.push({ row, column: "brand", message: "No brand has this slug." })
-          }
+          const issues: ImportIssue[] = [
+            ...categorySlugs
+              .filter((entry) => !categoryIds.has(entry.slug))
+              .map((entry) => ({ row: entry.row, column: "category", message: "No category has this slug." })),
+            ...brandSlugs
+              .filter((entry) => !brandIds.has(entry.slug))
+              .map((entry) => ({ row: entry.row, column: "brand", message: "No brand has this slug." })),
+          ]
           if (issues.length > 0) return { _tag: "Invalid", issues }
 
           const updated = rows.filter((entry) => known.has(entry.product.slug)).length

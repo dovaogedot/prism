@@ -102,6 +102,32 @@ describe("ImportFile.parseCsv", () => {
     ])
   })
 
+  it("reads the rows past a header problem, and names a missing column once, in the header", () => {
+    const header = HEADER.replace(",stock", "")
+    const parsed = ImportFile.parseCsv([header, row({ price: "12.901" }).replace(",10,", ",")].join("\n"))
+
+    expect(parsed.issues).toEqual([
+      { row: 1, column: "stock", message: "This column is missing." },
+      { row: 2, column: "price", message: "Write the price in euros with at most two decimals, such as 12.90." },
+    ])
+  })
+
+  it("keeps the slugs of every row, a row with other problems included, for the checks against the database", () => {
+    const parsed = ImportFile.parseCsv(
+      [HEADER, row({ price: "12.901", category: "chairs" }), row({ slug: "b", brand: "Bad Brand" })].join("\n"),
+    )
+
+    // A malformed slug is the shared rules' to name, not the database's.
+    expect(parsed.rows).toEqual([])
+    expect(parsed.slugs).toEqual([
+      { row: 2, column: "slug", slug: "desk-lamp" },
+      { row: 2, column: "category", slug: "chairs" },
+      { row: 2, column: "brand", slug: "acme" },
+      { row: 3, column: "slug", slug: "b" },
+      { row: 3, column: "category", slug: "lamps" },
+    ])
+  })
+
   it("refuses a column named twice", () => {
     expect(ImportFile.parseCsv(`${HEADER},name\n`).issues).toEqual([{ row: 1, column: "name", message: "This column appears twice." }])
   })
@@ -120,6 +146,15 @@ describe("ImportFile.parseCsv", () => {
 
     expect(parsed.rows).toHaveLength(1)
     expect(parsed.issues).toEqual([{ row: 3, column: "slug", message: "This slug is already used in row 2." }])
+  })
+
+  it("refuses a slug used before by a row with other problems", () => {
+    const parsed = ImportFile.parseCsv([HEADER, row({ stock: "lots" }), row({ name: "Another lamp" })].join("\n"))
+
+    expect(parsed.issues.map((issue) => [issue.row, issue.column])).toEqual([
+      [2, "stock"],
+      [3, "slug"],
+    ])
   })
 
   it("checks every cell against the product rules, naming the column", () => {
@@ -168,6 +203,23 @@ describe("ImportFile.parseJson", () => {
       { row: 1, column: "price", message: "This is not a field an import knows." },
     ])
     expect(ImportFile.parseJson(JSON.stringify(product)).issues).toEqual([{ message: "The file must hold one JSON array of products." }])
+  })
+
+  it("names every problem of a product in one pass: a field it does not know, its properties and its cells", () => {
+    const { slug: _slug, ...withoutSlug } = product
+    const parsed = ImportFile.parseJson(JSON.stringify([{ ...withoutSlug, price: 25, stock: -1, properties: { Color: 5 } }]))
+
+    expect(parsed.rows).toEqual([])
+    expect(parsed.issues).toEqual([
+      { row: 1, column: "price", message: "This is not a field an import knows." },
+      { row: 1, column: "properties.Color", message: expect.stringContaining("expected string") },
+      { row: 1, column: "slug", message: "Enter a slug." },
+      { row: 1, column: "stock", message: "The stock cannot be negative." },
+    ])
+    expect(parsed.slugs).toEqual([
+      { row: 1, column: "category", slug: "lamps" },
+      { row: 1, column: "brand", slug: "acme" },
+    ])
   })
 })
 
