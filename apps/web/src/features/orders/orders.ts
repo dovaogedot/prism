@@ -6,6 +6,7 @@
 
 import { OrderStatus, type OrderDetail, type OrderList, type PaymentSummary } from "@prism/shared"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { match } from "ts-pattern"
 import { Api } from "../../shared/api/client.ts"
 
 /** The query keys of orders: one order as its owner or a guest's key opens it, and the lists. */
@@ -42,6 +43,9 @@ export const OrderParams = {
 } as const
 
 export const OrderPolling = {
+  /** The first wait between two reads of an order whose payment is pending, in milliseconds; each wait after it doubles. */
+  FIRST_INTERVAL_MS: 250,
+  /** The longest wait between two reads, in milliseconds. */
   INTERVAL_MS: 2000,
   /** How long a just-placed order is watched for its payment before the page leaves it to the email. */
   LIMIT_MS: 2 * 60 * 1000,
@@ -49,6 +53,40 @@ export const OrderPolling = {
   /** Whether an order is still waiting for Stripe's word, and the page is still willing to wait. */
   watching: (status: OrderStatus | undefined, startedAt: number, now: number): boolean =>
     status === "pending_payment" && now - startedAt < OrderPolling.LIMIT_MS,
+
+  /**
+   * How long to wait before reading the order again once `reads` reads have
+   * answered: short at first, when a payment most often settles, then
+   * doubling up to `INTERVAL_MS`.
+   */
+  findInterval: (reads: number): number => Math.min(OrderPolling.INTERVAL_MS, OrderPolling.FIRST_INTERVAL_MS * 2 ** Math.max(0, reads - 1)),
+} as const
+
+/**
+ * Where an order stands, read from one answer of `GET /orders/:id`. The
+ * answer reads the order before its timeline, and every move of the order
+ * adds to its timeline as it happens, so a move made in between shows in
+ * the timeline first.
+ */
+export const OrderStanding = {
+  /** The newest status the shop has recorded for the order. */
+  readRecorded: (order: Pick<OrderDetail, "status" | "events">): OrderStatus => order.events.at(-1)?.status ?? order.status,
+
+  /**
+   * The status the order's page shows. A payment settles a moment before
+   * the order hears of it through the queue, so an order still recorded as
+   * waiting for its payment shows the outcome its payment already has.
+   */
+  readShown: (order: Pick<OrderDetail, "status" | "events" | "payment">): OrderStatus => {
+    const recorded = OrderStanding.readRecorded(order)
+    if (recorded !== "pending_payment") return recorded
+
+    return match(order.payment?.status)
+      .returnType<OrderStatus>()
+      .with("succeeded", () => "payment_successful")
+      .with("failed", () => "payment_failed")
+      .otherwise(() => recorded)
+  },
 } as const
 
 /** One page of the signed-in customer's orders, for the query string `query`. */
@@ -60,7 +98,11 @@ export const useOrders = (query: string) =>
     retry: false,
   })
 
-/** One order, opened by its owner or with a guest's key, watched while its payment is pending; fetched only when `enabled`. */
+/**
+ * One order, opened by its owner or with a guest's key, read again and again
+ * while its payment is pending, more often at first; fetched only when
+ * `enabled`.
+ */
 export const useOrder = (orderId: string, key: string | undefined, startedAt: number, enabled: boolean) =>
   useQuery({
     queryKey: OrderKeys.one(orderId, key),
@@ -68,5 +110,9 @@ export const useOrder = (orderId: string, key: string | undefined, startedAt: nu
     queryFn: ({ signal }) =>
       Api.get<OrderDetail>(`/orders/${orderId}${key === undefined ? "" : `?key=${encodeURIComponent(key)}`}`, signal),
     retry: false,
-    refetchInterval: (query) => (OrderPolling.watching(query.state.data?.status, startedAt, Date.now()) ? OrderPolling.INTERVAL_MS : false),
+    refetchInterval: (query) => {
+      const status = query.state.data === undefined ? undefined : OrderStanding.readRecorded(query.state.data)
+
+      return OrderPolling.watching(status, startedAt, Date.now()) ? OrderPolling.findInterval(query.state.dataUpdateCount) : false
+    },
   })

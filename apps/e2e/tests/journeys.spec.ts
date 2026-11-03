@@ -2,8 +2,9 @@
  * What a visitor does with a keyboard and a screen reader in mind: the skip
  * link, the header's controls, the search box, the cart preview, the links
  * of an order's page, and where focus and the view land when a page changes.
- * And the answers a crawler gets: a real 404 for an address outside the
- * route list, and for a product or a category the shop does not have.
+ * What a just-placed order's page says while its payment settles. And the
+ * answers a crawler gets: a real 404 for an address outside the route list,
+ * and for a product or a category the shop does not have.
  */
 
 import { expect, test } from "@playwright/test"
@@ -106,7 +107,8 @@ test("adding to the cart opens its preview, and Escape closes it and gives focus
 
 test("an order's page links each item's name to its product", async ({ page }) => {
   await Stack.fillCart(page.request)
-  await Checks.open(page, await Stack.placeOrder(page.request))
+  const placed = await Stack.placeOrder(page.request)
+  await Checks.open(page, `/orders/${placed.orderId}?key=${placed.key}`)
 
   const items = page.getByRole("heading", { level: 2, name: "Items" }).locator("xpath=..")
 
@@ -178,6 +180,40 @@ test("another page of results or of reviews opens at its heading, which takes fo
   await expect(reviews).toBeFocused()
   expect((await Checks.boxOf(reviews)).y).toBeGreaterThanOrEqual(0)
   expect((await Checks.boxOf(reviews)).y).toBeLessThan(200)
+})
+
+test("an order read before its payment reached it says it is confirmed, from its timeline and payment, and empties the header's cart", async ({
+  context,
+  page,
+}) => {
+  await Stack.fillCart(context.request)
+  const cartBefore: unknown = await (await context.request.get("/api/v1/cart")).json()
+  const placed = await Stack.placeOrder(context.request)
+
+  // Every read of the order answers as one that read the order a moment
+  // before its payment moved it, and its timeline and payment after.
+  await page.route(
+    (url) => url.pathname === `/api/v1/orders/${placed.orderId}`,
+    async (route) => {
+      const response = await route.fetch()
+      await route.fulfill({ response, json: { ...((await response.json()) as object), status: "pending_payment" } })
+    },
+  )
+  // The header's first read of the cart answers with the cart as the page held it before the order.
+  let isCartStale = true
+  await page.route("**/api/v1/cart", async (route) => {
+    if (!isCartStale) return route.fallback()
+
+    isCartStale = false
+    return route.fulfill({ json: cartBefore })
+  })
+
+  await Checks.open(page, `/orders/${placed.orderId}?placed=1&key=${placed.key}`)
+
+  await expect(page.getByRole("alert").filter({ hasText: "Thank you, your order is confirmed" })).toBeVisible()
+  await expect(page.locator("main header")).toContainText("Payment successful")
+  await expect(page.locator("main header")).not.toContainText("Pending payment")
+  await expect(page.getByRole("button", { name: "Cart, empty" })).toBeVisible()
 })
 
 test("an address outside the route list answers 404 with the shop's page, and a page inside it 200", async ({ request }) => {

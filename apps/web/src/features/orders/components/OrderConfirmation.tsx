@@ -1,17 +1,17 @@
-import { PaymentFailure, type OrderDetail } from "@prism/shared"
+import { PaymentFailure, type OrderDetail, type OrderStatus } from "@prism/shared"
 import { Link } from "react-router"
 import { match } from "ts-pattern"
 import { DeliveryDates } from "../../../shared/format/delivery-dates.ts"
 import { Alert, Spinner } from "../../../shared/ui/index.ts"
 
-/** The order just placed, and whether the page is still watching for its payment. */
-export type OrderConfirmationProps = Readonly<{ order: OrderDetail; watching: boolean }>
+/** The order just placed, the status its page shows, and whether the page is still watching for its payment. */
+export type OrderConfirmationProps = Readonly<{ order: OrderDetail; status: OrderStatus; isWatching: boolean }>
 
 /** What the customer sees first right after paying, as the payment settles. */
-export const OrderConfirmation = ({ order, watching }: OrderConfirmationProps) =>
-  match(order.status)
+export const OrderConfirmation = ({ order, status, isWatching }: OrderConfirmationProps) =>
+  match(status)
     .with("pending_payment", () =>
-      watching ? (
+      isWatching ? (
         <Alert tone="accent" title="Thank you for your order">
           <span className="inline-flex items-center gap-2">
             <Spinner /> Waiting for the payment to be confirmed…

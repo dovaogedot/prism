@@ -1,6 +1,7 @@
 /**
  * The stack the suite runs against: the accounts it knows, and the API calls
- * that set up what a page needs, such as a signed-in customer or a cart.
+ * that set up what a page needs, such as a signed-in customer, a cart or an
+ * order.
  */
 
 import { createHmac } from "node:crypto"
@@ -87,32 +88,31 @@ export const Stack = {
   },
 
   /**
-   * Places a guest order of the cart of `request`'s browser context with the
-   * first delivery option, and resolves to the address of the order's page.
+   * Places a guest order of what the cart of `request`'s browser context
+   * holds, with the first delivery option. Resolves to the order's id and the
+   * key a guest opens it with.
    */
-  placeOrder: async (request: APIRequestContext): Promise<string> => {
+  placeOrder: async (request: APIRequestContext): Promise<Readonly<{ orderId: string; key: string }>> => {
     const cart = (await (await request.get("/api/v1/cart")).json()) as Readonly<{ subtotalCents: number }>
-    const methods = (await (await request.get("/api/v1/shipping-methods")).json()) as Readonly<{
+    const options = (await (await request.get("/api/v1/shipping-methods")).json()) as Readonly<{
       items: readonly Readonly<{ code: string; priceCents: number; freeFromCents?: number }>[]
     }>
-    const [option] = methods.items
-
-    if (option === undefined) {
-      throw new Error("Checkout offers no delivery option.")
-    }
+    const option = options.items[0]
+    if (option === undefined) throw new Error("Checkout offers no delivery option.")
 
     const isFree = option.freeFromCents !== undefined && cart.subtotalCents >= option.freeFromCents
     const answer = await request.post("/api/v1/orders", {
       data: {
-        contact: { fullName: "Mari Maasikas", email: `order-${Date.now()}@example.com`, phone: "+372 5123 4567" },
+        contact: { fullName: "Mari Maasikas", email: `mari-${Date.now()}@example.com`, phone: "+372 5123 4567" },
         address: { line1: "Narva mnt 7", city: "Tallinn", postalCode: "10117", country: "EE" },
         shippingMethod: option.code,
         expectedTotalCents: cart.subtotalCents + (isFree ? 0 : option.priceCents),
       },
     })
     expect(answer.status(), await answer.text()).toBe(201)
-    const placed = (await answer.json()) as Readonly<{ orderId: string; key: string }>
+    const placed = (await answer.json()) as Readonly<{ orderId: string; key?: string }>
+    if (placed.key === undefined) throw new Error("A guest's order came without its key.")
 
-    return `/orders/${placed.orderId}?key=${placed.key}`
+    return { orderId: placed.orderId, key: placed.key }
   },
 } as const
