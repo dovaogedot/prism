@@ -3,14 +3,7 @@
  * takes in cents, slugs made from a name, and a picture to upload.
  */
 
-import {
-  FieldChecks,
-  ImageAlt,
-  ProductFields,
-  ProductInput,
-  ShippingMethodInput,
-  type ShippingMethodView,
-} from "@prism/shared"
+import { FieldChecks, ImageAlt, ProductFields, ProductInput, ShippingMethodInput, type ShippingMethodView } from "@prism/shared"
 import { z } from "zod"
 
 export const Cents = {
