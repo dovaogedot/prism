@@ -73,7 +73,7 @@ export const TwoFactorSetupFlow = ({ hasPassword, onDone }: TwoFactorSetupFlowPr
           </>
         ))
         .otherwise((value) => {
-          const key = SetupKey.of(value.uri)
+          const groups = SetupKey.splitIntoGroups(value.uri)
 
           return (
             <div className="space-y-4">
@@ -91,7 +91,16 @@ export const TwoFactorSetupFlow = ({ hasPassword, onDone }: TwoFactorSetupFlowPr
 
                 <div className="min-w-0 flex-1 space-y-2">
                   <p className="text-xs font-medium uppercase tracking-wider text-ink-faint">Or enter this setup key in the app</p>
-                  <code className="block break-all rounded-lg bg-sunken px-3 py-2 font-mono text-sm text-ink">{key ?? value.uri}</code>
+                  <code className="block break-all rounded-lg bg-sunken px-3 py-2 font-mono text-sm text-ink">
+                    {groups === undefined
+                      ? value.uri
+                      : groups.map((group, index) => (
+                          // A margin, not a space, parts the groups, so a copied key pastes into the app as it is.
+                          <span className="mr-[1ch] last:mr-0" key={index}>
+                            {group}
+                          </span>
+                        ))}
+                  </code>
                   <p className="text-sm">
                     <a className="text-accent underline underline-offset-2" href={value.uri}>
                       Open it in an authenticator app on this device

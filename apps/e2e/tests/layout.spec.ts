@@ -47,7 +47,7 @@ test("the profile, addresses and orders pages share one width and the same tabs,
   await expect(page).toHaveURL(/\/account\/orders\?status=delivered$/)
 })
 
-test("the two-factor setup puts its button in the code field's row, after the field", async ({ context, page }) => {
+test("the two-factor setup puts its button in the code field's row, and its setup key copies without spaces", async ({ context, page }) => {
   await Stack.registerCustomer(context.request, "two-factor-row")
   await Checks.open(page, "/account")
   await page.getByRole("button", { name: "Set up two-factor authentication" }).click()
@@ -57,6 +57,20 @@ test("the two-factor setup puts its button in the code field's row, after the fi
 
   expect(button.x).toBeGreaterThanOrEqual(field.x + field.width)
   expect(Checks.middleGap(field, button)).toBeLessThanOrEqual(Checks.TOLERANCE)
+
+  // Selecting the whole key, as a person copying it does, takes the base32 secret with nothing between its groups.
+  const copied = await page
+    .getByText("Or enter this setup key in the app")
+    .locator("xpath=following-sibling::code[1]")
+    .evaluate((code) => {
+      const range = document.createRange()
+      range.selectNodeContents(code)
+      const selection = window.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+      return selection?.toString() ?? ""
+    })
+  expect(copied).toMatch(/^[A-Z2-7]{32,}$/)
 })
 
 test("the quantity stepper beside Add to cart is as tall as the button, and level with it", async ({ page }) => {
